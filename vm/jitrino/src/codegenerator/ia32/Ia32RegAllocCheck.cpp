@@ -98,7 +98,7 @@ const size_t MaxRegs = IRMaxRegNamesSameKind*IRMaxRegKinds;
 
 static RegName regName (int x)
 {
-    uint32 k = x / IRMaxRegNamesSameKind;
+    U_32 k = x / IRMaxRegNamesSameKind;
     return getRegName((OpndKind)k, Constraint::getDefaultSize(k), x % IRMaxRegNamesSameKind);
 }
 
@@ -122,7 +122,7 @@ void RegAllocCheck::checkLiveness ()
 {
     lastbb = 0;
 
-    BitSet lives(mm, (uint32)opandcount);
+    BitSet lives(mm, (U_32)opandcount);
     irm.getLiveAtExit(bblock, lives);
 
     Opnd* regdefs[MaxRegs],
@@ -158,7 +158,7 @@ void RegAllocCheck::checkLiveness ()
 
     for (Inst* inst = (Inst*)bblock->getLastInst(); inst != 0; inst = inst->getPrevInst())
     {
-        const uint32 props = inst->getProperties();
+        const U_32 props = inst->getProperties();
 
     //  In general, operands can be stored in arbitrary order
         Inst::Opnds opnds(inst, Inst::OpndRole_All);
@@ -166,7 +166,7 @@ void RegAllocCheck::checkLiveness ()
             opnd = opnds.getOpnd(it);
             if ((ridx = regIdx(opnd)) < MaxRegs)
             {
-                const uint32 roles = inst->getOpndRoles(it);
+                const U_32 roles = inst->getOpndRoles(it);
 
                 if ((roles & Inst::OpndRole_Def) != 0)
                 {
@@ -240,7 +240,7 @@ void RegAllocCheck::checkLocations ()
 {
     for (size_t i = 0; i != opandcount; ++i)
     {
-        Opnd* opnd = irm.getOpnd((uint32)i);
+        Opnd* opnd = irm.getOpnd((U_32)i);
         if (!opnd->hasAssignedPhysicalLocation())
         {
             header() << "Not assigned opand " << *opnd << endl;
@@ -257,7 +257,7 @@ void RegAllocCheck::checkConstraints ()
     {
         Opnd* opnd;
         Inst::Opnds opnds(inst, Inst::OpndRole_AllDefs);
-        uint32 mask = 0;
+        U_32 mask = 0;
         for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it))
         {
             opnd = opnds.getOpnd(it);

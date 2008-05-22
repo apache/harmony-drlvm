@@ -677,7 +677,7 @@ private:
     uint16 _n_exceptions;           // num exceptions method can throw
     uint16 _n_handlers;             // num exception handlers in byte codes
     String** _exceptions;          // array of exceptions method can throw
-    uint32 _byte_code_length;       // num bytes of byte code
+    U_32 _byte_code_length;       // num bytes of byte code
     U_8*   _byte_codes;           // method's byte codes
     Handler *_handlers;             // array of exception handlers in code
     Method *_intf_method_for_fake_method;
@@ -713,7 +713,7 @@ private:
     // method when it is compiled. This number does not reflect
     // multiple breakpoints that are set in the same location by
     // different environments, it counts only unique locations
-    uint32 pending_breakpoints;
+    U_32 pending_breakpoints;
 
     /** Information about methods inlined to this. */
     InlineInfo* _inline_info;
@@ -736,8 +736,8 @@ public:
      * @param[in] addrLocationMap - native address to bytecode location
      * correspondence table
      */
-    void add_inline_info_entry(Method* method, uint32 codeSize, void* codeAddr,
-            uint32 mapLength, AddrLocation* addrLocationMap);
+    void add_inline_info_entry(Method* method, U_32 codeSize, void* codeAddr,
+            U_32 mapLength, AddrLocation* addrLocationMap);
 
     /**
      * Sends JVMTI_EVENT_COMPILED_METHOD_LOAD event for every inline method 
@@ -786,7 +786,7 @@ public:
     void lock();
     void unlock();
 
-    uint32 get_pending_breakpoints()
+    U_32 get_pending_breakpoints()
     {
         return pending_breakpoints;
     }

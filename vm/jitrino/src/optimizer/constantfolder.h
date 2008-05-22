@@ -36,7 +36,7 @@ public:
     static bool isConstantZero(Opnd* opnd);
     static bool isConstantOne(Opnd* opnd);
     static bool isConstantAllOnes(Opnd* opnd);
-    static bool isConstant(Inst* inst, int32& value);
+    static bool isConstant(Inst* inst, I_32& value);
     static bool isConstant(Inst* inst, int64& value);
     static bool isConstant(Inst* inst, ConstInst::ConstValue& value);
     static bool hasConstant(Inst* inst);
@@ -49,29 +49,29 @@ public:
     //
     // binary arithmetic/logical operations
     //
-    static bool fold8(Opcode,  int8 c1,  int8 c2,  int32& result, bool is_signed);
-    static bool fold16(Opcode, int16 c1, int16 c2, int32& result, bool is_signed);
-    static bool fold32(Opcode, int32 c1, int32 c2, int32& result, bool is_signed);
+    static bool fold8(Opcode,  int8 c1,  int8 c2,  I_32& result, bool is_signed);
+    static bool fold16(Opcode, int16 c1, int16 c2, I_32& result, bool is_signed);
+    static bool fold32(Opcode, I_32 c1, I_32 c2, I_32& result, bool is_signed);
     static bool fold64(Opcode, int64 c1, int64 c2, int64& result, bool is_signed);
     static bool foldSingle(Opcode, float c1, float c2, float& result);
     static bool foldDouble(Opcode, double c1, double c2, double& result);
     // 
     // unary arithmetic/logical operations
     //
-    static bool fold8(Opcode opc,  int8 c,  int32& result);
-    static bool fold16(Opcode opc, int16 c, int32& result);
-    static bool fold32(Opcode opc, int32 c, int32& result);
+    static bool fold8(Opcode opc,  int8 c,  I_32& result);
+    static bool fold16(Opcode opc, int16 c, I_32& result);
+    static bool fold32(Opcode opc, I_32 c, I_32& result);
     static bool fold64(Opcode opc, int64 c, int64& result);
     static bool foldSingle(Opcode, float c1, float& result);
     static bool foldDouble(Opcode, double c1, double& result);
     //
     // binary comparisons
     //
-    static bool foldCmp32(ComparisonModifier mod, int32 c1, int32 c2, int32& result);
-    static bool foldCmp64(ComparisonModifier mod, int64 c1, int64 c2, int32& result);
-    static bool foldCmpSingle(ComparisonModifier mod, float c1, float c2, int32& result);
-    static bool foldCmpDouble(ComparisonModifier mod, double c1, double c2, int32& result);
-    static bool foldCmpRef(ComparisonModifier, void* c1, void* c2, int32& result);
+    static bool foldCmp32(ComparisonModifier mod, I_32 c1, I_32 c2, I_32& result);
+    static bool foldCmp64(ComparisonModifier mod, int64 c1, int64 c2, I_32& result);
+    static bool foldCmpSingle(ComparisonModifier mod, float c1, float c2, I_32& result);
+    static bool foldCmpDouble(ComparisonModifier mod, double c1, double c2, I_32& result);
+    static bool foldCmpRef(ComparisonModifier, void* c1, void* c2, I_32& result);
     static bool foldCmp(Type::Tag cmpTypeTag,
                         ComparisonModifier mod,
                         ConstInst::ConstValue val1,
@@ -80,9 +80,9 @@ public:
     //
     // unary comparisons
     //
-    static bool foldCmp32(ComparisonModifier, int32 c, int32& result);
-    static bool foldCmp64(ComparisonModifier, int64 c, int32& result);
-    static bool foldCmpRef(ComparisonModifier, void* c, int32& result);
+    static bool foldCmp32(ComparisonModifier, I_32 c, I_32& result);
+    static bool foldCmp64(ComparisonModifier, int64 c, I_32& result);
+    static bool foldCmpRef(ComparisonModifier, void* c, I_32& result);
     //
     // conversions
     //
@@ -90,20 +90,20 @@ public:
                          ConstInst::ConstValue src,
                          ConstInst::ConstValue& res);
 
-    // result always written as an int32 so we overwrite extra bits
+    // result always written as an I_32 so we overwrite extra bits
     static bool foldCmp(Type::Tag cmpTypeTag,
                         ComparisonModifier mod,
                         ConstInst::ConstValue val,
                         ConstInst::ConstValue& result);
 
-    // result always written as an int32 or int64 depending on type
+    // result always written as an I_32 or int64 depending on type
     static bool foldConstant(Type::Tag type,
                              Opcode opc,
                              ConstInst::ConstValue val1,
                              ConstInst::ConstValue val2,
                              ConstInst::ConstValue& result,
                              bool is_signed);
-    // result always written as an int32 or int64 depending on type
+    // result always written as an I_32 or int64 depending on type
     static bool foldConstant(Type::Tag type,
                              Opcode opc,
                              ConstInst::ConstValue val,

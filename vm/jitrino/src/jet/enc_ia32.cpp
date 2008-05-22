@@ -675,7 +675,7 @@ void Encoder::alu_impl(ALU alu, const Opnd& op0, const Opnd& op1)
     ip(EncoderBase::encode(ip(), mn, args));
 }
 
-void Encoder::nop_impl(uint32 n) 
+void Encoder::nop_impl(U_32 n) 
 {
     ip(EncoderBase::nops(ip(), n));
 }

@@ -52,8 +52,8 @@ class StackInfoInstRegistrar : public SessionAction {
         stackInfo->registerInsts(*irManager);
         stackInfo->setMethodExitString(*irManager);
     }
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
     bool isIRDumpEnabled(){ return false; }
 };
 
@@ -63,11 +63,11 @@ static ActionFactory<StackInfoInstRegistrar> _si_insts("si_insts");
 #define CALL_MIN_SIZE 2
 #define CALL_MAX_SIZE 6
 
-POINTER_SIZE_INT hashFunc(POINTER_SIZE_INT key, uint32 hashTableSize) {
+POINTER_SIZE_INT hashFunc(POINTER_SIZE_INT key, U_32 hashTableSize) {
     return (key % hashTableSize);
 }
 
-    StackDepthInfo hashGet(DepthEntry** entries, POINTER_SIZE_INT key, uint32 hashTableSize) {
+    StackDepthInfo hashGet(DepthEntry** entries, POINTER_SIZE_INT key, U_32 hashTableSize) {
         DepthEntry * e = entries[hashFunc(key,hashTableSize)];
         assert(e);
         for(;e !=NULL;) {
@@ -80,7 +80,7 @@ POINTER_SIZE_INT hashFunc(POINTER_SIZE_INT key, uint32 hashTableSize) {
         return e->info;
     }
 
-    void hashSet(DepthEntry** entries, POINTER_SIZE_INT eip, uint32 hashTableSize,StackDepthInfo info, MemoryManager& mm) {
+    void hashSet(DepthEntry** entries, POINTER_SIZE_INT eip, U_32 hashTableSize,StackDepthInfo info, MemoryManager& mm) {
         POINTER_SIZE_INT key = hashFunc(eip,hashTableSize);
         DepthEntry * e = entries[key];
         if(!e) {
@@ -119,13 +119,13 @@ void StackInfo::write(U_8* bytes) {
     data+=sizeof(StackInfo);
     MemoryManager mm("DepthInfo");
     EntryPtr * entries = new(mm) EntryPtr[hashTableSize];
-    for(uint32 i = 0; i< hashTableSize; i++)
+    for(U_32 i = 0; i< hashTableSize; i++)
         entries[i] = NULL;
     for(DepthMap::iterator dmit = stackDepthInfo->begin(); dmit != stackDepthInfo->end(); dmit++) {
         hashSet(entries, dmit->first, hashTableSize, dmit->second, mm);
     }
     U_8* next = data + hashTableSize * sizeof(POINTER_SIZE_INT);
-    for(uint32 i = 0; i< hashTableSize; i++) {
+    for(U_32 i = 0; i< hashTableSize; i++) {
         DepthEntry * e = entries[i];
         POINTER_SIZE_INT serializedEntryAddr = 0;
         if(entries[i]) {
@@ -143,7 +143,7 @@ void StackInfo::write(U_8* bytes) {
     assert(getByteSize() == (POINTER_SIZE_INT) (((U_8*)next) - bytes));
 }
 
-DepthEntry * getHashEntry(U_8* data, POINTER_SIZE_INT eip, uint32 size) 
+DepthEntry * getHashEntry(U_8* data, POINTER_SIZE_INT eip, U_32 size) 
 {
     if(!size)
         return NULL;
@@ -186,7 +186,7 @@ void StackInfo::read(MethodDesc* pMethodDesc, POINTER_SIZE_INT eip, bool isFirst
             stackDepth = 0; //0 depth -> stack overflow error
         } else {
             DepthEntry * entry = NULL;
-            uint32 i = CALL_MIN_SIZE;
+            U_32 i = CALL_MIN_SIZE;
             for (; i<= CALL_MAX_SIZE; i++) {
                 entry = getHashEntry(data, eip + i, hashTableSize);
                 if(entry)
@@ -269,7 +269,7 @@ void StackInfo::unwind(MethodDesc* pMethodDesc, JitFrameContext* context, bool i
 
     context->esp += stackDepth;
 
-    uint32 offset = context->esp;
+    U_32 offset = context->esp;
     context->p_eip = (POINTER_SIZE_INT *) offset;
 
     offset += icalleeOffset;
@@ -370,13 +370,13 @@ void StackInfo::registerInsts(IRManager& irm)
 #ifdef _EM64T_
         if ((md.isSynchronized() || md.isParentClassIsLikelyExceptionType())) {
             EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
-            offsetOfThis = (uint32)entryPointInst->thisOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
+            offsetOfThis = (U_32)entryPointInst->thisOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
         } else {
             offsetOfThis = 0;
         }
 #else
         EntryPointPseudoInst * entryPointInst = irm.getEntryPointInst();
-        offsetOfThis = (uint32)entryPointInst->getOpnd(0)->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
+        offsetOfThis = (U_32)entryPointInst->getOpnd(0)->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement)->getImmValue();
 #endif
     }
     const Nodes& nodes = irm.getFlowGraph()->getNodes();
@@ -393,7 +393,7 @@ void StackInfo::registerInsts(IRManager& irm)
             }
         }
     }
-    hashTableSize = (uint32)stackDepthInfo->size();
+    hashTableSize = (U_32)stackDepthInfo->size();
 }
 
 void StackInfo::setMethodExitString(IRManager& irm)

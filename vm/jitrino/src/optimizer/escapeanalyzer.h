@@ -47,8 +47,8 @@ public:
     // Performs escape analysis and returns the number of instructions
     // that do not escape.
     //
-    uint32 doAnalysis();
-    uint32 doAggressiveAnalysis();
+    U_32 doAnalysis();
+    U_32 doAggressiveAnalysis();
 private:
     IRManager& irManager;
 };
@@ -61,15 +61,15 @@ class DefUseLink;
 class DefUseLink {
 public:
     Inst*       getUseInst()    {return useInst;}
-    uint32      getSrcIndex()   {return srcIndex;}
+    U_32      getSrcIndex()   {return srcIndex;}
     DefUseLink* getNext()       {return next;}
 private:
-    DefUseLink(Inst* use,uint32 index,DefUseLink* n) 
+    DefUseLink(Inst* use,U_32 index,DefUseLink* n) 
         : useInst(use), srcIndex(index), next(n) 
     {
     }
     Inst*       useInst;
-    uint32      srcIndex;
+    U_32      srcIndex;
     DefUseLink* next;
     friend class DefUseBuilder;
 };
@@ -85,12 +85,12 @@ public:
     }
 
     void    addUses(Inst* useInst);
-    void    addDefUse(Inst* defInst,Inst* srcInst,uint32 srcIndex);
+    void    addDefUse(Inst* defInst,Inst* srcInst,U_32 srcIndex);
 
-    DefUseLink* getDefUse(Inst* defInst,Inst* srcInst,uint32 srcIndex);
+    DefUseLink* getDefUse(Inst* defInst,Inst* srcInst,U_32 srcIndex);
 
     void    removeDef(Inst* defInst);
-    void    removeDefUse(Inst* defInst,Inst* srcInst,uint32 srcIndex);
+    void    removeDefUse(Inst* defInst,Inst* srcInst,U_32 srcIndex);
 private:
     MemoryManager&                              memoryManager;
     StlHashMap<Inst*,DefUseLink*>    defUseTable;

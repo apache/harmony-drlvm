@@ -88,8 +88,8 @@ public:
     StackInfo * getStackInfo() { return stackInfo; }
     void runImpl();
 
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
 
 protected:
     void checkUnassignedOpnds();
@@ -104,36 +104,36 @@ protected:
     */
     void createEpilog();
 
-    int32 getLocalBase(){ return  localBase; }
-    int32 getLocalEnd(){ return  localEnd; }
-    int32 getApplCalleeBase(){ return  acalleeBase; }
-    int32 getApplCalleeEnd(){ return  acalleeEnd; }
-    int32 getFloatCalleeBase(){ return  fcalleeBase; }
-    int32 getFloatCalleeEnd(){ return  fcalleeEnd; }
-    int32 getIntCalleeBase(){ return  icalleeBase; }
-    int32 getIntCalleeEnd(){ return  icalleeEnd; }
-    int32 getRetEIPBase(){ return  retEIPBase; } 
-    int32 getRetEIPEnd(){ return  retEIPEnd; }
-    int32 getInArgBase(){ return  inargBase; } 
-    int32 getInArgEnd(){ return  inargEnd; }
-    int32 getFrameSize(){ return  frameSize; }
-    uint32 getOutArgSize(){ return  outArgSize; }
+    I_32 getLocalBase(){ return  localBase; }
+    I_32 getLocalEnd(){ return  localEnd; }
+    I_32 getApplCalleeBase(){ return  acalleeBase; }
+    I_32 getApplCalleeEnd(){ return  acalleeEnd; }
+    I_32 getFloatCalleeBase(){ return  fcalleeBase; }
+    I_32 getFloatCalleeEnd(){ return  fcalleeEnd; }
+    I_32 getIntCalleeBase(){ return  icalleeBase; }
+    I_32 getIntCalleeEnd(){ return  icalleeEnd; }
+    I_32 getRetEIPBase(){ return  retEIPBase; } 
+    I_32 getRetEIPEnd(){ return  retEIPEnd; }
+    I_32 getInArgBase(){ return  inargBase; } 
+    I_32 getInArgEnd(){ return  inargEnd; }
+    I_32 getFrameSize(){ return  frameSize; }
+    U_32 getOutArgSize(){ return  outArgSize; }
 
-    int32 localBase;
-    int32 localEnd;
-    int32 fcalleeBase;
-    int32 fcalleeEnd;
-    int32 acalleeBase;
-    int32 acalleeEnd;
-    int32 icalleeBase;
-    int32 icalleeEnd;
+    I_32 localBase;
+    I_32 localEnd;
+    I_32 fcalleeBase;
+    I_32 fcalleeEnd;
+    I_32 acalleeBase;
+    I_32 acalleeEnd;
+    I_32 icalleeBase;
+    I_32 icalleeEnd;
 
-    int32 retEIPBase;
-    int32 retEIPEnd;
-    int32 inargBase;
-    int32 inargEnd;
-    int32 frameSize;
-    uint32 outArgSize;
+    I_32 retEIPBase;
+    I_32 retEIPEnd;
+    I_32 inargBase;
+    I_32 inargEnd;
+    I_32 frameSize;
+    U_32 outArgSize;
     StackInfo * stackInfo;
 
     MemoryManager memoryManager;
@@ -209,22 +209,22 @@ static bool hasSOEHandlers(IRManager& irm) {
 
 #define MAX_STACK_FOR_SOE_HANDLERS 0x2000
 
-static void insertSOECheck(IRManager& irm, uint32 maxStackUsedByMethod) {
+static void insertSOECheck(IRManager& irm, U_32 maxStackUsedByMethod) {
 #ifdef _EM64T_
     //SOE checking is not finished on EM64T
     //TODO: work on stack alignment & SOE checkers
     if (true) return; 
 #endif
-    uint32 stackToCheck = maxStackUsedByMethod + (hasSOEHandlers(irm) ? MAX_STACK_FOR_SOE_HANDLERS : 0);
+    U_32 stackToCheck = maxStackUsedByMethod + (hasSOEHandlers(irm) ? MAX_STACK_FOR_SOE_HANDLERS : 0);
     if (stackToCheck == 0) {
         return;
     }
-    static const uint32 PAGE_SIZE=0x1000;
+    static const U_32 PAGE_SIZE=0x1000;
     
-    uint32 nPagesToCheck = stackToCheck / PAGE_SIZE;
+    U_32 nPagesToCheck = stackToCheck / PAGE_SIZE;
     Inst* prevInst = irm.getEntryPointInst();
-    for(uint32 i=0;i<=nPagesToCheck; i++) {
-        uint32 offset = i < nPagesToCheck ? PAGE_SIZE * (i+1) : stackToCheck;
+    for(U_32 i=0;i<=nPagesToCheck; i++) {
+        U_32 offset = i < nPagesToCheck ? PAGE_SIZE * (i+1) : stackToCheck;
         Opnd* guardedMemOpnd = irm.newMemOpnd(irm.getTypeFromTag(Type::IntPtr), MemOpndKind_Heap, irm.getRegOpnd(STACK_REG), -(int)offset);
         Inst* guardInst = irm.newInst(Mnemonic_TEST, guardedMemOpnd, irm.getRegOpnd(STACK_REG));
         guardInst->insertAfter(prevInst);
@@ -245,7 +245,7 @@ void StackLayouter::runImpl()
     irManager->calculateTotalRegUsage(OpndKind_GPReg);
     createProlog();
     createEpilog();
-    uint32 maxStackDepth = irManager->calculateStackDepth();
+    U_32 maxStackDepth = irManager->calculateStackDepth();
     insertSOECheck(*irManager, maxStackDepth);
     irManager->layoutAliasOpnds();
 
@@ -264,7 +264,7 @@ void StackLayouter::runImpl()
 
 void StackLayouter::checkUnassignedOpnds()
 {
-    for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++) {
+    for (U_32 i=0, n=irManager->getOpndCount(); i<n; i++) {
 #ifdef _DEBUG
         Opnd * opnd = irManager->getOpnd(i);
         assert(!opnd->getRefCount() || opnd->hasAssignedPhysicalLocation());
@@ -274,11 +274,11 @@ void StackLayouter::checkUnassignedOpnds()
 
 void StackLayouter::createProlog()
 {
-    const uint32 slotSize = sizeof(POINTER_SIZE_INT); 
+    const U_32 slotSize = sizeof(POINTER_SIZE_INT); 
     EntryPointPseudoInst* entryPointInst = NULL;
     const CallingConventionClient* cClient = NULL;
     const CallingConvention* cConvention = NULL;
-    uint32 stackSizeAlignment = 0; 
+    U_32 stackSizeAlignment = 0; 
     int offset = 0;
     
     entryPointInst = irManager->getEntryPointInst();
@@ -290,7 +290,7 @@ void StackLayouter::createProlog()
         ? STACK_ALIGN16 : cConvention->getStackAlignment();
 
     // Create or reset displacements for stack memory operands.
-    for (uint32 i = 0; i < irManager->getOpndCount(); i++) {
+    for (U_32 i = 0; i < irManager->getOpndCount(); i++) {
         Opnd * opnd = irManager->getOpnd(i);
         if (opnd->getRefCount() && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) {
             Opnd * dispOpnd=opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
@@ -313,7 +313,7 @@ void StackLayouter::createProlog()
         const StlVector<CallingConventionClient::StackOpndInfo>& stackOpndInfos = 
             cClient->getStackOpndInfos(Inst::OpndRole_Def);
 
-        for (uint32 i = 0, n = (uint32)stackOpndInfos.size(); i < n; i++) {
+        for (U_32 i = 0, n = (U_32)stackOpndInfos.size(); i < n; i++) {
             uint64 argOffset = stackOpndInfos[i].offset;
             Opnd * opnd = entryPointInst->getOpnd(stackOpndInfos[i].opndIndex);
             Opnd * disp = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
@@ -323,17 +323,17 @@ void StackLayouter::createProlog()
     inargEnd = offset;
     icalleeEnd = offset = 0;
 
-    uint32 calleeSavedRegs = cConvention->getCalleeSavedRegs(OpndKind_GPReg).getMask();
-    uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
+    U_32 calleeSavedRegs = cConvention->getCalleeSavedRegs(OpndKind_GPReg).getMask();
+    U_32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
     Inst * lastPush = NULL;
     
     // Push callee-save registers onto stack.
 #ifdef _EM64T_
-    for (uint32 reg = RegName_R15; reg >= RegName_RAX; reg--) {
+    for (U_32 reg = RegName_R15; reg >= RegName_RAX; reg--) {
 #else
-    for (uint32 reg = RegName_EDI; reg >= RegName_EAX; reg--) {
+    for (U_32 reg = RegName_EDI; reg >= RegName_EAX; reg--) {
 #endif
-        uint32 mask = getRegMask((RegName)reg);
+        U_32 mask = getRegMask((RegName)reg);
         if ((mask & calleeSavedRegs) && (usageRegMask & mask)) {
             Inst * inst = irManager->newInst(Mnemonic_PUSH, irManager->getRegOpnd((RegName)reg));
             if (!lastPush) {
@@ -363,7 +363,7 @@ void StackLayouter::createProlog()
 
     // Assign displacements for local variable operands.
     for (int j = 0; j <= alignmentSequenceSize; j++) {
-        for (uint32 i = 0; i < irManager->getOpndCount(); i++) {
+        for (U_32 i = 0; i < irManager->getOpndCount(); i++) {
             Opnd * opnd = irManager->getOpnd(i);
             Opnd::MemOpndAlignment currentAlignment = alignmentSequence[j];
             if(opnd->getRefCount() != 0 
@@ -373,14 +373,14 @@ void StackLayouter::createProlog()
                 if (dispOpnd->getImmValue() == 0) {
                     if (relations[opnd->getId()].outerOpnd == NULL) {
                         if (currentAlignment == Opnd::MemOpndAlignment_Any) {
-                            uint32 cb = getByteSize(opnd->getSize());
+                            U_32 cb = getByteSize(opnd->getSize());
                             cb = (cb + (slotSize - 1)) & ~(slotSize - 1);
                             offset -= cb;
                         } else {
                             // Make sure 
                             assert((stackSizeAlignment % currentAlignment) == 0);
                             // It just doesn't make sense to align on less than operand size.
-                            assert((uint32)currentAlignment >= getByteSize(opnd->getSize()));
+                            assert((U_32)currentAlignment >= getByteSize(opnd->getSize()));
                             offset -= currentAlignment;
                         }
                         dispOpnd->assignImmValue(offset);
@@ -408,9 +408,9 @@ void StackLayouter::createProlog()
 
 void StackLayouter::createEpilog()
 { // Predeccessors of en and irManager->isEpilog(en->pred)
-    uint32 calleeSavedRegs = irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
+    U_32 calleeSavedRegs = irManager->getCallingConvention()->getCalleeSavedRegs(OpndKind_GPReg).getMask();
     const Edges& inEdges = irManager->getFlowGraph()->getExitNode()->getInEdges();
-    uint32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
+    U_32 usageRegMask = irManager->getTotalRegUsage(OpndKind_GPReg);
     for (Edges::const_iterator ite = inEdges.begin(), ende = inEdges.end(); ite!=ende; ++ite) {
         Edge* edge = *ite;
         if (irManager->isEpilog(edge->getSourceNode())) {
@@ -423,11 +423,11 @@ void StackLayouter::createEpilog()
                 newIns->insertBefore(retInst);
             }
 #ifdef _EM64T_
-            for (uint32 reg = RegName_R15; reg >= RegName_RAX ; reg--) {//pop callee-save registers
+            for (U_32 reg = RegName_R15; reg >= RegName_RAX ; reg--) {//pop callee-save registers
 #else
-            for (uint32 reg = RegName_EDI; reg >= RegName_EAX ; reg--) {//pop callee-save registers
+            for (U_32 reg = RegName_EDI; reg >= RegName_EAX ; reg--) {//pop callee-save registers
 #endif
-                uint32 mask = getRegMask((RegName)reg);
+                U_32 mask = getRegMask((RegName)reg);
                 if ((mask & calleeSavedRegs) &&  (usageRegMask & mask)) {
                     Inst* newIns = irManager->newInst(Mnemonic_POP, irManager->getRegOpnd((RegName)reg));
                     newIns->insertBefore(retInst);

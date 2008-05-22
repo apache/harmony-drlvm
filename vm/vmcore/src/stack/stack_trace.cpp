@@ -72,7 +72,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
     POINTER_SIZE_INT eff_ip = (POINTER_SIZE_INT)ip -
                                 (is_ip_past ? callLength : 0);
 
-    uint32 offset = 0;
+    U_32 offset = 0;
     if (depth < 0) // Not inlined method
     {
         if (cci->get_jit()->get_bc_location_for_native(
@@ -85,7 +85,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
 
         if (inl_info)
         {
-            offset = (uint32) ((POINTER_SIZE_INT)ip -
+            offset = (U_32) ((POINTER_SIZE_INT)ip -
                 (POINTER_SIZE_INT)cci->get_code_block_addr());
             bcOffset = cci->get_jit()->get_inlined_bc(inl_info, offset, depth);
         }
@@ -126,7 +126,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
         stf->method = si_get_method(si);
         stf->depth = -1;
         if (stf->method) {
-            uint32 inlined_depth = si_get_inline_depth(si);
+            U_32 inlined_depth = si_get_inline_depth(si);
             if ( (target_depth >= depth) && 
                  (target_depth <= depth + inlined_depth) ) {
                 stf->ip = si_get_ip(si);
@@ -136,7 +136,7 @@ bool st_get_frame(unsigned target_depth, StackTraceFrame* stf)
                     CodeChunkInfo* cci = si_get_code_chunk_info(si);
                     // FIXME64: no support for large methods
                     // with compiled code size greater than 4GB
-                    uint32 offset = (uint32)((POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                    U_32 offset = (U_32)((POINTER_SIZE_INT)stf->ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
                     stf->depth = inlined_depth - (target_depth - depth);
                     stf->method = cci->get_jit()->get_inlined_method(
                             cci->get_inline_info(), offset, stf->depth);
@@ -209,11 +209,11 @@ void st_get_trace(VM_thread *p_vmthread, unsigned* res_depth, StackTraceFrame** 
                 if (cci->has_inline_info()) {
                     // FIXME64: no support for large methods
                     // with compiled code greater than 4GB
-                    uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
-                    uint32 inlined_depth = jit->get_inline_depth(
+                    U_32 offset = (U_32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                    U_32 inlined_depth = jit->get_inline_depth(
                         cci->get_inline_info(), offset);
                     if (inlined_depth) {
-                        for (uint32 i = inlined_depth; i > 0; i--) {
+                        for (U_32 i = inlined_depth; i > 0; i--) {
                             stf->method = jit->get_inlined_method(cci->get_inline_info(), offset, i);
                             stf->ip = ip;
                             stf->depth = i;
@@ -316,11 +316,11 @@ void st_print(FILE* f, hythread_t thread)
             if (cci != NULL && cci->has_inline_info()) {
                 // FIXME64: no support for large methods
                 // with compiled code size greater than 4GB
-                uint32 offset = (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
-                uint32 inlined_depth = cci->get_jit()->get_inline_depth(
+                U_32 offset = (U_32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                U_32 inlined_depth = cci->get_jit()->get_inline_depth(
                     cci->get_inline_info(), offset);
                 if (inlined_depth) {
-                    for (uint32 i = inlined_depth; i > 0; i--) {
+                    for (U_32 i = inlined_depth; i > 0; i--) {
                         Method *real_method = cci->get_jit()->get_inlined_method(cci->get_inline_info(), offset, i);
                         fprintf(f, "%s.%s%s\n", real_method->get_class()->get_name()->bytes, 
                             real_method->get_name()->bytes, real_method->get_descriptor()->bytes);

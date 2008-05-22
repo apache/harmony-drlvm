@@ -53,7 +53,7 @@ FlowGraph::foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken)
 }
 
 void         
-FlowGraph::foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, uint32 index)
+FlowGraph::foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, U_32 index)
 {
     Node* block = sw->getNode();
     assert(sw == block->getLastInst());
@@ -140,8 +140,8 @@ Node* FlowGraph::duplicateNode(IRManager& irm, Node *source, Node *before, OpndR
         newblock->appendInst(newInst);
         if(Log::isEnabled()) {
             Log::out() << "          ";
-            Log::out() << (int32)inst->getNumSrcOperands();
-            Log::out() << " " << (int32)inst->getOpcode() << " ";
+            Log::out() << (I_32)inst->getNumSrcOperands();
+            Log::out() << " " << (I_32)inst->getOpcode() << " ";
             newInst->print(Log::out());
             Log::out() << "\n";
             Log::out().flush();
@@ -366,7 +366,7 @@ Inst* FlowGraph::insertPhi(IRManager& irm, StlBitVector* nodesInRegion,
 Inst* FlowGraph::findPhi(Node* node, Opnd** opnds, int opndsCount) {
     
     for (Inst* inst = (Inst*)node->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {        
-        if (inst->getOpcode() == Op_Phi && inst->getNumSrcOperands() == (uint32)opndsCount) {
+        if (inst->getOpcode() == Op_Phi && inst->getNumSrcOperands() == (U_32)opndsCount) {
             for (int i = 0; i < opndsCount; i++) {
                 if (inst->getSrc(i) != opnds[i]) {
                     break;
@@ -450,8 +450,8 @@ Node* FlowGraph::duplicateRegion(IRManager& irm, Node* entry, StlBitVector& node
 void FlowGraph::renameOperandsInNode(Node *node, OpndRenameTable *renameTable) {
     Inst *first = (Inst*)node->getFirstInst();
     for (Inst *inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
-        uint32 n = inst->getNumSrcOperands();
-        for(uint32 i = 0; i < n; ++i) {
+        U_32 n = inst->getNumSrcOperands();
+        for(U_32 i = 0; i < n; ++i) {
             Opnd* src = inst->getSrc(i);
             Opnd* newsrc = renameTable->getMapping(src);
             if(newsrc != NULL)
@@ -727,7 +727,7 @@ static void inlineJSRs(IRManager* irManager) {
     //std::reverse(nodes.begin(), nodes.end());
     //WARN: new nodes created during the iteration 
     //we use the fact that new nodes added to the end of the collection here.
-    for (uint32 idx = 0; idx < nodes.size(); ++idx) {
+    for (U_32 idx = 0; idx < nodes.size(); ++idx) {
         Node* node = nodes[idx];
         Inst* last = (Inst*)node->getLastInst();
         if(last->isJSR()) {
@@ -736,7 +736,7 @@ static void inlineJSRs(IRManager* irManager) {
     }
 #ifdef _DEBUG
     const Nodes& nnodes = fg.getNodes();
-    for (uint32 idx = 0; idx < nnodes.size(); ++idx) {
+    for (U_32 idx = 0; idx < nnodes.size(); ++idx) {
         Node* node = nnodes[idx];
         Inst* last = (Inst*)node->getLastInst();
         assert(!last->isJSR());
@@ -893,7 +893,7 @@ static void checkBCMapping(IRManager& irm) {
 }
 
 void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
-    uint32 id = irm.getCompilationContext()->getCurrentSessionNum();
+    U_32 id = irm.getCompilationContext()->getCurrentSessionNum();
     const char* stage = "trans_cleanup";
     if (Log::isLogEnabled(LogStream::IRDUMP)) {
         LogStream& irdump = Log::log(LogStream::IRDUMP);
@@ -1163,13 +1163,13 @@ void FlowGraph::printLabel(std::ostream& cout, Node* node) {
         if(node->getOutDegree() == 1 && node->getOutEdges().front()->getTargetNode()->isExitNode())
             cout << "UNWIND";
         else
-            cout << "D" << (int32)((LabelInst*)first)->getLabelId();
+            cout << "D" << (I_32)((LabelInst*)first)->getLabelId();
     } else {
         cout << "EXIT";
     }
 }
 
-void FlowGraph::printInsts(std::ostream& cout, Node* node, uint32 indent){
+void FlowGraph::printInsts(std::ostream& cout, Node* node, U_32 indent){
     std::string indentstr(indent, ' ');
     Inst* inst = (Inst*)node->getFirstInst();
     while (inst!=NULL) {

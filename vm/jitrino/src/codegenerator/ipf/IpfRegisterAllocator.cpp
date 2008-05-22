@@ -72,7 +72,7 @@ void RegisterAllocator::buildInterferenceMatrix() {
         BbNode *node = (BbNode *)nodes[i];
         liveManager.init(node);
 
-        uint32       execCounter = node->getExecCounter();
+        U_32       execCounter = node->getExecCounter();
         InstIterator currInst    = node->getInsts().end()-1;
         InstIterator firstInst   = node->getInsts().begin()-1;
         
@@ -103,7 +103,7 @@ void RegisterAllocator::buildInterferenceMatrix() {
 
 //----------------------------------------------------------------------------------------//
 
-void RegisterAllocator::checkCoalescing(uint32 execCounter, Inst *inst) {
+void RegisterAllocator::checkCoalescing(U_32 execCounter, Inst *inst) {
     
     if (inst->getInstCode() != INST_MOV)          return; // if inst is not "mov" - ignore
 
@@ -201,7 +201,7 @@ void RegisterAllocator::assignLocation(RegOpnd *target) {
     RegOpndSet &depOpnds = target->getDepOpnds();               // target can not be assigned on reg used by depOpnds
     for (RegOpndSet::iterator it=depOpnds.begin(); it!=depOpnds.end(); it++) {
         RegOpnd *opnd = *it;
-        int32 location = opnd->getLocation();                   // get location of dep opnd
+        I_32 location = opnd->getLocation();                   // get location of dep opnd
         if (location >= NUM_G_REG) continue;                    // if opnd is not assigned on reg - continue
         usedMask[location] = true;                              // mark reg busy
     }
@@ -209,7 +209,7 @@ void RegisterAllocator::assignLocation(RegOpnd *target) {
     Int2OpndMap &coalesceCands = target->getCoalesceCands();    // opnds used in inst like: move target = opnd
     for (Int2OpndMap::iterator it=coalesceCands.begin(); it!=coalesceCands.end(); it++) {
         RegOpnd *cls = it->second;
-        int32 location = cls->getValue();                       // get location of coalesce candidate 
+        I_32 location = cls->getValue();                       // get location of coalesce candidate 
         if (location > NUM_G_REG)                   continue;   // opnd is not allocated (or allocated on stack)
         if (isPreserved && !cls->isCrossCallSite()) continue;   // target must be preserved, but cls is scratch
         if (usedMask[location] == true)             continue;   // target can not be allocated on cls location
@@ -217,13 +217,13 @@ void RegisterAllocator::assignLocation(RegOpnd *target) {
         return;
     }
     
-    int32 location = opndManager->newLocation(opndKind, dataKind, usedMask, isPreserved);
+    I_32 location = opndManager->newLocation(opndKind, dataKind, usedMask, isPreserved);
     target->setLocation(location);                              // assign target new location
 }    
 
 //----------------------------------------------------------------------------------------//
 
-void RegisterAllocator::updateAllocSet(Opnd *cand_, uint32 execCounter, QpMask mask) {
+void RegisterAllocator::updateAllocSet(Opnd *cand_, U_32 execCounter, QpMask mask) {
 
     if (cand_->isReg()      == false) return;    // imm - it does not need allocation
     if (cand_->isMem()      == true)  return;    // mem stack - it does not need allocation

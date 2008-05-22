@@ -238,8 +238,8 @@ struct ObjectHandlesOld {
 
 struct ObjectHandlesNew {
 #ifdef _IPF_
-    uint32 capacity;
-    uint32 size;
+    U_32 capacity;
+    U_32 size;
 #else //IA32
     uint16 capacity;
     uint16 size;

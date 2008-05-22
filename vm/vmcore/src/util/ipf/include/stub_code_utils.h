@@ -101,7 +101,7 @@ void increment_stats_counter(Merced_Code_Emitter &emitter, void *counter_addr, u
 // only the lower 32 bits of the register need to be checked,
 // and that the lower 32 bits are usually 0.
 // The semantics are:
-//   cmp4.eq  p1,p2=src,(uint32)managed_null
+//   cmp4.eq  p1,p2=src,(U_32)managed_null
 void gen_compare_to_managed_null(Merced_Code_Emitter &emitter,
                                  int predicate1, int predicate2, // predicate regs to set
                                  int src, // register to compare against

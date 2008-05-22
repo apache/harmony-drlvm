@@ -39,7 +39,7 @@ struct apr_dso_handle_t {
 
 APR_DECLARE(apr_status_t) port_dso_load_ex(apr_dso_handle_t** handle,
                                            const char* path,
-                                           uint32 mode,
+                                           U_32 mode,
                                            apr_pool_t* pool){
     /*
     * FIXME Windows does not support lazy dll resolution a la Linux's RTLD_LAZY.

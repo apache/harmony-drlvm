@@ -52,8 +52,8 @@ public:
     
     
 
-    void offset(uint32 offset);
-    void offset_done(uint32 offset);
+    void offset(U_32 offset);
+    void offset_done(U_32 offset);
     void checkStack();
     // called before parsing starts
     virtual void parseInit() {
@@ -69,18 +69,18 @@ public:
     // generates the argument loading code
     void genArgLoads();
     // generated argument loading for inlined methods
-    void genArgLoads(uint32 numActualArgs,Opnd** actualArgs);
+    void genArgLoads(U_32 numActualArgs,Opnd** actualArgs);
 
     void nop();
     void aconst_null();
-    void iconst(int32 val);
+    void iconst(I_32 val);
     void lconst(int64 val);
     void fconst(float val);
     void dconst(double val);
     void bipush(int8 val);
     void sipush(int16 val);
-    void ldc(uint32 constPoolIndex);
-    void ldc2(uint32 constPoolIndex);
+    void ldc(U_32 constPoolIndex);
+    void ldc2(U_32 constPoolIndex);
     void iload(uint16 varIndex);
     void lload(uint16 varIndex);
     void fload(uint16 varIndex);
@@ -94,11 +94,11 @@ public:
     void baload();
     void caload();
     void saload();
-    void istore(uint16 varIndex,uint32 off);
-    void lstore(uint16 varIndex,uint32 off);
-    void fstore(uint16 varIndex,uint32 off);
-    void dstore(uint16 varIndex,uint32 off);
-    void astore(uint16 varIndex,uint32 off);
+    void istore(uint16 varIndex,U_32 off);
+    void lstore(uint16 varIndex,U_32 off);
+    void fstore(uint16 varIndex,U_32 off);
+    void dstore(uint16 varIndex,U_32 off);
+    void astore(uint16 varIndex,U_32 off);
     void iastore();
     void lastore();
     void fastore();
@@ -152,7 +152,7 @@ public:
     void lor();
     void ixor();
     void lxor();
-    void iinc(uint16 varIndex,int32 amount);
+    void iinc(uint16 varIndex,I_32 amount);
     void i2l();
     void i2f();
     void i2d();
@@ -173,68 +173,68 @@ public:
     void fcmpg();
     void dcmpl();
     void dcmpg();
-    void ifeq(uint32 targetOffset,uint32 nextOffset);
-    void ifne(uint32 targetOffset,uint32 nextOffset);
-    void iflt(uint32 targetOffset,uint32 nextOffset);
-    void ifge(uint32 targetOffset,uint32 nextOffset);
-    void ifgt(uint32 targetOffset,uint32 nextOffset);
-    void ifle(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpeq(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpne(uint32 targetOffset,uint32 nextOffset);
-    void if_icmplt(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpge(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpgt(uint32 targetOffset,uint32 nextOffset);
-    void if_icmple(uint32 targetOffset,uint32 nextOffset);
-    void if_acmpeq(uint32 targetOffset,uint32 nextOffset);
-    void if_acmpne(uint32 targetOffset,uint32 nextOffset);
-    void goto_(uint32 targetOffset,uint32 nextOffset);
-    void jsr(uint32 offset, uint32 nextOffset);
+    void ifeq(U_32 targetOffset,U_32 nextOffset);
+    void ifne(U_32 targetOffset,U_32 nextOffset);
+    void iflt(U_32 targetOffset,U_32 nextOffset);
+    void ifge(U_32 targetOffset,U_32 nextOffset);
+    void ifgt(U_32 targetOffset,U_32 nextOffset);
+    void ifle(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpeq(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpne(U_32 targetOffset,U_32 nextOffset);
+    void if_icmplt(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpge(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpgt(U_32 targetOffset,U_32 nextOffset);
+    void if_icmple(U_32 targetOffset,U_32 nextOffset);
+    void if_acmpeq(U_32 targetOffset,U_32 nextOffset);
+    void if_acmpne(U_32 targetOffset,U_32 nextOffset);
+    void goto_(U_32 targetOffset,U_32 nextOffset);
+    void jsr(U_32 offset, U_32 nextOffset);
     void ret(uint16 varIndex, const uint8* byteCodes);
     void tableswitch(JavaSwitchTargetsIter*);
     void lookupswitch(JavaLookupSwitchTargetsIter*);
-    void ireturn(uint32 off);
-    void lreturn(uint32 off);
-    void freturn(uint32 off);
-    void dreturn(uint32 off);
-    void areturn(uint32 off);
-    void return_(uint32 off);
-    void getstatic(uint32 constPoolIndex);
-    void putstatic(uint32 constPoolIndex);
-    void getfield(uint32 constPoolIndex);
-    void putfield(uint32 constPoolIndex);
-    void invokevirtual(uint32 constPoolIndex);
-    void invokespecial(uint32 constPoolIndex);
-    void invokestatic(uint32 constPoolIndex);
-    void invokeinterface(uint32 constPoolIndex,uint32 count);
-    void new_(uint32 constPoolIndex);
+    void ireturn(U_32 off);
+    void lreturn(U_32 off);
+    void freturn(U_32 off);
+    void dreturn(U_32 off);
+    void areturn(U_32 off);
+    void return_(U_32 off);
+    void getstatic(U_32 constPoolIndex);
+    void putstatic(U_32 constPoolIndex);
+    void getfield(U_32 constPoolIndex);
+    void putfield(U_32 constPoolIndex);
+    void invokevirtual(U_32 constPoolIndex);
+    void invokespecial(U_32 constPoolIndex);
+    void invokestatic(U_32 constPoolIndex);
+    void invokeinterface(U_32 constPoolIndex,U_32 count);
+    void new_(U_32 constPoolIndex);
     void newarray(uint8 type);
-    void anewarray(uint32 constPoolIndex);
+    void anewarray(U_32 constPoolIndex);
     void arraylength();
     void athrow();
-    void checkcast(uint32 constPoolIndex);
-    int  instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off) ;
+    void checkcast(U_32 constPoolIndex);
+    int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off) ;
     void monitorenter();
     void monitorexit();
-    void multianewarray(uint32 constPoolIndex,uint8 dimensions);
-    void ifnull(uint32 targetOffset,uint32 nextOffset);
-    void ifnonnull(uint32 targetOffset,uint32 nextOffset);
+    void multianewarray(U_32 constPoolIndex,uint8 dimensions);
+    void ifnull(U_32 targetOffset,U_32 nextOffset);
+    void ifnonnull(U_32 targetOffset,U_32 nextOffset);
 private:
 
-    typedef StlMap<uint32, Inst*> OffsetToInstMap;
+    typedef StlMap<U_32, Inst*> OffsetToInstMap;
 
     //
     // helper methods for generating code
     //
-    Opnd**  popArgs(uint32 numArgs);
+    Opnd**  popArgs(U_32 numArgs);
     // for invoke emulation if resolution fails
     void    pseudoInvoke(const char* mdesc);
     void    genCallWithResolve(JavaByteCodes bc, unsigned cpIndex);
     void    invalid();    // called when invalid IR is encountered
-    void    genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType);
-    void    genStVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType);
+    void    genLdVar(U_32 varIndex,JavaLabelPrepass::JavaVarType javaType);
+    void    genStVar(U_32 varIndex,JavaLabelPrepass::JavaVarType javaType);
     void    genTypeStVar(uint16 varIndex);
-    void    genReturn(JavaLabelPrepass::JavaVarType javaType,uint32 off);
-    void    genReturn(uint32 off);
+    void    genReturn(JavaLabelPrepass::JavaVarType javaType,U_32 off);
+    void    genReturn(U_32 off);
     void    genAdd(Type* dstType);
     void    genSub(Type* dstType);
     void    genMul(Type* dstType);
@@ -255,25 +255,25 @@ private:
     void    genTypeArrayStore();
     void    genShl(Type* type, ShiftMaskModifier mod);
     void    genShr(Type* type, SignedModifier mod1, ShiftMaskModifier mod2);
-    void    genIf1(ComparisonModifier,int32 targetOffset,int32 nextOffset);
-    void    genIf1Commute(ComparisonModifier,int32 targetOffset,int32 nextOffset);
-    void    genIf2(ComparisonModifier,int32 targetOffset,int32 nextOffset);
-    void    genIf2Commute(ComparisonModifier mod,int32 targetOffset,int32 nextOffset);
-    void    genIfNull(ComparisonModifier,int32 targetOffset,int32 nextOffset);
+    void    genIf1(ComparisonModifier,I_32 targetOffset,I_32 nextOffset);
+    void    genIf1Commute(ComparisonModifier,I_32 targetOffset,I_32 nextOffset);
+    void    genIf2(ComparisonModifier,I_32 targetOffset,I_32 nextOffset);
+    void    genIf2Commute(ComparisonModifier mod,I_32 targetOffset,I_32 nextOffset);
+    void    genIfNull(ComparisonModifier,I_32 targetOffset,I_32 nextOffset);
     void    genThreeWayCmp(Type::Tag cmpType,ComparisonModifier src1ToSrc2); // Src2toSrc1 must be same
     //
     // LinkingException throw
     // 
-    void linkingException(uint32 constPoolIndex, uint32 operation);
+    void linkingException(U_32 constPoolIndex, U_32 operation);
     //
     // helper methods for inlining, call and return sequences
     //
-    bool    needsReturnLabel(uint32 off);
-    void    genInvokeStatic(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
-    bool    genVMMagic(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
-    bool    genVMHelper(const char* mname, uint32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    bool    needsReturnLabel(U_32 off);
+    void    genInvokeStatic(MethodDesc * methodDesc,U_32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    bool    genVMMagic(const char* mname, U_32 numArgs,Opnd ** srcOpnds,Type * returnType);
+    bool    genVMHelper(const char* mname, U_32 numArgs,Opnd ** srcOpnds,Type * returnType);
     
-    bool    genMinMax(MethodDesc * methodDesc,uint32 numArgs,Opnd ** srcOpnds, Type * returnType);
+    bool    genMinMax(MethodDesc * methodDesc,U_32 numArgs,Opnd ** srcOpnds, Type * returnType);
     void    newFallthroughBlock();
 
     
@@ -287,19 +287,19 @@ private:
     //
     // labels and control flow
     //
-    uint32            labelId(uint32 offset);
-    LabelInst* getLabel(uint32 labelId) {
+    U_32            labelId(U_32 offset);
+    LabelInst* getLabel(U_32 labelId) {
         assert(labelId < numLabels);
         LabelInst *label = labels[labelId];
         return label;
     }
-    void       setLabel(uint32 labelId, LabelInst *label) {
+    void       setLabel(U_32 labelId, LabelInst *label) {
         labels[labelId] = label;
     }
     LabelInst* getNextLabel() {
         return labels[nextLabel];
     }
-    uint32    getNextLabelId() {
+    U_32    getNextLabelId() {
         assert(nextLabel < numLabels);
         return nextLabel++;
     }
@@ -313,14 +313,14 @@ private:
     //
     // field, method, and type resolution
     //
-    Type*            getFieldType(FieldDesc*, uint32 constPoolIndex);
-    const char*      methodSignatureString(uint32 cpIndex);
+    Type*            getFieldType(FieldDesc*, U_32 constPoolIndex);
+    const char*      methodSignatureString(U_32 cpIndex);
     //
     //
     // locals access
     //
-    Opnd*            getVarOpndLdVar(JavaLabelPrepass::JavaVarType javaType,uint32 index);
-    VarOpnd*         getVarOpndStVar(JavaLabelPrepass::JavaVarType javaType,uint32 index,Opnd *opnd);
+    Opnd*            getVarOpndLdVar(JavaLabelPrepass::JavaVarType javaType,U_32 index);
+    VarOpnd*         getVarOpndStVar(JavaLabelPrepass::JavaVarType javaType,U_32 index,Opnd *opnd);
     bool             needsReturnLabel();
     //
     //  synchronization
@@ -328,15 +328,15 @@ private:
     void             genMethodMonitorEnter();
     void             genMethodMonitorExit();
     
-    void             applyMaskToTop(int32 mask);
+    void             applyMaskToTop(I_32 mask);
 
     // Method checks if following bytecodes are array initializers for newly created array.
     // If they are then substitute array initializers with jit helper array copy instruction.
     // Returns the length of bytecodes converted by this routine.
-    uint32 checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength);
+    U_32 checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength);
     // Obtain the next numeric value from the bytecode in array initialization sequence
     // Returns number of bytes read from the byteCodes array.
-    uint32 getNumericValue(const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength, uint64& value);
+    U_32 getNumericValue(const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value);
 
     //
     // private fields
@@ -372,21 +372,21 @@ private:
     //
     ExceptionInfo*      inliningExceptionInfo; // instruction where inlining begins
     Node*            inliningNodeBegin;  // used by inlining of synchronized methods
-    uint32              numLabels;          // number of labels in this method
-    uint32              numVars;            // number of variables in this method
-    uint32              numStackVars;       // number of non-empty stack locations in this method
-    uint32              numArgs;            // number of arguments in this method
+    U_32              numLabels;          // number of labels in this method
+    U_32              numVars;            // number of variables in this method
+    U_32              numStackVars;       // number of non-empty stack locations in this method
+    U_32              numArgs;            // number of arguments in this method
     Type**              argTypes;           // types for each argument
     Opnd**              args;               // argument opnds
     Opnd*               resultOpnd;         // used for inlining only
     Type*               retType;            // return type of method
-    uint32              nextLabel;
+    U_32              nextLabel;
     LabelInst**         labels;
     Type*               javaTypeMap[JavaLabelPrepass::NumJavaVarTypes];
     JavaLabelPrepass    prepass;
     StateInfo           *stateInfo;
-    uint32              firstVarRef;
-    uint32              numberVarRef;
+    U_32              firstVarRef;
+    U_32              numberVarRef;
     // Synchronization
     Opnd*               lockAddr;
     Opnd*               oldLockValue;

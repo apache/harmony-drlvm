@@ -271,7 +271,7 @@ void Compiler::gen_prolog(void) {
     //    args)
     for (unsigned i = 0, local=0; i<m_ci.count(); i++, local++) {
         jtype jt = m_ci.jt(i);
-        // All values less than 32 bits get moved between methods as int32
+        // All values less than 32 bits get moved between methods as I_32
         if (jt<i32) {
             jt = i32;
         }
@@ -380,7 +380,7 @@ void Compiler::gen_prolog(void) {
         if (is_set(DBG_TRACE_CG)) {dbg(";;>locals.gc_map\n");}
         Opnd reg(i32, valloc(i32));
         alu(alu_xor, reg, reg);
-        for (unsigned i=(uint32)locals_map.size(); i<locals_gc_size; i++) {
+        for (unsigned i=(U_32)locals_map.size(); i<locals_gc_size; i++) {
             st4(reg.reg(), m_base, voff(m_stack.info_gc_locals()+i*sizeof(int)));
         }
     }

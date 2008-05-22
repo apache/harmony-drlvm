@@ -66,7 +66,7 @@ public:
     //
     //  Returns number of elements in the set
     //
-    uint32 getSize() const {return (uint32) size();}
+    U_32 getSize() const {return (U_32) size();}
     //
     //  Returns true if set contains the element, false otherwise
     //
@@ -122,7 +122,7 @@ public:
         //
         MemoryManager memManager("MapSet::intersect.memManager");
         KEY * removeList = (KEY *)memManager.alloc(sizeof(KEY) * size());
-        uint32 removeListSize = 0;
+        U_32 removeListSize = 0;
         const_iterator iter = begin(),
                        setend  = end();
         for (; iter != setend; iter++) {
@@ -132,7 +132,7 @@ public:
         //
         //  Remove elements that are in removeList
         //
-        for (uint32 i = 0; i < removeListSize; i++)
+        for (U_32 i = 0; i < removeListSize; i++)
             erase(removeList[i]);
     }
     //

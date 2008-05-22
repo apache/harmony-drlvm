@@ -113,20 +113,20 @@ public:
                                   const JitFrameContext   *context        // in
                                   ) = 0;
     
-    virtual uint32
+    virtual U_32
     get_inline_depth(InlineInfoPtr  ptr,
-                     uint32         offset) { return 0; }
+                     U_32         offset) { return 0; }
 
 
     virtual Method_Handle
     get_inlined_method(InlineInfoPtr  ptr,
-                       uint32         offset,
-                       uint32         inline_depth) { return NULL; }
+                       U_32         offset,
+                       U_32         inline_depth) { return NULL; }
 
     virtual uint16
     get_inlined_bc(InlineInfoPtr  ptr,
-                       uint32         offset,
-                       uint32         inline_depth) { return 0; }
+                       U_32         offset,
+                       U_32         inline_depth) { return 0; }
 
 
     //

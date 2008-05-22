@@ -85,7 +85,7 @@ LogStream& Log::log_ct ()
 #endif
 
 
-void Log::printStageBegin(std::ostream& out, uint32 stageId, const char * stageGroup, const char * stageName, const char * stageTag)
+void Log::printStageBegin(std::ostream& out, U_32 stageId, const char * stageGroup, const char * stageName, const char * stageTag)
 {
     out
         << "========================================================================" << ::std::endl
@@ -93,7 +93,7 @@ void Log::printStageBegin(std::ostream& out, uint32 stageId, const char * stageG
         << "========================================================================" << ::std::endl << ::std::endl ;
 }
 
-void Log::printStageEnd(std::ostream& out, uint32 stageId, const char * stageGroup, const char * stageName, const char * stageTag)
+void Log::printStageEnd(std::ostream& out, U_32 stageId, const char * stageGroup, const char * stageName, const char * stageTag)
 {
     out
         << "========================================================================" << ::std::endl
@@ -102,7 +102,7 @@ void Log::printStageEnd(std::ostream& out, uint32 stageId, const char * stageGro
 }
 
 
-void Log::printIRDumpBegin(std::ostream& out, uint32 stageId, const char * stageName, const char * subKind)
+void Log::printIRDumpBegin(std::ostream& out, U_32 stageId, const char * stageName, const char * subKind)
 {
     out
         << "========================================================================" << ::std::endl
@@ -112,7 +112,7 @@ void Log::printIRDumpBegin(std::ostream& out, uint32 stageId, const char * stage
 }
 
 
-void Log::printIRDumpEnd(std::ostream& out, uint32 stageId, const char * stageName, const char * subKind)
+void Log::printIRDumpEnd(std::ostream& out, U_32 stageId, const char * stageName, const char * subKind)
 {
     out
         << "========================================================================" << ::std::endl

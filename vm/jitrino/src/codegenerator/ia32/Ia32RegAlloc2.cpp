@@ -71,7 +71,7 @@ static const char* help =
 
 struct RegAlloc2 : public SessionAction
 {
-    typedef uint32 RegMask;     // used to represent set of registers
+    typedef U_32 RegMask;     // used to represent set of registers
     typedef size_t Instnb;      // used to describe instruction number
 
     typedef Interval::Span Span;        // interval of instructions not crossed basic block boundary
@@ -120,8 +120,8 @@ struct RegAlloc2 : public SessionAction
 
     RegAlloc2 ()                    :mm("RegAlloc2"), registers(mm), opandmap(mm) {}
 
-    uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
-    uint32 getSideEffects () const  {return 0;}
+    U_32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
+    U_32 getSideEffects () const  {return 0;}
 
     void runImpl();
     bool verify(bool force=false);
@@ -500,7 +500,7 @@ void RegAlloc2::buildOpands ()
     opandmap.clear();
     opandmap.reserve(opandcount);
 
-    for (uint32 i = 0; i != opandcount; ++i)
+    for (U_32 i = 0; i != opandcount; ++i)
     {
         Opnd*  opnd  = irManager->getOpnd(i);
         Opand* opand = 0;
@@ -531,7 +531,7 @@ void RegAlloc2::buildOpands ()
 
     //irManager->indexInsts();
 
-    BitSet lives(mm, (uint32)opandcount);
+    BitSet lives(mm, (U_32)opandcount);
 
     const Nodes& nodes = irManager->getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
@@ -545,7 +545,7 @@ void RegAlloc2::buildOpands ()
             if (inst == 0)
                 continue;
 
-            uint32 instIndex=inst->getIndex();
+            U_32 instIndex=inst->getIndex();
             Opand * opand;
 
         //  start with the operands at the block bottom

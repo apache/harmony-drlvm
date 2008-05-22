@@ -169,7 +169,7 @@ static bool preload_attrs(String_Pool& string_pool)
 }
 
 static String* parse_signature_attr(ByteReader &cfs,
-                             uint32 attr_len,
+                             U_32 attr_len,
                              Class* clss)
 {
     //See specification 4.8.8 about attribute length
@@ -194,7 +194,7 @@ static
 Attributes parse_attribute(Class *clss,
                            ByteReader &cfs,
 			   AttributeID* attrs,
-                           uint32 *attr_len)
+                           U_32 *attr_len)
 {
     static bool UNUSED init = preload_attrs(VM_Global_State::loader_env->string_pool);
     //See specification 4.8 about Attributes
@@ -231,11 +231,11 @@ Attributes parse_attribute(Class *clss,
 } //parse_attribute
 
 // forward declaration
-static uint32
+static U_32
 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss);
 
 // returns number of read bytes, 0 if error occurred
-static uint32
+static U_32
 parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
 {
     unsigned initial_offset = cfs.get_offset();
@@ -285,7 +285,7 @@ parse_annotation(Annotation** value, ByteReader& cfs, Class* clss)
 }
 
 // returns number of read bytes, 0 if error occurred
-static uint32
+static U_32
 parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
 {
     unsigned initial_offset = cfs.get_offset();
@@ -434,7 +434,7 @@ parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
 }
 
 // returns number of read bytes, 0 if error occurred
-static uint32
+static U_32
 parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
 {
     unsigned initial_offset = cfs.get_offset();
@@ -465,7 +465,7 @@ parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
     return cfs.get_offset() - initial_offset;
 }
 
-static uint32
+static U_32
 parse_parameter_annotations(AnnotationTable *** table,
                                         uint8 num_annotations,
                                         ByteReader& cfs, Class* clss)
@@ -533,21 +533,21 @@ bool Class_Member::parse(Class* clss, ByteReader &cfs)
 static bool
 is_identifier(const char *name, unsigned len)
 {
-    uint32 u_ch;
+    U_32 u_ch;
     for(unsigned i = 0; i < len;) {
         unsigned ch_len = 0;
         if(name[i] & 0x80) {
             assert(name[i] & 0x40);
             if(name[i] & 0x20) {
-                uint32 x = name[i];
-                uint32 y = name[i + 1];
-                uint32 z = name[i + 2];
-                u_ch = (uint32)(((0x0f & x) << 12) + ((0x3f & y) << 6) + ((0x3f & z)));
+                U_32 x = name[i];
+                U_32 y = name[i + 1];
+                U_32 z = name[i + 2];
+                u_ch = (U_32)(((0x0f & x) << 12) + ((0x3f & y) << 6) + ((0x3f & z)));
                 ch_len = 3;
             } else {
-                uint32 x = name[i];
-                uint32 y = name[i + 1];
-                u_ch = (uint32)(((0x1f & x) << 6) + (0x3f & y));
+                U_32 x = name[i];
+                U_32 y = name[i + 1];
+                u_ch = (U_32)(((0x1f & x) << 6) + (0x3f & y));
                 ch_len = 2;
             }
         } else {
@@ -796,7 +796,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
     unsigned numConstantValue = 0;
     unsigned numRuntimeVisibleAnnotations = 0;
     unsigned numRuntimeInvisibleAnnotations = 0;
-    uint32 attr_len = 0;
+    U_32 attr_len = 0;
 
     ConstantPool& cp = clss->get_constant_pool();
 
@@ -968,7 +968,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
                     return false;
                 }
 
-                uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                U_32 read_len = parse_annotation_table(&_annotations, cfs, clss);
                 if(read_len == 0)
                     return false;
                 if (attr_len != read_len) {
@@ -991,7 +991,7 @@ bool Field::parse(Global_Env& env, Class *clss, ByteReader &cfs, bool is_trusted
                     return false;
                 }
                 if(env.retain_invisible_annotations) {
-                    uint32 read_len =
+                    U_32 read_len =
                         parse_annotation_table(&_invisible_annotations, cfs, clss);
                     if(read_len == 0)
                         return false;
@@ -1459,7 +1459,7 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
 
     static bool TI_enabled = VM_Global_State::loader_env->TI->isEnabled();
 
-    uint32 attr_len = 0;
+    U_32 attr_len = 0;
     LocalVarOffset* offset_lvt_array = NULL;
     LocalVarOffset* lvt_iter = NULL;
     LocalVarOffset* offset_lvtt_array = NULL;
@@ -1890,7 +1890,7 @@ bool Method::parse(Global_Env& env, Class* clss,
     unsigned numRuntimeVisibleAnnotations = 0;
     unsigned numRuntimeInvisibleAnnotations = 0;
     unsigned numRuntimeInvisibleParameterAnnotations = 0;
-    uint32 attr_len = 0;
+    U_32 attr_len = 0;
     ConstantPool& cp = clss->get_constant_pool();
 
     for (unsigned j=0; j<attr_count; j++) {
@@ -1938,9 +1938,9 @@ bool Method::parse(Global_Env& env, Class* clss,
                             "truncated class file: failed to parse number of InvisibleParameterAnnotations");
                         return false;
                     }
-                    uint32 read_len = 1;
+                    U_32 read_len = 1;
                     if (_num_invisible_param_annotations) {
-                        uint32 len =
+                        U_32 len =
                             parse_parameter_annotations(&_invisible_param_annotations,
                                         _num_invisible_param_annotations, cfs, _class);  
                         if(len == 0)
@@ -1979,9 +1979,9 @@ bool Method::parse(Global_Env& env, Class* clss,
                         "cannot parse number of ParameterAnnotations");
                     return false;
                 }
-                uint32 read_len = 1;
+                U_32 read_len = 1;
                 if (_num_param_annotations) {
-                    uint32 len = parse_parameter_annotations(&_param_annotations,
+                    U_32 len = parse_parameter_annotations(&_param_annotations,
                                     _num_param_annotations, cfs, _class);
                     if(len == 0)
                         return false;
@@ -2007,7 +2007,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                 _default_value = (AnnotationValue *)_class->get_class_loader()->Alloc(
                     sizeof(AnnotationValue));
                 //FIXME: verav should throw OOM
-                uint32 read_len = parse_annotation_value(*_default_value, cfs, clss);
+                U_32 read_len = parse_annotation_value(*_default_value, cfs, clss);
                 if (read_len == 0) {
                     return false;
                 } else if (read_len != attr_len) {
@@ -2066,7 +2066,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                     return false;
                 }
 
-                uint32 read_len = parse_annotation_table(&_annotations, cfs, clss);
+                U_32 read_len = parse_annotation_table(&_annotations, cfs, clss);
                 if(read_len == 0)
                     return false;
                 if (attr_len != read_len) {
@@ -2091,7 +2091,7 @@ bool Method::parse(Global_Env& env, Class* clss,
                 //RuntimeInvisibleAnnotations attribute is parsed only if
                 //command line option -Xinvisible is set. See specification 4.8.15.
                 if(env.retain_invisible_annotations) {
-                    uint32 read_len =
+                    U_32 read_len =
                         parse_annotation_table(&_invisible_annotations, cfs, clss);
                     if(read_len == 0)
                         return false;
@@ -2770,7 +2770,7 @@ bool Class::parse(Global_Env* env,
     /*
      *  get and check magic number (Oxcafebabe)
      */
-    uint32 magic;
+    U_32 magic;
     if (!cfs.parse_u4_be(&magic)) {
         REPORT_FAILED_CLASS_FORMAT(this, "class is not a valid Java class file");
         return false;
@@ -2995,7 +2995,7 @@ bool Class::parse(Global_Env* env,
     unsigned numEnclosingMethods = 0;
     unsigned numRuntimeVisibleAnnotations = 0;
     unsigned numRuntimeInvisibleAnnotations = 0;
-    uint32 attr_len = 0;
+    U_32 attr_len = 0;
 
     for (unsigned i=0; i<n_attrs; i++) {
         Attributes cur_attr = parse_attribute(this, cfs, class_attrs, &attr_len);
@@ -3253,7 +3253,7 @@ bool Class::parse(Global_Env* env,
                         "more than one RuntimeVisibleAnnotations attribute");
                     return false;
                 }
-                uint32 read_len = parse_annotation_table(&m_annotations, cfs, this);
+                U_32 read_len = parse_annotation_table(&m_annotations, cfs, this);
                 if(attr_len == 0)
                     return false;
                 if (attr_len != read_len) {
@@ -3276,7 +3276,7 @@ bool Class::parse(Global_Env* env,
                             "more than one RuntimeInvisibleAnnotations attribute");
                         return false;
                     }
-                    uint32 read_len = parse_annotation_table(&m_invisible_annotations, cfs, this);
+                    U_32 read_len = parse_annotation_table(&m_invisible_annotations, cfs, this);
                     if(read_len == 0)
                         return false;
                     if (attr_len != read_len) {
@@ -3386,7 +3386,7 @@ const String* class_extract_name(Global_Env* env,
 {
     ByteReader cfs(buffer, offset, length);
 
-    uint32 magic;
+    U_32 magic;
     // check magic
     if(!cfs.parse_u4_be(&magic) || magic != CLASSFILE_MAGIC)
         return NULL;

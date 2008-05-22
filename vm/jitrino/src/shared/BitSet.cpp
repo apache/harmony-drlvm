@@ -35,22 +35,22 @@ namespace Jitrino
 //
 // returns the word containing bitNumber
 //
-static inline uint32 getWordIndex(uint32 bitNumber) {
+static inline U_32 getWordIndex(U_32 bitNumber) {
     return (bitNumber >> WORD_SHIFT_AMOUNT);
 }
 //
 // returns a mask for bitNumber masking 
 //
-static inline uint32 getBitMask(uint32 bitNumber) {
+static inline U_32 getBitMask(U_32 bitNumber) {
     return (0x0001 << (bitNumber & WORD_MASK));
 }
 
-static uint32 getNumWords(uint32 setSize) {
+static U_32 getNumWords(U_32 setSize) {
     return setSize == 0 ? 0 : getWordIndex(setSize-1) + 1;
 }
 
 /*
-static uint32 getNumBytes(uint32 setSize) {
+static U_32 getNumBytes(U_32 setSize) {
     return setSize == 0 ? 0 : (setSize + 7) >> 3;
 }
 */
@@ -58,9 +58,9 @@ static uint32 getNumBytes(uint32 setSize) {
 // Constructors
 //
 
-static uint32* stub=(uint32*)0xDEADBEEF;
+static U_32* stub=(U_32*)0xDEADBEEF;
 
-BitSet::BitSet(MemoryManager& memManager, uint32 size)
+BitSet::BitSet(MemoryManager& memManager, U_32 size)
 :words(0), setSize(0), wordsCapacity(0), mm(memManager)
 {
     if (size != 0)
@@ -91,7 +91,7 @@ BitSet::BitSet(const BitSet& set)
 }
 
 
-BitSet::BitSet(MemoryManager& memManager, const BitSet& set, uint32 size)
+BitSet::BitSet(MemoryManager& memManager, const BitSet& set, U_32 size)
 :mm(memManager)
 {
     alloc(size);
@@ -113,14 +113,14 @@ BitSet& BitSet::operator = (const BitSet& set)
 }
 
 
-void BitSet::alloc(uint32 size)
+void BitSet::alloc(U_32 size)
 {
     assert(size != 0);
-    words = new (mm) uint32[wordsCapacity = getNumWords(setSize = size)];
+    words = new (mm) U_32[wordsCapacity = getNumWords(setSize = size)];
 }
 
 
-void BitSet::copy(uint32* src)
+void BitSet::copy(U_32* src)
 {
     for (int i = getNumWords(setSize); --i >= 0;)
         words[i] = src[i];
@@ -129,13 +129,13 @@ void BitSet::copy(uint32* src)
 }
 
 
-void BitSet::resize(uint32 newSetSize) {
+void BitSet::resize(U_32 newSetSize) {
     if (newSetSize > setSize ) {
-        uint32 newWordsCapacity = getNumWords(newSetSize);
+        U_32 newWordsCapacity = getNumWords(newSetSize);
         if (newWordsCapacity > wordsCapacity) {
-            uint32 *oldWords = words;
-            words = new (mm) uint32[newWordsCapacity];
-            for (uint32 i=0; i<wordsCapacity; i++) words[i] = oldWords[i];
+            U_32 *oldWords = words;
+            words = new (mm) U_32[newWordsCapacity];
+            for (U_32 i=0; i<wordsCapacity; i++) words[i] = oldWords[i];
             wordsCapacity = newWordsCapacity;
         }
         clearTrailingBits();
@@ -150,20 +150,20 @@ void BitSet::resize(uint32 newSetSize) {
 
 void BitSet::clearTrailingBits() 
 {
-    uint32 mk = getBitMask(setSize) - 1;
-    for (uint32 i = getWordIndex(setSize); i < wordsCapacity; ++i) {
+    U_32 mk = getBitMask(setSize) - 1;
+    for (U_32 i = getWordIndex(setSize); i < wordsCapacity; ++i) {
         words[i] &= mk;
         mk = 0;
     }
 }
 
 
-void BitSet::resizeClear(uint32 newSetSize) {
-    uint32 newWordsCapacity = getNumWords(newSetSize);
+void BitSet::resizeClear(U_32 newSetSize) {
+    U_32 newWordsCapacity = getNumWords(newSetSize);
     if (newWordsCapacity > wordsCapacity) 
-        words = new (mm) uint32[wordsCapacity = newWordsCapacity];
+        words = new (mm) U_32[wordsCapacity = newWordsCapacity];
 
-    for (uint32 i=0; i<wordsCapacity; i++) 
+    for (U_32 i=0; i<wordsCapacity; i++) 
         words[i] = 0;
     setSize = newSetSize;
 }
@@ -173,16 +173,16 @@ void BitSet::resizeClear(uint32 newSetSize) {
 //  Sets all bits to false
 //
 void BitSet::clear() {
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++)   words[i] = 0;
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++)   words[i] = 0;
 }
 //
 //  Sets all bits to true
 //
 void BitSet::setAll() {
     assert(words != 0);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++)  words[i] = ~((uint32)0);
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++)  words[i] = ~((U_32)0);
     clearTrailingBits();
 }
 //
@@ -190,24 +190,24 @@ void BitSet::setAll() {
 //
 bool BitSet::isEmpty() const {
     assert(words != 0);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) if (words[i] != 0) return false;
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) if (words[i] != 0) return false;
     return true;
 }
 //
 //  Sets 32 bits to values indicated by a bit mask and returns old values
 //
-uint32 BitSet::set32Bits(uint32 firstBitNumber, uint32 value) {
+U_32 BitSet::set32Bits(U_32 firstBitNumber, U_32 value) {
     assert(words != 0 && firstBitNumber < setSize || firstBitNumber % 32 == 0);
-    uint32 wordIndex = getWordIndex(firstBitNumber);
-    uint32 oldValue = words[wordIndex];
+    U_32 wordIndex = getWordIndex(firstBitNumber);
+    U_32 oldValue = words[wordIndex];
     words[wordIndex] = value;
     return oldValue;
 }
 //
 //  Returns values of 32 bits encoded as a bit mask
 //
-uint32 BitSet::get32Bits(uint32 firstBitNumber) {
+U_32 BitSet::get32Bits(U_32 firstBitNumber) {
     assert(words != 0 && firstBitNumber < setSize || firstBitNumber % 32 == 0);
     return words[getWordIndex(firstBitNumber)];
 }
@@ -220,8 +220,8 @@ void BitSet::copyFrom(const BitSet& set) {
         if (words == 0)
             alloc(set.setSize);
         assert(setSize == set.setSize);
-        uint32 numWords = getNumWords(setSize);
-        for (uint32 i=0; i<numWords; i++) words[i] = set.words[i];
+        U_32 numWords = getNumWords(setSize);
+        for (U_32 i=0; i<numWords; i++) words[i] = set.words[i];
     }
 }
 //
@@ -233,10 +233,10 @@ void BitSet::copyFromSmallerSet(const BitSet& set) {
     if (words == 0)
         alloc(set.setSize);
     assert(setSize >= set.setSize);
-    uint32 numWords1 = getNumWords(setSize);
-    uint32 numWords2 = getNumWords(set.setSize);
+    U_32 numWords1 = getNumWords(setSize);
+    U_32 numWords2 = getNumWords(set.setSize);
     assert(numWords1 >= numWords2);
-    uint32 i;
+    U_32 i;
     for (i=0; i<numWords2; i++) words[i] = set.words[i];
     for (i=numWords2; i<numWords1; i++) words[i] = 0;
 }
@@ -245,24 +245,24 @@ void BitSet::copyFromSmallerSet(const BitSet& set) {
 //
 void BitSet::unionWith(const BitSet& set) {
     assert(words != 0 && set.words != 0 && setSize == set.setSize);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) words[i] |= set.words[i];
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) words[i] |= set.words[i];
 }
 //
 //  Intersects with another set
 //
 void BitSet::intersectWith(const BitSet& set) {
     assert(words != 0 && set.words != 0 && setSize == set.setSize);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) words[i] &= set.words[i];
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) words[i] &= set.words[i];
 }
 //
 //  Subtracts another set
 //
 void BitSet::subtract(const BitSet& set) {
     assert(words != 0 && set.words != 0 && setSize == set.setSize);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) words[i] &= ~(set.words[i]);
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) words[i] &= ~(set.words[i]);
 }
 //
 //  Checks if this set is equal to another one
@@ -270,8 +270,8 @@ void BitSet::subtract(const BitSet& set) {
 bool BitSet::isEqual(const BitSet& set) {
     assert(words != 0 && set.words != 0);
     if (setSize != set.setSize) return false;
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) {
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) {
         if (words[i] != set.words[i]) return false;
     }
     return true;
@@ -281,8 +281,8 @@ bool BitSet::isEqual(const BitSet& set) {
 //
 bool BitSet::isDisjoint(const BitSet& set) {
     assert(words != 0 && set.words != 0 && setSize == set.setSize);
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) {
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) {
         if ((words[i] & set.words[i]) != 0) return false;
     }
     return true;
@@ -292,8 +292,8 @@ bool BitSet::isDisjoint(const BitSet& set) {
 //
 bool BitSet::isLessOrEqual(const BitSet& set) {
     assert(words != 0 && set.words != 0 && setSize == set.setSize);
-    uint32 numWords = getNumWords(setSize);
-    for  (uint32 i=0; i<numWords; i++) {
+    U_32 numWords = getNumWords(setSize);
+    for  (U_32 i=0; i<numWords; i++) {
         if ((words[i] & (~set.words[i])) != 0) return false;
     }
     return true;
@@ -301,11 +301,11 @@ bool BitSet::isLessOrEqual(const BitSet& set) {
 
 void BitSet::visitElems(Visitor& visitor) const {
     assert(words != 0);
-    uint32 bitNumber = 0;
-    uint32 numWords = getNumWords(setSize);
-    for (uint32 i=0; i<numWords; i++) {
-        uint32 word = words[i];
-        for (uint32 mask = 0x0001; mask != 0; mask = mask << 1) {
+    U_32 bitNumber = 0;
+    U_32 numWords = getNumWords(setSize);
+    for (U_32 i=0; i<numWords; i++) {
+        U_32 word = words[i];
+        for (U_32 mask = 0x0001; mask != 0; mask = mask << 1) {
             if ((word & mask) != 0)
                 visitor.visit(bitNumber);
             bitNumber++;

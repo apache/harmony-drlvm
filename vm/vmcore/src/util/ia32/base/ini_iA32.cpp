@@ -39,26 +39,26 @@
 
 #include "dump.h"
 
-typedef ManagedObject* (*RefFuncPtr)(uint32* args, int args_size, void* func);
-typedef int32 (*IntFuncPtr)(uint32* args, int args_size, void* func);
-typedef int64 (*LongFuncPtr)(uint32* args, int args_size, void* func);
-typedef float (*FloatFuncPtr)(uint32* args, int args_size, void* func);
-typedef double (*DoubleFuncPtr)(uint32* args, int args_size, void* func);
+typedef ManagedObject* (*RefFuncPtr)(U_32* args, int args_size, void* func);
+typedef I_32 (*IntFuncPtr)(U_32* args, int args_size, void* func);
+typedef int64 (*LongFuncPtr)(U_32* args, int args_size, void* func);
+typedef float (*FloatFuncPtr)(U_32* args, int args_size, void* func);
+typedef double (*DoubleFuncPtr)(U_32* args, int args_size, void* func);
 
 static char* gen_invoke_common_managed_func(char* stub) {
     // Defines stack alignment on managed function enter.
-    const int32 STACK_ALIGNMENT = MANAGED_STACK_ALIGNMENT;
-    const int32 STACK_ALIGNMENT_MASK = ~(STACK_ALIGNMENT - 1);
+    const I_32 STACK_ALIGNMENT = MANAGED_STACK_ALIGNMENT;
+    const I_32 STACK_ALIGNMENT_MASK = ~(STACK_ALIGNMENT - 1);
     const char * LOOP_BEGIN = "loop_begin";
     const char * LOOP_END = "loop_end";
 
     // [ebp + 8] - args
     // [ebp + 12] - size
     // [ebp + 16] - func
-    const int32 STACK_ARGS_OFFSET = 8;
-    const int32 STACK_NARGS_OFFSET = 12;
-    const int32 STACK_FUNC_OFFSET = 16;
-    const int32 STACK_CALLEE_SAVED_OFFSET = -12;
+    const I_32 STACK_ARGS_OFFSET = 8;
+    const I_32 STACK_NARGS_OFFSET = 12;
+    const I_32 STACK_FUNC_OFFSET = 16;
+    const I_32 STACK_CALLEE_SAVED_OFFSET = -12;
     
     tl::MemoryPool pool;
     LilCguLabelAddresses labels(&pool, stub);
@@ -216,7 +216,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             << method->get_descriptor()->bytes);
     int sz = method->get_num_arg_slots();
     void *meth_addr = method->get_code_addr();
-    uint32 *arg_words = (uint32*) STD_ALLOCA(sz * sizeof(uint32));
+    U_32 *arg_words = (U_32*) STD_ALLOCA(sz * sizeof(U_32));
 
     int argId = sz;
     int pos = 0;
@@ -247,26 +247,26 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
 
             case JAVA_TYPE_SHORT:
                 // sign extend
-                arg_words[--argId] = (uint32)(int32) args[pos++].s;
+                arg_words[--argId] = (U_32)(I_32) args[pos++].s;
                 break;
             case JAVA_TYPE_BYTE:
                 // sign extend
-                arg_words[--argId] = (uint32)(int32) args[pos++].b;
+                arg_words[--argId] = (U_32)(I_32) args[pos++].b;
                 break;
             case JAVA_TYPE_INT:
                 // sign extend
-                arg_words[--argId] = (uint32)(int32) args[pos++].i;
+                arg_words[--argId] = (U_32)(I_32) args[pos++].i;
                 break;
 
             case JAVA_TYPE_FLOAT:
-                arg_words[--argId] = (int32) args[pos++].i;
+                arg_words[--argId] = (I_32) args[pos++].i;
                 break;
             case JAVA_TYPE_BOOLEAN:
-                arg_words[--argId] = (int32) args[pos++].z;
+                arg_words[--argId] = (I_32) args[pos++].z;
                 break;
             case JAVA_TYPE_CHAR:
                 // zero extend
-                arg_words[--argId] = (int32) args[pos++].c;
+                arg_words[--argId] = (I_32) args[pos++].c;
                 break;
 
             case JAVA_TYPE_LONG:

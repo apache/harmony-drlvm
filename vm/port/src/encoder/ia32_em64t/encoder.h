@@ -222,14 +222,14 @@ protected:
         int64           value;
         unsigned char   bytes[8];
 #else
-        int32           value;
+        I_32           value;
         unsigned char   bytes[4];
 #endif
     };
     Opnd_Size           size;
 
 public:
-    Imm_Opnd(int32 val): Opnd(Imm), value(val), size(size_32) {
+    Imm_Opnd(I_32 val): Opnd(Imm), value(val), size(size_32) {
         if (CHAR_MIN <= val && val <= CHAR_MAX) {
             size = size_8;
         }
@@ -250,7 +250,7 @@ public:
             assert(val == (int64)(int16)val);
             break;
         case size_32:
-            assert(val == (int64)(int32)val);
+            assert(val == (int64)(I_32)val);
             break;
         case size_64:
             break;
@@ -265,14 +265,14 @@ public:
 
 #else
 
-    Imm_Opnd(Opnd_Size sz, int32 val): Opnd(Imm), value(val), size(sz) {
+    Imm_Opnd(Opnd_Size sz, I_32 val): Opnd(Imm), value(val), size(sz) {
 #ifndef NDEBUG
         switch (size) {
         case size_8:
-            assert((int32)val == (int32)(int8)val);
+            assert((I_32)val == (I_32)(int8)val);
             break;
         case size_16:
-            assert((int32)val == (int32)(int16)val);
+            assert((I_32)val == (I_32)(int16)val);
             break;
         case size_32:
             break;
@@ -284,7 +284,7 @@ public:
 #endif // NDEBUG
     }
     
-    int32 get_value() const { return value; }
+    I_32 get_value() const { return value; }
 
 #endif
     Opnd_Size get_size(void) const { return size; }
@@ -331,11 +331,11 @@ protected:
 
 public:
     //M_Opnd(Opnd_Size sz): RM_Opnd(Mem, K_M, sz), m_disp(0), m_scale(0), m_index(n_reg), m_base(n_reg) {}
-    M_Opnd(int32 disp):
+    M_Opnd(I_32 disp):
         RM_Opnd(Mem), m_disp(disp), m_scale(0), m_index(n_reg), m_base(n_reg) {}
-    M_Opnd(Reg_No rbase, int32 rdisp): 
+    M_Opnd(Reg_No rbase, I_32 rdisp): 
         RM_Opnd(Mem), m_disp(rdisp), m_scale(0), m_index(n_reg), m_base(rbase) {}
-    M_Opnd(int32 disp, Reg_No rbase, Reg_No rindex, unsigned scale):
+    M_Opnd(I_32 disp, Reg_No rbase, Reg_No rindex, unsigned scale):
         RM_Opnd(Mem), m_disp(disp), m_scale(scale), m_index(rindex), m_base(rbase) {}
     M_Opnd(const M_Opnd & that) : RM_Opnd(Mem), 
         m_disp((int)that.m_disp.get_value()), m_scale((int)that.m_scale.get_value()),
@@ -354,7 +354,7 @@ public:
 class M_Base_Opnd: public M_Opnd {
 
 public:
-    M_Base_Opnd(Reg_No base, int32 disp) : M_Opnd(disp, base, n_reg, 0) {}
+    M_Base_Opnd(Reg_No base, I_32 disp) : M_Opnd(disp, base, n_reg, 0) {}
 
 private:
     // disallow copying - but it leads to ICC errors #734 in encoder.inl
@@ -368,7 +368,7 @@ private:
 class M_Index_Opnd : public M_Opnd {
 
 public:
-    M_Index_Opnd(Reg_No base, Reg_No index, int32 disp, unsigned scale):
+    M_Index_Opnd(Reg_No base, Reg_No index, I_32 disp, unsigned scale):
         M_Opnd(disp, base, index, scale) {}
 
 private:
@@ -567,7 +567,7 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, const RM_Opnd & rm, Opnd_Size 
 ENCODER_DECLARE_EXPORT char *jump(char * stream, char *target);
 
 // jump with displacement
-//char * jump(char * stream, int32 disp);
+//char * jump(char * stream, I_32 disp);
 
 // conditional branch with 8-bit branch offset
 ENCODER_DECLARE_EXPORT char * branch8(char * stream, ConditionCode cc, const Imm_Opnd & imm, InstrPrefix prefix = no_prefix);
@@ -579,7 +579,7 @@ ENCODER_DECLARE_EXPORT char * branch32(char * stream, ConditionCode cc, const Im
 //char * branch(char * stream, ConditionCode cc, const char * target, InstrPrefix prefix = no_prefix);
 
 // conditional branch with displacement immediate
-ENCODER_DECLARE_EXPORT char * branch(char * stream, ConditionCode cc, int32 disp, InstrPrefix prefix = no_prefix);
+ENCODER_DECLARE_EXPORT char * branch(char * stream, ConditionCode cc, I_32 disp, InstrPrefix prefix = no_prefix);
 
 // call with displacement
 ENCODER_DECLARE_EXPORT char * call(char * stream, const Imm_Opnd & imm);

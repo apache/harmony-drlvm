@@ -723,8 +723,8 @@ void Method::unlock()
     _class->unlock();
 }
 
-void Method::add_inline_info_entry(Method* method, uint32 codeSize, void* codeAddr,
-        uint32 mapLength, AddrLocation* addrLocationMap) {
+void Method::add_inline_info_entry(Method* method, U_32 codeSize, void* codeAddr,
+        U_32 mapLength, AddrLocation* addrLocationMap) {
     if (NULL == _inline_info) 
         _inline_info = new InlineInfo();
 

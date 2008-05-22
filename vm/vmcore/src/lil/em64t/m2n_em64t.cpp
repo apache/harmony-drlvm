@@ -283,7 +283,7 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
                         bool handles,
                         unsigned num_callee_saves,
                         unsigned num_std_need_to_save,
-                        int32 bytes_to_m2n_top) {
+                        I_32 bytes_to_m2n_top) {
     // skip callee-saves registers
     bytes_to_m2n_top -= num_callee_saves * LcgEM64TContext::GR_SIZE;
     // TODO: check if it makes sense to save all callee-saves registers here
@@ -324,7 +324,7 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
         num_std_need_to_save, 0);
     
     // shift to the last_m2n_frame field
-    int32 last_m2n_frame_offset = (int32)(int64)&((VM_thread*)0)->last_m2n_frame;
+    I_32 last_m2n_frame_offset = (I_32)(int64)&((VM_thread*)0)->last_m2n_frame;
     buf = alu(buf, add_opc,  rax_opnd,  Imm_Opnd(size_32, last_m2n_frame_offset), size_64);
     // store pointer to pointer to last m2n frame
     bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
@@ -367,7 +367,7 @@ static void m2n_free_local_handles() {
 }
 
 char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
-                      int32 bytes_to_m2n_bottom, unsigned num_preserve_ret) {
+                      I_32 bytes_to_m2n_bottom, unsigned num_preserve_ret) {
     assert (num_preserve_ret <= 2);
     assert(LcgEM64TContext::GR_SIZE == 8);
 

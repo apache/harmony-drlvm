@@ -52,7 +52,7 @@ namespace Jitrino
 namespace Ia32
 {
 
-const char * newString(MemoryManager& mm, const char * str, uint32 length=EmptyUint32);
+const char * newString(MemoryManager& mm, const char * str, U_32 length=EmptyUint32);
 
 //========================================================================================
 // STL aux classes (need to be moved somewhere)
@@ -124,8 +124,8 @@ public:
     struct AliasRelation
     {
         Opnd * outerOpnd;
-        uint32 offset;
-        AliasRelation(Opnd * oo =0, uint32 offs=0)
+        U_32 offset;
+        AliasRelation(Opnd * oo =0, U_32 offs=0)
             :outerOpnd(oo), offset(offs){}
     };
 
@@ -144,15 +144,15 @@ public:
 
     ConstantAreaItem *  newConstantAreaItem(float f);
     ConstantAreaItem *  newConstantAreaItem(double d);
-    ConstantAreaItem *  newSwitchTableConstantAreaItem(uint32 numTargets);
+    ConstantAreaItem *  newSwitchTableConstantAreaItem(U_32 numTargets);
     ConstantAreaItem *  newInternalStringConstantAreaItem(const char * str);
-    ConstantAreaItem *  newBinaryConstantAreaItem(uint32 size, const void * pv);
+    ConstantAreaItem *  newBinaryConstantAreaItem(U_32 size, const void * pv);
 
     Opnd * newFPConstantMemOpnd(float f, Opnd * baseOpnd=0, BasicBlock * bb=0);
     Opnd * newFPConstantMemOpnd(double f, Opnd * baseOpnd=0, BasicBlock * bb=0);
 
     Opnd * newInternalStringConstantImmOpnd(const char * str);
-    Opnd * newBinaryConstantImmOpnd(uint32 size, const void * pv);
+    Opnd * newBinaryConstantImmOpnd(U_32 size, const void * pv);
 
     /** Creates a new operand assigned to a physical register */
     Opnd * newRegOpnd(Type * type, RegName reg);
@@ -162,7 +162,7 @@ public:
     /** Shortcut: Creates a new operand assigned to a memory location of kind Heap */
     Opnd * newMemOpnd(Type * type, Opnd * base, Opnd * index=0, Opnd * scale=0, Opnd * displacement=0, RegName segReg=RegName_Null);
     /** Shortcut: Creates a new operand assigned to a memory location of kind k */
-    Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, int32 displacement, RegName segReg=RegName_Null);
+    Opnd * newMemOpnd(Type * type, MemOpndKind k, Opnd * base, I_32 displacement, RegName segReg=RegName_Null);
 
     Opnd * newMemOpndAutoKind(Type * type, MemOpndKind k, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0);
     Opnd * newMemOpndAutoKind(Type * type, Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0)
@@ -178,9 +178,9 @@ public:
         );
 
     /** Creates a new Extended Inst defined by mnemonic with up to 8 operands */
-    Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
+    Inst * newInstEx(Mnemonic mnemonic, U_32 defCount, Opnd * opnd0=0, Opnd * opnd1=0, Opnd * opnd2=0);
 
-    Inst * newInstEx(Mnemonic mnemonic, uint32 defCount, 
+    Inst * newInstEx(Mnemonic mnemonic, U_32 defCount, 
         Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
         Opnd * opnd4, Opnd * opnd5=0, Opnd * opnd6=0, Opnd * opnd7=0
         );
@@ -193,19 +193,19 @@ public:
     */
     BranchInst * newBranchInst(Mnemonic mnemonic, Node* trueTarget, Node* falseTarget, Opnd * targetOpnd=0); 
 
-    SwitchInst * newSwitchInst(uint32 numTargets, Opnd * index);
+    SwitchInst * newSwitchInst(U_32 numTargets, Opnd * index);
 
     JumpInst * newJumpInst(Opnd * targetOpnd=0); 
 
     /** Creates a CallInst instance. */
     CallInst *  newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
-        uint32 numArgs, Opnd ** args, Opnd * retOpnd);
+        U_32 numArgs, Opnd ** args, Opnd * retOpnd);
 
     /** A specialization of the newCallInst to create a VM Helper CallInst. */
     CallInst *  newRuntimeHelperCallInst(VM_RT_SUPPORT helperId, 
-        uint32 numArgs, Opnd ** args, Opnd * retOpnd);
+        U_32 numArgs, Opnd ** args, Opnd * retOpnd);
     /** A specialization of the newCallInst to create an internal helper CallInst. */
-    CallInst *  newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd);
+    CallInst *  newInternalRuntimeHelperCallInst(const char * internalHelperID, U_32 numArgs, Opnd ** args, Opnd * retOpnd);
 
     void registerInternalHelperInfo(const char * internalHelperID, const InternalHelperInfo& info);
     const InternalHelperInfo *  getInternalHelperInfo(const char * internalHelperID)const
@@ -214,14 +214,14 @@ public:
     const char * newInternalString(const char * originalString)const
     { return newString(memoryManager, originalString); }
 
-    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 offset);
-    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, uint32 sourceOpndCount, Opnd ** sourceOpnds);
+    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 offset);
+    AliasPseudoInst * newAliasPseudoInst(Opnd * targetOpnd, U_32 sourceOpndCount, Opnd ** sourceOpnds);
 
     CMPXCHG8BPseudoInst * newCMPXCHG8BPseudoInst(Opnd* mem, Opnd* edx, Opnd* eax, Opnd* ecx, Opnd* ebx);
 
     CatchPseudoInst * newCatchPseudoInst(Opnd * exception);
 
-    Inst * newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
+    Inst * newI8PseudoInst(Mnemonic mnemonic, U_32 defCount,
             Opnd * opnd0, Opnd * opnd1=0, Opnd * opnd2=0, Opnd * opnd3=0
         );
 
@@ -240,7 +240,7 @@ public:
     */
     EntryPointPseudoInst * newEntryPointPseudoInst(const CallingConvention * cc);
 
-    Inst * newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL, uint32 regUsageMask=(uint32)~0, uint32 flagsRegUsageMask=(uint32)~0);
+    Inst * newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1=NULL, U_32 regUsageMask=(U_32)~0, U_32 flagsRegUsageMask=(U_32)~0);
 
     /** Creates an EmptyPseudoInst instruction to fill BB, which shoud not be cosidered as an empty one.
     */
@@ -266,11 +266,11 @@ public:
 
     const CallingConvention * getCallingConvention()const { assert(NULL!=entryPointInst); return getEntryPointInst()->getCallingConventionClient().getCallingConvention(); }
 
-    Opnd * defArg(Type * type, uint32 position);
+    Opnd * defArg(Type * type, U_32 position);
 
     void applyCallingConventions();
 
-    uint32 getMaxInstId() { return instId; }
+    U_32 getMaxInstId() { return instId; }
 
     //-----------------------------------------------------------------------------------------------
     /** Updates operands resolving their RuntimeInfo */
@@ -287,7 +287,7 @@ public:
     /** calculate liveness information */
     void calculateLivenessInfo();
 
-    void fixLivenessInfo( uint32 * map = NULL );
+    void fixLivenessInfo( U_32 * map = NULL );
 
     bool hasLivenessInfo()const
     { 
@@ -316,20 +316,20 @@ public:
 
     /** returns the reg usage information for node entry 
     as uint32containing bit mask for used registers */
-    uint32 getRegUsageAtEntry(const Node * node, OpndKind regKind)const
+    U_32 getRegUsageAtEntry(const Node * node, OpndKind regKind)const
     {   return getRegUsageFromLiveSet(getLiveAtEntry(node), regKind);   }
 
     /** returns the reg usage information for node exit 
-    as uint32 containing bit mask for used registers */
-    void getRegUsageAtExit(const Node * node, OpndKind regKind, uint32 & mask)const;
+    as U_32 containing bit mask for used registers */
+    void getRegUsageAtExit(const Node * node, OpndKind regKind, U_32 & mask)const;
 
     /** use this function to update reg usage in a single postorder pass when liveness info is calculated */
-    void updateRegUsage(const Inst * inst, OpndKind regKind, uint32 & mask)const;
+    void updateRegUsage(const Inst * inst, OpndKind regKind, U_32 & mask)const;
 
-    uint32 getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const;
+    U_32 getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const;
 
     /** returns Constraint containing bit mask for all registers used in the method */
-    uint32 getTotalRegUsage(OpndKind regKind)const;
+    U_32 getTotalRegUsage(OpndKind regKind)const;
 
     void calculateTotalRegUsage(OpndKind regKind);
 
@@ -373,7 +373,7 @@ public:
     ControlFlowGraph* createSubCFG(bool withReturn, bool withUnwind);
 
     /** expands SystemExceptionCheckPseudoInst */
-    void expandSystemExceptions(uint32 reservedForFlags);
+    void expandSystemExceptions(U_32 reservedForFlags);
 
     /** generater code to throw noted type exception, set for code BC offset and include into basic block*/
     void throwException(ObjectType* excType, uint16 bcOffset, Node* basicBlock);
@@ -389,25 +389,25 @@ public:
         2) (re-)calculates operand statistics (ref counts)
         3) If reindex is true it sets new sequential Opnd::id 
         for all operands with refcount>0(used for packOpnds)*/
-    uint32 calculateOpndStatistics(bool reindex=false);
+    U_32 calculateOpndStatistics(bool reindex=false);
 
     /** this function performs the following:
         1) calls calculateOpndStatistics().
         2) removes operands with zero ref counts from the internal
-        array of all operands accessed via IRManager::getOpnd(uint32).
+        array of all operands accessed via IRManager::getOpnd(U_32).
     */
     void packOpnds();
 
     /** returns the number of operands in the internal
-        array of all operands accessed via IRManager::getOpnd(uint32).
+        array of all operands accessed via IRManager::getOpnd(U_32).
         This number is affected by packOpnds which removes from the array all operands which
         are no longer in the LIR.
     */
-    uint32 getOpndCount()const
-    { return (uint32)opnds.size(); }
+    U_32 getOpndCount()const
+    { return (U_32)opnds.size(); }
 
     /** returns an operand from the internal array of all operands by its ID. */
-    Opnd * getOpnd(uint32 id)const
+    Opnd * getOpnd(U_32 id)const
     { 
         assert(id<opnds.size()); return opnds[id]; 
     }
@@ -416,18 +416,18 @@ public:
     void resetOpndConstraints();
 
     //-----------------------------------------------------------------------------------------------
-    uint32 assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnds, uint32 offset);
-    void assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, uint32 innerOpndCount);
+    U_32 assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnds, U_32 offset);
+    void assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, U_32 innerOpndCount);
     void layoutAliasPseudoInstOpnds(AliasPseudoInst * inst);
     void getAliasRelations(AliasRelation * relations);
     void layoutAliasOpnds();
-    uint32 getLayoutOpndAlignment(Opnd * opnd);
+    U_32 getLayoutOpndAlignment(Opnd * opnd);
     void finalizeCallSites();
 
     /** Calculates displacement from stack entry point
         for every instruction and returns maximum stack depth needed for a method
     */
-    uint32 calculateStackDepth();
+    U_32 calculateStackDepth();
     //-----------------------------------------------------------------------------------------------
     bool verify();
     bool verifyOpnds() const;
@@ -468,8 +468,8 @@ public:
     bool isRegisterSetLocked(OpndKind regKind){ return true; } 
     void lockRegisterSet(OpndKind regKind){ } 
 
-    void setVerificationLevel(uint32 v){ verificationLevel=v; }
-    uint32 getVerificationLevel()const{ return verificationLevel; }
+    void setVerificationLevel(U_32 v){ verificationLevel=v; }
+    U_32 getVerificationLevel()const{ return verificationLevel; }
 
     bool refsAreCompressed() {return refsCompressed;}
 protected:
@@ -480,11 +480,11 @@ protected:
 
     void addOpnd(Opnd * opnd);
 
-    void addAliasRelation(AliasRelation * relations, Opnd * opndOuter, Opnd * opndInner, uint32 offset);
+    void addAliasRelation(AliasRelation * relations, Opnd * opndOuter, Opnd * opndInner, U_32 offset);
 
-    Inst * newCopySequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask=(uint32)~0, uint32 flagsRegUsageMask=(uint32)~0);
-    Inst * newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMask=(uint32)~0);
-    Inst * newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask, bool checkSource=false);
+    Inst * newCopySequence(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 regUsageMask=(U_32)~0, U_32 flagsRegUsageMask=(U_32)~0);
+    Inst * newPushPopSequence(Mnemonic mn, Opnd * opnd, U_32 regUsageMask=(U_32)~0);
+    Inst * newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 regUsageMask, bool checkSource=false);
 
     void initInitialConstraints();
     Constraint createInitialConstraint(Type::Tag t)const;
@@ -497,12 +497,12 @@ protected:
     MethodDesc              &       methodDesc;
     CompilationInterface    &       compilationInterface;
 
-    uint32                          opndId;
-    uint32                          instId;
+    U_32                          opndId;
+    U_32                          instId;
 
     OpndVector                      opnds;
 
-    uint32                          gpTotalRegUsage;
+    U_32                          gpTotalRegUsage;
 
     EntryPointPseudoInst *          entryPointInst;
 
@@ -514,7 +514,7 @@ protected:
 
     ConstCharStringToVoidPtrMap     infoMap;
 
-    uint32                          verificationLevel;
+    U_32                          verificationLevel;
 
     bool                            hasCalls;
     bool                            hasNonExceptionCalls;
@@ -577,7 +577,7 @@ protected:
     The returned value is |-ed from the NeedInfo enum
 
     Optional, defaults to all possible info */
-    virtual uint32 getNeedInfo()const;
+    virtual U_32 getNeedInfo()const;
 
     /** Implementors override getSideEffects() to indicate the side effect 
     of the pass (currently in terms of common info like liveness, loop, etc.)
@@ -585,7 +585,7 @@ protected:
     The returned value is |-ed from the SideEffect enum
 
     Optional, defaults to all possible side effects */
-    virtual uint32 getSideEffects()const;
+    virtual U_32 getSideEffects()const;
     /**
      * Forces dominator tree to be valid
      */
@@ -607,7 +607,7 @@ protected:
 
     IRManager * irManager;
 
-    uint32      stageId;
+    U_32      stageId;
 };
 
 

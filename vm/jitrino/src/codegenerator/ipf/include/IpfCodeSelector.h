@@ -43,9 +43,9 @@ public:
                          IpfMethodCodeSelector(Cfg&, CompilationInterface&);
     MethodDesc           *getMethodDesc();
 
-    void                 genVars(uint32, VarCodeSelector&);
+    void                 genVars(U_32, VarCodeSelector&);
     void                 setMethodDesc(MethodDesc*);
-    void                 genCFG(uint32, CFGCodeSelector&, bool);
+    void                 genCFG(U_32, CFGCodeSelector&, bool);
 //    void                 setProfileInfo(CodeProfiler*) {}
     virtual              ~IpfMethodCodeSelector() {}
 
@@ -65,8 +65,8 @@ protected:
 class IpfVarCodeSelector : public VarCodeSelector::Callback {
 public:
                   IpfVarCodeSelector(Cfg&, OpndVector&);
-    uint32        defVar(Type*, bool, bool);
-    void          setManagedPointerBase(uint32, uint32);
+    U_32        defVar(Type*, bool, bool);
+    void          setManagedPointerBase(U_32, U_32);
 
 protected:
     MemoryManager &mm;
@@ -82,19 +82,19 @@ protected:
 class IpfCfgCodeSelector : public CFGCodeSelector::Callback {
 public:
                          IpfCfgCodeSelector(Cfg&, NodeVector&, OpndVector&, CompilationInterface&);
-    uint32               genDispatchNode(uint32, uint32, const StlVector<MethodDesc*>&, double);
-    uint32               genBlock(uint32, uint32, BlockKind, BlockCodeSelector&, double);
-    uint32               genUnwindNode(uint32, uint32, double);
-    uint32               genExitNode(uint32, double);
-    void                 genUnconditionalEdge(uint32, uint32, double);
-    void                 genTrueEdge(uint32, uint32, double);
-    void                 genFalseEdge(uint32, uint32, double);
-    void                 genSwitchEdges(uint32, uint32, uint32*, double*, uint32);
-    void                 genExceptionEdge(uint32, uint32, double);
-    void                 genCatchEdge(uint32, uint32, uint32, Type*, double);
-    void                 genExitEdge(uint32, uint32, double);
-    void                 setLoopInfo(uint32, bool, bool, uint32);
-    void                 setPersistentId(uint32, uint32);
+    U_32               genDispatchNode(U_32, U_32, const StlVector<MethodDesc*>&, double);
+    U_32               genBlock(U_32, U_32, BlockKind, BlockCodeSelector&, double);
+    U_32               genUnwindNode(U_32, U_32, double);
+    U_32               genExitNode(U_32, double);
+    void                 genUnconditionalEdge(U_32, U_32, double);
+    void                 genTrueEdge(U_32, U_32, double);
+    void                 genFalseEdge(U_32, U_32, double);
+    void                 genSwitchEdges(U_32, U_32, U_32*, double*, U_32);
+    void                 genExceptionEdge(U_32, U_32, double);
+    void                 genCatchEdge(U_32, U_32, U_32, Type*, double);
+    void                 genExitEdge(U_32, U_32, double);
+    void                 setLoopInfo(U_32, bool, bool, U_32);
+    void                 setPersistentId(U_32, U_32);
     virtual              ~IpfCfgCodeSelector() {}
 
 protected:
@@ -142,19 +142,19 @@ public:
     CG_OpndHandle *shl   (IntegerOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *shr   (IntegerOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *shru  (IntegerOp::Types, CG_OpndHandle*, CG_OpndHandle*);
-    CG_OpndHandle *shladd(IntegerOp::Types, CG_OpndHandle*, uint32, CG_OpndHandle*);
+    CG_OpndHandle *shladd(IntegerOp::Types, CG_OpndHandle*, U_32, CG_OpndHandle*);
 
     CG_OpndHandle *convToInt(ConvertToIntOp::Types, bool, bool, ConvertToIntOp::OverflowMod, Type*, CG_OpndHandle*);
     CG_OpndHandle *convToFp(ConvertToFpOp::Types, Type*, CG_OpndHandle*);
 
-    CG_OpndHandle *ldc_i4(int32);
+    CG_OpndHandle *ldc_i4(I_32);
     CG_OpndHandle *ldc_i8(int64);
     CG_OpndHandle *ldc_s(float);
     CG_OpndHandle *ldc_d(double);
     CG_OpndHandle *ldnull(bool);
-    CG_OpndHandle *ldVar(Type*, uint32);
-    void          stVar(CG_OpndHandle*, uint32);
-    CG_OpndHandle *defArg(uint32, Type*);
+    CG_OpndHandle *ldVar(Type*, U_32);
+    void          stVar(CG_OpndHandle*, U_32);
+    CG_OpndHandle *defArg(U_32, Type*);
 
     CG_OpndHandle *cmp   (CompareOp::Operators, CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, int);
     CG_OpndHandle *czero (CompareZeroOp::Types, CG_OpndHandle*);
@@ -170,11 +170,11 @@ public:
     void          branch(CompareOp::Operators, CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*);
     void          bzero (CompareZeroOp::Types, CG_OpndHandle*);
     void          bnzero(CompareZeroOp::Types, CG_OpndHandle*);
-    void          tableSwitch(CG_OpndHandle*, uint32);       
+    void          tableSwitch(CG_OpndHandle*, U_32);       
 
-    CG_OpndHandle *call(uint32, CG_OpndHandle**, Type*, MethodDesc*);
-    CG_OpndHandle *tau_call(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*);
-    CG_OpndHandle *tau_calli(uint32,CG_OpndHandle**, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
+    CG_OpndHandle *call(U_32, CG_OpndHandle**, Type*, MethodDesc*);
+    CG_OpndHandle *tau_call(U_32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*);
+    CG_OpndHandle *tau_calli(U_32,CG_OpndHandle**, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
     void          ret();
     void          ret(CG_OpndHandle*);
 
@@ -185,7 +185,7 @@ public:
     void          throwException(CG_OpndHandle*, bool);
     void          throwException(ObjectType* excType);// generater code to throw noted type exception
     void          throwSystemException(CompilationInterface::SystemExceptionId);
-    void          throwLinkingException(Class_Handle, uint32, uint32);
+    void          throwLinkingException(Class_Handle, U_32, U_32);
     CG_OpndHandle *catchException(Type*);
 
     CG_OpndHandle *tau_checkNull(CG_OpndHandle *, bool);
@@ -202,7 +202,7 @@ public:
 
     void          tau_stInd(CG_OpndHandle*, CG_OpndHandle*, Type::Tag, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
     CG_OpndHandle *tau_ldInd(Type*, CG_OpndHandle*, Type::Tag, bool, bool, CG_OpndHandle*, CG_OpndHandle*);
-    CG_OpndHandle *ldString(MethodDesc*, uint32, bool);
+    CG_OpndHandle *ldString(MethodDesc*, U_32, bool);
     CG_OpndHandle *ldLockAddr(CG_OpndHandle*);
     CG_OpndHandle *tau_ldVirtFunAddr(Type*, CG_OpndHandle*, MethodDesc*, CG_OpndHandle*);
     CG_OpndHandle *tau_ldVTableAddr(Type*, CG_OpndHandle*, CG_OpndHandle*);
@@ -214,7 +214,7 @@ public:
     void          initType(Type*);
     CG_OpndHandle *newObj(ObjectType*); 
     CG_OpndHandle *newArray(ArrayType*, CG_OpndHandle*);
-    CG_OpndHandle *newMultiArray(ArrayType*, uint32, CG_OpndHandle**);
+    CG_OpndHandle *newMultiArray(ArrayType*, U_32, CG_OpndHandle**);
     CG_OpndHandle *ldElemBaseAddr(CG_OpndHandle*);
     CG_OpndHandle *addElemIndex(Type *, CG_OpndHandle *, CG_OpndHandle *);
     CG_OpndHandle *tau_arrayLen(Type*, ArrayType*, Type*, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*);
@@ -238,7 +238,7 @@ public:
     CG_OpndHandle *tauEdge()                       { return opndManager->getTau(); }
     CG_OpndHandle *tauUnsafe()                     { return opndManager->getTau(); }
     CG_OpndHandle *tauSafe()                       { return opndManager->getTau(); }
-    CG_OpndHandle *tauAnd(uint32, CG_OpndHandle**) { return opndManager->getTau(); }
+    CG_OpndHandle *tauAnd(U_32, CG_OpndHandle**) { return opndManager->getTau(); }
     void          opndMaybeGlobal(CG_OpndHandle* opnd)            {}
     void          setCurrentPersistentId(PersistentInstructionId) {}
     void          clearCurrentPersistentId()                      {}
@@ -265,23 +265,23 @@ public:
     CG_OpndHandle *addOffset(Type*, CG_OpndHandle*, CG_OpndHandle*)        { NOT_IMPLEMENTED_C("addOffset") }
     CG_OpndHandle *ldElemAddr(CG_OpndHandle*,CG_OpndHandle*)               { NOT_IMPLEMENTED_C("ldElemAddr") }
     CG_OpndHandle *ldStatic(Type*, FieldDesc*, Type::Tag, bool)            { NOT_IMPLEMENTED_C("ldStatic") }
-    CG_OpndHandle *ldVarAddr(uint32)                                       { NOT_IMPLEMENTED_C("ldVarAddr") }
-    CG_OpndHandle *ldToken(Type*, MethodDesc*, uint32)                     { NOT_IMPLEMENTED_C("ldToken") }
+    CG_OpndHandle *ldVarAddr(U_32)                                       { NOT_IMPLEMENTED_C("ldVarAddr") }
+    CG_OpndHandle *ldToken(Type*, MethodDesc*, U_32)                     { NOT_IMPLEMENTED_C("ldToken") }
     CG_OpndHandle *tau_cast(ObjectType*, CG_OpndHandle*, CG_OpndHandle*)   { NOT_IMPLEMENTED_C("tau_cast") }
     CG_OpndHandle *tau_asType(ObjectType*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_asType") }
     CG_OpndHandle *box(ObjectType*, CG_OpndHandle*)                        { NOT_IMPLEMENTED_C("box") }
     CG_OpndHandle *unbox(Type*, CG_OpndHandle*)                            { NOT_IMPLEMENTED_C("unbox") }
     CG_OpndHandle *ldValueObj(Type*, CG_OpndHandle*)                       { NOT_IMPLEMENTED_C("ldValueObj") }
     CG_OpndHandle *tau_ckfinite(CG_OpndHandle*)                            { NOT_IMPLEMENTED_C("tau_ckfinite") }
-    CG_OpndHandle *callhelper(uint32, CG_OpndHandle**, Type*, JitHelperCallOp::Id) { NOT_IMPLEMENTED_C("callhelper") }
-    CG_OpndHandle *tau_callvirt(uint32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*)  { NOT_IMPLEMENTED_C("tau_callvirt") }
+    CG_OpndHandle *callhelper(U_32, CG_OpndHandle**, Type*, JitHelperCallOp::Id) { NOT_IMPLEMENTED_C("callhelper") }
+    CG_OpndHandle *tau_callvirt(U_32, CG_OpndHandle**, Type*, MethodDesc*, CG_OpndHandle*, CG_OpndHandle*)  { NOT_IMPLEMENTED_C("tau_callvirt") }
     CG_OpndHandle *select(CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("select") }
     CG_OpndHandle *cmp3(CompareOp::Operators,CompareOp::Types, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("cmp3") }
     CG_OpndHandle *tau_optimisticBalancedMonitorEnter(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_optimisticBalancedMonitorEnter") }
     CG_OpndHandle *addOffsetPlusHeapbase(Type*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("addOffsetPlusHeapbase") }
     CG_OpndHandle *tau_ldField(Type*, CG_OpndHandle*, Type::Tag, FieldDesc*, bool, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldField") }
     CG_OpndHandle *tau_ldElem(Type*, CG_OpndHandle*, CG_OpndHandle*, bool, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_C("tau_ldElem") }
-    void          incCounter(Type*, uint32)                               { NOT_IMPLEMENTED_V("incCounter") }
+    void          incCounter(Type*, U_32)                               { NOT_IMPLEMENTED_V("incCounter") }
     void          incRecursionCount(CG_OpndHandle*, CG_OpndHandle*)       { NOT_IMPLEMENTED_V("incRecursionCount") }
     void          monitorEnterFence(CG_OpndHandle*)                       { NOT_IMPLEMENTED_V("monitorEnterFence") }
     void          monitorExitFence(CG_OpndHandle*)                        { NOT_IMPLEMENTED_V("monitorExitFence") }
@@ -290,7 +290,7 @@ public:
     void          copyValueObj(Type*, CG_OpndHandle*, CG_OpndHandle*)     { NOT_IMPLEMENTED_V("copyValueObj") }
     void          prefetch(CG_OpndHandle*)                                { NOT_IMPLEMENTED_V("prefetch") }
     void          jump()                                                  { NOT_IMPLEMENTED_V("jump") }
-    void          throwLazyException(uint32, CG_OpndHandle**, MethodDesc*) { NOT_IMPLEMENTED_V("throwLazyException") }
+    void          throwLazyException(U_32, CG_OpndHandle**, MethodDesc*) { NOT_IMPLEMENTED_V("throwLazyException") }
     void          tau_stStatic(CG_OpndHandle*, FieldDesc*, Type::Tag, bool, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stStatic") } 
     void          tau_stField(CG_OpndHandle*, CG_OpndHandle*, Type::Tag, FieldDesc*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stField") }
     void          tau_stElem(CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*, bool, CG_OpndHandle*, CG_OpndHandle*, CG_OpndHandle*) { NOT_IMPLEMENTED_V("tau_stElem") }
@@ -300,7 +300,7 @@ public:
     // TRANSITION
     //---------------------------------------------------------------------------//
 
-    CG_OpndHandle* callvmhelper(uint32, CG_OpndHandle**, Type*
+    CG_OpndHandle* callvmhelper(U_32, CG_OpndHandle**, Type*
                         , VM_RT_SUPPORT) { NOT_IMPLEMENTED_C("unbox") }
 
     CG_OpndHandle* convUPtrToObject(ObjectType*, CG_OpndHandle*)              { NOT_IMPLEMENTED_C("convUPtrToObject") }
@@ -352,9 +352,9 @@ protected:
                   CG_OpndHandle *op4=NULL, CG_OpndHandle *op5=NULL, CG_OpndHandle *op6=NULL);
         
     // CG helper methods
-    void      directCall(uint32, Opnd**, RegOpnd*, Opnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
-    void      indirectCall(uint32, Opnd**, RegOpnd*, RegOpnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
-    void      makeCallArgs(uint32, Opnd**, Inst*, RegOpnd*);
+    void      directCall(U_32, Opnd**, RegOpnd*, Opnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
+    void      indirectCall(U_32, Opnd**, RegOpnd*, RegOpnd*, RegOpnd*, Completer=CMPLT_WH_SPTK);
+    void      makeCallArgs(U_32, Opnd**, Inst*, RegOpnd*);
     RegOpnd   *makeConvOpnd(RegOpnd*);
     void      makeRetVal(RegOpnd*, RegOpnd*, RegOpnd*);
 

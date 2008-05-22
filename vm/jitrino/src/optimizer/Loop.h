@@ -41,9 +41,9 @@ struct LoopBuilderFlags {
     bool old_static_peeling;
     bool aggressive_peeling;
     bool peel_upto_branch;
-    uint32 peeling_threshold; 
+    U_32 peeling_threshold; 
     bool fullpeel;
-    uint32 fullpeel_max_inst;
+    U_32 fullpeel_max_inst;
     bool peel_upto_branch_no_instanceof;
 };
 
@@ -65,11 +65,11 @@ private:
     
     class IdentifyByID {
     public:
-        uint32 operator() (Node* node) { return node->getId(); }
+        U_32 operator() (Node* node) { return node->getId(); }
     };
     class IdentifyByDFN {
     public:
-        uint32 operator() (Node* node) { return node->getDfNum(); }
+        U_32 operator() (Node* node) { return node->getDfNum(); }
     };
 
     void        peelLoops(StlVector<Edge*>& backEdges);
@@ -77,7 +77,7 @@ private:
     bool        isVariantInst(Inst* inst, StlHashSet<Opnd*>& variantOpnds);
     bool        isVariantOperation(Operation operation);
     bool        isInversionCandidate(Node* currentHeader, Node* proposedHeader, StlBitVector& nodesInLoop, Node*& next, Node*& exit);
-    uint32      markNodesOfLoop(StlBitVector& nodesInLoop,Node* header,Node* tail);
+    U_32      markNodesOfLoop(StlBitVector& nodesInLoop,Node* header,Node* tail);
     LoopNode*   findEnclosingLoop(LoopNode* loop, Node* header);
 
 

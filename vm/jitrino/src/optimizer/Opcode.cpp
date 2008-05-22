@@ -237,13 +237,13 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauIsNonNull,          true, MB::CSEable,       MK::None,                             "tauisnonnull ",        "tauisnonnull      %0 -) %l",        }, // temporary declaration that source null
 };                                                             
 
-unsigned short Modifier::encode(Opcode opcode, uint32 numbits) const
+unsigned short Modifier::encode(Opcode opcode, U_32 numbits) const
 {
     assert((opcode >= 0) && (opcode < NumOpcodes));
     Modifier::Kind::Enum kinds = opcodeTable[opcode].modifierKind;
     if (kinds == 0) return 0;
-    uint32 encoded = 0;
-    uint32 bitsused = 0;
+    U_32 encoded = 0;
+    U_32 bitsused = 0;
     if ((kinds & Modifier::Kind::Overflow) != 0) addEncoding(encoded, bitsused, Overflow_Mask, Overflow_None, Overflow_Unsigned, OverflowModifier_IsShiftedBy, OverflowModifier_BitsToEncode);
     if ((kinds & Modifier::Kind::Signed) != 0) addEncoding(encoded, bitsused, Signed_Mask, SignedOp, UnsignedOp, SignedModifier_IsShiftedBy, SignedModifier_BitsToEncode);
     if ((kinds & Modifier::Kind::Comparison) != 0) addEncoding(encoded, bitsused, Cmp_Mask, Cmp_EQ, Cmp_NonZero, ComparisonModifier_IsShiftedBy, ComparisonModifier_BitsToEncode);
@@ -260,7 +260,7 @@ unsigned short Modifier::encode(Opcode opcode, uint32 numbits) const
     if ((kinds & Modifier::Kind::NewModifier2) != 0) addEncoding(encoded, bitsused, NewModifier2_Mask, NewModifier2_Value1, NewModifier2_Value3, NewModifier2_IsShiftedBy, NewModifier2_BitsToEncode);
     assert(bitsused <= numbits);
     unsigned short usencoded = (unsigned short) encoded;
-    assert(encoded == (uint32) usencoded);
+    assert(encoded == (U_32) usencoded);
     if (0 && Log::isEnabled()) {
         Log::out() << ::std::endl << "Modifier " << ::std::hex << (int) value << " and Opcode " 
                    << (int) opcode << " encoded as " << (int) usencoded << ::std::dec << ::std::endl;
@@ -268,12 +268,12 @@ unsigned short Modifier::encode(Opcode opcode, uint32 numbits) const
     return (unsigned short) usencoded;
 }
 
-Modifier::Modifier(Opcode opcode, uint32 encoding) : value(0)
+Modifier::Modifier(Opcode opcode, U_32 encoding) : value(0)
 {
     assert((opcode >= 0) && (opcode < NumOpcodes));
     Modifier::Kind::Enum kinds = opcodeTable[opcode].modifierKind;
     if (kinds == 0) return;
-    uint32 bitsused = 0;
+    U_32 bitsused = 0;
     if ((kinds & Modifier::Kind::Overflow) != 0) addDecoding(encoding, bitsused, Overflow_Mask, Overflow_None, Overflow_Unsigned, OverflowModifier_IsShiftedBy, OverflowModifier_BitsToEncode);
     if ((kinds & Modifier::Kind::Signed) != 0) addDecoding(encoding, bitsused, Signed_Mask, SignedOp, UnsignedOp, SignedModifier_IsShiftedBy, SignedModifier_BitsToEncode);
     if ((kinds & Modifier::Kind::Comparison) != 0) addDecoding(encoding, bitsused, Cmp_Mask, Cmp_EQ, Cmp_NonZero, ComparisonModifier_IsShiftedBy, ComparisonModifier_BitsToEncode);
@@ -294,32 +294,32 @@ Modifier::Modifier(Opcode opcode, uint32 encoding) : value(0)
         Log::out() << ::std::endl << "Opcode " << ::std::hex << (int) opcode << " and bits " << (int) encoding 
                    << " decoded to Modifier " << (int) value << ::std::dec << ::std::endl;
     }
-    assert(((uint32)encode(opcode, OPERATION_MODIFIER_BITS)) == encoding);
+    assert(((U_32)encode(opcode, OPERATION_MODIFIER_BITS)) == encoding);
 }
 
 
-void Modifier::addEncoding(uint32 &encoded, uint32 &bitsused, uint32 mask, 
-                           uint32 minval, uint32 maxval, 
-                           uint32 isshiftedby,
-                           uint32 bitstoencode) const
+void Modifier::addEncoding(U_32 &encoded, U_32 &bitsused, U_32 mask, 
+                           U_32 minval, U_32 maxval, 
+                           U_32 isshiftedby,
+                           U_32 bitstoencode) const
 {
-    uint32 thisval = value & mask;
+    U_32 thisval = value & mask;
 
     assert((minval <= thisval) && (thisval <= maxval));
-    uint32 encodedval = ((thisval - minval) >> isshiftedby) << bitsused;
+    U_32 encodedval = ((thisval - minval) >> isshiftedby) << bitsused;
     encoded = encoded | encodedval ;
     bitsused = bitsused + bitstoencode;
 }
 
-void Modifier::addDecoding(uint32 &encoding, uint32 &bitsused, uint32 mask, 
-                           uint32 minval, uint32 maxval, 
-                           uint32 isshiftedby,
-                           uint32 bitstoencode)
+void Modifier::addDecoding(U_32 &encoding, U_32 &bitsused, U_32 mask, 
+                           U_32 minval, U_32 maxval, 
+                           U_32 isshiftedby,
+                           U_32 bitstoencode)
 {
-    uint32 maskedbits = (1 << bitstoencode)-1;
-    uint32 shifted = ((encoding >> bitsused) & maskedbits) << isshiftedby;
-    uint32 decoded = shifted + minval;
-    uint32 masked = decoded & mask;
+    U_32 maskedbits = (1 << bitstoencode)-1;
+    U_32 shifted = ((encoding >> bitsused) & maskedbits) << isshiftedby;
+    U_32 decoded = shifted + minval;
+    U_32 masked = decoded & mask;
     assert(masked != 0);
     value |= masked;
     bitsused = bitsused + bitstoencode;

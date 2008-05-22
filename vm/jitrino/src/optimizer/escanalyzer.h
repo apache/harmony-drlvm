@@ -58,7 +58,7 @@ public:
     void doAnalysis();
 
     // read from command line to output debug information
-    uint32 allProps;
+    U_32 allProps;
 
 private:
 /**
@@ -94,49 +94,49 @@ private:
         NT_OBJS     = NT_OBJECT|NT_RETVAL|NT_LDOBJ  //for findCnGNode_op
     };
 // CnG node reference types
-    static const uint32 NR_PRIM = 0;
-    static const uint32 NR_REF = 1;
-    static const uint32 NR_ARR = 2;
-    static const uint32 NR_REFARR = 3;
+    static const U_32 NR_PRIM = 0;
+    static const U_32 NR_REF = 1;
+    static const U_32 NR_ARR = 2;
+    static const U_32 NR_REFARR = 3;
 // CnG edge types
-    static const uint32 ET_POINT = 1;  // Op_TauLdInd (loaded value)
-    static const uint32 ET_DEFER = 2;
-    static const uint32 ET_FIELD = 3;  // Op_LdFieldAddr (object field), Op_AddScaledIndex
+    static const U_32 ET_POINT = 1;  // Op_TauLdInd (loaded value)
+    static const U_32 ET_DEFER = 2;
+    static const U_32 ET_FIELD = 3;  // Op_LdFieldAddr (object field), Op_AddScaledIndex
 // CG node states
-    static const uint32 GLOBAL_ESCAPE = 1;
-    static const uint32 ARG_ESCAPE = 2;
-    static const uint32 NO_ESCAPE = 3;
-    static const uint32 ESC_MASK = 3;
-    static const uint32 BIT_MASK = 56;
-    static const uint32 LOOP_CREATED = 8;
-    static const uint32 OUT_ESCAPED = 16;
-    static const uint32 VIRTUAL_CALL = 32;
+    static const U_32 GLOBAL_ESCAPE = 1;
+    static const U_32 ARG_ESCAPE = 2;
+    static const U_32 NO_ESCAPE = 3;
+    static const U_32 ESC_MASK = 3;
+    static const U_32 BIT_MASK = 56;
+    static const U_32 LOOP_CREATED = 8;
+    static const U_32 OUT_ESCAPED = 16;
+    static const U_32 VIRTUAL_CALL = 32;
 
 
     struct CnGNode;
     struct CnGRef {
         CnGNode* cngNodeTo;
-        uint32 edgeType;
+        U_32 edgeType;
         Inst* edgeInst;
     };
 
     typedef StlList<CnGRef*> CnGRefs;   
     typedef StlList<Inst*> Insts;
-    typedef StlList<uint32> NodeMDs;    
+    typedef StlList<U_32> NodeMDs;    
 
     // connection graph node structure
     struct CnGNode {
-        uint32 cngNodeId;   // CnG node id
-        uint32 opndId;      // opnd id  (0 for NT_ACTARG) 
+        U_32 cngNodeId;   // CnG node id
+        U_32 opndId;      // opnd id  (0 for NT_ACTARG) 
         void* refObj;       // MethodDesc* for NT_ACTARG, Inst* for fields, Opnd* for others
-        uint32 nodeType;    // CnG node types
-        uint32 nodeRefType; // CnG node reference types
-        uint32 instrId;
+        U_32 nodeType;    // CnG node types
+        U_32 nodeRefType; // CnG node reference types
+        U_32 instrId;
         CnGNode* lNode;     // ldind from lNode for ldflda & ldsflda
-        uint32 state;       // escape state
+        U_32 state;       // escape state
         NodeMDs* nodeMDs;   // list of NT_ACTARG nodes
         Inst* nInst;        // ref to inst 
-        uint32 argNumber;   // number of arg for NT_DEFARG & NT_ACTARG (0 for others)
+        U_32 argNumber;   // number of arg for NT_DEFARG & NT_ACTARG (0 for others)
         CnGRefs* outEdges;  // cngNode out edges
     };
 
@@ -151,13 +151,13 @@ private:
 
     struct InstFld {
         MemberIdent* fldIdent;
-        uint32 state;
+        U_32 state;
         InstFlds* instFlds;   // contained instance fields
     };
 
     struct ParamInfo {
-        uint32 paramNumber;
-        uint32 state;
+        U_32 paramNumber;
+        U_32 state;
         InstFlds* instFlds;   // contained instance fields
     }; 
 
@@ -166,10 +166,10 @@ private:
     // structure of saved by EA information about compiled method
     struct CalleeMethodInfo {
         MemberIdent* methodIdent;
-        uint32 numberOfArgs;
-        uint32 properties;     // native, final, virtual ...
+        U_32 numberOfArgs;
+        U_32 properties;     // native, final, virtual ...
         ParamInfos* paramInfos;
-        uint32 retValueState;
+        U_32 retValueState;
         bool mon_on_this;
     };
 
@@ -187,7 +187,7 @@ private:
     // list of connection graph edges definition
     typedef StlList<CnGEdge*> CnGEdges; 
     // list of object Ids definition
-    typedef StlList<uint32> ObjIds; 
+    typedef StlList<U_32> ObjIds; 
 
 
     static CalleeMethodInfos* calleeMethodInfos;
@@ -222,14 +222,14 @@ private:
     Insts* exam2Insts;
 
     // maximum level to analyze callee methods (from command line or default set)
-    uint32 maxMethodExamLevel;
+    U_32 maxMethodExamLevel;
     // set level for escape analysis
-    uint32 method_ea_level;
+    U_32 method_ea_level;
 
-    uint32 lastCnGNodeId;
-    uint32 curMDNode;
+    U_32 lastCnGNodeId;
+    U_32 curMDNode;
     int defArgNumber;
-    uint32 initNodeType;  // type of initial scanned node
+    U_32 initNodeType;  // type of initial scanned node
 
     // lists to help do CFG scan
     ObjIds *scannedObjs;
@@ -273,7 +273,7 @@ private:
  * @param ntype - CnG node type.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode(Inst* inst, Type* type, uint32 ntype);
+    CnGNode* addCnGNode(Inst* inst, Type* type, U_32 ntype);
 
 /**
  * Creates new CnG node for specified instruction dst operand. 
@@ -282,7 +282,7 @@ private:
  * @param ntype - CnG node type.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode_op(Inst* inst, Type* type, uint32 ntype);
+    CnGNode* addCnGNode_op(Inst* inst, Type* type, U_32 ntype);
 
 /**
  * Creates new CnG node for specified call instruction argument. 
@@ -292,7 +292,7 @@ private:
  * @param narg - method argument.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode_mp(Inst* inst, MethodPtrType* mpt, uint32 ntype, uint32 narg);
+    CnGNode* addCnGNode_mp(Inst* inst, MethodPtrType* mpt, U_32 ntype, U_32 narg);
 
 /**
  * Creates new CnG node for specified return or throw instruction. 
@@ -300,7 +300,7 @@ private:
  * @param ntype - CnG node type.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode_ex(Inst* inst, uint32 ntype);
+    CnGNode* addCnGNode_ex(Inst* inst, U_32 ntype);
 
 /**
  * Creates new field CnG node for specified instruction. 
@@ -308,28 +308,28 @@ private:
  * @param ntype - CnG node type.
  * @return created CnGnode. 
  */
-    CnGNode* addCnGNode_fl(Inst* inst, uint32 ntype);
+    CnGNode* addCnGNode_fl(Inst* inst, U_32 ntype);
 
 /**
  * Finds CnG node for specified operand Id. 
  * @param nId - operand Id.
  * @return found CnGnode, or <code>NULL</code>. 
  */
-    CnGNode* findCnGNode_op(uint32 nId);
+    CnGNode* findCnGNode_op(U_32 nId);
 
 /**
  * Finds CnG node for specified CnG node Id. 
  * @param nId - CnG node Id.
  * @return found CnGnode, or <code>NULL</code>. 
  */
-    CnGNode* findCnGNode_id(uint32 nId);
+    CnGNode* findCnGNode_id(U_32 nId);
 
 /**
  * Finds CnG node for specified instruction Id. 
  * @param nId - instruction Id.
  * @return found CnGnode, or <code>NULL</code>. 
  */
-    CnGNode* findCnGNode_in(uint32 nId);
+    CnGNode* findCnGNode_in(U_32 nId);
 
 /**
  * Finds NT_ACTARG CnG node for specified instruction Id and argument number. 
@@ -337,7 +337,7 @@ private:
  * @param aId - argument number.
  * @return found CnGnode, or <code>NULL</code>. 
  */
-    CnGNode* findCnGNode_mp(uint32 iId, uint32 aId);
+    CnGNode* findCnGNode_mp(U_32 iId, U_32 aId);
 
 /**
  * Finds field CnG node for specified instruction and CnG node type. 
@@ -345,7 +345,7 @@ private:
  * @param ntype - CnG node type.
  * @return found CnGnode, or <code>NULL</code>. 
  */
-    CnGNode* findCnGNode_fl(Inst* inst, uint32 ntype);
+    CnGNode* findCnGNode_fl(Inst* inst, U_32 ntype);
 
 /**
  * Creates new CnG edge for specified instruction, adds it to cngEdges and
@@ -356,7 +356,7 @@ private:
  * @param inst - instruction.
  * @return created CnGnode. 
  */
-    void addEdge(CnGNode* cgnfrom, CnGNode* cgnto, uint32 etype, Inst* inst);
+    void addEdge(CnGNode* cgnfrom, CnGNode* cgnto, U_32 etype, Inst* inst);
 
 /**
  * Sets escape state for method created objects.
@@ -433,7 +433,7 @@ private:
  * @param np - parameter number.
  * @return specified parameter state.
  */
-    uint32 getMethodParamState(CalleeMethodInfo* mi, uint32 np);
+    U_32 getMethodParamState(CalleeMethodInfo* mi, U_32 np);
 
 /**
  * Collects instructions creating objects that are not GLOBAL_ESCAPE. 
@@ -566,7 +566,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
     void debug_opnd_info(Opnd* opnd,::std::ostream& os);
 
 
-    bool checkScanned(ObjIds* ids, uint32 id) {
+    bool checkScanned(ObjIds* ids, U_32 id) {
         ObjIds::iterator it;
         if (ids == NULL) {
             return false;
@@ -578,24 +578,24 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
         }
         return false;
     }
-    bool checkScannedObjs(uint32 id) {return checkScanned(scannedObjs, id);}
-    bool checkScannedObjsRev(uint32 id) {return checkScanned(scannedObjsRev, id);}
-    bool checkScannedInsts(uint32 id) {return checkScanned(scannedInsts, id);}
-    bool checkScannedSucNodes(uint32 id) {return checkScanned(scannedSucNodes, id);}
+    bool checkScannedObjs(U_32 id) {return checkScanned(scannedObjs, id);}
+    bool checkScannedObjsRev(U_32 id) {return checkScanned(scannedObjsRev, id);}
+    bool checkScannedInsts(U_32 id) {return checkScanned(scannedInsts, id);}
+    bool checkScannedSucNodes(U_32 id) {return checkScanned(scannedSucNodes, id);}
 
-    uint32 getEscState(CnGNode* n) {
+    U_32 getEscState(CnGNode* n) {
         return (n->state)&ESC_MASK;
     }
-    void setEscState(CnGNode* n, uint32 st) {
+    void setEscState(CnGNode* n, U_32 st) {
         n->state = ((n->state)&BIT_MASK)+st;
     }
-    uint32 getFullState(CnGNode* n) {
+    U_32 getFullState(CnGNode* n) {
         return n->state;
     }
-    void setFullState(CnGNode* n, uint32 st) {
+    void setFullState(CnGNode* n, U_32 st) {
         n->state = st;
     }
-    uint32 getLoopCreated(CnGNode* n) {
+    U_32 getLoopCreated(CnGNode* n) {
         return (n->state)&LOOP_CREATED;
     }
     void setLoopCreated(CnGNode* n) {
@@ -604,7 +604,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
     void remLoopCreated(CnGNode* n) {
         n->state = (n->state|LOOP_CREATED)^LOOP_CREATED;
     }
-    uint32 getOutEscaped(CnGNode* n) {
+    U_32 getOutEscaped(CnGNode* n) {
         return (n->state)&OUT_ESCAPED;
     }
     void setOutEscaped(CnGNode* n) {
@@ -613,7 +613,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
     void remOutEscaped(CnGNode* n) {
         n->state = (n->state|OUT_ESCAPED)^OUT_ESCAPED;
     }
-    uint32 getVirtualCall(CnGNode* n) {
+    U_32 getVirtualCall(CnGNode* n) {
         return (n->state)&VIRTUAL_CALL;
     }
     void setVirtualCall(CnGNode* n) {
@@ -625,15 +625,15 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
     void printState(CnGNode* n,::std::ostream& os=Log::out()) {
         os << getEscState(n) << " (" << (getFullState(n)>>3) << ")";
     }
-    void printState(uint32 st,::std::ostream& os=Log::out()) {
+    void printState(U_32 st,::std::ostream& os=Log::out()) {
         os << (st&ESC_MASK) << " (" << (st>>3) << ")";
     }
-    bool isGlobalState(uint32 state) {
+    bool isGlobalState(U_32 state) {
         if ((state&ESC_MASK)==GLOBAL_ESCAPE||(state&VIRTUAL_CALL)!=0)
             return true;
         return false;
     }
-    bool isStateNeedGEFix(uint32 state, uint32 nType) {
+    bool isStateNeedGEFix(U_32 state, U_32 nType) {
         if ((state&ESC_MASK)==GLOBAL_ESCAPE)
             return false;
         if ((state&OUT_ESCAPED)!=0 && initNodeType != NT_STFLD)
@@ -646,7 +646,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
 // Monitors elimination optimization
 
     struct MonUnit {
-        uint32 opndId;
+        U_32 opndId;
         Insts* monInsts;
         Insts* icallInsts;
     };
@@ -665,7 +665,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @param opndId - monitor instruction operand Id.
  * @return <code>MonUnit</code>, if found, or <code>NULL</code> otherwise. 
  */
-    MonUnit* findMonUnit(uint32 opndId);
+    MonUnit* findMonUnit(U_32 opndId);
 
 /**
  * Adds call instruction to the specified monitor unit. 
@@ -710,7 +710,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  *         <code>ARG_ESCAPE</code>, if any of source operand state or st is <code>ARG_ESCAPE</code>,
  *         <code>NO_ESCAPE</code> otherwise.
  */
-    uint32 checkState(Inst* inst,uint32 st);
+    U_32 checkState(Inst* inst,U_32 st);
 
 /**
  * Checks if CnGNode operand is GLOBAL_ESCAPED while monitor instructions are executed. 
@@ -745,7 +745,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @param chk - value to check with (0 or 1),
  * @param muflag - monitor flag operand (VarOpnd* or SsaTmpOpnd*).
  */
-    void insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk);
+    void insertFlagCheck(Insts* syncInsts, Opnd* muflag, U_32 chk);
 
 /**
  * Removes monitor instructions from the specified monitor instruction list.
@@ -800,7 +800,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @return  i32_0, if value = 0
  *          i32_1, if value = 1
  */
-    SsaTmpOpnd* insertLdConst(uint32 value);
+    SsaTmpOpnd* insertLdConst(U_32 value);
 
 
 
@@ -855,7 +855,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @param vc_insts - list of call instructions,
  * @param vcids - list of call instructions ids.
  */
-    void collectCallInsts(uint32 n, Insts* vc_insts, ObjIds* vcids);
+    void collectCallInsts(U_32 n, Insts* vc_insts, ObjIds* vcids);
 
 /**
  * Performs scalar replacement optimization for optimized object field usage.
@@ -887,7 +887,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @return <code>true</code> if an object is used only in ldflda or ldbase instructions; 
  *         <code>false<code> otherwise.
  */
-    bool checkOpndUsage(uint32 lobjid);
+    bool checkOpndUsage(U_32 lobjid);
 
 /**
  * Performs checks for CnGNode operand using connection graph.
@@ -917,7 +917,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @return <code>execCount</code> the most value of <code>execCount</code> and 
  *                                checkNextNodes execution for next after n node.
  */
-    double checkNextNodes(Node* n, uint32 obId, double cExecCount);
+    double checkNextNodes(Node* n, U_32 obId, double cExecCount);
 
 /**
  * Checks flag and creates object before call instruction (if it was not created yet).
@@ -926,7 +926,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * @param ob_var_opnd -  varOpnd replacing optimized object,
  * @param oid         - escaped optimized object Id.
  */
-    void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, uint32 oid);
+    void restoreEOCreation(Insts* vc_insts, ScObjFlds* objs, VarOpnd* ob_var_opnd, U_32 oid);
 
 /**
  * Removes specified instruction from ControlFlowGraph.
@@ -940,7 +940,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * for scalar replacement optimized object.
  * @param ob_id - optimized object Id.
  */
-    void fixMethodEndInsts(uint32 ob_id);
+    void fixMethodEndInsts(U_32 ob_id);
 
 /**
  * Finds (using connection graph) load varOpnd that should be optimized with 
@@ -982,7 +982,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
  * Removes check instructions for optimized load varOpnd.
  * @param ob_id - optimized load variable operand Id.
  */
-    void fixCheckInsts(uint32 opId);
+    void fixCheckInsts(U_32 opId);
 
 /**
  * Checks (using connection graph) if CnGNode operand has final fields and scalarizes them.
@@ -994,7 +994,7 @@ void printCallMethodName(Inst* inst, ::std::ostream& os);
 
     void instrExam_processLdFieldAddr(Inst* inst);
     void instrExam2_processLdFieldAddr(Inst* inst);
-    static void getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType);
+    static void getLdFieldAddrInfo(Inst* inst, Type*& type, U_32& nType);
 
 };
 

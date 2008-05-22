@@ -207,7 +207,7 @@ void BottomUpLayout::combineChains() {
     assert(*chains.begin() ==irManager->getFlowGraph()->getEntryNode());
 
     assert(*chains.begin() == irManager->getFlowGraph()->getEntryNode());
-    for (uint32 i = 0, n = (uint32)chains.size()-1; i<n;i++) {
+    for (U_32 i = 0, n = (U_32)chains.size()-1; i<n;i++) {
         BasicBlock* firstChain = chains[i];
         BasicBlock* secondChain= chains[i+1];
         BasicBlock* lastInFirst = firstChain;

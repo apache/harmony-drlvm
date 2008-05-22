@@ -38,12 +38,12 @@ public:
     void unguardCallsInRegion(IRManager& irm);
 
     static bool isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, 
-        Opnd* & tauNullChecked, Opnd*&tauTypesChecked, uint32 &argOffset, bool &isIntfCall);
+        Opnd* & tauNullChecked, Opnd*&tauTypesChecked, U_32 &argOffset, bool &isIntfCall);
 
 
 private:
     void guardCallsInBlock(IRManager& irm, Node* node);
-    void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* valuedType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset);
+    void genGuardedDirectCall(IRManager& irm, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* valuedType, Opnd *tauNullChecked, Opnd *tauTypesChecked, U_32 argOffset);
     bool doGuard(IRManager& irm, Node* node, MethodDesc& methodDesc);
     ObjectType *getTopProfiledCalleeType(IRManager& irm, MethodDesc *origMethodDesc, Inst *call);
 

@@ -27,7 +27,7 @@ namespace Jitrino
 {
 namespace Ia32{
 
-const uint32 BBPollingMaxVersion = 6;
+const U_32 BBPollingMaxVersion = 6;
 
 //========================================================================================
 // class BBPolling
@@ -38,11 +38,11 @@ const uint32 BBPollingMaxVersion = 6;
 */
 class BBPolling
 {
-typedef ::std::pair<uint32,uint32> targetIdDispatchIdPair;
+typedef ::std::pair<U_32,U_32> targetIdDispatchIdPair;
 typedef StlMap<targetIdDispatchIdPair,Node*> BBPControllersMap;
 public:
 
-    BBPolling(IRManager& ir,uint32 ver) :
+    BBPolling(IRManager& ir,U_32 ver) :
         irManager(ir),
         version(ver),
         hasThreadInterruptablePoint(irManager.getMemoryManager(), irManager.getFlowGraph()->getMaxNodeId(), false),
@@ -84,8 +84,8 @@ public:
 #endif
     }
 
-    uint32  numberOfAffectedEdges()     { return (uint32)eligibleEdges.size(); }
-    Edge*   getAffectedEdge(uint32 i)   { assert(i < eligibleEdges.size()); return eligibleEdges[i]; }
+    U_32  numberOfAffectedEdges()     { return (U_32)eligibleEdges.size(); }
+    Edge*   getAffectedEdge(U_32 i)   { assert(i < eligibleEdges.size()); return eligibleEdges[i]; }
 
     Opnd*   getOrCreateTLSBaseReg(Edge* e);
 
@@ -95,8 +95,8 @@ public:
     
     bool    hasAllThreadInterruptablePredecessors(const Node* node);
 
-    Node*   getBBPSubCFGController(uint32 targetId, uint32 dispatchId);
-    void    setBBPSubCFGController(uint32 targetId, uint32 dispatchId, Node* node);
+    Node*   getBBPSubCFGController(U_32 targetId, U_32 dispatchId);
+    void    setBBPSubCFGController(U_32 targetId, U_32 dispatchId, Node* node);
     ControlFlowGraph*    createBBPSubCFG(IRManager& ir, Opnd* tlsBaseReg);
 
 private:
@@ -139,7 +139,7 @@ private:
     //  5 - like "1" but some backedges are not patched (if all paths through it are uninterpretable)
     //  6 - "4" + "5"
     //  7.. illegal
-    uint32  version;
+    U_32  version;
     // storage for ThreadInterruptablePoints information
     //     hasThreadInterruptablePoint[Node->getId()] == true means that the Node is a LoopHeader
     //     OR It has at least one instruction that isThreadInterruptablePoint(inst)
@@ -159,7 +159,7 @@ private:
     //     to get the toppest loop header of the given without calling getLoopHeader
     StlVector<Node*>    toppestLoopHeader;
     //     start index in otheredges collection for the topmost loop headers
-    StlVector<uint32> otherStartNdx;
+    StlVector<U_32> otherStartNdx;
 
     // just a collection of loop headers of the method (Basic blocks only!)
     StlVector<Node*> loopHeaders;
@@ -169,11 +169,11 @@ private:
     StlVector<Edge*> eligibleEdges;
 
     /// Offset of the suspension flag in the VM's structure stored in TLS.
-    uint32 gcFlagOffsetOffset;
+    U_32 gcFlagOffsetOffset;
 
 #ifdef _DEBUG
-    uint32  interruptablePoints;
-    uint32  pollingPoints;
+    U_32  interruptablePoints;
+    U_32  pollingPoints;
 #endif
     StlHashMap<Edge*, Node *> loopHeaderOfEdge;
 
@@ -204,19 +204,19 @@ public:
             Log::out() << "BBPolling transformer version="<< version <<" STARTED" << ::std::endl;
         }
         BBPolling bbp = BBPolling(*irManager, version);
-        uint32 numOfAffectedEdges = bbp.numberOfAffectedEdges();
+        U_32 numOfAffectedEdges = bbp.numberOfAffectedEdges();
         hasSideEffects = numOfAffectedEdges != 0;
         ControlFlowGraph* fg = irManager->getFlowGraph();
         // Foreach eligible backedge create bbpCFG and inline it between the backedge's Tail and it's target
-        for (uint32 j = 0; j < numOfAffectedEdges; j++) {
+        for (U_32 j = 0; j < numOfAffectedEdges; j++) {
             Edge* edge = bbp.getAffectedEdge(j);
 
             // get or create and insert before the loopHeade a basic block for calculating TLS base
             Opnd* tlsBaseReg = bbp.getOrCreateTLSBaseReg(edge);
 
-            uint32 originalTargetId = edge->getTargetNode()->getId();
+            U_32 originalTargetId = edge->getTargetNode()->getId();
             Edge*  srcDispatchEdge  = edge->getSourceNode()->getExceptionEdge();
-            uint32 sourceDispatchId = srcDispatchEdge ? srcDispatchEdge->getTargetNode()->getId() : 0;
+            U_32 sourceDispatchId = srcDispatchEdge ? srcDispatchEdge->getTargetNode()->getId() : 0;
             // CFG for inlining
             Node* bbpCFGController = bbp.getBBPSubCFGController(originalTargetId,sourceDispatchId);
             if (bbpCFGController) { // just retarget the edge
@@ -237,10 +237,10 @@ public:
         if (Log::isEnabled())
             Log::out() << "BBPolling transformer FINISHED" << ::std::endl;
     } //runImpl()
-    uint32  getNeedInfo()const{ return NeedInfo_LoopInfo; }
-    uint32  getSideEffects()const{ return hasSideEffects ? SideEffect_InvalidatesLoopInfo|SideEffect_InvalidatesLivenessInfo : 0; }
+    U_32  getNeedInfo()const{ return NeedInfo_LoopInfo; }
+    U_32  getSideEffects()const{ return hasSideEffects ? SideEffect_InvalidatesLoopInfo|SideEffect_InvalidatesLivenessInfo : 0; }
     bool    isIRDumpEnabled(){ return true; }
-    uint32  version;
+    U_32  version;
 };
 
 static ActionFactory<BBPollingTransformer> _bbp("bbp");
@@ -252,7 +252,7 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
     Node* loopHeader = toppestLoopHeader[loopHeaderOfEdge[e]->getId()];
     assert(loopHeader);
 
-    const uint32 id = loopHeader->getId();
+    const U_32 id = loopHeader->getId();
 
     Opnd* tlsBaseReg = tlsBaseRegForLoopHeader[id];
     if ( tlsBaseReg ) { // it is already created for this loop
@@ -284,10 +284,10 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
     }
 
     // inserting bbpFlagAddrBlock before the given loopHeader
-    uint32 startIndex = otherStartNdx[id];
+    U_32 startIndex = otherStartNdx[id];
 
     ControlFlowGraph* fg = irManager.getFlowGraph();
-    for (uint32 otherIdx = startIndex; ; otherIdx++) {
+    for (U_32 otherIdx = startIndex; ; otherIdx++) {
         if (otherIdx == otherEdges.size())
             break;
         Edge* other = otherEdges[otherIdx];
@@ -304,7 +304,7 @@ BBPolling::getOrCreateTLSBaseReg(Edge* e)
 }
 
 Node*
-BBPolling::getBBPSubCFGController(uint32 targetId, uint32 dispatchId)
+BBPolling::getBBPSubCFGController(U_32 targetId, U_32 dispatchId)
 {
     const BBPControllersMap::iterator iter = bbpCFGControllerForNode.find(::std::make_pair(targetId,dispatchId));
     if (iter == bbpCFGControllerForNode.end()) {
@@ -315,7 +315,7 @@ BBPolling::getBBPSubCFGController(uint32 targetId, uint32 dispatchId)
 }
 
 void
-BBPolling::setBBPSubCFGController(uint32 targetId, uint32 dispatchId, Node* node)
+BBPolling::setBBPSubCFGController(U_32 targetId, U_32 dispatchId, Node* node)
 {
     assert(node);
     assert(!bbpCFGControllerForNode.has(::std::make_pair(targetId,dispatchId)));
@@ -454,7 +454,7 @@ BBPolling::calculateInitialInterruptability(bool doPassingDown)
     const Nodes& postOrder = irManager.getFlowGraph()->getNodesPostOrder();
     for (Nodes::const_reverse_iterator it = postOrder.rbegin(), end = postOrder.rend(); it!=end; ++it) {
         Node* node = *it;
-        const uint32 id = node->getId();
+        const U_32 id = node->getId();
 
         if (lt->isLoopHeader(node) && node->isBlockNode()) {
             loopHeaders.push_back(node);
@@ -470,7 +470,7 @@ BBPolling::calculateInitialInterruptability(bool doPassingDown)
             if ( !toppestLoopHeader[id] ) {
                 toppestLoopHeader[id] = loopHeader;
                 // here we need to remember all otheredges and their start index for particular loopHeader
-                otherStartNdx[loopHeader->getId()] = (uint32)otherEdges.size();
+                otherStartNdx[loopHeader->getId()] = (U_32)otherEdges.size();
                 const Edges& edges = loopHeader->getInEdges();
                 for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
                     Edge* e = *ite;
@@ -510,17 +510,17 @@ BBPolling::calculateInterruptablePathes()
 {
     assert(loopHeaders.size());
     LoopTree* lt = irManager.getFlowGraph()->getLoopTree();
-    uint32 maxLoopDepth = lt->getMaxLoopDepth();
+    U_32 maxLoopDepth = lt->getMaxLoopDepth();
 
     // process the deepest firstly
-    for (uint32 currDepth = maxLoopDepth; currDepth > 0; currDepth--)
+    for (U_32 currDepth = maxLoopDepth; currDepth > 0; currDepth--)
     {
-        for (uint32 i=0; i < loopHeaders.size(); i++)
+        for (U_32 i=0; i < loopHeaders.size(); i++)
         {
             Node* loopHeader = loopHeaders[i];
             LoopNode* loop = lt->getLoopNode(loopHeader, false);
             assert(loopHeader == loop->getHeader());
-            const uint32 loopHeaderId = loopHeader->getId();
+            const U_32 loopHeaderId = loopHeader->getId();
             if (loop->getDepth() == currDepth - 1) {
                 if (hasNativeInterruptablePoint[loopHeaderId])  {
                     // fortunately we can skip this loop, because it is already interruptable ( it has respective
@@ -558,7 +558,7 @@ BBPolling::calculateInterruptablePathes()
 bool
 BBPolling::isOnInterruptablePath(Node* node)
 {
-    const uint32 id = node->getId();
+    const U_32 id = node->getId();
     // the order of these check is essential! (because in case of nested loops
     // if the node is a loopHeader of a nested loop we must return true)
     LoopTree* lt = irManager.getFlowGraph()->getLoopTree();
@@ -597,7 +597,7 @@ void
 BBPolling::collectEligibleEdges()
 {
     LoopTree* lt = irManager.getFlowGraph()->getLoopTree();
-    for (uint32 i=0; i < loopHeaders.size(); i++) {
+    for (U_32 i=0; i < loopHeaders.size(); i++) {
         Node* node = loopHeaders[i];
         const Edges& edges = node->getInEdges();
         for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
@@ -621,7 +621,7 @@ BBPolling::collectEligibleEdges2()
     const Nodes& nodes = irManager.getFlowGraph()->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
-        const uint32 id = node->getId();
+        const U_32 id = node->getId();
         if ( isOnThreadInterruptablePath[id] && ! hasNativeInterruptablePoint[id] ) {
             const Edges& edges = node->getOutEdges();
             LoopNode* nodeLoop = lt->getLoopNode(node, false);
@@ -629,7 +629,7 @@ BBPolling::collectEligibleEdges2()
             for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
                 Edge* e = *ite;
                 Node* succ = e->getTargetNode();
-                uint32 succId = succ->getId();
+                U_32 succId = succ->getId();
                 if (nodeLoop->inLoop(succ)) {
                     if( !isOnThreadInterruptablePath[succId] ) {
                         eligibleEdges.push_back(e);
@@ -647,7 +647,7 @@ BBPolling::collectEligibleEdges2()
 void
 BBPolling::collectEligibleEdgesRecursive()
 {
-    for (uint32 i=0; i < loopHeaders.size(); i++)
+    for (U_32 i=0; i < loopHeaders.size(); i++)
     {
         collectEdgesDeeper(loopHeaders[i]);
     }
@@ -660,7 +660,7 @@ BBPolling::collectEligibleEdgesRecursive()
 void
 BBPolling::collectEdgesDeeper(Node* node)
 {
-    uint32 id = node->getId();
+    U_32 id = node->getId();
     if (hasNativeInterruptablePoint[id]) {
         return;
     }
@@ -674,7 +674,7 @@ BBPolling::collectEdgesDeeper(Node* node)
         for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
             Edge* e = *ite;
             Node* succ = e->getTargetNode();
-            uint32 succId = succ->getId();
+            U_32 succId = succ->getId();
             if ( succ == node ) {
                 eligibleEdges.push_back(e);
                 loopHeaderOfEdge[e] = node;
@@ -712,10 +712,10 @@ BBPolling::dumpEligibleEdges()
 {
     assert(Log::isEnabled());
     Log::out() << "    EligibleEdges:" << ::std::endl;
-    for (uint32 i = 0; eligibleEdges.size() > i; i++) {
+    for (U_32 i = 0; eligibleEdges.size() > i; i++) {
         Edge* e = eligibleEdges[i];
-        uint32 srcId  = e->getSourceNode()->getId();
-        uint32 succId = e->getTargetNode()->getId();
+        U_32 srcId  = e->getSourceNode()->getId();
+        U_32 succId = e->getTargetNode()->getId();
         Log::out() << "        eligibleEdge ["<<srcId<<"]-->["<<succId<<"]" << ::std::endl;
     }
     Log::out() << "    EligibleEdges END! " << ::std::endl;
@@ -740,7 +740,7 @@ BBPolling::verify()
     Node* unwind = irManager.getFlowGraph()->getUnwindNode();
     Node* exit = irManager.getFlowGraph()->getExitNode();
 
-    for (uint32 i=0; i < loopHeaders.size(); i++)
+    for (U_32 i=0; i < loopHeaders.size(); i++)
     {
         assert(interruptablePoints == 0);
         assert(pollingPoints == 0);

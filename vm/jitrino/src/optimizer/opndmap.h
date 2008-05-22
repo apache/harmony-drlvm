@@ -38,8 +38,8 @@ class SparseScopedMap {
     // priorValues has previous value for each non-0 elt in theList:
     StlVector<ToType> priorValues;
     FromType zero;
-    uint32 resize_when;
-    uint32 resize_by;
+    U_32 resize_when;
+    U_32 resize_by;
 public:
     SparseScopedMap(MemoryManager& mm) :
         theMap(mm), 
@@ -51,9 +51,9 @@ public:
     {};
     SparseScopedMap(size_t n,  
                     MemoryManager& mm,
-                    uint32 init_factor=1,
-                    uint32 resize_factor=4,
-                    uint32 resize_to=7) :
+                    U_32 init_factor=1,
+                    U_32 resize_factor=4,
+                    U_32 resize_to=7) :
         theMap(mm), 
         theList(mm),
         priorValues(mm),
@@ -106,7 +106,7 @@ public:
     SparseOpndMap(MemoryManager& mm) :
         SparseScopedMap<Opnd *, Opnd *>(mm) {};
     SparseOpndMap(size_t n, MemoryManager& mm,
-                  uint32 init_factor, uint32 resize_factor, uint32 resize_to) :
+                  U_32 init_factor, U_32 resize_factor, U_32 resize_to) :
         SparseScopedMap<Opnd *, Opnd *>(n, mm, init_factor, resize_factor,
                                         resize_to) {};
 };

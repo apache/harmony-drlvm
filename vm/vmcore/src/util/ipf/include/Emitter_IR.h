@@ -35,7 +35,7 @@
 class IPF_Encoder : public Merced_Encoder {
   public:
     IPF_Encoder() : Merced_Encoder(0) {
-        assert(*(uint32*)"JIT1"==0x3154494A);
+        assert(*(U_32*)"JIT1"==0x3154494A);
         // assure little-endian because get_slot01_code_image() needs it
     }
 

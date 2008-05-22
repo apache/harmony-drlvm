@@ -35,9 +35,9 @@
 
 Method_Profile_Handle edge_profiler_create_profile( PC_Handle ph,
                                                     Method_Handle mh,
-                                                    uint32 numCounters,
-                                                    uint32* counterKeys,
-                                                    uint32 checkSum )
+                                                    U_32 numCounters,
+                                                    U_32* counterKeys,
+                                                    U_32 checkSum )
 {
     ProfileCollector* pc = (ProfileCollector*)ph;
     assert(pc->type == EM_PCTYPE_EDGE);
@@ -54,7 +54,7 @@ void* edge_profiler_get_entry_counter_addr(Method_Profile_Handle mph) {
     return &emp->entryCounter;
 }
 
-void* edge_profiler_get_counter_addr(Method_Profile_Handle mph, uint32 key)
+void* edge_profiler_get_counter_addr(Method_Profile_Handle mph, U_32 key)
 {
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_EDGE);
@@ -62,29 +62,29 @@ void* edge_profiler_get_counter_addr(Method_Profile_Handle mph, uint32 key)
 }
 
 
-uint32 edge_profiler_get_num_counters(Method_Profile_Handle mph)
+U_32 edge_profiler_get_num_counters(Method_Profile_Handle mph)
 {
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_EDGE);
-    return (uint32)((EdgeMethodProfile*)mp)->counters.size();
+    return (U_32)((EdgeMethodProfile*)mp)->counters.size();
 }
 
 
-uint32 edge_profiler_get_checksum(Method_Profile_Handle mph)
+U_32 edge_profiler_get_checksum(Method_Profile_Handle mph)
 {
     MethodProfile* mp = (MethodProfile*)mph;
     assert(mp->pc->type == EM_PCTYPE_EDGE);
     return ((EdgeMethodProfile*)mp)->checkSum;
 }
 
-uint32 edge_profiler_get_entry_threshold(PC_Handle pch) {
+U_32 edge_profiler_get_entry_threshold(PC_Handle pch) {
     assert(pch!=NULL);
     ProfileCollector* pc = (ProfileCollector*)pch;
     assert(pc->type == EM_PCTYPE_EDGE);
     return ((EdgeProfileCollector*)pc)->getEntryThreshold();
 }
 
-uint32 edge_profiler_get_backedge_threshold(PC_Handle pch) {
+U_32 edge_profiler_get_backedge_threshold(PC_Handle pch) {
     assert(pch!=NULL);
     ProfileCollector* pc = (ProfileCollector*)pch;
     assert(pc->type == EM_PCTYPE_EDGE);
@@ -95,8 +95,8 @@ uint32 edge_profiler_get_backedge_threshold(PC_Handle pch) {
 
 
 EdgeProfileCollector::EdgeProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
-                                           uint32 _initialTimeout, uint32 _timeout, 
-                                           uint32 _eThreshold, uint32 _bThreshold)
+                                           U_32 _initialTimeout, U_32 _timeout, 
+                                           U_32 _eThreshold, U_32 _bThreshold)
                                            : ProfileCollector(em, name, EM_PCTYPE_EDGE, genJit), initialTimeout(_initialTimeout), 
                                            timeout(_timeout),eThreshold(_eThreshold), bThreshold(_bThreshold)
 {
@@ -136,15 +136,15 @@ MethodProfile* EdgeProfileCollector::getMethodProfile(Method_Handle mh) const
 
 
 
-uint32* EdgeMethodProfile::getCounter( uint32 key ) const 
+U_32* EdgeMethodProfile::getCounter( U_32 key ) const 
 {
     //log2 search
     EdgeMap::const_iterator it = lower_bound(cntMap.begin(), cntMap.end(), key);
     if (it == cntMap.end() || *it != key) {
         return NULL;
     }
-    uint32 idx = (uint32)(it - cntMap.begin());
-    return (uint32*)&counters.front() + idx;
+    U_32 idx = (U_32)(it - cntMap.begin());
+    return (U_32*)&counters.front() + idx;
 }
 
 void EdgeMethodProfile::dump( const char* banner )
@@ -153,14 +153,14 @@ void EdgeMethodProfile::dump( const char* banner )
     Class_Handle ch = method_get_class(mh);
     const char* className = class_get_name(ch);
     const char* signature = method_get_descriptor(mh);
-    uint32 backEdgeCounter = entryCounter;
-    uint32 instrCost = entryCounter;
+    U_32 backEdgeCounter = entryCounter;
+    U_32 instrCost = entryCounter;
 
     assert(  banner != NULL );
 
     fprintf( stderr, "%s: %s::%s%s\n", banner, className, methodName, signature );
 
-    for( uint32 i = 0; i < counters.size(); i++ ){
+    for( U_32 i = 0; i < counters.size(); i++ ){
         instrCost += counters[i];
         if( counters[i] > backEdgeCounter ){
             backEdgeCounter = counters[i];
@@ -178,9 +178,9 @@ void EdgeMethodProfile::dump( const char* banner )
 
 
 EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
-                                                        uint32 numCounters,
-                                                        uint32* counterKeys,
-                                                        uint32 checkSum)
+                                                        U_32 numCounters,
+                                                        U_32* counterKeys,
+                                                        U_32 checkSum)
 {
     port_mutex_lock(&profilesLock);
 
@@ -206,14 +206,14 @@ EdgeMethodProfile* EdgeProfileCollector::createProfile( Method_Handle mh,
 
 bool EdgeProfileCollector::isMethodHot( EdgeMethodProfile* profile )
 {
-    uint32 entryCounter = profile->entryCounter;
+    U_32 entryCounter = profile->entryCounter;
     if( entryCounter >= eThreshold ){
         return true;
     }
 
-    const uint32 cutoff = bThreshold;
+    const U_32 cutoff = bThreshold;
 
-    for( uint32 i = 0; i < profile->counters.size(); i++ ){
+    for( U_32 i = 0; i < profile->counters.size(); i++ ){
         if( profile->counters[i] >= cutoff ){
             return true;
         }
@@ -229,7 +229,7 @@ static void logReadyProfile(const std::string& catName, const std::string& profi
     const char* className = class_get_name(ch);
     const char* signature = method_get_descriptor(mp->mh);
 
-    uint32 backEgdeMaxValue = mp->counters.empty() ? 0 : *std::max_element( mp->counters.begin(), mp->counters.end());
+    U_32 backEgdeMaxValue = mp->counters.empty() ? 0 : *std::max_element( mp->counters.begin(), mp->counters.end());
     std::ostringstream msg;
     msg <<"EM: profiler["<<profilerName.c_str()<<"] profile is ready [e:"
         << mp->entryCounter<<" b:"<<backEgdeMaxValue<<"] " <<className<<"::"<<methodName<<signature;

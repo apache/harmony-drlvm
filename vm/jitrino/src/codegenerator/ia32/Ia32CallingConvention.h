@@ -78,10 +78,10 @@ public:
 
     struct OpndInfo
     {
-        uint32              typeTag;
-        uint32              slotCount;
+        U_32              typeTag;
+        U_32              slotCount;
         bool                isReg;
-        uint32              slots[4];
+        U_32              slots[4];
     };
 
     //--------------------------------------------------------------
@@ -96,7 +96,7 @@ public:
     /** Fills the infos array with information how incoming arguments or return values are passed 
     according to this calling convention 
     */
-    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const =0;
+    virtual void    getOpndInfo(ArgKind kind, U_32 argCount, OpndInfo * infos) const =0;
 
     /** Returns a mask describing registers of regKind which are to be preserved by a callee
     */
@@ -113,7 +113,7 @@ public:
     /**
      * Defines stack pointer alignment on method enter.
      */
-    virtual uint32 getStackAlignment()const { return 0; }
+    virtual U_32 getStackAlignment()const { return 0; }
     
     /**
      * Maps a string representation of CallingConvention to the 
@@ -140,7 +140,7 @@ class STDCALLCallingConventionIA32: public CallingConvention
 public: 
     
     virtual             ~STDCALLCallingConventionIA32() {}
-    virtual void        getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual void        getOpndInfo(ArgKind kind, U_32 argCount, OpndInfo * infos) const;
     virtual Constraint  getCalleeSavedRegs(OpndKind regKind) const;
     virtual bool        calleeRestoresStack() const{ return true; }
     virtual bool        pushLastToFirst() const { return true; }
@@ -152,10 +152,10 @@ class STDCALLCallingConventionEM64T: public CallingConvention
 public: 
     
     virtual             ~STDCALLCallingConventionEM64T() {}
-    virtual void        getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual void        getOpndInfo(ArgKind kind, U_32 argCount, OpndInfo * infos) const;
     virtual Constraint  getCalleeSavedRegs(OpndKind regKind) const;
     virtual bool        calleeRestoresStack() const { return false; }
-    virtual uint32      getStackAlignment() const { return STACK_ALIGNMENT; }
+    virtual U_32      getStackAlignment() const { return STACK_ALIGNMENT; }
     virtual bool        pushLastToFirst() const { return true; }
 
 };
@@ -191,9 +191,9 @@ class ManagedCallingConventionIA32: public STDCALLCallingConventionIA32
 {   
 public: 
     virtual         ~ManagedCallingConventionIA32() {}
-    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual void    getOpndInfo(ArgKind kind, U_32 argCount, OpndInfo * infos) const;
     virtual bool    pushLastToFirst( ) const { return false; }
-    virtual uint32  getStackAlignment() const { return STACK_ALIGNMENT; }
+    virtual U_32  getStackAlignment() const { return STACK_ALIGNMENT; }
 };
 
 class ManagedCallingConventionEM64T: public STDCALLCallingConventionEM64T
@@ -221,7 +221,7 @@ class MultiArrayCallingConventionEM64T: public CDECLCallingConventionEM64T
 {
 public:
     virtual         ~MultiArrayCallingConventionEM64T() {}    
-    virtual void    getOpndInfo(ArgKind kind, uint32 argCount, OpndInfo * infos) const;
+    virtual void    getOpndInfo(ArgKind kind, U_32 argCount, OpndInfo * infos) const;
 };
 
 #ifdef _EM64T_

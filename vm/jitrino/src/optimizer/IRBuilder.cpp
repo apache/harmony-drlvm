@@ -139,13 +139,13 @@ protected:
         irBuilder.genBranch(instType, mod, label, src1);
     }
     virtual Inst* genDirectCall(MethodDesc* methodDesc,Type* returnType,Opnd* tauNullCheckedFirstArg,
-        Opnd* tauTypesChecked,uint32 numArgs,Opnd* args[])
+        Opnd* tauTypesChecked,U_32 numArgs,Opnd* args[])
     {
         irBuilder.genDirectCall(methodDesc, returnType, tauNullCheckedFirstArg, tauTypesChecked, numArgs, args);
         return (Inst*)irBuilder.getCurrentLabel()->getNode()->getLastInst();
     }
     // load, store & mov
-    virtual Inst* genLdConstant(int32 val) {
+    virtual Inst* genLdConstant(I_32 val) {
         return irBuilder.genLdConstant(val)->getInst();
     }
     virtual Inst* genLdConstant(int64 val) {
@@ -166,7 +166,7 @@ protected:
             return irBuilder.genTauLdInd(mod, dstType, ldType, src, tauNonNullBase, tauAddressInRange)->getInst();
     }
     
-    virtual Inst* genLdRef(Modifier mod, Type* dstType, uint32 token, MethodDesc *enclosingMethod) {
+    virtual Inst* genLdRef(Modifier mod, Type* dstType, U_32 token, MethodDesc *enclosingMethod) {
         return irBuilder.genLdRef(mod, dstType, token, enclosingMethod)->getInst();
     }
     virtual Inst* genLdFunAddrSlot(MethodDesc* methodDesc) {
@@ -223,7 +223,7 @@ protected:
     virtual void  foldBranch(BranchInst* br, bool isTaken) {
         assert(0);
     }
-    virtual void  foldSwitch(SwitchInst* sw, uint32 index) {
+    virtual void  foldSwitch(SwitchInst* sw, U_32 index) {
         assert(0);
     }
     virtual void  eliminateCheck(Inst* checkInst, bool alwaysThrows) {
@@ -370,8 +370,8 @@ LabelInst* IRBuilder::createLabel() {
     return currentLabel;
 }
 
-void IRBuilder::createLabels(uint32 numLabels, LabelInst** labels) {
-    for (uint32 i=0; i<numLabels; i++) {
+void IRBuilder::createLabels(U_32 numLabels, LabelInst** labels) {
+    for (U_32 i=0; i<numLabels; i++) {
         labels[i] = (LabelInst*)instFactory->makeLabel();
     }
 }
@@ -394,7 +394,7 @@ IRBuilder::genAdd(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src1 = propagateCopy(src1);
     src2 = propagateCopy(src2);
     Operation operation(Op_Add, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -415,7 +415,7 @@ IRBuilder::genMul(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src1 = propagateCopy(src1);
     src2 = propagateCopy(src2);
     Operation operation(Op_Mul, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -435,7 +435,7 @@ IRBuilder::genSub(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src1 = propagateCopy(src1);
     src2 = propagateCopy(src2);
     Operation operation(Op_Sub, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -460,7 +460,7 @@ IRBuilder::genDiv(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     else
         tauDivOk = genTauSafe(); // safe by construction
     Operation operation(Op_TauDiv, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2); // tauDivOk is not needed in hash
     if (dst) return dst;
 
@@ -483,7 +483,7 @@ IRBuilder::genCliDiv(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src2 = propagateCopy(src2);
 
     Operation operation(Op_TauDiv, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2); // tauDivOk is not needed in hash
     if (dst) return dst;
 
@@ -516,7 +516,7 @@ IRBuilder::genRem(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src2 = propagateCopy(src2);
 
     Operation operation(Op_TauRem, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2); // tauDivOk is not needed in hash
     if (dst) return dst;
 
@@ -547,7 +547,7 @@ IRBuilder::genCliRem(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src2 = propagateCopy(src2);
 
     Operation operation(Op_TauRem, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2); // tauDivOk is not needed in hash
     if (dst) return dst;
 
@@ -579,7 +579,7 @@ Opnd*
 IRBuilder::genNeg(Type* dstType, Opnd* src) {
     src = propagateCopy(src);
     Operation operation(Op_Neg, dstType->tag, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src);
     if (dst) return dst;
 
@@ -599,7 +599,7 @@ IRBuilder::genMulHi(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2) {
     src1 = propagateCopy(src1);
     src2 = propagateCopy(src2);
     Operation operation(Op_MulHi, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -623,7 +623,7 @@ IRBuilder::genMin(Type* dstType, Opnd* src1, Opnd* src2) {
         src2 = propagateCopy(src2);
 
         Operation operation(Op_Min, dstType->tag, Modifier());
-        uint32 hashcode = operation.encodeForHashing();
+        U_32 hashcode = operation.encodeForHashing();
         Opnd* dst = lookupHash(hashcode, src1, src2);
         if (dst) return dst;
         
@@ -706,7 +706,7 @@ IRBuilder::genMax(Type* dstType, Opnd* src1, Opnd* src2) {
         src1 = propagateCopy(src1);
         src2 = propagateCopy(src2);
         Operation operation(Op_Max, dstType->tag, Modifier());
-        uint32 hashcode = operation.encodeForHashing();
+        U_32 hashcode = operation.encodeForHashing();
         Opnd* dst = lookupHash(hashcode, src1, src2);
         if (dst) return dst;
         
@@ -778,7 +778,7 @@ IRBuilder::genAbs(Type* dstType, Opnd* src1) {
 
         src1 = propagateCopy(src1);
         Operation operation(Op_Abs, dstType->tag, Modifier());
-        uint32 hashcode = operation.encodeForHashing();
+        U_32 hashcode = operation.encodeForHashing();
         Opnd* dst = lookupHash(hashcode, src1);
         if (dst) return dst;
         
@@ -801,7 +801,7 @@ IRBuilder::genAbs(Type* dstType, Opnd* src1) {
         case Type::Int64:
             {
                 Opnd *zero = ((typeTag == Type::Int32)
-                              ? genLdConstant((int32)0)
+                              ? genLdConstant((I_32)0)
                               : genLdConstant((int64)0));
                 Opnd *cmpRes = genCmp(cmpDstType, typeTag, 
                                                 Cmp_GT, zero, src1);
@@ -931,7 +931,7 @@ IRBuilder::genConv(Type* dstType,
 {
     src = propagateCopy(src);
     Operation operation(Op_Conv, toType, ovfMod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
 
@@ -957,7 +957,7 @@ IRBuilder::genConvUnmanaged(Type* dstType,
             || (dstType->isObject() && src->getType()->isUnmanagedPtr()));
     src = propagateCopy(src);
     Operation operation(Op_ConvUnmanaged, toType, ovfMod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
 
@@ -983,7 +983,7 @@ IRBuilder::genConvZE(Type* dstType,
     assert(src->getType()->isInteger() && (dstType->isInteger() || dstType->isUnmanagedPtr()));
     src = propagateCopy(src);
     Operation operation(Op_ConvZE, toType, ovfMod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
 
@@ -1031,7 +1031,7 @@ IRBuilder::genShl(Type* dstType,
     shiftAmount = propagateCopy(shiftAmount);
 
     Operation operation(Op_Shladd, dstType->tag, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, value, shiftAmount);
     if (dst) return dst;
 
@@ -1055,7 +1055,7 @@ IRBuilder::genShr(Type* dstType,
     shiftAmount = propagateCopy(shiftAmount);
 
     Operation operation(Op_Shr, dstType->tag, mods);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, value, shiftAmount);
     if (dst) return dst;
 
@@ -1081,7 +1081,7 @@ IRBuilder::genCmp(Type* dstType,
     src2 = propagateCopy(src2);
 
     Operation operation(Op_Cmp, instType, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -1113,7 +1113,7 @@ IRBuilder::genCmp3(Type* dstType,
     src1 = propagateCopy(src1);
     src2 = propagateCopy(src2);
     Operation operation(Op_Cmp3, instType, mod);
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src1, src2);
     if (dst) return dst;
 
@@ -1182,7 +1182,7 @@ IRBuilder::genJSR(LabelInst* label) {
 }
 
 void
-IRBuilder::genSwitch(uint32 nLabels,
+IRBuilder::genSwitch(U_32 nLabels,
                      LabelInst* labelInsts[],
                      LabelInst* defaultLabel,
                      Opnd* src) {
@@ -1207,7 +1207,7 @@ IRBuilder::genThrowSystemException(CompilationInterface::SystemExceptionId id) {
 }
 
 void
-IRBuilder::genThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation) {
+IRBuilder::genThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation) {
     appendInst(instFactory->makeThrowLinkingException(encClass, CPIndex, operation));
 }
 
@@ -1261,11 +1261,11 @@ Opnd* IRBuilder::createTypeOpnd(ObjectType* type) {
 Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
                                 Opnd* tauNullCheckedFirstArg,
                                 Opnd* tauTypesChecked,
-                                uint32 numArgs,
+                                U_32 numArgs,
                                 Opnd* args[],
                                 ObjectType* ch,
                                 JavaByteCodes bc,
-                                uint32 cpIndex,
+                                U_32 cpIndex,
                                 MethodSignature* sig
                                 )
 {
@@ -1280,7 +1280,7 @@ Opnd* IRBuilder::genIndirectCallWithResolve(Type* returnType,
         MemoryManager& mm = irManager->getMemoryManager();
         Opnd* clsOpnd = createTypeOpnd(ch);
         Opnd* idxOpnd = genLdConstant((int)cpIndex);
-        uint32 numHelperArgs = 0;
+        U_32 numHelperArgs = 0;
         Opnd** helperArgs = new(mm)Opnd*[3];
         helperArgs[0] = clsOpnd;
         helperArgs[1] = idxOpnd;
@@ -1319,7 +1319,7 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
                          Type* returnType,
                          Opnd* tauNullCheckedFirstArg,
                          Opnd* tauTypesChecked,
-                         uint32 numArgs,
+                         U_32 numArgs,
                          Opnd* args[])
 {
     if (!tauNullCheckedFirstArg)
@@ -1336,7 +1336,7 @@ IRBuilder::genDirectCall(MethodDesc* methodDesc,
                                      tauNullCheckedFirstArg, tauTypesChecked,
                                      numArgs, args); 
     }
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(returnType);
@@ -1353,7 +1353,7 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
                              Type* returnType,
                              Opnd* tauNullCheckedFirstArg,
                              Opnd* tauTypesChecked,
-                             uint32 numArgs,
+                             U_32 numArgs,
                              Opnd* args[])
 {
     if(!methodDesc->isVirtual())
@@ -1361,7 +1361,7 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
         return genDirectCall(methodDesc, returnType,
                              tauNullCheckedFirstArg, tauTypesChecked, 
                              numArgs, args);
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     // callvirt can throw a null pointer exception
@@ -1406,9 +1406,9 @@ IRBuilder::genTauVirtualCall(MethodDesc* methodDesc,
 Opnd*
 IRBuilder::genJitHelperCall(JitHelperCallId helperId,
                             Type* returnType,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd*  args[]) {
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
@@ -1421,9 +1421,9 @@ IRBuilder::genJitHelperCall(JitHelperCallId helperId,
                             Type* returnType,
                             Opnd* tauNullCheckedRefArgs,
                             Opnd* tauTypesChecked,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd*  args[]) {
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
@@ -1434,9 +1434,9 @@ IRBuilder::genJitHelperCall(JitHelperCallId helperId,
 Opnd*
 IRBuilder::genVMHelperCall(VM_RT_SUPPORT helperId,
                             Type* returnType,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd*  args[]) {
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd * dst = createOpnd(returnType);
@@ -1465,10 +1465,10 @@ IRBuilder::genIndirectCall(Type* returnType,
                            Opnd* funAddr,
                            Opnd* tauNullCheckedFirstArg,
                            Opnd* tauTypesChecked,
-                           uint32 numArgs,
+                           U_32 numArgs,
                            Opnd* args[])
 {
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(returnType);
@@ -1492,10 +1492,10 @@ IRBuilder::genIndirectMemoryCall(Type* returnType,
                                  Opnd* funAddr,
                                  Opnd* tauNullCheckedFirstArg,
                                  Opnd* tauTypesChecked,
-                                 uint32 numArgs,
+                                 U_32 numArgs,
                                  Opnd* args[])
 {
-    for (uint32 i=0; i<numArgs; i++) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
 
@@ -1589,8 +1589,8 @@ IRBuilder::genVarDef(Type* type, bool isPinned) {
 
 // Phi-node instruction
 Opnd*
-IRBuilder::genPhi(uint32 numArgs, Opnd* args[]) {
-    for (uint32 i=0; i<numArgs; i++) {
+IRBuilder::genPhi(U_32 numArgs, Opnd* args[]) {
+    for (U_32 i=0; i<numArgs; i++) {
         args[i] = propagateCopy(args[i]);
     }
     Opnd* dst = createOpnd(args[0]->getType());
@@ -1610,34 +1610,34 @@ IRBuilder::genTauPi(Opnd *src, Opnd *tau, PiCondition *cond) {
 
 // load instructions
 Opnd*
-IRBuilder::genLdConstant(int32 val) {
+IRBuilder::genLdConstant(I_32 val) {
     Operation operation(Op_LdConstant, Type::Int32, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
-    Opnd* dst = lookupHash(hashcode, (uint32) val);
+    U_32 hashcode = operation.encodeForHashing();
+    Opnd* dst = lookupHash(hashcode, (U_32) val);
     if (dst) return dst;
     dst = createOpnd(typeManager->getInt32Type());
     appendInst(instFactory->makeLdConst(dst, val));
-    insertHash(hashcode, (uint32) val, dst->getInst());
+    insertHash(hashcode, (U_32) val, dst->getInst());
     return dst;
 }
 Opnd*
 IRBuilder::genLdConstant(int64 val) {
     Operation operation(Op_LdConstant, Type::Int64, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
-    Opnd* dst = lookupHash(hashcode, (uint32) (val >> 32), (uint32) (val & 0xffffffff));
+    U_32 hashcode = operation.encodeForHashing();
+    Opnd* dst = lookupHash(hashcode, (U_32) (val >> 32), (U_32) (val & 0xffffffff));
     if (dst) return dst;
     dst = createOpnd(typeManager->getInt64Type());
     appendInst(instFactory->makeLdConst(dst, val));
-    insertHash(hashcode, (uint32) (val >> 32), (uint32) (val & 0xffffffff), dst->getInst());
+    insertHash(hashcode, (U_32) (val >> 32), (U_32) (val & 0xffffffff), dst->getInst());
     return dst;
 }
 Opnd* IRBuilder::genLdConstant(float val) {
     ConstInst::ConstValue cv;
     cv.s = val;
-    uint32 word1 = cv.dword1;
-    uint32 word2 = cv.dword2;
+    U_32 word1 = cv.dword1;
+    U_32 word2 = cv.dword2;
     Operation operation(Op_LdConstant, Type::Single, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(typeManager->getSingleType());
@@ -1649,10 +1649,10 @@ Opnd*
 IRBuilder::genLdConstant(double val) {
     ConstInst::ConstValue cv;
     cv.d = val;
-    uint32 word1 = cv.dword1;
-    uint32 word2 = cv.dword2;
+    U_32 word1 = cv.dword1;
+    U_32 word2 = cv.dword2;
     Operation operation(Op_LdConstant, Type::Double, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(typeManager->getDoubleType());
@@ -1662,10 +1662,10 @@ IRBuilder::genLdConstant(double val) {
 }
 Opnd*
 IRBuilder::genLdConstant(Type *ptrtype, ConstInst::ConstValue val) {
-    uint32 word1 = val.dword1;
-    uint32 word2 = val.dword2;
+    U_32 word1 = val.dword1;
+    U_32 word2 = val.dword2;
     Operation operation(Op_LdConstant, ptrtype->tag, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(ptrtype);
@@ -1677,10 +1677,10 @@ Opnd*
 IRBuilder::genLdFloatConstant(double val) {
     ConstInst::ConstValue cv;
     cv.d = val;
-    uint32 word1 = cv.dword1;
-    uint32 word2 = cv.dword2;
+    U_32 word1 = cv.dword1;
+    U_32 word2 = cv.dword2;
     Operation operation(Op_LdConstant, Type::Float, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(typeManager->getFloatType());
@@ -1694,10 +1694,10 @@ IRBuilder::genLdFloatConstant(float val) {
     cv.dword1 = 0;
     cv.dword2 = 0;
     cv.s = val;
-    uint32 word1 = cv.dword1;
-    uint32 word2 = cv.dword2;
+    U_32 word1 = cv.dword1;
+    U_32 word2 = cv.dword2;
     Operation operation(Op_LdConstant, Type::Float, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, word1, word2);
     if (dst) return dst;
     dst = createOpnd(typeManager->getFloatType());
@@ -1708,7 +1708,7 @@ IRBuilder::genLdFloatConstant(float val) {
 Opnd*
 IRBuilder::genLdNull() {
     Operation operation(Op_LdConstant, Type::NullObject, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode);
     if (dst) return dst;
     dst = createOpnd(typeManager->getNullObjectType());
@@ -1718,7 +1718,7 @@ IRBuilder::genLdNull() {
 }
 
 Opnd*
-IRBuilder::genLdRef(MethodDesc* enclosingMethod, uint32 stringToken, Type* type) {
+IRBuilder::genLdRef(MethodDesc* enclosingMethod, U_32 stringToken, Type* type) {
     bool uncompress = irBuilderFlags.compressedReferences;
 
     Modifier mod = uncompress ? AutoCompress_Yes : AutoCompress_No;
@@ -1729,7 +1729,7 @@ IRBuilder::genLdRef(MethodDesc* enclosingMethod, uint32 stringToken, Type* type)
 }
 
 Opnd*
-IRBuilder::genLdToken(MethodDesc* enclosingMethod, uint32 metadataToken) {
+IRBuilder::genLdToken(MethodDesc* enclosingMethod, U_32 metadataToken) {
     Opnd* dst = createOpnd(typeManager->getSystemObjectType());
     appendInst(instFactory->makeLdToken(dst, enclosingMethod, metadataToken));
     return dst;
@@ -1795,7 +1795,7 @@ IRBuilder::genTauLdInd(Modifier mod, Type* type, Type::Tag ldType, Opnd* ptr,
 
 Opnd*
 IRBuilder::genLdRef(Modifier mod, Type* type, 
-                    uint32 token, MethodDesc *enclosingMethod)
+                    U_32 token, MethodDesc *enclosingMethod)
 {
     Opnd* dst = createOpnd(type);
     appendInst(instFactory->makeLdRef(mod, dst, enclosingMethod, token));
@@ -1830,7 +1830,7 @@ IRBuilder::genLdField(Type* type, Opnd* base, FieldDesc* fieldDesc) {
 }
 
 Opnd*
-IRBuilder::genLdFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIndex) {
+IRBuilder::genLdFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, U_32 cpIndex) {
     base = propagateCopy(base);
     Opnd *tauNullCheck = genTauCheckNull(base);
     Opnd *tauAddressInRange = genTauSafe();
@@ -1864,7 +1864,7 @@ IRBuilder::genInitType(NamedType* type) {
 }
 
 Opnd*
-IRBuilder::genLdStaticWithResolve(Type* type, ObjectType* enclClass, uint32 cpIdx) {
+IRBuilder::genLdStaticWithResolve(Type* type, ObjectType* enclClass, U_32 cpIdx) {
     bool uncompress = false;
     if (irBuilderFlags.compressedReferences && type->isObject()) {
         assert(!type->isCompressedReference());
@@ -1970,7 +1970,7 @@ IRBuilder::genLdFieldAddr(Type* type, Opnd* base, FieldDesc* fieldDesc) {
 }
 
 Opnd*
-IRBuilder::genLdFieldAddrWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIndex, bool putfield) {
+IRBuilder::genLdFieldAddrWithResolve(Type* type, Opnd* base, ObjectType* enclClass, U_32 cpIndex, bool putfield) {
     base = propagateCopy(base);
     genTauCheckNull(base);
 
@@ -2025,7 +2025,7 @@ IRBuilder::genLdStaticAddr(Type* type, FieldDesc* fieldDesc) {
 }
 
 Opnd*
-IRBuilder::genLdStaticAddrWithResolve(Type* type, ObjectType* enclClass, uint32 cpIndex, bool putfield) {
+IRBuilder::genLdStaticAddrWithResolve(Type* type, ObjectType* enclClass, U_32 cpIndex, bool putfield) {
     JavaByteCodes opcode = putfield ? OPCODE_PUTSTATIC : OPCODE_GETSTATIC;
     Opnd* dst = lookupHash(Op_VMHelperCall, opcode, cpIndex);
     if (dst) return dst;
@@ -2620,7 +2620,7 @@ IRBuilder::genStField(Type* type, Opnd* base, FieldDesc* fieldDesc,Opnd* src) {
 
 
 void       
-IRBuilder::genStFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, uint32 cpIdx, Opnd* src) {
+IRBuilder::genStFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, U_32 cpIdx, Opnd* src) {
     base = propagateCopy(base);
     src = propagateCopy(src);
     Opnd *tauBaseNonNull = genTauCheckNull(base);
@@ -2643,7 +2643,7 @@ IRBuilder::genStFieldWithResolve(Type* type, Opnd* base, ObjectType* enclClass, 
 
 
 void       
-IRBuilder::genStStaticWithResolve(Type* type, ObjectType* enclClass, uint32 cpIdx, Opnd* src) {
+IRBuilder::genStStaticWithResolve(Type* type, ObjectType* enclClass, U_32 cpIdx, Opnd* src) {
     src = propagateCopy(src);
     Opnd *tauOk = genTauSafe(); // address is always ok
     Opnd *tauTypeIsOk = type->isObject() ? genTauHasType(src, type) : genTauSafe();
@@ -2772,7 +2772,7 @@ IRBuilder::genNewObj(Type* type) {
 }
 
 Opnd*
-IRBuilder::genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex) {
+IRBuilder::genNewObjWithResolve(ObjectType* enclClass, U_32 cpIndex) {
     Opnd* clsOpnd = createTypeOpnd(enclClass);
     Opnd* idxOpnd = genLdConstant((int)cpIndex);
     Opnd** args = new (irManager->getMemoryManager()) Opnd*[2];
@@ -2783,7 +2783,7 @@ IRBuilder::genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex) {
 }
 
 Opnd*
-IRBuilder::genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, uint32 cpIndex) {
+IRBuilder::genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, U_32 cpIndex) {
     numElems = propagateCopy(numElems);
     Opnd* clsOpnd = createTypeOpnd(enclClass);
     Opnd* idxOpnd = genLdConstant((int)cpIndex);
@@ -2806,11 +2806,11 @@ IRBuilder::genNewArray(NamedType* elemType, Opnd* numElems) {
 
 Opnd*
 IRBuilder::genMultianewarray(NamedType* arrayType,
-                             uint32 dimensions,
+                             U_32 dimensions,
                              Opnd** numElems) {
     NamedType* elemType = arrayType;
     // create an array of arrays type
-    for (uint32 i=0; i<dimensions; i++) {
+    for (U_32 i=0; i<dimensions; i++) {
         elemType = ((ArrayType*)elemType)->getElementType();
     }
     Opnd* dst = createOpnd(arrayType);
@@ -2821,8 +2821,8 @@ IRBuilder::genMultianewarray(NamedType* arrayType,
 Opnd*
 IRBuilder::genMultianewarrayWithResolve(NamedType* arrayType,
                                         ObjectType* enclClass, 
-                                        uint32 cpIndex,
-                                        uint32 dimensions,
+                                        U_32 cpIndex,
+                                        U_32 dimensions,
                                         Opnd** numElems) 
 {
     Opnd* enclClsOpnd = createTypeOpnd(enclClass);
@@ -2839,10 +2839,10 @@ IRBuilder::genMultianewarrayWithResolve(NamedType* arrayType,
     args2[0]=clsOpnd;
     args2[1]=genLdConstant((int)dimensions);
     // create an array of arrays type
-    for (uint32 i=0; i<dimensions; i++) {
+    for (U_32 i=0; i<dimensions; i++) {
         args2[i+2]=numElems[dimensions-1-i];
     }
-    Opnd* dst = genVMHelperCall(VM_RT_MULTIANEWARRAY_RESOLVED, arrayType, (uint32)nArgs2, args2);
+    Opnd* dst = genVMHelperCall(VM_RT_MULTIANEWARRAY_RESOLVED, arrayType, (U_32)nArgs2, args2);
     return dst;
 }
 
@@ -2972,7 +2972,7 @@ IRBuilder::genCast(Opnd* src, Type* castType) {
 // type checking
 // CastException (succeeds if argument is null, returns casted object)
 Opnd*
-IRBuilder::genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, uint32 cpIndex) {
+IRBuilder::genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, U_32 cpIndex) {
     src = propagateCopy(src);
     Opnd* dst = lookupHash(Op_VMHelperCall, OPCODE_CHECKCAST, src->getId(), cpIndex);
     if (dst) return dst;
@@ -3054,7 +3054,7 @@ IRBuilder::genInstanceOf(Opnd* src, Type* type) {
 }
 
 Opnd*
-IRBuilder::genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, uint32 cpIndex) {
+IRBuilder::genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, U_32 cpIndex) {
     src = propagateCopy(src);
 
     Opnd* dst = lookupHash(Op_VMHelperCall, OPCODE_INSTANCEOF, src->getId(), cpIndex);
@@ -3340,7 +3340,7 @@ IRBuilder::genTauCheckFinite(Opnd* src) {
 // Methods for CSE hashing
 //
 //-----------------------------------------------------------------------------
-Opnd* IRBuilder::lookupHash(uint32 opc) {
+Opnd* IRBuilder::lookupHash(U_32 opc) {
     if (! irBuilderFlags.doCSE)
         return NULL;
     Inst* inst = cseHashTable->lookup(opc);
@@ -3350,7 +3350,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc) {
         return NULL;
 }
 
-Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op) {
+Opnd* IRBuilder::lookupHash(U_32 opc, U_32 op) {
     if (! irBuilderFlags.doCSE)
         return NULL;
     Inst* inst =  cseHashTable->lookup(opc, op);
@@ -3360,7 +3360,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op) {
         return NULL;
 }
 
-Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2) {
+Opnd* IRBuilder::lookupHash(U_32 opc, U_32 op1, U_32 op2) {
     if (! irBuilderFlags.doCSE)
         return NULL;
     Inst* inst = cseHashTable->lookup(opc, op1, op2);
@@ -3370,7 +3370,7 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2) {
         return NULL;
 }
 
-Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
+Opnd* IRBuilder::lookupHash(U_32 opc, U_32 op1, U_32 op2, U_32 op3) {
     if (! irBuilderFlags.doCSE)
         return NULL;
     Inst* inst = cseHashTable->lookup(opc, op1, op2, op3);
@@ -3380,25 +3380,25 @@ Opnd* IRBuilder::lookupHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
         return NULL;
 }
 
-void IRBuilder::insertHash(uint32 opc, Inst* inst) {
+void IRBuilder::insertHash(U_32 opc, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
     cseHashTable->insert(opc, inst);
 }
 
-void IRBuilder::insertHash(uint32 opc, uint32 op1, Inst* inst) {
+void IRBuilder::insertHash(U_32 opc, U_32 op1, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
     cseHashTable->insert(opc, op1, inst);
 }
 
-void IRBuilder::insertHash(uint32 opc, uint32 op1, uint32 op2, Inst* inst) {
+void IRBuilder::insertHash(U_32 opc, U_32 op1, U_32 op2, Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
     cseHashTable->insert(opc, op1, op2, inst);
 }
 
-void IRBuilder::insertHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3,
+void IRBuilder::insertHash(U_32 opc, U_32 op1, U_32 op2, U_32 op3,
                            Inst* inst) {
     if (! irBuilderFlags.doCSE)
         return;
@@ -3460,7 +3460,7 @@ IRBuilder::genTauUnsafe() {
 Opnd*
 IRBuilder::genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
     Operation operation(Op_TauStaticCast, castType->tag, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId(), tauCheckedCast->getId(), castType->getId());
     if (dst) return dst;
     
@@ -3469,7 +3469,7 @@ IRBuilder::genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
     
     insertHash(hashcode, src->getId(), tauCheckedCast->getId(), castType->getId(), dst->getInst());
     Operation hasTypeOperation(Op_TauHasType, castType->tag, Modifier());
-    uint32 hasTypeHashcode = hasTypeOperation.encodeForHashing();
+    U_32 hasTypeHashcode = hasTypeOperation.encodeForHashing();
     insertHash(hasTypeHashcode, src->getId(), castType->getId(), tauCheckedCast->getId(),
                dst->getInst());
     return dst;
@@ -3478,7 +3478,7 @@ IRBuilder::genTauStaticCast(Opnd *src, Opnd *tauCheckedCast, Type *castType) {
 Opnd*
 IRBuilder::genTauHasType(Opnd *src, Type *castType) {
     Operation operation(Op_TauHasType, castType->tag, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId(), castType->getId());
     if (dst) return dst;
     
@@ -3505,7 +3505,7 @@ Opnd* IRBuilder::genTauHasTypeWithConv(Opnd **srcPtr, Type *hasType) {
 Opnd*
 IRBuilder::genTauHasExactType(Opnd *src, Type *castType) {
     Operation operation(Op_TauHasExactType, castType->tag, Modifier());
-    uint32 hashcode = operation.encodeForHashing();
+    U_32 hashcode = operation.encodeForHashing();
     Opnd* dst = lookupHash(hashcode, src->getId(), castType->getId());
     if (dst) return dst;
     
@@ -3518,7 +3518,7 @@ IRBuilder::genTauHasExactType(Opnd *src, Type *castType) {
 
 Opnd*
 IRBuilder::genTauIsNonNull(Opnd *src) {
-    uint32 hashcode = Op_TauCheckNull;
+    U_32 hashcode = Op_TauCheckNull;
     Opnd* dst = lookupHash(hashcode, src->getId());
     if (dst) return dst;
     

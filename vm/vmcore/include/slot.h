@@ -50,7 +50,7 @@ class Slot {
 private:
     union {
         void **raw;
-        uint32 *compressed;
+        U_32 *compressed;
         void *value;
     } content;
 
@@ -97,7 +97,7 @@ public:
         REFS_RUNTIME_SWITCH_IF
 #ifdef REFS_RUNTIME_OR_COMPRESSED
             if (obj != NULL) {
-                *content.compressed = (uint32) ((UDATA)obj - (UDATA)heap_base);
+                *content.compressed = (U_32) ((UDATA)obj - (UDATA)heap_base);
             } else {
                 *content.compressed = 0;
             }

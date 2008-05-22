@@ -173,10 +173,10 @@ Inliner::Inliner(SessionAction* argSource, MemoryManager& mm, IRManager& irm,
     _usesOptimisticBalancedSync = argSource->getBoolArg("sync_optimistic", false) ? argSource->getBoolArg("sync_optcatch", true) : false;
 }
 
-int32 
-Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth) 
+I_32 
+Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, U_32 loopDepth) 
 {
-    int32 benefit = 0;
+    I_32 benefit = 0;
 
     if (Log::isEnabled()) {
         Log::out() << "Computing Inline benefit for "
@@ -193,7 +193,7 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
     //
     // Size impact
     //
-    uint32 size = methodDesc.getByteCodeSize();
+    U_32 size = methodDesc.getByteCodeSize();
     Log::out() << "  size is " << (int) size << ::std::endl;
     if(size < _inlineSmallMaxByteSize) {
         // Large bonus for smallest methods
@@ -255,7 +255,7 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
         assert(call->getNumSrcOperands() >= 2);
         assert(call->getSrc(0)->getType()->tag == Type::Tau);
         assert(call->getSrc(1)->getType()->tag == Type::Tau);
-        for(uint32 i = 2; i < call->getNumSrcOperands(); ++i) {
+        for(U_32 i = 2; i < call->getNumSrcOperands(); ++i) {
             Opnd* arg = call->getSrc(i);
             assert(arg->getType()->tag != Type::Tau);
             if(arg->getInst()->isConst()) {
@@ -290,7 +290,7 @@ Inliner::computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* pa
         // Remove any loop bonus as this is already accounted for in block count
         benefit -= _inlineLoopBonus*loopDepth;
         // Scale by call site 'hotness'.
-        benefit = (uint32) ((double) benefit * scale);
+        benefit = (U_32) ((double) benefit * scale);
 
         Log::out() << "  HeatThreshold=" << heatThreshold
                                << ", nodeCount=" << nodeCount
@@ -315,18 +315,18 @@ public:
 protected:
     bool leaf;
 
-    void offset(uint32 offset) {};
-    void offset_done(uint32 offset) {};
+    void offset(U_32 offset) {};
+    void offset_done(U_32 offset) {};
     void nop()  {}
     void aconst_null()  {}
-    void iconst(int32)  {}
+    void iconst(I_32)  {}
     void lconst(int64)  {}
     void fconst(float)  {}
     void dconst(double)  {}
     void bipush(int8)  {}
     void sipush(int16)  {}
-    void ldc(uint32)  {}
-    void ldc2(uint32)  {}
+    void ldc(U_32)  {}
+    void ldc2(U_32)  {}
     void iload(uint16 varIndex)  {}
     void lload(uint16 varIndex)  {}
     void fload(uint16 varIndex)  {}
@@ -340,11 +340,11 @@ protected:
     void baload()  {}
     void caload()  {}
     void saload()  {}
-    void istore(uint16 varIndex,uint32 off)  {}
-    void lstore(uint16 varIndex,uint32 off)  {}
-    void fstore(uint16 varIndex,uint32 off)  {}
-    void dstore(uint16 varIndex,uint32 off)  {}
-    void astore(uint16 varIndex,uint32 off)  {}
+    void istore(uint16 varIndex,U_32 off)  {}
+    void lstore(uint16 varIndex,U_32 off)  {}
+    void fstore(uint16 varIndex,U_32 off)  {}
+    void dstore(uint16 varIndex,U_32 off)  {}
+    void astore(uint16 varIndex,U_32 off)  {}
     void iastore()  {}
     void lastore()  {}
     void fastore()  {}
@@ -398,7 +398,7 @@ protected:
     void lor()  {}
     void ixor()  {}
     void lxor()  {}
-    void iinc(uint16 varIndex,int32 amount)  {}
+    void iinc(uint16 varIndex,I_32 amount)  {}
     void i2l()  {}
     void i2f()  {}
     void i2d()  {}
@@ -419,56 +419,56 @@ protected:
     void fcmpg()  {}
     void dcmpl()  {}
     void dcmpg()  {}
-    void ifeq(uint32 targetOffset,uint32 nextOffset)  {}
-    void ifne(uint32 targetOffset,uint32 nextOffset)  {}
-    void iflt(uint32 targetOffset,uint32 nextOffset)  {}
-    void ifge(uint32 targetOffset,uint32 nextOffset)  {}
-    void ifgt(uint32 targetOffset,uint32 nextOffset)  {}
-    void ifle(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmpeq(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmpne(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmplt(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmpge(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmpgt(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_icmple(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_acmpeq(uint32 targetOffset,uint32 nextOffset)  {}
-    void if_acmpne(uint32 targetOffset,uint32 nextOffset)  {}
-    void goto_(uint32 targetOffset,uint32 nextOffset)  {}
-    void jsr(uint32 offset, uint32 nextOffset)  {}
+    void ifeq(U_32 targetOffset,U_32 nextOffset)  {}
+    void ifne(U_32 targetOffset,U_32 nextOffset)  {}
+    void iflt(U_32 targetOffset,U_32 nextOffset)  {}
+    void ifge(U_32 targetOffset,U_32 nextOffset)  {}
+    void ifgt(U_32 targetOffset,U_32 nextOffset)  {}
+    void ifle(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmpeq(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmpne(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmplt(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmpge(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmpgt(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_icmple(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_acmpeq(U_32 targetOffset,U_32 nextOffset)  {}
+    void if_acmpne(U_32 targetOffset,U_32 nextOffset)  {}
+    void goto_(U_32 targetOffset,U_32 nextOffset)  {}
+    void jsr(U_32 offset, U_32 nextOffset)  {}
     void ret(uint16 varIndex,const uint8* byteCodes)  {}
     void tableswitch(JavaSwitchTargetsIter*)  {}
     void lookupswitch(JavaLookupSwitchTargetsIter*)  {}
-    void ireturn(uint32 off)  {}
-    void lreturn(uint32 off)  {}
-    void freturn(uint32 off)  {}
-    void dreturn(uint32 off)  {}
-    void areturn(uint32 off)  {}
-    void return_(uint32 off)  {}
-    void getstatic(uint32 constPoolIndex)  {}
-    void putstatic(uint32 constPoolIndex)  {}
-    void getfield(uint32 constPoolIndex)  {}
-    void putfield(uint32 constPoolIndex)  {}
-    void invokevirtual(uint32 constPoolIndex)  { leaf = false; }
-    void invokespecial(uint32 constPoolIndex)  { leaf = false; }
-    void invokestatic(uint32 constPoolIndex)  { leaf = false; }
-    void invokeinterface(uint32 constPoolIndex,uint32 count)  { leaf = false; }
-    void new_(uint32 constPoolIndex)  {}
+    void ireturn(U_32 off)  {}
+    void lreturn(U_32 off)  {}
+    void freturn(U_32 off)  {}
+    void dreturn(U_32 off)  {}
+    void areturn(U_32 off)  {}
+    void return_(U_32 off)  {}
+    void getstatic(U_32 constPoolIndex)  {}
+    void putstatic(U_32 constPoolIndex)  {}
+    void getfield(U_32 constPoolIndex)  {}
+    void putfield(U_32 constPoolIndex)  {}
+    void invokevirtual(U_32 constPoolIndex)  { leaf = false; }
+    void invokespecial(U_32 constPoolIndex)  { leaf = false; }
+    void invokestatic(U_32 constPoolIndex)  { leaf = false; }
+    void invokeinterface(U_32 constPoolIndex,U_32 count)  { leaf = false; }
+    void new_(U_32 constPoolIndex)  {}
     void newarray(uint8 type)  {}
-    void anewarray(uint32 constPoolIndex)  {}
+    void anewarray(U_32 constPoolIndex)  {}
     void arraylength()  {}
     void athrow()  {}
-    void checkcast(uint32 constPoolIndex)  {}
-    int  instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)  {return 3;}
+    void checkcast(U_32 constPoolIndex)  {}
+    int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)  {return 3;}
     void monitorenter()  {}
     void monitorexit()  {}
-    void multianewarray(uint32 constPoolIndex,uint8 dimensions)  {}
-    void ifnull(uint32 targetOffset,uint32 nextOffset)  {}
-    void ifnonnull(uint32 targetOffset,uint32 nextOffset) {}
+    void multianewarray(U_32 constPoolIndex,uint8 dimensions)  {}
+    void ifnull(U_32 targetOffset,U_32 nextOffset)  {}
+    void ifnonnull(U_32 targetOffset,U_32 nextOffset) {}
 };
 
 bool
 Inliner::isLeafMethod(MethodDesc& methodDesc) {
-    uint32 size = methodDesc.getByteCodeSize();
+    U_32 size = methodDesc.getByteCodeSize();
     const U_8* bytecodes = methodDesc.getByteCodes();
     ByteCodeParser parser(bytecodes,size);
     JavaByteCodeLeafSearchCallback leafTester;
@@ -559,7 +559,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
 
 
     // Fuse callsite arguments with incoming parameters
-    uint32 numArgs = callInst->getNumSrcOperands() - 2; // omit taus
+    U_32 numArgs = callInst->getNumSrcOperands() - 2; // omit taus
     Opnd *tauNullChecked = callInst->getSrc(0);
     Opnd *tauTypesChecked = callInst->getSrc(1);
     assert(tauNullChecked->getType()->tag == Type::Tau);
@@ -577,7 +577,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
     Inst* first = (Inst*)entry->getFirstInst();
     Inst* inst;
     Opnd* thisPtr = 0;
-    uint32 j;
+    U_32 j;
     for(j = 0, inst = first->getNextInst(); j < numArgs && inst != NULL;) {
         switch (inst->getOpcode()) {
         case Op_DefArg:
@@ -608,7 +608,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
                 Opnd* src = inst->getSrc(0);
                 if (tauTypesChecked->getInst()->getOpcode() != Op_TauUnsafe) {
                     // it's worth substituting the tau
-                    for (uint32 i=0; i<numArgs; ++i) {
+                    for (U_32 i=0; i<numArgs; ++i) {
                         if (src == callInst->getSrc(i+2)) {
                             // it is a parameter
                             Opnd* dst = inst->getDst();
@@ -655,7 +655,7 @@ Inliner::connectRegion(InlineNode* inlineNode) {
         assert(retNode != NULL);
         bool isSsa = inlinedIRM.getInSsa();
         Opnd** phiArgs = isSsa ? new (_toplevelIRM.getMemoryManager()) Opnd*[retNode->getInDegree()] : NULL;
-        uint32 phiCount = 0;
+        U_32 phiCount = 0;
         const Edges& inEdges = retNode->getInEdges();
         Edges::const_iterator eiter;
         for(eiter = inEdges.begin(); eiter != inEdges.end(); ++eiter) {
@@ -906,7 +906,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
     InlineNode* inlineParentNode = 0;
     MethodCallInst* call = 0;
     MethodDesc* methodDesc = 0;
-    uint32 newByteSize = 0;
+    U_32 newByteSize = 0;
     
     //
     // Search priority queue for next inline candidate
@@ -924,7 +924,7 @@ Inliner::getNextRegionToInline(CompilationContext& inlineCC) {
 
         // If candidate would cause top level method to exceed size threshold, throw away.
         
-        uint32 methodByteSize = methodDesc->getByteCodeSize();
+        U_32 methodByteSize = methodDesc->getByteCodeSize();
         methodByteSize = (methodByteSize <= CALL_COST) ? 1 : methodByteSize-CALL_COST;
         newByteSize = _currentByteSize + methodByteSize;
         double factor = ((double) newByteSize) / ((double) _initByteSize);
@@ -968,9 +968,9 @@ InlineNode* Inliner::createInlineNode(CompilationContext& inlineCC, MethodCallIn
     inlineCC.setHIRManager(inlinedIRM);
     
     //prepare type info
-    uint32 nArgs = call->getNumSrcOperands() - 2;
+    U_32 nArgs = call->getNumSrcOperands() - 2;
     Type** types = new (_tmpMM)Type*[nArgs];
-    for (uint32 i = 0; i < nArgs; i++) {
+    for (U_32 i = 0; i < nArgs; i++) {
         types[i] = call->getSrc(i + 2)->getType();
     }
 
@@ -1001,8 +1001,8 @@ Inliner::processDominatorNode(InlineNode *inlineNode, DominatorNode* dnode, Loop
 
             Log::out() << "Considering inlining instruction I" << (int)call->getId() << ::std::endl;
             if (usePriorityQueue && canInlineInto(*methodDesc)) {
-                uint32 size = methodDesc->getByteCodeSize();
-                int32 benefit = computeInlineBenefit(node, *methodDesc, inlineNode, ltree->getLoopDepth(node));
+                U_32 size = methodDesc->getByteCodeSize();
+                I_32 benefit = computeInlineBenefit(node, *methodDesc, inlineNode, ltree->getLoopDepth(node));
                 assert(size > 0);
                 Log::out() << "Inline benefit " << methodDesc->getParentType()->getName() << "." << methodDesc->getName() << " == " << (int) benefit << ::std::endl;
                 if(0 < size && benefit > _minBenefitThreshold) {
@@ -1103,7 +1103,7 @@ InlineNode::printTag(::std::ostream& os) {
 
 
 
-uint32
+U_32
 InlineTree::computeCheckSum(InlineNode* node) {
     if(node == NULL)
         return 0;
@@ -1119,7 +1119,7 @@ InlineTree::computeCheckSum(InlineNode* node) {
     sum += hash(desc.getName());
     sum += computeCheckSum(node->getSiblings());
     sum += computeCheckSum(node->getChild());
-    return (uint32) sum;
+    return (U_32) sum;
 }
 
 void Inliner::runInlinerPipeline(CompilationContext& inlineCC, const char* pipeName) {

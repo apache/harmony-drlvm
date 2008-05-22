@@ -52,13 +52,13 @@ void CodeGen::gen_prof_be(void)
     movp(addr, m_p_backedge_counter);
     int off = 0;
 #endif
-    uint32 offset = (uint32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff); //store offsets inside of BB now. Fix it to method's offset after code layout
+    U_32 offset = (U_32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff); //store offsets inside of BB now. Fix it to method's offset after code layout
     //put number of nops to align counter instruction
     nop(NOPS_PER_COUNTER);
     alu(alu_add, Opnd(i32, addr, off), 1);
 
    //store information about profiling counters
-    uint32 new_offset = (uint32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff);
+    U_32 new_offset = (U_32)(m_codeStream.ip() - m_codeStream.data() - m_bbinfo->ipoff);
     ProfileCounterInfo info;
     info.bb = m_bbinfo;
     info.offsetInfo = ProfileCounterInfo::createOffsetInfo(new_offset - offset, offset);

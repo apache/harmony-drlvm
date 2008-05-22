@@ -261,7 +261,7 @@ void InsertPi::insertPiForUnexceptionalPEI(Node *block, Inst *lasti)
     case Op_NewMultiArray:
         {
             // the number of newarray dimensions must be >= 1.
-            uint32 numOpnds = lasti->getNumSrcOperands();
+            U_32 numOpnds = lasti->getNumSrcOperands();
             assert(numOpnds >= 1);
             StlSet<Opnd *> done(_mm);
             if (Log::isEnabled()) {
@@ -271,7 +271,7 @@ void InsertPi::insertPiForUnexceptionalPEI(Node *block, Inst *lasti)
             }
             Opnd *tauOpnd = 0;
             // the number of newarray elements must be in [0, MAXINT32]
-            for (uint32 opndNum = 0; opndNum < numOpnds; opndNum++) {
+            for (U_32 opndNum = 0; opndNum < numOpnds; opndNum++) {
                 Opnd *thisOpnd = lasti->getSrc(opndNum);
                 if (!done.has(thisOpnd)) {
                     done.insert(thisOpnd);
@@ -763,7 +763,7 @@ bool InsertPi::getAliases(Opnd *opnd, AbcdAliases *aliases, int64 addend)
                 ConstInst *cinst0 = inst0->asConstInst();
                 assert(cinst0);
                 ConstInst::ConstValue cv = cinst0->getValue();
-                int32 c = cv.i4;
+                I_32 c = cv.i4;
                 int64 sumc = c + addend;
                 if (add_overflowed<int64>(sumc, c, addend)) {
                     return false;
@@ -907,7 +907,7 @@ private:
 void InsertPi::renamePiVariables()
 {
     MethodDesc &methodDesc= _irManager.getMethodDesc();
-    uint32 byteCodeSize = methodDesc.getByteCodeSize();
+    U_32 byteCodeSize = methodDesc.getByteCodeSize();
     MemoryManager localMemManager("Abcd::renamePiNodes");
 
     RenamePiWalker theWalker(this, localMemManager, _piMap, byteCodeSize);
@@ -963,8 +963,8 @@ void InsertPi::renamePiVariablesInNode(Node *block)
             }
             
             // now process source operands
-            uint32 numOpnds = inst->getNumSrcOperands();
-            for (uint32 i=0; i<numOpnds; i++) {
+            U_32 numOpnds = inst->getNumSrcOperands();
+            for (U_32 i=0; i<numOpnds; i++) {
                 Opnd *opnd = inst->getSrc(i);
                 if (opnd->isPiOpnd())
                     opnd = opnd->asPiOpnd()->getOrg();
@@ -1093,8 +1093,8 @@ void InsertPi::removePiOnInst(Node* block, Inst *inst)
         inst->unlink();
     }else{
         // replace Pi operands with original ones
-        uint32 num_opnds = inst->getNumSrcOperands();
-        for (uint32 i = 0; i < num_opnds; i++) {
+        U_32 num_opnds = inst->getNumSrcOperands();
+        for (U_32 i = 0; i < num_opnds; i++) {
             Opnd* pi_opnd = inst->getSrc(i);
             while ( pi_opnd->isPiOpnd() ) {
                 pi_opnd = pi_opnd->asPiOpnd()->getOrg();

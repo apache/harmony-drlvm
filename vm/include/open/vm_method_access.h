@@ -359,7 +359,7 @@ DECLARE_OPEN(Type_Info_Handle, method_args_get_type_info,
  *
  * @return The method bytecode size.
  */
-DECLARE_OPEN(uint32, method_get_bytecode_length, (Method_Handle method));
+DECLARE_OPEN(U_32, method_get_bytecode_length, (Method_Handle method));
 
 /**
  * Returns the method bytecode array.
@@ -393,7 +393,7 @@ DECLARE_OPEN(U_8*, method_get_stackmaptable, (Method_Handle hmethod));
  * @note An assertion is raised if the method equals to <code>NULL</code>. 
  * @note Replaces functions method_get_max_local and method_vars_get_number.
  */
-DECLARE_OPEN(uint32, method_get_max_locals, (Method_Handle method));
+DECLARE_OPEN(U_32, method_get_max_locals, (Method_Handle method));
 
 /**
  * Returns the maximum stack depth for the given method.

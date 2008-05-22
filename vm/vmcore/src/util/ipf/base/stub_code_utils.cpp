@@ -190,7 +190,7 @@ void gen_compare_to_managed_null(Merced_Code_Emitter &emitter,
 {
     assert(VM_Global_State::loader_env->compress_references);
     const bool cmp4 = true;
-    uint32 null_low = (uint32) (uint64) VM_Global_State::loader_env->managed_null;
+    U_32 null_low = (U_32) (uint64) VM_Global_State::loader_env->managed_null;
     if (null_low == 0)
     {
         emitter.ipf_cmp(icmp_eq, cmp_none, predicate1, predicate2, src, 0, cmp4);

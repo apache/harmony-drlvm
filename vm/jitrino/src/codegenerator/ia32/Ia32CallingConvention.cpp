@@ -68,10 +68,10 @@ const RegName fastCallFPRegs[8] = {RegName_XMM0,RegName_XMM1,RegName_XMM2,RegNam
 
 #ifdef _IA32_
 //______________________________________________________________________________________
-void STDCALLCallingConventionIA32::getOpndInfo(ArgKind kind, uint32 count, OpndInfo * infos) const
+void STDCALLCallingConventionIA32::getOpndInfo(ArgKind kind, U_32 count, OpndInfo * infos) const
 {
     if (kind == ArgKind_InArg) {
-        for (uint32 i=0; i<count; i++){
+        for (U_32 i=0; i<count; i++){
     
             Type::Tag typeTag=(Type::Tag)infos[i].typeTag;
             OpndSize size=IRManager::getTypeSize(typeTag);
@@ -120,17 +120,17 @@ void STDCALLCallingConventionIA32::getOpndInfo(ArgKind kind, uint32 count, OpndI
 }
 
 #else
-void STDCALLCallingConventionEM64T::getOpndInfo(ArgKind kind, uint32 count, OpndInfo * infos) const
+void STDCALLCallingConventionEM64T::getOpndInfo(ArgKind kind, U_32 count, OpndInfo * infos) const
 {
     if (kind == ArgKind_InArg) {
-        uint32 gpreg = 0;
+        U_32 gpreg = 0;
 #ifdef _WIN64
     #define fpreg gpreg
 #else
-    uint32 fpreg = 0;
+    U_32 fpreg = 0;
 #endif
 
-        for (uint32 i=0; i<count; i++){
+        for (U_32 i=0; i<count; i++){
     
             Type::Tag typeTag=(Type::Tag)infos[i].typeTag;
             if(((typeTag>Type::Float  ||typeTag<Type::Single)  && gpreg < lengthof(fastCallGPRegs))) {
@@ -212,7 +212,7 @@ Constraint STDCALLCallingConventionEM64T::getCalleeSavedRegs(OpndKind regKind) c
 
 //______________________________________________________________________________________
 #ifdef _IA32_
-void ManagedCallingConventionIA32::getOpndInfo(ArgKind kind, uint32 count, OpndInfo * infos) const
+void ManagedCallingConventionIA32::getOpndInfo(ArgKind kind, U_32 count, OpndInfo * infos) const
 {
     if (kind == ArgKind_RetArg) {
         assert(count <= 1);
@@ -238,10 +238,10 @@ void ManagedCallingConventionIA32::getOpndInfo(ArgKind kind, uint32 count, OpndI
 
 #ifdef _IA32_
 #else
-void MultiArrayCallingConventionEM64T::getOpndInfo(ArgKind kind, uint32 count, OpndInfo * infos) const
+void MultiArrayCallingConventionEM64T::getOpndInfo(ArgKind kind, U_32 count, OpndInfo * infos) const
 {
     if (kind == ArgKind_InArg){
-        for (uint32 i = 0; i < count; i++) {    
+        for (U_32 i = 0; i < count; i++) {    
                 infos[i].slotCount = 1;
                 infos[i].slots[0] = RegName_Null;
                 infos[i].isReg = false;

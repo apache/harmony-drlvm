@@ -58,7 +58,7 @@ public:
 
 protected:
 
-    typedef uint32 RegMask;
+    typedef U_32 RegMask;
 
     const IRManager& irm;
     MemoryManager     mm;

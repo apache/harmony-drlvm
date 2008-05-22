@@ -44,10 +44,10 @@ protected:
     void               assignLocations();
     
     void               assignLocation(RegOpnd*);
-    void               updateAllocSet(Opnd*, uint32, QpMask);
+    void               updateAllocSet(Opnd*, U_32, QpMask);
     void               checkCallSite(Inst*, QpMask);
     
-    void               checkCoalescing(uint32, Inst*);
+    void               checkCoalescing(U_32, Inst*);
     void               removeSameRegMoves();
 
     MemoryManager      &mm;

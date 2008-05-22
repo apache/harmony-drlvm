@@ -235,7 +235,7 @@ private:
     Nodes                       basicBlocks;
 
     /** result of irManager.getOpndCount before the pass */ 
-    uint32                      originalOpndCount;
+    U_32                      originalOpndCount;
 
     /** Current live set, updated as usual for each instruction in resolveConstraints(Inst*) */ 
     BitSet                      liveOpnds;
@@ -260,7 +260,7 @@ private:
     StlVector<Opnd*>            opndReplaceWorkset;
 
 
-    StlVector<uint32>           opndUsage;
+    StlVector<U_32>           opndUsage;
 
     unsigned callSplitThresholdForNoRegs;
     unsigned callSplitThresholdFor1Reg;

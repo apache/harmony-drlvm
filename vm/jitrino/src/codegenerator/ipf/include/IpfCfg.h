@@ -52,8 +52,8 @@ class OpndManager;
 class Constant {
 public:
                  Constant(DataKind);
-    void         setOffset(int32 offset_)    { offset = offset_; }
-    int32        getOffset()                 { return offset; }
+    void         setOffset(I_32 offset_)    { offset = offset_; }
+    I_32        getOffset()                 { return offset; }
     void         setAddress(void *address_)  { address = address_; }
     void         *getAddress()               { return address; }
     void         setSize(int16 size_)        { size = size_; }
@@ -63,7 +63,7 @@ public:
 
 protected:
     void         *address;
-    int32        offset;
+    I_32        offset;
     int16        size;
     DataKind     dataKind;
 };
@@ -135,7 +135,7 @@ protected:
 
 class Opnd : public CG_OpndHandle {
 public:
-                    Opnd(uint32, OpndKind=OPND_INVALID, DataKind=DATA_INVALID, int64=0);
+                    Opnd(U_32, OpndKind=OPND_INVALID, DataKind=DATA_INVALID, int64=0);
 
     uint16          getId()                         { return id; }
     OpndKind        getOpndKind()                   { return opndKind; }
@@ -172,18 +172,18 @@ protected:
 
 class RegOpnd : public Opnd {
 public:
-                RegOpnd(MemoryManager&, uint32, OpndKind, DataKind, int32=LOCATION_INVALID);
+                RegOpnd(MemoryManager&, U_32, OpndKind, DataKind, I_32=LOCATION_INVALID);
     int64       getValue();
-    void        setLocation(int32 value_)             { value = value_; }
-    int32       getLocation()                         { return value; }
+    void        setLocation(I_32 value_)             { value = value_; }
+    I_32       getLocation()                         { return value; }
 
     QpMask      getQpMask()                           { return qpMask; }
     void        andQpMask(QpMask mask)                { qpMask &= mask; }
     void        orQpMask(QpMask mask)                 { qpMask |= mask; }
     bool        isAlive(QpMask mask)                  { return mask & qpMask; }
 
-    void        incSpillCost(uint32 spillCost_)       { spillCost += spillCost_; }
-    uint32      getSpillCost()                        { return spillCost; }
+    void        incSpillCost(U_32 spillCost_)       { spillCost += spillCost_; }
+    U_32      getSpillCost()                        { return spillCost; }
     RegOpndSet  &getDepOpnds()                        { return depOpnds; }
     void        insertDepOpnds(RegOpndSet &opnds)     { depOpnds.insert(opnds.begin(), opnds.end()); }
     void        insertDepOpnd(RegOpnd*);
@@ -191,14 +191,14 @@ public:
     bool        isCrossCallSite()                     { return crossCallSite; }
 
     Int2OpndMap &getCoalesceCands()                   { return coalesceCands; }
-    void        addCoalesceCand(uint32 execCnt, RegOpnd *opnd) { coalesceCands.insert(make_pair(execCnt, opnd)); }
+    void        addCoalesceCand(U_32 execCnt, RegOpnd *opnd) { coalesceCands.insert(make_pair(execCnt, opnd)); }
 
     virtual     ~RegOpnd() {}
 
 protected:
     QpMask      qpMask;             // mask of predicate spaces opnd alive in
     // These fields are for register allocation algorithm
-    uint32      spillCost;          // number of opnd uses
+    U_32      spillCost;          // number of opnd uses
     RegOpndSet  depOpnds;           // opnds which can not be placed in the same reg with the opnd
     bool        crossCallSite;      // opnd live range crosses call site
     Int2OpndMap coalesceCands;      // 
@@ -210,7 +210,7 @@ protected:
 
 class ConstantRef : public Opnd {
 public:
-    ConstantRef::ConstantRef(uint32 id, Constant *constant, DataKind dataKind = DATA_CONST_REF) :
+    ConstantRef::ConstantRef(U_32 id, Constant *constant, DataKind dataKind = DATA_CONST_REF) :
         Opnd(id, OPND_IMM, dataKind, LOCATION_INVALID), constant(constant) {}
 
     int64     getValue()     { return (int64)constant->getAddress(); }
@@ -226,7 +226,7 @@ protected:
 
 class NodeRef : public Opnd {
 public:
-    NodeRef(uint32 id, BbNode *node = NULL) 
+    NodeRef(U_32 id, BbNode *node = NULL) 
     : Opnd(id, OPND_IMM, DATA_NODE_REF, LOCATION_INVALID), node(node) {}
     
     int64    getValue();
@@ -243,7 +243,7 @@ protected:
 
 class MethodRef : public Opnd {
 public:
-    MethodRef(uint32 id, MethodDesc *method = NULL) 
+    MethodRef(U_32 id, MethodDesc *method = NULL) 
     : Opnd(id, OPND_IMM, DATA_METHOD_REF, LOCATION_INVALID), method(method) {}
     
     int64       getValue();
@@ -278,21 +278,21 @@ public:
     CompVector  &getComps()                          { return compList; }
     Completer   getComp(uint16 num)                  { return compList[num]; }
     void        addComp(Completer comp_)             { compList.push_back(comp_); }
-    void        setComp(uint32 num, Completer comp_) { compList[num] = comp_; }
+    void        setComp(U_32 num, Completer comp_) { compList[num] = comp_; }
 
     void        addOpnd(Opnd *opnd_)                 { opndList.push_back(opnd_); }
     void        removeLastOpnd()                     { opndList.pop_back(); }
     OpndVector  &getOpnds()                          { return opndList; }
-    void        setOpnd(uint32 num, Opnd *opnd_)     { opndList[num] = opnd_; }
-    Opnd        *getOpnd(uint32 num)                 { return opndList[num]; }
+    void        setOpnd(U_32 num, Opnd *opnd_)     { opndList[num] = opnd_; }
+    Opnd        *getOpnd(U_32 num)                 { return opndList[num]; }
     uint16      getNumDst()                          { return Encoder::getNumDst(instCode); }
     uint16      getNumOpnd()                         { return Encoder::getNumOpnd(instCode); }
 
     char        *getInstMnemonic()                   { return Encoder::getMnemonic(instCode); }
     char        *getCompMnemonic(Completer comp)     { return Encoder::getMnemonic(comp); }
 
-    uint32      getAddr()                            { return addr; }
-    void        setAddr(uint32 addr_)                { addr = addr_; }
+    U_32      getAddr()                            { return addr; }
+    void        setAddr(U_32 addr_)                { addr = addr_; }
     
     bool        isBr();
     bool        isCall();
@@ -303,7 +303,7 @@ protected:
     InstCode    instCode;
     CompVector  compList;
     OpndVector  opndList;
-    uint32      addr;       // addr == <bundle's offset in basic block> + <slot's index>
+    U_32      addr;       // addr == <bundle's offset in basic block> + <slot's index>
 };
 
 //========================================================================================//
@@ -338,13 +338,13 @@ protected:
 
 class ExceptionEdge : public Edge {
 public:
-                ExceptionEdge(Node*, Node*, double, Type*, uint32);
+                ExceptionEdge(Node*, Node*, double, Type*, U_32);
     Type        *getExceptionType()  { return exceptionType; }
-    uint32      getPriority()        { return priority; }
+    U_32      getPriority()        { return priority; }
 
 protected:
     Type        *exceptionType;
-    uint32      priority;
+    U_32      priority;
 };
 
 //========================================================================================//
@@ -353,7 +353,7 @@ protected:
 
 class Node {
 public:
-                Node(MemoryManager&, uint32, uint32, NodeKind = NODE_INVALID);
+                Node(MemoryManager&, U_32, U_32, NodeKind = NODE_INVALID);
 
     void        remove();
     void        addEdge(Edge *edge);
@@ -366,8 +366,8 @@ public:
     void        mergeOutLiveSets(RegOpndSet &resultSet);
 
     uint16      getId()                             { return id; }
-    void        setExecCounter(uint32 execCounter_) { execCounter = execCounter_; }
-    uint32      getExecCounter()                    { return execCounter; }
+    void        setExecCounter(U_32 execCounter_) { execCounter = execCounter_; }
+    U_32      getExecCounter()                    { return execCounter; }
     void        setNodeKind(NodeKind kind_)         { nodeKind = kind_; }
     NodeKind    getNodeKind()                       { return nodeKind; }
     EdgeVector  &getInEdges()                       { return inEdges; }
@@ -383,7 +383,7 @@ public:
     
 protected:
     uint16      id;               // node unique Id
-    uint32      execCounter;      // profile info (how many times the node executes)
+    U_32      execCounter;      // profile info (how many times the node executes)
     NodeKind    nodeKind;         // 
     EdgeVector  inEdges;          // in edges list
     EdgeVector  outEdges;         // out edges list
@@ -398,7 +398,7 @@ protected:
 
 class BbNode : public Node {
 public:
-                BbNode(MemoryManager&, uint32, uint32);
+                BbNode(MemoryManager&, U_32, U_32);
     void        addInst(Inst *inst)                 { insts.push_back(inst); }
     void        removeInst(Inst *inst)              { insts.erase(find(insts.begin(),insts.end(),inst)); } 
     InstVector  &getInsts()                         { return insts; }

@@ -308,7 +308,7 @@ void Jitrino::decCompilationRecursionLevel() {
 
 #if defined(_WIN32) || defined(_WIN64)
 
-extern "C" bool __stdcall DllMain(void *dll_handle, uint32 reason, void *reserved) {
+extern "C" bool __stdcall DllMain(void *dll_handle, U_32 reason, void *reserved) {
 
     switch (reason) { 
     case DLL_PROCESS_ATTACH: 

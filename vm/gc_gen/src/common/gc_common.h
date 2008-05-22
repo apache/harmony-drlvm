@@ -93,7 +93,7 @@ extern POINTER_SIZE_INT HEAP_BASE;
 #endif
 
 #ifdef COMPRESS_REFERENCE
-    #define REF uint32
+    #define REF U_32
 #else
     #define REF Partial_Reveal_Object*
 #endif

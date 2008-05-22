@@ -78,8 +78,8 @@
 #endif
 
 #ifdef COMPRESS_VTABLE
-    #define VT uint32
-    #define VT_SIZE_INT uint32
+    #define VT U_32
+    #define VT_SIZE_INT U_32
 #else
     #define VT Partial_Reveal_VTable*
     #define VT_SIZE_INT POINTER_SIZE_INT
@@ -104,7 +104,7 @@ typedef struct GC_VTable_Info {
 
   unsigned int gc_number_of_ref_fields;
 
-  uint32 gc_class_properties;    // This is the same as class_properties in VM's VTable.
+  U_32 gc_class_properties;    // This is the same as class_properties in VM's VTable.
 
   unsigned int gc_allocated_size;
 

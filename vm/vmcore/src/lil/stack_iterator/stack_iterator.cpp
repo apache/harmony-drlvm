@@ -36,7 +36,7 @@ Method_Handle si_get_method(StackIterator* si)
         return m2n_get_method(si_get_m2n(si));
 }
 
-uint32 si_get_inline_depth(StackIterator* si)
+U_32 si_get_inline_depth(StackIterator* si)
 {
     //
     // Here we assume that JIT data blocks can store only InlineInfo
@@ -60,7 +60,7 @@ uint32 si_get_inline_depth(StackIterator* si)
         return cci->get_jit()->get_inline_depth(
                 cci->get_inline_info(),
                 // FIXME64: no support for large methods
-                (uint32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr()));
+                (U_32)((POINTER_SIZE_INT)si_get_ip(si) - (POINTER_SIZE_INT)cci->get_code_block_addr()));
     }
     return 0;
 }

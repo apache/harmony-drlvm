@@ -71,8 +71,8 @@ protected:
     struct CandidateInst
     {   
         Inst * inst;
-        uint32 execCount;
-        CandidateInst(Inst * i = NULL, uint32 ec = 0)
+        U_32 execCount;
+        CandidateInst(Inst * i = NULL, U_32 ec = 0)
             :inst(i), execCount(ec){}
 
         static bool less (const CandidateInst& x, const CandidateInst& y)   
@@ -83,21 +83,21 @@ protected:
 
     typedef StlVector<CandidateInst> CandidateInsts;
 
-    uint32 initIntervals();
+    U_32 initIntervals();
     bool isCandidate(const Inst * inst) const;
     void collectCandidates();
     void collectIntervals();
     void addReplacement(Opnd * dst, Opnd * src);
     void removeInsts();
     void replaceOpnds();
-    void printCandidates(::std::ostream& os, uint32 detailLevel = 0)const;
+    void printCandidates(::std::ostream& os, U_32 detailLevel = 0)const;
 
     IRManager &     irManager;
     MemoryManager   memoryManager;
     CandidateInsts  candidateInsts;
     Intervals       intervals;
     OpndVector      opndReplacements;
-    uint32          replacementsAdded;
+    U_32          replacementsAdded;
     bool            emptyBlocks;
 };
 
@@ -124,12 +124,12 @@ void SimpleStackOpndCoalescer::run()
 }
 
 //_________________________________________________________________________________________________
-uint32 SimpleStackOpndCoalescer::initIntervals()
+U_32 SimpleStackOpndCoalescer::initIntervals()
 {
-    uint32 candidateOpndCount = 0;
-    uint32 opndCount = irManager.getOpndCount();
+    U_32 candidateOpndCount = 0;
+    U_32 opndCount = irManager.getOpndCount();
     intervals.resize(opndCount);
-    for (uint32 i = 0; i < opndCount; i++){
+    for (U_32 i = 0; i < opndCount; i++){
         Opnd * opnd = irManager.getOpnd(i);
         if (opnd->isPlacedIn(OpndKind_Mem) && opnd->getMemOpndKind() == MemOpndKind_StackAutoLayout){
             intervals[i] = new (memoryManager) Interval(memoryManager);
@@ -151,7 +151,7 @@ void SimpleStackOpndCoalescer::collectCandidates()
         if (node->isBlockNode()){
             for (Inst*  inst  = (Inst*)node->getFirstInst(); inst!=NULL; inst=inst->getNextInst()){
                 if (isCandidate(inst)){
-                    uint32 execCount = (uint32)node->getExecCount();
+                    U_32 execCount = (U_32)node->getExecCount();
                     if (execCount < 1) 
                         execCount = 1;
                     candidateInsts.push_back(CandidateInst(inst, execCount));
@@ -164,12 +164,12 @@ void SimpleStackOpndCoalescer::collectCandidates()
 }
 
 //_________________________________________________________________________________________________
-void SimpleStackOpndCoalescer::printCandidates(::std::ostream& os, uint32 detailLevel)const
+void SimpleStackOpndCoalescer::printCandidates(::std::ostream& os, U_32 detailLevel)const
 {
     os << irManager.getMethodDesc().getParentType()->getName() << "." << irManager.getMethodDesc().getName()
         << ": " << candidateInsts.size() << ::std::endl;
     if (detailLevel > 0){
-        for (uint32 i = 0; i < candidateInsts.size(); i++){
+        for (U_32 i = 0; i < candidateInsts.size(); i++){
             if (detailLevel > 1)
                 IRPrinter::printInst(os, candidateInsts[i].inst);
             Inst * inst = candidateInsts[i].inst;
@@ -211,7 +211,7 @@ bool SimpleStackOpndCoalescer::isCandidate(const Inst * inst)const
 void SimpleStackOpndCoalescer::collectIntervals()
 {
     irManager.indexInsts();
-    uint32 opndCount = irManager.getOpndCount();
+    U_32 opndCount = irManager.getOpndCount();
 
     Interval * interval;
 
@@ -224,7 +224,7 @@ void SimpleStackOpndCoalescer::collectIntervals()
             if (inst == 0)
                 continue;
 
-            uint32 instIndex=inst->getIndex();
+            U_32 instIndex=inst->getIndex();
 
             BitSet lives(memoryManager, opndCount);
 
@@ -240,7 +240,7 @@ void SimpleStackOpndCoalescer::collectIntervals()
                 Inst::Opnds defs(inst, Inst::OpndRole_All);
                 for (Inst::Opnds::iterator it = defs.begin(); it != defs.end(); it = defs.next(it)){
                     Opnd * opnd = inst->getOpnd(it);
-                    uint32 opndId = opnd->getId();
+                    U_32 opndId = opnd->getId();
                     if ( (interval = intervals[opndId]) != NULL ){
                         if (inst->isLiveRangeEnd(it))
                             intervals[opndId]->stop(instIndex + 1);
@@ -260,7 +260,7 @@ void SimpleStackOpndCoalescer::collectIntervals()
         }
     }
     
-    for (uint32 i = 0; i < opndCount; i++){
+    for (U_32 i = 0; i < opndCount; i++){
         if ( (interval = intervals[i]) != NULL )
             interval->finish();
     }
@@ -283,7 +283,7 @@ void SimpleStackOpndCoalescer::addReplacement(Opnd * dstOpnd, Opnd * srcOpnd)
 {
     if (dstOpnd != srcOpnd){
         intervals[srcOpnd->getId()]->unionWith(intervals[dstOpnd->getId()]);
-        for (uint32 i = 0, n = irManager.getOpndCount(); i < n; i++){
+        for (U_32 i = 0, n = irManager.getOpndCount(); i < n; i++){
             if (opndReplacements[i] == dstOpnd){
                 if (srcOpnd->getId() != i)
                     opndReplacements[i] = srcOpnd;
@@ -299,7 +299,7 @@ void SimpleStackOpndCoalescer::addReplacement(Opnd * dstOpnd, Opnd * srcOpnd)
 //_________________________________________________________________________________________________
 void SimpleStackOpndCoalescer::removeInsts()
 {
-    uint32 opndCount = irManager.getOpndCount();
+    U_32 opndCount = irManager.getOpndCount();
     
     // Exclude aliased memory locations from the optimization
     // example: if for "mov arg1, arg0"  both args are on stack but arg0 is placed in incoming args stack area 
@@ -312,9 +312,9 @@ void SimpleStackOpndCoalescer::removeInsts()
 
     replacementsAdded = 0;
     opndReplacements.resize(opndCount);
-    for (uint32 i = 0; i < opndCount; i++)
+    for (U_32 i = 0; i < opndCount; i++)
         opndReplacements[i] = NULL;
-    for (uint32 i = 0; i < candidateInsts.size(); i++){
+    for (U_32 i = 0; i < candidateInsts.size(); i++){
         int adj;
         Inst * inst = candidateInsts[i].inst;
         if (Log::isEnabled()) {
@@ -351,9 +351,9 @@ void SimpleStackOpndCoalescer::removeInsts()
 */
 class CopyExpansion : public SessionAction {
     void runImpl();
-    void restoreRegUsage(Node * bb, Inst * toInst, uint32& gpRegUsageMask, uint32& appRegUsageMask);
-    uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
-    uint32 getSideEffects()const{ return SideEffect_InvalidatesLivenessInfo; }
+    void restoreRegUsage(Node * bb, Inst * toInst, U_32& gpRegUsageMask, U_32& appRegUsageMask);
+    U_32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
+    U_32 getSideEffects()const{ return SideEffect_InvalidatesLivenessInfo; }
 };
 
 
@@ -380,8 +380,8 @@ void CopyExpansion::runImpl()
     for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()){
-            uint32 flagsRegUsageMask = 0;
-            uint32 gpRegUsageMask = 0;
+            U_32 flagsRegUsageMask = 0;
+            U_32 gpRegUsageMask = 0;
             bool calculatingRegUsage = false;
             for (Inst * inst=(Inst*)node->getLastInst(), * nextInst=NULL; inst!=NULL; inst=nextInst){
                 nextInst=inst->getPrevInst();
@@ -460,7 +460,7 @@ void CopyExpansion::runImpl()
 }
 
 //_________________________________________________________________________________________________
-void CopyExpansion::restoreRegUsage(Node* bb, Inst * toInst, uint32& gpRegUsageMask, uint32& appRegUsageMask)
+void CopyExpansion::restoreRegUsage(Node* bb, Inst * toInst, U_32& gpRegUsageMask, U_32& appRegUsageMask)
 {
     assert(bb->isBlockNode());
     if (bb->isEmpty()) {

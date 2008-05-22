@@ -36,7 +36,7 @@ namespace Jitrino {
 
 void JavaTranslator::translateMethod(CompilationInterface& ci, MethodDesc& methodDesc, IRBuilder& irBuilder) {
     
-    uint32 byteCodeSize = methodDesc.getByteCodeSize();
+    U_32 byteCodeSize = methodDesc.getByteCodeSize();
     const unsigned char* byteCodes = methodDesc.getByteCodes();
     MemoryManager  translatorMemManager("JavaTranslator::translateMethod.translatorMemManager");
 

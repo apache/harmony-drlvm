@@ -91,16 +91,16 @@ private:
 
 private:
     // parts of findBalancedExits pulled out:
-    uint32 findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, uint32 numNodes,
+    U_32 findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, U_32 numNodes,
                                     SyncOptDfValue *&entrySolution, 
                                     SyncOptDfValue *&exitSolution);
-    void linkStacks(uint32 depth1, SyncClique *stack1,
-                    uint32 depth2, SyncClique *stack2,
+    void linkStacks(U_32 depth1, SyncClique *stack1,
+                    U_32 depth2, SyncClique *stack2,
                     SyncClique *bottomClique);
     void findBalancedExits_Stage2a(Node *node,
-                                   uint32 depthIn,
+                                   U_32 depthIn,
                                    SyncClique *inStack,
-                                   uint32 depthOut,
+                                   U_32 depthOut,
                                    SyncClique *outStack,
                                    BuildSyncCliquesWalker &walker,
                                    StlVector<SyncClique *>&stackspace,

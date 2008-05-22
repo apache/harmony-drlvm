@@ -233,7 +233,7 @@ struct StackIterator {
     CodeChunkInfo*    cci;
     JitFrameContext   c;
     M2nFrame*         m2nfl;
-    uint32            ip;
+    U_32            ip;
 };
 
 StackIterator* si_create_from_native();

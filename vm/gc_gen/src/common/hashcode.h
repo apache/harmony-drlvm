@@ -161,7 +161,7 @@ inline int hashcode_buf_lookup(Partial_Reveal_Object* p_obj,Hashcode_Buf* hashco
   return 0;
 }
 
-inline void hashcode_buf_add(Partial_Reveal_Object* p_obj, int32 hashcode, Hashcode_Buf* hashcode_buf)
+inline void hashcode_buf_add(Partial_Reveal_Object* p_obj, I_32 hashcode, Hashcode_Buf* hashcode_buf)
 {
   Seq_List* list = hashcode_buf->list; 
   Vector_Block* tail_block = (Vector_Block*)seq_list_end_node(list);
@@ -177,7 +177,7 @@ inline void hashcode_buf_add(Partial_Reveal_Object* p_obj, int32 hashcode, Hashc
   return;
 }
 
-inline void hashcode_buf_update(Partial_Reveal_Object* p_obj, int32 hashcode, Hashcode_Buf* hashcode_buf)
+inline void hashcode_buf_update(Partial_Reveal_Object* p_obj, I_32 hashcode, Hashcode_Buf* hashcode_buf)
 {
   POINTER_SIZE_INT obj_addr = (POINTER_SIZE_INT)p_obj;
   lock(hashcode_buf->lock);
@@ -264,7 +264,7 @@ inline void hashcode_buf_transfer_new_entry(Hashcode_Buf* old_buf, Hashcode_Buf*
     iter =vector_block_iterator_advance(first_block, iter);
     POINTER_SIZE_INT hashcode = (POINTER_SIZE_INT)*iter;
     iter =vector_block_iterator_advance(first_block, iter);
-    hashcode_buf_add(p_obj, (int32)hashcode, new_buf);
+    hashcode_buf_add(p_obj, (I_32)hashcode, new_buf);
   }
   first_block->tail = old_buf->checkpoint;
 
@@ -279,7 +279,7 @@ inline void hashcode_buf_transfer_new_entry(Hashcode_Buf* old_buf, Hashcode_Buf*
       POINTER_SIZE_INT hashcode = (POINTER_SIZE_INT)*iter;
       iter =vector_block_iterator_advance(curr_block, iter);
 
-      hashcode_buf_add(p_obj, (int32)hashcode, new_buf);
+      hashcode_buf_add(p_obj, (I_32)hashcode, new_buf);
     }
     hashcode_buf_remove(old_buf, curr_block);
   } 

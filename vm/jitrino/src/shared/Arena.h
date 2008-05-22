@@ -41,7 +41,7 @@ typedef struct Arena {
 
 #define ARENA_HEADER_SIZE ((sizeof(struct Arena *)+sizeof(char *)+sizeof(char *) + BITS_TO_CLEAR) & ~BITS_TO_CLEAR);
 
-static const uint32 default_arena_size = 1024;
+static const U_32 default_arena_size = 1024;
 //
 // give empty space of memory, make it into an arena of given size.
 //

@@ -35,7 +35,7 @@
 class R_Opnd;
 
 // Return a pointer to the argument just above the return address of an M2nFrame
-uint32* m2n_get_args(M2nFrame*);
+U_32* m2n_get_args(M2nFrame*);
 
 // An M2nFrame is a structure that resides on the stack.
 // It takes up space below and including the return address to the managed code, and thus is immediately below the arguments.
@@ -97,11 +97,11 @@ struct M2nFrame {
     Method_Handle        method;
     frame_type           current_frame_type; // type of the current frame also shows is the frame unwindable
     Registers*           pop_regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs and prepare jvmtiPopFrame)
-    uint32               edi;
-    uint32               esi;
-    uint32               ebx;
-    uint32               ebp;
-    uint32               eip;
+    U_32               edi;
+    U_32               esi;
+    U_32               ebx;
+    U_32               ebp;
+    U_32               eip;
     Registers*           regs; // This is only for M2nFrames for suspended managed code (as against ones that call stubs and prepare jvmtiPopFrame)
 };
 

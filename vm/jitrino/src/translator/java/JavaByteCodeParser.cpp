@@ -292,10 +292,10 @@ int16    si16(const uint8* bcp)    {
 uint16    su16(const uint8* bcp)    {
     return (((uint16)(bcp)[0] << 8)| bcp[1]);
 }
-int32    si32(const uint8* bcp)    {
-    return (((uint32)(bcp)[0] << 24) | 
-            ((uint32)(bcp)[1] << 16) |
-            ((uint32)(bcp)[2] << 8)  |
+I_32    si32(const uint8* bcp)    {
+    return (((U_32)(bcp)[0] << 24) | 
+            ((U_32)(bcp)[1] << 16) |
+            ((U_32)(bcp)[2] << 8)  |
             bcp[3]);
 }
 uint64    si64(const uint8* bcp)    {
@@ -313,13 +313,13 @@ uint64    si64(const uint8* bcp)    {
 //
 //
 bool 
-JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
+JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
     bool linearPassEnd = false;
     currentOffset = off;
     const uint8* bcp = byteCodes + off;
 
     // find length of the byte code instruction
-    uint32 len = 0; 
+    U_32 len = 0; 
     const uint8  opcode = *bcp;
     assert (opcode <= 0xc9);
     if (Log::isEnabled()) {
@@ -636,7 +636,7 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
         if (labelStack != NULL) {
             JavaLookupSwitchTargetsIter switchIter2(bcp,off);
             while (switchIter2.hasNext()) {
-                uint32 key;
+                U_32 key;
                 labelStack->push((uint8*)byteCodes + switchIter2.getNextTarget(&key));
             }
             labelStack->push((uint8*)byteCodes + switchIter2.getDefaultTarget());
@@ -737,7 +737,7 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,uint32 off) {
     } 
     // get next label by popping label stack
     while (!labelStack->isEmpty()) {
-        nextOffset = (uint32) (labelStack->pop() - byteCodes);
+        nextOffset = (U_32) (labelStack->pop() - byteCodes);
         if (!visited->getBit(nextOffset)) {
             return true;
         }

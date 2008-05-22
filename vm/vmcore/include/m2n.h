@@ -41,19 +41,19 @@
 
 struct M2nFrame;
 
-typedef uint32 frame_type;
+typedef U_32 frame_type;
 
-extern const uint32 FRAME_UNKNOWN;
-extern const uint32 FRAME_NON_UNWINDABLE;
-extern const uint32 FRAME_JNI;
-extern const uint32 FRAME_COMPILATION;
-extern const uint32 FRAME_UNPOPABLE;
-extern const uint32 FRAME_POPABLE;
-extern const uint32 FRAME_POP_NOW;
-extern const uint32 FRAME_POP_DONE;
-extern const uint32 FRAME_POP_MASK;
-extern const uint32 FRAME_SAFE_POINT;
-extern const uint32 FRAME_MODIFIED_STACK;
+extern const U_32 FRAME_UNKNOWN;
+extern const U_32 FRAME_NON_UNWINDABLE;
+extern const U_32 FRAME_JNI;
+extern const U_32 FRAME_COMPILATION;
+extern const U_32 FRAME_UNPOPABLE;
+extern const U_32 FRAME_POPABLE;
+extern const U_32 FRAME_POP_NOW;
+extern const U_32 FRAME_POP_DONE;
+extern const U_32 FRAME_POP_MASK;
+extern const U_32 FRAME_SAFE_POINT;
+extern const U_32 FRAME_MODIFIED_STACK;
 
 // The pushing and popping of native frames is done only by stubs that
 // implement the managed to native transitions. These stubs use code that is

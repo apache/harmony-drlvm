@@ -485,7 +485,7 @@ enum Opcode {
 };
 
 class Modifier {
-    uint32 value;
+    U_32 value;
 public:
     struct Kind {
         enum Enum {
@@ -520,55 +520,55 @@ public:
     };
     
     Modifier() : value(0) { };
-    Modifier(uint32 mask, uint32 value0) : value(value0) {
+    Modifier(U_32 mask, U_32 value0) : value(value0) {
         assert((mask & value) == value);
         assert(value0 != 0);
     };
-    Modifier(enum OverflowModifier mod) : value((uint32)mod) { 
+    Modifier(enum OverflowModifier mod) : value((U_32)mod) { 
         assert((Overflow_None <= value) && (value <= Overflow_Unsigned));
     }
-    Modifier(enum SignedModifier mod) : value((uint32)mod) { 
+    Modifier(enum SignedModifier mod) : value((U_32)mod) { 
         assert((SignedOp <= value) && (value <= UnsignedOp));
     }
-    Modifier(enum ComparisonModifier mod) : value((uint32)mod) { 
+    Modifier(enum ComparisonModifier mod) : value((U_32)mod) { 
         assert((Cmp_EQ <= value) && (value <= Cmp_NonZero));
     }
-    Modifier(enum ShiftMaskModifier mod) : value((uint32)mod) { 
+    Modifier(enum ShiftMaskModifier mod) : value((U_32)mod) { 
         assert((ShiftMask_None <= value) && (value <= ShiftMask_Masked));
     }
-    Modifier(enum StrictModifier mod) : value((uint32)mod) { 
+    Modifier(enum StrictModifier mod) : value((U_32)mod) { 
         assert((Strict_No <= value) && (value <= Strict_Yes));
     }
-    Modifier(enum DefArgModifier mod) : value((uint32)mod) { 
+    Modifier(enum DefArgModifier mod) : value((U_32)mod) { 
         assert((DefArgNoModifier <= value) && (value <= DefArgBothModifiers));
     }
-    Modifier(enum StoreModifier mod) : value((uint32)mod) { 
+    Modifier(enum StoreModifier mod) : value((U_32)mod) { 
         assert((Store_NoWriteBarrier <= value) && (value <= Store_WriteBarrier));
     }
-    Modifier(enum ExceptionModifier mod) : value((uint32)mod) { 
+    Modifier(enum ExceptionModifier mod) : value((U_32)mod) { 
         assert((Exception_Sometimes <= value) && (value <= Exception_Never));
     }
-    Modifier(enum SrcNonNullModifier mod) : value((uint32)mod) { 
+    Modifier(enum SrcNonNullModifier mod) : value((U_32)mod) { 
         assert((SrcNonNull_No <= value) && (value <= SrcNonNull_Yes));
     }
-    Modifier(enum AutoCompressModifier mod) : value((uint32)mod) { 
+    Modifier(enum AutoCompressModifier mod) : value((U_32)mod) { 
         assert((AutoCompress_Yes <= value) && (value <= AutoCompress_No));
     }
-    Modifier(enum SpeculativeModifier mod) : value((uint32)mod) {
+    Modifier(enum SpeculativeModifier mod) : value((U_32)mod) {
         assert((Speculative_Yes <= value) && (value <= Speculative_No));
     }
-    Modifier(enum ThrowModifier mod) : value((uint32)mod) { 
+    Modifier(enum ThrowModifier mod) : value((U_32)mod) { 
         assert((Throw_NoModifier <= value) && (value <= Throw_CreateStackTrace));
     }
-    Modifier(enum NewModifier1 mod) : value((uint32)mod) { 
+    Modifier(enum NewModifier1 mod) : value((U_32)mod) { 
         assert((NewModifier1_Value1 <= value) && (value <= NewModifier1_Value2));
     }
-    Modifier(enum NewModifier2 mod) : value((uint32)mod) { 
+    Modifier(enum NewModifier2 mod) : value((U_32)mod) { 
         assert((NewModifier2_Value1 <= value) && (value <= NewModifier2_Value3));
     }
     Modifier operator|(const Modifier &other) const {
         assert((value & other.value) == 0);
-        uint32 newvalue = value | other.value;
+        U_32 newvalue = value | other.value;
         return Modifier(newvalue, newvalue);
     };
     enum OverflowModifier getOverflowModifier() const { 
@@ -579,7 +579,7 @@ public:
     void setOverflowModifier(enum OverflowModifier newmod) {
         assert(hasOverflowModifier());
         assert((newmod & Overflow_Mask) == newmod);
-        uint32 newval = value & (~Overflow_Mask);
+        U_32 newval = value & (~Overflow_Mask);
         value = newval | newmod;
     }
     bool hasSignedModifier() const { return ((value & Signed_Mask) != 0); };
@@ -590,7 +590,7 @@ public:
     void setSignedModifier(enum SignedModifier newmod) {
         assert(hasSignedModifier());
         assert((newmod & Signed_Mask) == newmod);
-        uint32 newval = value & (~Signed_Mask);
+        U_32 newval = value & (~Signed_Mask);
         value = newval | newmod;
     }
     bool hasComparisonModifier() const { return ((value & Cmp_Mask) != 0); };
@@ -601,7 +601,7 @@ public:
     void setComparisonModifier(enum ComparisonModifier newmod) {
         assert(hasComparisonModifier());
         assert((newmod & Cmp_Mask) == newmod);
-        uint32 newval = value & (~Cmp_Mask);
+        U_32 newval = value & (~Cmp_Mask);
         value = newval | newmod;
     }
     bool hasShiftMaskModifier() const { return ((value & ShiftMask_Mask) != 0); };
@@ -612,7 +612,7 @@ public:
     void setShiftMaskModifier(enum ShiftMaskModifier newmod) {
         assert(hasShiftMaskModifier());
         assert((newmod & ShiftMask_Mask) == newmod);
-        uint32 newval = value & (~ShiftMask_Mask);
+        U_32 newval = value & (~ShiftMask_Mask);
         value = newval | newmod;
     }
     bool hasStrictModifier() const { return ((value & Strict_Mask) != 0); };
@@ -623,7 +623,7 @@ public:
     void setStrictModifier(enum StrictModifier newmod) {
         assert(hasStrictModifier());
         assert((newmod & Strict_Mask) == newmod);
-        uint32 newval = value & (~Strict_Mask);
+        U_32 newval = value & (~Strict_Mask);
         value = newval | newmod;
     }
     bool hasDefArgModifier() const { return ((value & DefArg_Mask) != 0); };
@@ -634,7 +634,7 @@ public:
     void setDefArgModifier(enum DefArgModifier newmod) {
         assert(hasDefArgModifier());
         assert((newmod & DefArg_Mask) == newmod);
-        uint32 newval = value & (~DefArg_Mask);
+        U_32 newval = value & (~DefArg_Mask);
         value = newval | newmod;
     }
     bool hasSrcNonNullModifier() const { return ((value & SrcNonNull_Mask) != 0); };
@@ -645,7 +645,7 @@ public:
     void setSrcNonNullModifier(enum SrcNonNullModifier newmod) {
         assert(hasSrcNonNullModifier());
         assert((newmod & SrcNonNull_Mask) == newmod);
-        uint32 newval = value & (~SrcNonNull_Mask);
+        U_32 newval = value & (~SrcNonNull_Mask);
         value = newval | newmod;
     }
     bool hasStoreModifier() const { return ((value & Store_Mask) != 0); };
@@ -656,7 +656,7 @@ public:
     void setStoreModifier(enum StoreModifier newmod) {
         assert(hasStoreModifier());
         assert((newmod & Store_Mask) == newmod);
-        uint32 newval = value & (~Store_Mask);
+        U_32 newval = value & (~Store_Mask);
         value = newval | newmod;
     }
     bool hasExceptionModifier() const { return ((value & Exception_Mask) != 0); };
@@ -667,7 +667,7 @@ public:
     void setExceptionModifier(enum ExceptionModifier newmod) {
         assert(hasExceptionModifier());
         assert((newmod & Exception_Mask) == newmod);
-        uint32 newval = value & (~Exception_Mask);
+        U_32 newval = value & (~Exception_Mask);
         value = newval | newmod;
     }
     bool hasAutoCompressModifier() const { return ((value & AutoCompress_Mask) != 0); };
@@ -678,7 +678,7 @@ public:
     void setAutoCompressModifier(enum AutoCompressModifier newmod) {
         assert(hasAutoCompressModifier());
         assert((newmod & AutoCompress_Mask) == newmod);
-        uint32 newval = value & (~AutoCompress_Mask);
+        U_32 newval = value & (~AutoCompress_Mask);
         value = newval | newmod;
     }
     bool hasSpeculativeModifier() const { return ((value & Speculative_Mask) != 0); };
@@ -687,7 +687,7 @@ public:
     };
     void setSpeculativeModifier(enum SpeculativeModifier newmod) {
         assert(hasSpeculativeModifier());
-        uint32 newval = value & (~Speculative_Mask);
+        U_32 newval = value & (~Speculative_Mask);
         value = newval | newmod;
     }
     bool hasThrowModifier() const { return ((value & Throw_Mask) != 0); };
@@ -698,7 +698,7 @@ public:
     void setThrowModifier(enum ThrowModifier newmod) {
         assert(hasThrowModifier());
         assert((newmod & Throw_Mask) == newmod);
-        uint32 newval = value & (~Throw_Mask);
+        U_32 newval = value & (~Throw_Mask);
         value = newval | newmod;
     }
     bool hasNewModifier1() const { return ((value & NewModifier1_Mask) != 0); };
@@ -709,7 +709,7 @@ public:
     void setNewModifier1(enum NewModifier1 newmod) {
         assert(hasNewModifier1());
         assert((newmod & NewModifier1_Mask) == newmod);
-        uint32 newval = value & (~NewModifier1_Mask);
+        U_32 newval = value & (~NewModifier1_Mask);
         value = newval | newmod;
     }
     bool hasNewModifier2() const { return ((value & NewModifier2_Mask) != 0); };
@@ -720,7 +720,7 @@ public:
     void setNewModifier2(enum NewModifier2 newmod) {
         assert(hasNewModifier2());
         assert((newmod & NewModifier2_Mask) == newmod);
-        uint32 newval = value & (~NewModifier2_Mask);
+        U_32 newval = value & (~NewModifier2_Mask);
         value = newval | newmod;
     }
     bool isSigned() const { 
@@ -743,17 +743,17 @@ public:
 
 protected:
     friend class Operation;
-    unsigned short encode(Opcode opcode, uint32 bits) const;
+    unsigned short encode(Opcode opcode, U_32 bits) const;
 
-    Modifier(Opcode opcode, uint32 encoding);
+    Modifier(Opcode opcode, U_32 encoding);
     
 private:
-    void addEncoding(uint32 &encoded, uint32 &bitsused, uint32 mask, 
-                     uint32 minval, uint32 maxval, uint32 isshiftedby,
-                     uint32 bitstoencode) const;
-    void addDecoding(uint32 &encoding, uint32 &bitsused, uint32 mask, 
-                     uint32 minval, uint32 maxval, uint32 isshiftedby,
-                     uint32 bitstoencode);
+    void addEncoding(U_32 &encoded, U_32 &bitsused, U_32 mask, 
+                     U_32 minval, U_32 maxval, U_32 isshiftedby,
+                     U_32 bitstoencode) const;
+    void addDecoding(U_32 &encoding, U_32 &bitsused, U_32 mask, 
+                     U_32 minval, U_32 maxval, U_32 isshiftedby,
+                     U_32 bitstoencode);
 };
 
 #define OPERATION_OPCODE_BITS 8
@@ -931,11 +931,11 @@ public:
         setModifier(mod);
     };
 
-    uint32 encodeForHashing() const { 
+    U_32 encodeForHashing() const { 
         if (Type::isReference((Type::Tag)typetag)) {
             return ((opcode << (OPERATION_MODIFIER_BITS+OPERATION_TYPE_BITS))
                     | (modifiers << OPERATION_TYPE_BITS)
-                    | (uint32)Type::SystemObject);
+                    | (U_32)Type::SystemObject);
         } else {
             return ((opcode << (OPERATION_MODIFIER_BITS+OPERATION_TYPE_BITS))
                     | (modifiers << OPERATION_TYPE_BITS)

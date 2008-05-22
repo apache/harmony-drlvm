@@ -36,8 +36,8 @@ class RuntimeInterface : public ::Jitrino::RuntimeInterface {
 public:
     void           unwindStack(MethodDesc*, JitFrameContext*, bool) ;
     void           getGCRootSet(MethodDesc*, GCInterface*, const JitFrameContext*, bool);
-    uint32         getInlineDepth(InlineInfoPtr, uint32);
-    Method_Handle  getInlinedMethod(InlineInfoPtr, uint32, uint32);
+    U_32         getInlineDepth(InlineInfoPtr, U_32);
+    Method_Handle  getInlinedMethod(InlineInfoPtr, U_32, U_32);
     void           fixHandlerContext(MethodDesc*, JitFrameContext*, bool);
     void           *getAddressOfThis(MethodDesc*, const JitFrameContext*, bool);
     bool           recompiledMethodEvent(MethodDesc*, void*);
@@ -48,12 +48,12 @@ public:
 protected:
 
     // getGCRootSet support
-    U_8*           findSafePoint(U_8*, uint32, uint64);
+    U_8*           findSafePoint(U_8*, U_32, uint64);
     void           enumerateRootSet(GCInterface*, const JitFrameContext*, U_8*);
-    void**         getContextValue(int32);
-    void           reportMptr(int32, int32);
-    void           reportBase(int32);
-    bool           isMptr(int32);
+    void**         getContextValue(I_32);
+    void           reportMptr(I_32, I_32);
+    void           reportBase(I_32);
+    bool           isMptr(I_32);
 
     GCInterface    *gcInterface;
     const JitFrameContext *context;

@@ -56,13 +56,13 @@ Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_,
     srcs[1] = src2;
 }
 
-Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_, uint32 nSrcs)
+Inst::Inst(Opcode opcode, Modifier mod, Type::Tag type, Opnd* dst_, U_32 nSrcs)
     : operation(opcode, type, mod), numSrcs(nSrcs), dst(0)
 {
     setDst(dst_);
 }
 
-Opnd* Inst::getSrcExtended(uint32 srcIndex) const {
+Opnd* Inst::getSrcExtended(U_32 srcIndex) const {
     assert(0);
     return NULL;
 }
@@ -156,7 +156,7 @@ Edge::Kind BranchInst::getEdgeKind(const Edge* edge) const {
 // the following utility for conditional branches will return the taken edge based on the
 // incoming condition. This will ignore exception edges
 
-Edge* BranchInst::getTakenEdge(uint32 result) {
+Edge* BranchInst::getTakenEdge(U_32 result) {
     // find the node for this branch instruction
     Node *node = getNode();
     assert(node->getFirstInst()->isLabel());
@@ -196,7 +196,7 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
     case 's': // src operands
         {
             bool comma = false;
-            for (uint32 i=0; i<numSrcs; i++) {
+            for (U_32 i=0; i<numSrcs; i++) {
                 if (comma)
                     os << ", ";
                 getSrc(i)->print(os);
@@ -207,7 +207,7 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
     case 'a': // arguments to a virtual or indirect call
         {
             bool comma = false;
-            for (uint32 i=3; i<numSrcs; i++) {
+            for (U_32 i=3; i<numSrcs; i++) {
                 if (comma)
                     os << ", ";
                 getSrc(i)->print(os);
@@ -223,7 +223,7 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
                     os<<"bcmap:unknown ";
                 }
             } else {
-                int32 bcOffset = (int32)getBCOffset();
+                I_32 bcOffset = (I_32)getBCOffset();
                 os<<"bcmap:"<<bcOffset<<" ";
             }
         }
@@ -231,7 +231,7 @@ void Inst::handlePrintEscape(::std::ostream& os, char code) const {
     case 'p': // arguments to a more direct call
         {
             bool comma = false;
-            for (uint32 i=2; i<numSrcs; i++) {
+            for (U_32 i=2; i<numSrcs; i++) {
                 if (comma)
                     os << ", ";
                 getSrc(i)->print(os);
@@ -533,8 +533,8 @@ void SwitchInst::updateControlTransferInst(Node *oldTarget, Node* newTarget ) {
         assert(newTarget->isBlockNode());
         replaceDefaultTargetLabel(newLabel);
     }
-    uint32 n = getNumTargets();
-    for (uint32 i = 0; i < n; i++) {
+    U_32 n = getNumTargets();
+    for (U_32 i = 0; i < n; i++) {
         if (getTarget(i) == oldLabel) {
             assert(newTarget->isBlockNode());
             replaceTargetLabel(i, newLabel);
@@ -559,7 +559,7 @@ void SwitchInst::handlePrintEscape(::std::ostream& os, char code) const {
     case 'l':  // target labels
         {
             bool comma = false;
-            for (uint32 i=0; i<numTargets; i++) {
+            for (U_32 i=0; i<numTargets; i++) {
                 if (comma)
                     os << ", ";
                 comma = true;
@@ -808,10 +808,10 @@ InstFactory::makeClone(SwitchInst* inst,
                        OpndManager& opndManager,
                        OpndRenameTable& table) {
     Opnd* src = table.rename(inst->getSrc(0));
-    uint32 numTargets = inst->getNumTargets();
+    U_32 numTargets = inst->getNumTargets();
     LabelInst** targets = inst->getTargets();
     LabelInst** newTargets = new (memManager) LabelInst*[numTargets];
-    for(uint32 i = 0; i < numTargets; ++i)
+    for(U_32 i = 0; i < numTargets; ++i)
         newTargets[i] = targets[i];
     SwitchInst *newInst = makeSwitchInst(src, newTargets, numTargets, inst->getDefaultTarget());
     newInst->setPersistentInstructionId(inst->getPersistentInstructionId());
@@ -928,7 +928,7 @@ InstFactory::makeClone(TypeInst* inst, OpndManager& opndManager, OpndRenameTable
     Modifier mod = inst->getModifier();
     Type::Tag tag = inst->getType();
     Opnd* dst = table.duplicate(opndManager, inst->getDst());
-    uint32 numSrcs = inst->getNumSrcOperands();
+    U_32 numSrcs = inst->getNumSrcOperands();
     TypeInst *newInst = NULL;
     switch(inst->getNumSrcOperands()) {
     case 0:
@@ -943,7 +943,7 @@ InstFactory::makeClone(TypeInst* inst, OpndManager& opndManager, OpndRenameTable
         break;
     default:
         Opnd** opnds = new (memManager) Opnd*[numSrcs];
-        for (uint32 i=0; i<numSrcs; i++)
+        for (U_32 i=0; i<numSrcs; i++)
             opnds[i] = table.rename(inst->getSrc(i));
         newInst = makeTypeInst(opc, mod, tag, dst, numSrcs, opnds, inst->getTypeInfo());
         break;
@@ -958,7 +958,7 @@ InstFactory::makeClone(FieldAccessInst* inst, OpndManager& opndManager, OpndRena
     Modifier mod = inst->getModifier();
     Type::Tag tag = inst->getType();
     Opnd* dst = table.duplicate(opndManager, inst->getDst());
-    uint32 numSrcs = inst->getNumSrcOperands();
+    U_32 numSrcs = inst->getNumSrcOperands();
     FieldAccessInst *newInst = NULL;
     switch(inst->getNumSrcOperands()) {
     case 0:
@@ -974,7 +974,7 @@ InstFactory::makeClone(FieldAccessInst* inst, OpndManager& opndManager, OpndRena
         break;
     default:
         Opnd** opnds = new (memManager) Opnd*[numSrcs];
-        for (uint32 i=0; i<numSrcs; i++)
+        for (U_32 i=0; i<numSrcs; i++)
             opnds[i] = table.rename(inst->getSrc(i));
         newInst = makeFieldAccessInst(opc, mod, tag, dst, numSrcs, opnds, inst->fieldDesc);
         break;
@@ -991,7 +991,7 @@ InstFactory::makeClone(MethodInst* inst,
     Modifier mod = inst->getModifier();
     Type::Tag tag = inst->getType();
     Opnd* dst = table.duplicate(opndManager, inst->getDst());
-    uint32 numSrcs = inst->getNumSrcOperands();
+    U_32 numSrcs = inst->getNumSrcOperands();
     MethodInst *newInst = NULL;
     switch(inst->getNumSrcOperands()) {
     case 0:
@@ -1003,7 +1003,7 @@ InstFactory::makeClone(MethodInst* inst,
         break;
     default:
         Opnd** opnds = new (memManager) Opnd*[numSrcs];
-        for (uint32 i=0; i<numSrcs; i++)
+        for (U_32 i=0; i<numSrcs; i++)
             opnds[i] = table.rename(inst->getSrc(i));
         newInst = makeMethodInst(opc, mod, tag, dst, numSrcs, opnds, inst->methodDesc);
         break;
@@ -1016,9 +1016,9 @@ MethodCallInst*
 InstFactory::makeClone(MethodCallInst* inst,
                        OpndManager& opndManager,
                        OpndRenameTable& table) {
-    uint32 nsrcs = inst->getNumSrcOperands();
+    U_32 nsrcs = inst->getNumSrcOperands();
     Opnd** newArgs = new (memManager) Opnd*[nsrcs];
-    for (uint32 i=0; i<nsrcs; i++)
+    for (U_32 i=0; i<nsrcs; i++)
         newArgs[i] = table.rename(inst->getSrc(i));
     MethodCallInst *newInst 
         = makeMethodCallInst(inst->getOpcode(),
@@ -1036,9 +1036,9 @@ CallInst*
 InstFactory::makeClone(CallInst* inst,
                        OpndManager& opndManager,
                        OpndRenameTable& table) {
-    uint32 numArgs = inst->getNumArgs();
+    U_32 numArgs = inst->getNumArgs();
     Opnd** newArgs = new (memManager) Opnd*[numArgs];
-    for (uint32 i=0; i<numArgs; i++)
+    for (U_32 i=0; i<numArgs; i++)
         newArgs[i] = table.rename(inst->getArg(i));
 
     CallInst *newInst = makeCallInst(inst->getOpcode(),
@@ -1057,9 +1057,9 @@ InstFactory::makeClone(JitHelperCallInst* inst,
                        OpndManager& opndManager,
                        OpndRenameTable& table)
 {
-    uint32 nsrcs = inst->getNumSrcOperands();
+    U_32 nsrcs = inst->getNumSrcOperands();
     Opnd** newArgs = new (memManager) Opnd*[nsrcs];
-    for (uint32 i=0; i<nsrcs; i++){
+    for (U_32 i=0; i<nsrcs; i++){
         newArgs[i] = table.rename(inst->getSrc(i));
     }
     JitHelperCallInst *newInst = makeJitHelperCallInst(inst->getOpcode(),
@@ -1078,9 +1078,9 @@ InstFactory::makeClone(VMHelperCallInst* inst,
                        OpndManager& opndManager,
                        OpndRenameTable& table)
 {
-    uint32 nsrcs = inst->getNumSrcOperands();
+    U_32 nsrcs = inst->getNumSrcOperands();
     Opnd** newArgs = new (memManager) Opnd*[nsrcs];
-    for (uint32 i=0; i<nsrcs; i++){
+    for (U_32 i=0; i<nsrcs; i++){
         newArgs[i] = table.rename(inst->getSrc(i));
     }
     VMHelperCallInst *newInst = makeVMHelperCallInst(inst->getOpcode(),
@@ -1096,9 +1096,9 @@ InstFactory::makeClone(VMHelperCallInst* inst,
 
 PhiInst*
 InstFactory::makeClone(PhiInst* inst, OpndManager& opndManager, OpndRenameTable& table) {
-    uint32 numArgs = inst->getNumSrcOperands();
+    U_32 numArgs = inst->getNumSrcOperands();
     Opnd** newArgs = new (memManager) Opnd*[numArgs];
-    for (uint32 i=0; i<numArgs; i++)
+    for (U_32 i=0; i<numArgs; i++)
         newArgs[i] = table.rename(inst->getSrc(i));
     
     PhiInst *newInst = makePhiInst(inst->getType(),
@@ -1115,7 +1115,7 @@ InstFactory::makeClone(MultiSrcInst* inst, OpndManager& opndManager, OpndRenameT
     Modifier mod = inst->getModifier();
     Type::Tag tag = inst->getType();
     Opnd* dst = table.duplicate(opndManager, inst->getDst());
-    uint32 numSrcs = inst->getNumSrcOperands();
+    U_32 numSrcs = inst->getNumSrcOperands();
     MultiSrcInst *newInst;
     switch(numSrcs) {
     case 0:
@@ -1129,7 +1129,7 @@ InstFactory::makeClone(MultiSrcInst* inst, OpndManager& opndManager, OpndRenameT
         break;
     default:
         Opnd** opnds = new (memManager) Opnd*[numSrcs];
-        for (uint32 i=0; i<numSrcs; i++)
+        for (U_32 i=0; i<numSrcs; i++)
             opnds[i] = table.rename(inst->getSrc(i));
         newInst = makeMultiSrcInst(opc, mod, tag, dst, numSrcs, opnds);
         break;
@@ -1147,50 +1147,50 @@ InstFactory::InstFactory(MemoryManager& mm, MethodDesc &md) : memManager(mm) {
 }
 
 Opnd**
-InstFactory::copyOpnds(Opnd** srcs, uint32 numSrcs) {
+InstFactory::copyOpnds(Opnd** srcs, U_32 numSrcs) {
     Opnd** newSrcs = new (memManager) Opnd*[numSrcs];
-    for (uint32 i=0; i<numSrcs; i++)
+    for (U_32 i=0; i<numSrcs; i++)
         newSrcs[i] = srcs[i];
     return newSrcs;
 }
 
 Opnd**
-InstFactory::copyOpnds(Opnd* src1, Opnd** srcs, uint32 numSrcs) {
+InstFactory::copyOpnds(Opnd* src1, Opnd** srcs, U_32 numSrcs) {
     Opnd** newSrcs = new (memManager) Opnd*[numSrcs+1];
     newSrcs[0] = src1;
-    for (uint32 i=0; i<numSrcs; i++)
+    for (U_32 i=0; i<numSrcs; i++)
         newSrcs[i+1] = srcs[i];
     return newSrcs;
 }
 
 Opnd**
-InstFactory::copyOpnds(Opnd* src1, Opnd* src2, Opnd** srcs, uint32 numSrcs) {
+InstFactory::copyOpnds(Opnd* src1, Opnd* src2, Opnd** srcs, U_32 numSrcs) {
     Opnd** newSrcs = new (memManager) Opnd*[numSrcs+2];
     newSrcs[0] = src1;
     newSrcs[1] = src2;
-    for (uint32 i=0; i<numSrcs; i++)
+    for (U_32 i=0; i<numSrcs; i++)
         newSrcs[i+2] = srcs[i];
     return newSrcs;
 }
 
 void
 InstFactory::appendSrc(MultiSrcInst *inst, Opnd *opnd) {
-    uint32 oldNumSrcs = inst->numSrcs;
-    uint32 newNumSrcs = inst->numSrcs+1;
+    U_32 oldNumSrcs = inst->numSrcs;
+    U_32 newNumSrcs = inst->numSrcs+1;
     if (newNumSrcs > MAX_INST_SRCS) {
         // an extended source
-        uint32 oldExtendedSrcs = oldNumSrcs - MAX_INST_SRCS;
-        uint32 newExtendedSrcs = newNumSrcs - MAX_INST_SRCS;
+        U_32 oldExtendedSrcs = oldNumSrcs - MAX_INST_SRCS;
+        U_32 newExtendedSrcs = newNumSrcs - MAX_INST_SRCS;
         if (newExtendedSrcs <= inst->extendedSrcSpace) {
             // fits in existing memory
             inst->extendedSrcs[oldExtendedSrcs] = opnd;
         } else {
             // need to allocate more memory
-            uint32 newSpace = newExtendedSrcs * 2;
+            U_32 newSpace = newExtendedSrcs * 2;
             Opnd** opnds = new (memManager) Opnd*[newSpace];
             Opnd** oldOpnds = inst->extendedSrcs;
             // copy existing opnds
-            uint32 j;
+            U_32 j;
             for (j = 0; j < oldExtendedSrcs; j++) 
                 opnds[j] = oldOpnds[j];
             opnds[j++] = opnd;
@@ -1233,27 +1233,27 @@ InstFactory::makeInst(Opcode op,
     return inst;
 }
 LabelInst*
-InstFactory::makeLabelInst(uint32 labelId) {
+InstFactory::makeLabelInst(U_32 labelId) {
     LabelInst* inst = new (memManager) LabelInst(labelId);
     inst->id       = numInsts++;
     return inst;
 }
 LabelInst*
-InstFactory::makeLabelInst(Opcode opc, uint32 labelId) {
+InstFactory::makeLabelInst(Opcode opc, U_32 labelId) {
     LabelInst* inst = new (memManager) LabelInst(opc, labelId);
     inst->id       = numInsts++;
     return inst;
 }
 DispatchLabelInst*
-InstFactory::makeDispatchLabelInst(uint32 labelId) {
+InstFactory::makeDispatchLabelInst(U_32 labelId) {
     DispatchLabelInst* inst = new (memManager) DispatchLabelInst(labelId);
     inst->id       = numInsts++;
     return inst;
 }
 
 CatchLabelInst *
-InstFactory::makeCatchLabelInst(uint32 labelId,
-                                   uint32 ord,
+InstFactory::makeCatchLabelInst(U_32 labelId,
+                                   U_32 ord,
                                    Type *exceptionType) {
     CatchLabelInst* inst = new (memManager) CatchLabelInst(labelId, ord, exceptionType);
     inst->id       = numInsts++;
@@ -1261,7 +1261,7 @@ InstFactory::makeCatchLabelInst(uint32 labelId,
 }
 
 MethodEntryInst*
-InstFactory::makeMethodEntryInst(uint32 labelId, MethodDesc* md)  {
+InstFactory::makeMethodEntryInst(U_32 labelId, MethodDesc* md)  {
     MethodEntryInst* inst = new (memManager) MethodEntryInst(labelId, md);
     inst->id       = numInsts++;
     return inst;
@@ -1328,14 +1328,14 @@ InstFactory::makeBranchInst(Opcode op,
 }
 
 SwitchInst*
-InstFactory::makeSwitchInst(Opnd* src, LabelInst** targets, uint32 nTargets, 
+InstFactory::makeSwitchInst(Opnd* src, LabelInst** targets, U_32 nTargets, 
                             LabelInst* defTarget) {
     SwitchInst* inst = new (memManager) SwitchInst(src, targets, nTargets, defTarget);
     inst->id       = numInsts++;
     return inst;
 }
 ConstInst*
-InstFactory::makeConstInst(Opnd* dst, int32 i4) {
+InstFactory::makeConstInst(Opnd* dst, I_32 i4) {
     ConstInst* inst = new (memManager) ConstInst(dst, i4);
     inst->id       = numInsts++;
     return inst;
@@ -1371,14 +1371,14 @@ InstFactory::makeConstInst(Opnd* dst) {
     return inst;
 }
 TokenInst*
-InstFactory::makeTokenInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* dst, uint32 t, MethodDesc* encMethod) {
+InstFactory::makeTokenInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* dst, U_32 t, MethodDesc* encMethod) {
     TokenInst* inst = new (memManager) TokenInst(opc, mod, type, dst, t, encMethod);
     inst->id       = numInsts++;
     return inst;
 }
 LinkingExcInst*
 InstFactory::makeLinkingExcInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* dst,
-                                Class_Handle encClass, uint32 CPIndex, uint32 operation) {
+                                Class_Handle encClass, U_32 CPIndex, U_32 operation) {
     LinkingExcInst* inst =
         new (memManager) LinkingExcInst(opc, mod, type, dst, encClass, CPIndex, operation);
     inst->id       = numInsts++;
@@ -1448,7 +1448,7 @@ InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
 }
 TypeInst*
 InstFactory::makeTypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
-    uint32 nArgs, Opnd** args_, Type* td) {
+    U_32 nArgs, Opnd** args_, Type* td) {
     TypeInst* inst = new (memManager) TypeInst(op, mod, ty, dst, nArgs, args_, td);
     inst->id       = numInsts++;
     return inst;
@@ -1491,7 +1491,7 @@ InstFactory::makeFieldAccessInst(Opcode op,
                                  Modifier mod,
                                  Type::Tag type,
                                  Opnd* dst,
-                                 uint32 numSrcs,
+                                 U_32 numSrcs,
                                  Opnd** srcs,
                                  FieldDesc* fd) {
     srcs = copyOpnds(srcs, numSrcs);
@@ -1524,7 +1524,7 @@ InstFactory::makeMethodInst(Opcode op,
                             Modifier mod,
                             Type::Tag type,
                             Opnd* dst,
-                            uint32 nArgs,
+                            U_32 nArgs,
                             MethodDesc* md) {
     MethodInst* inst = new (memManager) MethodInst(op, mod, type, dst, nArgs, 0, md);
     inst->id       = numInsts++;
@@ -1535,7 +1535,7 @@ InstFactory::makeMethodInst(Opcode op,
                             Modifier mod,
                             Type::Tag type,
                             Opnd* dst,
-                            uint32 numSrcs,
+                            U_32 numSrcs,
                             Opnd** srcs,
                             MethodDesc* md) {
     srcs = copyOpnds(srcs, numSrcs);
@@ -1547,7 +1547,7 @@ MethodCallInst*
 InstFactory::makeMethodCallInst(Opcode op, Modifier mod,
                Type::Tag type,
                Opnd* dst,
-               uint32 numArgs,
+               U_32 numArgs,
                Opnd** args,
                MethodDesc* md) {
     MethodCallInst* inst = new (memManager) MethodCallInst(op, mod, type, dst, numArgs, args, md, memManager);
@@ -1560,7 +1560,7 @@ InstFactory::makeCallInst(Opcode op, Modifier mod,
                           Type::Tag type,
                           Opnd* dst,
                           Opnd* funptr,
-                          uint32 numArgs,
+                          U_32 numArgs,
                           Opnd** args) {
     CallInst* inst = new (memManager) CallInst(op, mod, type, dst, funptr, numArgs, args, memManager);
     inst->id       = numInsts++;
@@ -1572,7 +1572,7 @@ InstFactory::makeJitHelperCallInst(Opcode op,
                                     Modifier mod,
                                     Type::Tag type,
                                     Opnd* dst,
-                                    uint32 nArgs,
+                                    U_32 nArgs,
                                     Opnd** args_,
                                     JitHelperCallId id) {
     JitHelperCallInst * inst = 
@@ -1586,7 +1586,7 @@ InstFactory::makeVMHelperCallInst(Opcode op,
                                     Modifier mod,
                                     Type::Tag type,
                                     Opnd* dst,
-                                    uint32 nArgs,
+                                    U_32 nArgs,
                                     Opnd** args_,
                                     VM_RT_SUPPORT id) {
     VMHelperCallInst * inst = 
@@ -1596,9 +1596,9 @@ InstFactory::makeVMHelperCallInst(Opcode op,
 }
 
 PhiInst*
-InstFactory::makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_) {
+InstFactory::makePhiInst(Type::Tag type, Opnd* dst, U_32 nArgs, Opnd** args_) {
 #ifdef BRM_CHECK_TYPES
-    for (uint32 i=0; i<nArgs; ++i) {
+    for (U_32 i=0; i<nArgs; ++i) {
         assert(args_[i]->getType() == dst->getType());
     }
 #endif
@@ -1669,7 +1669,7 @@ InstFactory::makeMultiSrcInst(Opcode opc,
                           Modifier mod,
                           Type::Tag ty,
                           Opnd* dst,
-                          uint32 nSrcs,
+                          U_32 nSrcs,
                           Opnd** srcs) {
     MultiSrcInst* inst = new (memManager) MultiSrcInst(opc, mod, ty, dst, nSrcs, srcs);
     inst->id       = numInsts++;
@@ -1836,14 +1836,14 @@ Inst* InstFactory::makeCmp3(ComparisonModifier mod, Type::Tag type, Opnd* dst, O
 }
 
 Inst*
-InstFactory::makeCatchLabel(uint32 labelId,
-                            uint32 exceptionOrder,
+InstFactory::makeCatchLabel(U_32 labelId,
+                            U_32 exceptionOrder,
                             Type*  handlerExceptionType) {
     return makeCatchLabelInst(labelId, exceptionOrder, handlerExceptionType);
 }
 
 CatchLabelInst*
-InstFactory::makeCatchLabel(uint32 exceptionOrder,
+InstFactory::makeCatchLabel(U_32 exceptionOrder,
                             Type*  handlerExceptionType) {
     return makeCatchLabelInst(createLabelNumber(), exceptionOrder, handlerExceptionType);
 }
@@ -1873,9 +1873,9 @@ Inst* InstFactory::makeJSR(LabelInst* labelInst) {
     return makeBranchInst(Op_JSR, labelInst);
 }
 
-Inst* InstFactory::makeSwitch(Opnd* src, uint32 nLabels, LabelInst** labelInsts, LabelInst* defaultLabel) {
+Inst* InstFactory::makeSwitch(Opnd* src, U_32 nLabels, LabelInst** labelInsts, LabelInst* defaultLabel) {
     LabelInst** newLabelInsts = new (memManager) LabelInst*[nLabels];
-    for (uint32 i=0; i<nLabels; i++)
+    for (U_32 i=0; i<nLabels; i++)
         newLabelInsts[i] = labelInsts[i];
     return makeSwitchInst(src, newLabelInsts, nLabels, defaultLabel);
 }
@@ -1908,10 +1908,10 @@ Inst* InstFactory::makePseudoThrow() {
 Inst* InstFactory::makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId) {
     MethodDesc* enclosingMethod = 0;
     return makeTokenInst(Op_ThrowSystemException, Modifier(), Type::Void, 
-                         OpndManager::getNullOpnd(), (uint32) exceptionId, enclosingMethod);
+                         OpndManager::getNullOpnd(), (U_32) exceptionId, enclosingMethod);
 }
 
-Inst* InstFactory::makeThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation) {
+Inst* InstFactory::makeThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation) {
     return makeLinkingExcInst(Op_ThrowLinkingException, Modifier(), Type::Void, 
                               OpndManager::getNullOpnd(), encClass, CPIndex, operation);
 }
@@ -1936,7 +1936,7 @@ Inst*
 InstFactory::makeDirectCall(Opnd* dst,
                             Opnd* tauNullChecked,
                             Opnd* tauTypesChecked,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd** args,
                             MethodDesc* methodDesc) {
     assert(tauNullChecked->getType()->tag == Type::Tau);
@@ -1951,7 +1951,7 @@ Inst*
 InstFactory::makeTauVirtualCall(Opnd* dst,
                                 Opnd *tauNullChecked,
                                 Opnd *tauTypesChecked,
-                                uint32 numArgs,
+                                U_32 numArgs,
                                 Opnd** args,
                                 MethodDesc* methodDesc) {
     assert(tauNullChecked->getType()->tag == Type::Tau);
@@ -1967,7 +1967,7 @@ InstFactory::makeIndirectCall(Opnd* dst,
                               Opnd* funAddr,
                               Opnd* tauNullCheckedFirstArg,
                               Opnd* tauTypesChecked,
-                              uint32 numArgs,
+                              U_32 numArgs,
                               Opnd** args) {
     assert(tauNullCheckedFirstArg->getType()->tag == Type::Tau);
     assert(tauTypesChecked->getType()->tag == Type::Tau);
@@ -1985,7 +1985,7 @@ InstFactory::makeIndirectMemoryCall(Opnd* dst,
                                     Opnd* funAddr,
                                     Opnd* tauNullCheckedFirstArg,
                                     Opnd* tauTypesChecked,
-                                    uint32 numArgs,
+                                    U_32 numArgs,
                                     Opnd** args) {
     assert(tauNullCheckedFirstArg->getType()->tag == Type::Tau);
     assert(tauTypesChecked->getType()->tag == Type::Tau);
@@ -2001,7 +2001,7 @@ InstFactory::makeIndirectMemoryCall(Opnd* dst,
 Inst*
 InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id,
                                Opnd* tauNullChecked, Opnd* tauTypesChecked,
-                               uint32 numArgs, Opnd** args)
+                               U_32 numArgs, Opnd** args)
 {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     if (id == ArrayCopyDirect || id == ArrayCopyReverse) // these three need taus
@@ -2025,7 +2025,7 @@ InstFactory::makeJitHelperCall(Opnd* dst, JitHelperCallId id,
 }
 
 Inst*
-InstFactory::makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs, Opnd** args) {
+InstFactory::makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, U_32 numArgs, Opnd** args) {
     Type::Tag returnType = dst->isNull()? Type::Void : dst->getType()->tag;
     args = copyOpnds(args, numArgs);
     return makeVMHelperCallInst(Op_VMHelperCall, Modifier(Exception_Sometimes), returnType, dst, numArgs, args, id);
@@ -2034,9 +2034,9 @@ InstFactory::makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs, Opnd*
 
 // load, store, & move
 Inst*
-InstFactory::makePhi(Opnd* dst, uint32 numOpnds, Opnd** opnds) {
+InstFactory::makePhi(Opnd* dst, U_32 numOpnds, Opnd** opnds) {
 #ifdef BRM_CHECK_TYPES
-    for (uint32 i=0; i<numOpnds; ++i) {
+    for (U_32 i=0; i<numOpnds; ++i) {
         assert(opnds[i]->getType() == dst->getType());
     }
 #endif
@@ -2352,7 +2352,7 @@ Inst* InstFactory::makeNewArray(Opnd* dst, Opnd* numElems, Type* elemType) {
 
 Inst*
 InstFactory::makeNewMultiArray(Opnd* dst,
-                               uint32 dimensions,
+                               U_32 dimensions,
                                Opnd** numElems,
                                Type* elemType) {
     Opnd** newNumElems = copyOpnds(numElems, dimensions);
@@ -2433,11 +2433,11 @@ Inst* InstFactory::makeMonitorExitFence(Opnd* src) {
     return makeInst(Op_MonitorExitFence, Modifier(), Type::Void, OpndManager::getNullOpnd(), src);
 }
 
-Inst* InstFactory::makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, uint32 metadataToken) {
+Inst* InstFactory::makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, U_32 metadataToken) {
     return makeTokenInst(Op_LdToken, Modifier(), Type::Object, dst, metadataToken, enclosingMethod);
 }
 
-Inst* InstFactory::makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 token) {
+Inst* InstFactory::makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, U_32 token) {
     return makeTokenInst(Op_LdRef, mod, dst->getType()->tag, dst, token, enclosingMethod);
 }
 
@@ -2546,7 +2546,7 @@ Inst* InstFactory::makeTauCheckElemType(Opnd *dst, Opnd* array, Opnd* src,
                             tauIsArray);
 }
 
-Inst* InstFactory::makeLdConst(Opnd* dst, int32 val) {
+Inst* InstFactory::makeLdConst(Opnd* dst, I_32 val) {
     return makeConstInst(dst, val);
 }
 
@@ -2570,7 +2570,7 @@ Inst* InstFactory::makeLdNull(Opnd* dst) {
     return makeConstInst(dst);
 }
 
-Inst* InstFactory::makeIncCounter(uint32 val) {
+Inst* InstFactory::makeIncCounter(U_32 val) {
     return makeTokenInst(Op_IncCounter, Modifier(), Type::Void, OpndManager::getNullOpnd(), val, NULL);
 }
 
@@ -2584,7 +2584,7 @@ Inst* InstFactory::makeTauEdge(Opnd *dst) {
     return makeInst(Op_TauEdge, Modifier(), Type::Tau, dst);
 }
 
-Inst* InstFactory::makeTauAnd(Opnd *dst, uint32 numOpnds, Opnd** opnds) {
+Inst* InstFactory::makeTauAnd(Opnd *dst, U_32 numOpnds, Opnd** opnds) {
     assert(dst->getType()->tag == Type::Tau);
     assert(numOpnds > 0);
 

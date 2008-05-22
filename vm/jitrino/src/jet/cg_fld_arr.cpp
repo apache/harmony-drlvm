@@ -383,7 +383,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             void * inv_base = (void*)-(int_ptr)OBJ_BASE;
             movp(tmp, inv_base);
             alu(alu_add, Opnd(jobj, tmp), s0.as_opnd());
-            // store the resulting int32
+            // store the resulting I_32
             Opnd where32(i32, where.base(), where.disp(), 
                           where.index(), where.scale());
             mov(where32, Opnd(jobj, tmp)); //s0.as_opnd(i32));

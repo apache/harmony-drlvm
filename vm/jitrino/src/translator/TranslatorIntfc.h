@@ -85,14 +85,14 @@ private:
 
 class OpndStack {
 public:
-    OpndStack(MemoryManager& memManager,uint32 slots);
+    OpndStack(MemoryManager& memManager,U_32 slots);
     bool isEmpty() {
         return tos == 0;
     }
     bool isFull() {
         return tos == maxSlots;
     }
-    uint32 getNumElems() {
+    U_32 getNumElems() {
         return tos;
     }
     Opnd* top() {
@@ -117,7 +117,7 @@ public:
         opnds[tos++] = opnd;
         return true;
     }
-    Opnd* getElem(uint32 i) {
+    Opnd* getElem(U_32 i) {
         if (i >= tos) {
             assert(0);
             return NULL;
@@ -131,8 +131,8 @@ private:
     //
     // private fields
     //
-    const uint32 maxSlots;
-    uint32 tos;
+    const U_32 maxSlots;
+    U_32 tos;
     Opnd**    opnds;
 };
 

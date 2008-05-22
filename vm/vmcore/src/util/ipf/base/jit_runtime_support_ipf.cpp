@@ -1470,7 +1470,7 @@ void emit_arraycopy_override(Emitter_Handle eh, Method *method)
 
     int out0, save_pfs, save_b0, save_gp;
     const int num_in_args = 5, num_out_args = 5;
-    ArrayCopyResult (*p_array_copy)(ManagedObject* src, int32 src_off, ManagedObject* dst, int32 dst_off, int32 count);
+    ArrayCopyResult (*p_array_copy)(ManagedObject* src, I_32 src_off, ManagedObject* dst, I_32 dst_off, I_32 count);
     p_array_copy = array_copy;
     emit_alloc_for_single_call(emitter, num_in_args, num_out_args,
         (void **)p_array_copy,

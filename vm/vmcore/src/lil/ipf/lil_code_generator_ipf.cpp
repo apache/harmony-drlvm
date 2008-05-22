@@ -1592,7 +1592,7 @@ public:
                     result = (int64) (int16) imm;
                     break;
                 case LO_Sx4:
-                    result = (int64) (int32) imm;
+                    result = (int64) (I_32) imm;
                     break;
                 case LO_Zx1:
                     result = (int64) (uint64) (uint8) imm;
@@ -1601,7 +1601,7 @@ public:
                     result = (int64) (uint64) (uint16) imm;
                     break;
                 case LO_Zx4:
-                    result = (int64) (uint64) (uint32) imm;
+                    result = (int64) (uint64) (U_32) imm;
                     break;
                 default:
                     DIE(("Unexpected LIL operation"));  // control should never reach this point

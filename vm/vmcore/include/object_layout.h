@@ -72,7 +72,7 @@ extern "C" {
 /// Raw and compressed reference pointers
 
 typedef ManagedObject*  RAW_REFERENCE;
-typedef uint32          COMPRESSED_REFERENCE;
+typedef U_32          COMPRESSED_REFERENCE;
 
 // Useful macros: REFS_IS_COMPRESSED_MODE effectively specifies compressed mode
 // REF_SIZE returns size of type used for references
@@ -81,7 +81,7 @@ typedef uint32          COMPRESSED_REFERENCE;
 #if defined(REFS_USE_COMPRESSED)
 
 #define REFS_IS_COMPRESSED_MODE 1
-#define REF_SIZE (sizeof(uint32))
+#define REF_SIZE (sizeof(U_32))
 #define REF_MANAGED_NULL VM_Global_State::loader_env->heap_base
 #define REF_INIT_BY_ADDR(_ref_addr_, _val_)                                 \
     *((COMPRESSED_REFERENCE*)(_ref_addr_)) = (COMPRESSED_REFERENCE)(_val_)
@@ -160,7 +160,7 @@ REFS_RUNTIME_SWITCH_ENDIF
 #if defined(REFS_USE_COMPRESSED)
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
         gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(_object_),\
-                                          (uint32*)(_slot_addr_),           \
+                                          (U_32*)(_slot_addr_),           \
                                           (Managed_Object_Handle)(_value_))
 #elif defined(REFS_USE_UNCOMPRESSED)
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
@@ -171,7 +171,7 @@ REFS_RUNTIME_SWITCH_ENDIF
 #define STORE_REFERENCE(_object_, _slot_addr_, _value_)                     \
     if (VM_Global_State::loader_env->compress_references) {                 \
         gc_heap_slot_write_ref_compressed((Managed_Object_Handle)(_object_),\
-                                          (uint32*)(_slot_addr_),           \
+                                          (U_32*)(_slot_addr_),           \
                                           (Managed_Object_Handle)(_value_));\
     } else {                                                                \
         gc_heap_slot_write_ref((Managed_Object_Handle)(_object_),           \
@@ -185,7 +185,7 @@ REFS_RUNTIME_SWITCH_ENDIF
 // other global slot at address "slot_addr".
 #if defined(REFS_USE_COMPRESSED)
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
-        gc_heap_write_global_slot_compressed((uint32*)(_slot_addr_),    \
+        gc_heap_write_global_slot_compressed((U_32*)(_slot_addr_),    \
                                    (Managed_Object_Handle)(_value_))
 #elif defined(REFS_USE_UNCOMPRESSED)
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
@@ -194,7 +194,7 @@ REFS_RUNTIME_SWITCH_ENDIF
 #else // for REFS_USE_RUNTIME_SWITCH
 #define STORE_GLOBAL_REFERENCE(_slot_addr_, _value_)                    \
     if (VM_Global_State::loader_env->compress_references) {             \
-        gc_heap_write_global_slot_compressed((uint32*)(_slot_addr_),    \
+        gc_heap_write_global_slot_compressed((U_32*)(_slot_addr_),    \
                                   (Managed_Object_Handle)(_value_));    \
     } else {                                                            \
         gc_heap_write_global_slot((Managed_Object_Handle*)(_slot_addr_),\
@@ -206,9 +206,9 @@ REFS_RUNTIME_SWITCH_ENDIF
 
 // The object layout is currently as follows
 //
-//    * VTable* / uint32 vt_offset  +
-//  .-* uint32 lockword             +- get_constant_header_size()
-//  |   [int32 array lenth]
+//    * VTable* / U_32 vt_offset  +
+//  .-* U_32 lockword             +- get_constant_header_size()
+//  |   [I_32 array lenth]
 //  | * [void* tag pointer]
 //  |   [padding]
 //  |   fields / array elements
@@ -221,11 +221,11 @@ REFS_RUNTIME_SWITCH_ENDIF
 typedef struct ManagedObject {
 #if defined USE_COMPRESSED_VTABLE_POINTERS
     union {
-    uint32 vt_offset;
+    U_32 vt_offset;
     POINTER_SIZE_INT padding;
     };
     union {
-    uint32 obj_info;
+    U_32 obj_info;
     POINTER_SIZE_INT padding2;
     };
 
@@ -238,7 +238,7 @@ typedef struct ManagedObject {
 #else // USE_COMPRESSED_VTABLE_POINTERS
     VTable *vt_raw;
     union {
-    uint32 obj_info;
+    U_32 obj_info;
     POINTER_SIZE_INT padding;
     };
     VTable *vt_unsafe() { return vt_raw; }
@@ -258,10 +258,10 @@ typedef struct ManagedObject {
         return get_constant_header_size() + (_tag_pointer ? sizeof(void*) : 0); 
     }
 
-    uint32 get_obj_info() { return obj_info; }
-    void set_obj_info(uint32 value) { obj_info = value; }
-    uint32* get_obj_info_addr() {
-        return (uint32*)((char*)this + header_offset());
+    U_32 get_obj_info() { return obj_info; }
+    void set_obj_info(U_32 value) { obj_info = value; }
+    U_32* get_obj_info_addr() {
+        return (U_32*)((char*)this + header_offset());
     }
 
     /**
@@ -282,11 +282,11 @@ typedef struct ManagedObject {
 typedef struct VM_Vector
 {
     ManagedObject object;
-    int32 length;
+    I_32 length;
 
     static size_t length_offset() { return (size_t)(&((VM_Vector*)NULL)->length); }
-    int32 get_length() { return length; }
-    void set_length(int32 len) { length = len; }
+    I_32 get_length() { return length; }
+    void set_length(I_32 len) { length = len; }
 
     void** get_tag_pointer_address() {
         assert(ManagedObject::_tag_pointer);
@@ -300,9 +300,9 @@ typedef struct VM_Vector
 
 
 // Every vector has two pointers that can be found in any VM object
-// and an int32 field to hold the length (i.e., the number of elements).
+// and an I_32 field to hold the length (i.e., the number of elements).
 // The combined size of those fields is:
-#define VM_VECTOR_RT_OVERHEAD ((unsigned)(ManagedObject::get_size() + sizeof(int32)))
+#define VM_VECTOR_RT_OVERHEAD ((unsigned)(ManagedObject::get_size() + sizeof(I_32)))
 
 
 // The offset to the first element of a vector with 8-byte elements.

@@ -47,7 +47,7 @@ protected:
 class LightJNISession : public SessionAction { 
 protected: 
     void runImpl(); 
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
     const char* getName() { return "light_jni"; } 
     bool isInOptimizationTable(Method_Table* table, MethodDesc* mmd);
     void derefIfObject(CallInst* callInst, Opnd* origRetOpnd);
@@ -211,7 +211,7 @@ void LightJNISession::runImpl() {
 
         void* tmpPoint = md->getNativeAddress();
         Opnd* tmpZero = lirm->newImmOpnd(lirm->getTypeManager().getIntPtrType(), 0);
-        uint32 tmpNumArgs = callInst->getOpndCount();
+        U_32 tmpNumArgs = callInst->getOpndCount();
         CallInst* newCallInst = NULL;
         Opnd* origRetOpnd = callInst->getOpnd(0);
         //const char* mmthName = md->getName();
@@ -225,7 +225,7 @@ void LightJNISession::runImpl() {
             Opnd* newTargetOpnd = lirm->newImmOpnd(tm.getIntPtrType(), ((POINTER_SIZE_INT)tmpPoint));
 
             tmpOpnds[0] = tmpZero;
-            for (uint32 i = 2; i<tmpNumArgs; i++) {
+            for (U_32 i = 2; i<tmpNumArgs; i++) {
                 tmpOpnds[i-1] = callInst->getOpnd(i);
             }
             newCallInst = lirm->newCallInst(newTargetOpnd, &CallingConvention_STDCALL, tmpNumArgs - 1, tmpOpnds, newRetOpnd);
@@ -236,7 +236,7 @@ void LightJNISession::runImpl() {
             Opnd* tmpClassName = lirm->newImmOpnd(tm.getIntPtrType(), (POINTER_SIZE_INT)(md->getParentHandle()));
             tmpOpnds[0] = tmpZero;
             tmpOpnds[1] = tmpClassName;
-            for (uint32 i = 2; i<tmpNumArgs; i++){
+            for (U_32 i = 2; i<tmpNumArgs; i++){
                 tmpOpnds[i] = callInst->getOpnd(i);
             }
             newCallInst = lirm->newCallInst(newTargetOpnd, &CallingConvention_STDCALL, tmpNumArgs, tmpOpnds, newRetOpnd);

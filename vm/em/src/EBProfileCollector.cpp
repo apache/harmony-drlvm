@@ -35,8 +35,8 @@
 
 
 EBProfileCollector::EBProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, 
-                                       EB_ProfilerMode _mode, uint32 _eThreshold, uint32 _bThreshold,
-                                       uint32 _initialTimeout, uint32 _timeout) 
+                                       EB_ProfilerMode _mode, U_32 _eThreshold, U_32 _bThreshold,
+                                       U_32 _initialTimeout, U_32 _timeout) 
                                        : ProfileCollector(em, name, EM_PCTYPE_ENTRY_BACKEDGE, genJit),
                                         mode(_mode), eThreshold(_eThreshold), bThreshold(_bThreshold), 
                                         initialTimeout(_initialTimeout), timeout(_timeout), loggingEnabled(false)
@@ -95,14 +95,14 @@ void __stdcall eb_profiler_sync_mode_callback(Method_Profile_Handle mph) {
     ((EBProfileCollector*)mp->pc)->syncModeJitCallback(mp);
 }
 
-uint32 eb_profiler_get_entry_threshold(PC_Handle pch) {
+U_32 eb_profiler_get_entry_threshold(PC_Handle pch) {
     assert(pch!=NULL);
     ProfileCollector* pc = (ProfileCollector*)pch;
     assert(pc->type == EM_PCTYPE_ENTRY_BACKEDGE);
     return ((EBProfileCollector*)pc)->getEntryThreshold();
 }
 
-uint32 eb_profiler_get_backedge_threshold(PC_Handle pch) {
+U_32 eb_profiler_get_backedge_threshold(PC_Handle pch) {
     assert(pch!=NULL);
     ProfileCollector* pc = (ProfileCollector*)pch;
     assert(pc->type == EM_PCTYPE_ENTRY_BACKEDGE);

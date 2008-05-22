@@ -343,7 +343,7 @@ typedef struct HyThread_public {
      *    2. hythread_exception_safe_point()
      *          - removes safe point callback request for current thread
      */
-    int32 request;
+    I_32 request;
 
     /**
      * Field indicating that thread can safely be suspended.

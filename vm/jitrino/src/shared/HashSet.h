@@ -57,7 +57,7 @@ public:
     //
     //  Returns number of elements in the set
     //
-    uint32 getSize() const {return (uint32)map.size();}
+    U_32 getSize() const {return (U_32)map.size();}
     //
     //  Returns true if set contains the element, false otherwise
     //
@@ -114,7 +114,7 @@ public:
         //
         MemoryManager memManager("HashSet::intersect.memManager");
         KEY * removeList = (KEY *)memManager.alloc(sizeof(KEY) * map.size());
-        uint32 removeListSize = 0;
+        U_32 removeListSize = 0;
         const_iterator iter = map.begin(),
                        end  = map.end();
         for (; iter != end; iter++) {
@@ -124,7 +124,7 @@ public:
         //
         //  Remove elements that are in removeList
         //
-        for (uint32 i = 0; i < removeListSize; i++)
+        for (U_32 i = 0; i < removeListSize; i++)
             map.erase(removeList[i]);
     }
     //
@@ -175,7 +175,7 @@ public:
     //
     iterator end() {return map.end();}
 private:
-    StlHashMap<uint32,ELEM> map;
+    StlHashMap<U_32,ELEM> map;
 };
 
 } //namespace Jitrino 

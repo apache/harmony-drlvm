@@ -52,13 +52,13 @@ struct HashTableLink {
 
 class HashTableImpl {
 public:
-    HashTableImpl(MemoryManager& mm, uint32 size) 
+    HashTableImpl(MemoryManager& mm, U_32 size) 
         : memManager(mm), table(0), tableSize(size) {
         table = new (memManager) HashTableLink*[tableSize];
-        for (uint32 i=0; i<tableSize; i++)
+        for (U_32 i=0; i<tableSize; i++)
             table[i] = NULL;
     }
-    HashTableImpl(MemoryManager& mm,uint32 size,HashTableLink** t) 
+    HashTableImpl(MemoryManager& mm,U_32 size,HashTableLink** t) 
         : memManager(mm), table(t), tableSize(size) {
         removeAll();
     }
@@ -73,7 +73,7 @@ public:
     void  insert(void* key, void* value) {
         HashTableLink* entry = lookupEntry(key);
         if (entry == NULL) {
-            uint32 idx = getTableIndex(key);
+            U_32 idx = getTableIndex(key);
             HashTableLink* link = createLink(key,value);
             link->next = table[idx];
             table[idx] = link;
@@ -82,7 +82,7 @@ public:
         }
     }
     void    remove(void* key) {
-        uint32 idx = getTableIndex(key);
+        U_32 idx = getTableIndex(key);
         HashTableLink* prev = NULL;
         for (HashTableLink* e = table[idx]; e != NULL; prev = e, e = e->next) {
             if (equals(e->keyPtr,key)) {
@@ -96,7 +96,7 @@ public:
         }
     }
     void    removeAll() {
-        for (uint32 i=0; i<tableSize; i++) {
+        for (U_32 i=0; i<tableSize; i++) {
             HashTableLink* link;
             if ((link = table[i]) == NULL)
                 continue;
@@ -132,7 +132,7 @@ protected:
         }
         return NULL;
     }
-    uint32 getTableIndex(void* key) const {
+    U_32 getTableIndex(void* key) const {
         return getHashCode(key) % tableSize;
     }
     virtual HashTableLink*  createLink(void* key,void* elem) {
@@ -142,7 +142,7 @@ protected:
         delete link;
     }
     virtual bool    equals(void* key1,void* key2) const = 0;
-    virtual uint32  getHashCode(void* key) const = 0;
+    virtual U_32  getHashCode(void* key) const = 0;
 
     friend class HashTableIterImpl;
     //
@@ -150,12 +150,12 @@ protected:
     //
     MemoryManager&  memManager;
     HashTableLink** table;
-    uint32          tableSize;
+    U_32          tableSize;
 
 public:
-    static uint32 numLookup;
-    static uint32 numLookupEntry;
-    static uint32 numFound;
+    static U_32 numLookup;
+    static U_32 numLookupEntry;
+    static U_32 numFound;
 };
 
 //
@@ -192,7 +192,7 @@ protected:
     }
 
     HashTableImpl* hashTable;
-    uint32         nextEntry;
+    U_32         nextEntry;
     HashTableLink* nextElem;
 };
 
@@ -207,7 +207,7 @@ struct LinkWithKey : HashTableLink {
 template <class KEY>
 class KeyLinkHashTable : HashTableImpl {
 public:
-    KeyLinkHashTable(MemoryManager& mm,uint32 size) : HashTableImpl(mm,size) {}
+    KeyLinkHashTable(MemoryManager& mm,U_32 size) : HashTableImpl(mm,size) {}
     virtual ~KeyLinkHashTable() {}
     void*   lookup(KEY* key) const {return HashTableImpl::lookup(key);}
     void    insert(KEY* key,void* value) {HashTableImpl::insert(key,value);}
@@ -226,18 +226,18 @@ protected:
     virtual bool equals(void* key1,void* key2) const {
         return ((KEY*)key1)->equals((KEY*)key2);
     }
-    virtual uint32 getHashCode(void* key) const {
+    virtual U_32 getHashCode(void* key) const {
         return ((KEY*)key)->getHashCode();
     }
 };
 
-template<class KEY,uint32 NUM_LINKS>
+template<class KEY,U_32 NUM_LINKS>
 class FixedKeyLinkHashTable : public KeyLinkHashTable<KEY> {
 public:
-    FixedKeyLinkHashTable(MemoryManager& mm,uint32 size) 
+    FixedKeyLinkHashTable(MemoryManager& mm,U_32 size) 
         : KeyLinkHashTable<KEY>(mm,size) {
         freeList = &links[0];
-        for (uint32 i=0; i<NUM_LINKS-1; i++) {
+        for (U_32 i=0; i<NUM_LINKS-1; i++) {
             // initialize 
             links[i].next = &links[i+1];
         }
@@ -301,8 +301,8 @@ struct DoublePtrKey {
     bool    equals(const DoublePtrKey* key) const {
         return (key1 == key->key1 && key2 == key->key2);
     }
-    uint32  getHashCode() const {
-        return ((uint32)(((POINTER_SIZE_INT)key1)>>3) ^ (uint32)(((POINTER_SIZE_INT)key2)>>3));
+    U_32  getHashCode() const {
+        return ((U_32)(((POINTER_SIZE_INT)key1)>>3) ^ (U_32)(((POINTER_SIZE_INT)key2)>>3));
     }
     void* key1;
     void* key2;
@@ -310,7 +310,7 @@ struct DoublePtrKey {
 
 class DoubleKeyHashTable : KeyLinkHashTable<DoublePtrKey> {
 public:
-    DoubleKeyHashTable(MemoryManager& mm,uint32 size) 
+    DoubleKeyHashTable(MemoryManager& mm,U_32 size) 
         : KeyLinkHashTable<DoublePtrKey>(mm,size) {}
     virtual ~DoubleKeyHashTable() {}
     void*   lookup(void* key1,void* key2) const {
@@ -336,44 +336,44 @@ public:
 template <class KEY, class VALUE>
 class HashTable : public HashTableImpl {
 public:
-    HashTable(MemoryManager& mm,uint32 sz) : HashTableImpl(mm,sz) {}
+    HashTable(MemoryManager& mm,U_32 sz) : HashTableImpl(mm,sz) {}
     VALUE* lookup(KEY* key) const {return (VALUE*)HashTableImpl::lookup(key);}
     void   insert(KEY* key, VALUE* value) {HashTableImpl::insert(key,value);}
     void   remove(KEY* key) {HashTableImpl::remove(key);}
 protected:
     virtual bool   keyEquals(KEY* key1, KEY* key2) const = 0;
-    virtual uint32 getKeyHashCode(KEY* key) const = 0;
+    virtual U_32 getKeyHashCode(KEY* key) const = 0;
 private:
     bool   equals(void* key1, void* key2) const {return keyEquals((KEY*)key1,(KEY*)key2);}
-    uint32 getHashCode(void* key) const {return getKeyHashCode((KEY*)key);}
+    U_32 getHashCode(void* key) const {return getKeyHashCode((KEY*)key);}
 };
 
 template <class KEY, class VALUE>
 class ConstHashTable : public HashTableImpl {
 public:
-    ConstHashTable(MemoryManager& mm,uint32 sz) : HashTableImpl(mm,sz) {}
+    ConstHashTable(MemoryManager& mm,U_32 sz) : HashTableImpl(mm,sz) {}
     const VALUE* lookup(const KEY* key) const {return (const VALUE*)HashTableImpl::lookup((void *)key);}
     void   insert(const KEY* key, const VALUE* value) {HashTableImpl::insert((void *)key,(void *)value);}
     void   remove(const KEY* key) {HashTableImpl::remove((void *)key);}
 protected:
     virtual bool   keyEquals(const KEY* key1, const KEY* key2) const = 0;
-    virtual uint32 getKeyHashCode(const KEY* key) const = 0;
+    virtual U_32 getKeyHashCode(const KEY* key) const = 0;
 private:
     bool   equals(void* key1, void* key2) const {return keyEquals((const KEY*)key1,(const KEY*)key2);}
-    uint32 getHashCode(void* key) const {return getKeyHashCode((const KEY*)key);}
+    U_32 getHashCode(void* key) const {return getKeyHashCode((const KEY*)key);}
 };
 
 template <class ELEM_TYPE>
 class PtrHashTable : public HashTable<void,ELEM_TYPE> {
 public:
-    PtrHashTable(MemoryManager& mm,uint32 size) : HashTable<void,ELEM_TYPE>(mm,size) {}
+    PtrHashTable(MemoryManager& mm,U_32 size) : HashTable<void,ELEM_TYPE>(mm,size) {}
 protected:
     virtual bool keyEquals(void* key1,void* key2) const {
         return key1 == key2;
     }
-    virtual uint32 getKeyHashCode(void* key) const {
+    virtual U_32 getKeyHashCode(void* key) const {
         // return hash of address bits
-        return ((uint32)(((POINTER_SIZE_INT)key) >> sizeof(void*)));
+        return ((U_32)(((POINTER_SIZE_INT)key) >> sizeof(void*)));
     }
 };
 

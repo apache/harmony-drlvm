@@ -41,7 +41,7 @@ typedef double (*DoubleFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef ManagedObject** (*RefFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef void* (*ObjFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef float (*FloatFuncPtr)(uword*,uword,word,GenericFunctionPointer);
-typedef int32 (*IntFuncPtr)(uword*,uword,word,GenericFunctionPointer);
+typedef I_32 (*IntFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef int16 (*ShortFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef int8 (*ByteFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef uint16 (*CharFuncPtr)(uword*,uword,word,GenericFunctionPointer);
@@ -462,7 +462,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().i = (int32)res;
+                prevFrame.stack.pick().i = (I_32)res;
             }
             break;
 
@@ -473,7 +473,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().u = (uint32) res;
+                prevFrame.stack.pick().u = (U_32) res;
             }
             break;
 
@@ -484,7 +484,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().i = (int32) res;
+                prevFrame.stack.pick().i = (I_32) res;
             }
             break;
 
@@ -741,7 +741,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().i = (int32) res;
+                prevFrame.stack.pick().i = (I_32) res;
             }
             break;
 
@@ -752,7 +752,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().u = (uint32) res;
+                prevFrame.stack.pick().u = (U_32) res;
             }
             break;
 
@@ -763,7 +763,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 prevFrame.stack.popClearRef(sz);
 
                 prevFrame.stack.push();
-                prevFrame.stack.pick().i = (int32) res;
+                prevFrame.stack.pick().i = (I_32) res;
             }
             break;
 

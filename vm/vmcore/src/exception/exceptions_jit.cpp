@@ -98,7 +98,7 @@ bool Target_Exception_Handler::is_exc_obj_dead()
 #ifdef POINTER64
 typedef uint64 NumericNativeCodePtr;
 #else
-typedef uint32 NumericNativeCodePtr;
+typedef U_32 NumericNativeCodePtr;
 #endif
 
 bool Target_Exception_Handler::is_in_range(NativeCodePtr ip, bool is_ip_past)

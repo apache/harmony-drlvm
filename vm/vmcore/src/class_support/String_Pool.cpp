@@ -359,8 +359,8 @@ ManagedObject * String_Pool::intern(String * str) {
         COMPRESSED_REFERENCE compressed_lang_string =
             compress_reference(string->object);
         assert(is_compressed_reference(compressed_lang_string));
-        uint32 result = apr_atomic_cas32(
-            /*destination*/ (volatile uint32 *)&str->intern.compressed_ref, 
+        U_32 result = apr_atomic_cas32(
+            /*destination*/ (volatile U_32 *)&str->intern.compressed_ref, 
             /*exchange*/    compressed_lang_string,
             /*comparand*/   0);
         if (result == 0) {

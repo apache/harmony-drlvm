@@ -182,9 +182,9 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
 // Stack size should be (% 8 == 0) but shouldn't be (% 16 == 0)
 const int ALIGNMENT = 0;
 
-const int32 gr_stack_size = (1 + MAX_GR)*GR_STACK_SIZE
+const I_32 gr_stack_size = (1 + MAX_GR)*GR_STACK_SIZE
         + SHADOW;
-const int32 stack_size = (int32)(m2n_get_size() - 2*sizeof(void*))
+const I_32 stack_size = (I_32)(m2n_get_size() - 2*sizeof(void*))
         + MAX_FR*FR_STACK_SIZE
         + gr_stack_size + ALIGNMENT;
 
@@ -254,7 +254,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     stub = call(stub, (char *)&compile_me);
 
     // pop m2n from the stack
-    const int32 bytes_to_m2n_bottom = (int32)(stack_size - (m2n_get_size() - 2*sizeof(void*)));
+    const I_32 bytes_to_m2n_bottom = (I_32)(stack_size - (m2n_get_size() - 2*sizeof(void*)));
     stub = m2n_gen_pop_m2n(stub, false, 0, bytes_to_m2n_bottom, 1);
 
     // restore gp inputs from the stack

@@ -136,7 +136,7 @@ private:
     
     EM_ProfileAccessInterface profileAccessInterface;
 
-    uint32 tick;
+    U_32 tick;
     
     osmutex_t recompilationLock;
     std::set<Method_Profile_Handle> methodsInRecompile;

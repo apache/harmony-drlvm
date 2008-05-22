@@ -68,7 +68,7 @@ public:
     {}
     virtual ~AdvancedGlobalOpndAnalyzer() {};
 private:
-    void analyzeInst(Inst* inst, uint32 loopHeader, uint32 timeStamp);
+    void analyzeInst(Inst* inst, U_32 loopHeader, U_32 timeStamp);
     void unmarkFalseGlobals();
     void markManagedPointerBases();
     virtual void markGlobals();

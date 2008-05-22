@@ -40,7 +40,7 @@ class VPInstructionProfileData;
 struct Simple_TNV_Table
 {
     POINTER_SIZE_INT value;
-    uint32 frequency;
+    U_32 frequency;
 };
 
 enum ProfileUpdateStrategy {
@@ -71,8 +71,8 @@ public:
     typedef struct Simple_TNV_Table TableT;
     typedef POINTER_SIZE_INT ValueT;
     typedef VPInstructionProfileData VPData;
-    TNVTableManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval, ProfileUpdateStrategy update_strategy) :
+    TNVTableManager(U_32 steady_size, U_32 clear_size,
+            U_32 clear_interval, ProfileUpdateStrategy update_strategy) :
         steadySize(steady_size),
         clearSize(clear_size),
         clearInterval(clear_interval),
@@ -82,13 +82,13 @@ public:
     VPInstructionProfileData* createProfileData();
 
     // finds a given value in TNV table, returns the index, (-1) if not found
-    int32 find(TableT* where, ValueT value_to_search, uint32 size);
+    I_32 find(TableT* where, ValueT value_to_search, U_32 size);
 
     // clearSize elements are cleared from the top
     void clearTopElements(TableT* where);
 
     // returns the index of the minimum element
-    int32 findMinIdx(TableT* where, uint32 size);
+    I_32 findMinIdx(TableT* where, U_32 size);
 
     // returns the maximum value in a given steady TNV table
     ValueT findMax(TableT* TNV_where);
@@ -105,17 +105,17 @@ public:
 
 protected:
     virtual void insert(TableT* where, TableT* clear_part,
-            ValueT value_to_insert, uint32 times_met) = 0;
+            ValueT value_to_insert, U_32 times_met) = 0;
 
-    const uint32 steadySize, clearSize, clearInterval;
+    const U_32 steadySize, clearSize, clearInterval;
     const ProfileUpdateStrategy updateStrategy;
 };
 
 class TNVTableDividedManager : public TNVTableManager {
 public:
     // c-tor
-    TNVTableDividedManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval, ProfileUpdateStrategy us) :
+    TNVTableDividedManager(U_32 steady_size, U_32 clear_size,
+            U_32 clear_interval, ProfileUpdateStrategy us) :
         TNVTableManager(steady_size, clear_size, clear_interval, us)
     {}
 
@@ -124,14 +124,14 @@ public:
 
 protected:
     virtual void insert(TableT* where, TableT* clear_part,
-            ValueT value_to_insert, uint32 times_met);
+            ValueT value_to_insert, U_32 times_met);
 };
 
 class TNVTableFirstNManager : public TNVTableManager {
 public:
     // c-tor
-    TNVTableFirstNManager(uint32 steady_size, uint32 clear_size,
-            uint32 clear_interval, ProfileUpdateStrategy us) :
+    TNVTableFirstNManager(U_32 steady_size, U_32 clear_size,
+            U_32 clear_interval, ProfileUpdateStrategy us) :
         TNVTableManager(steady_size, clear_size, clear_interval, us)
     {}
 
@@ -140,7 +140,7 @@ public:
 
 private:
     void insert(TableT* where, TableT* clear_part,
-            ValueT value_to_insert, uint32 times_met);
+            ValueT value_to_insert, U_32 times_met);
 
 };
 
@@ -152,14 +152,14 @@ public:
     };
 
     ValueProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
-                                                uint32 _TNV_steady_size, uint32 _TNV_clear_size,
-                                                uint32 _clear_interval, algotypes _TNV_algo_type,
+                                                U_32 _TNV_steady_size, U_32 _TNV_clear_size,
+                                                U_32 _clear_interval, algotypes _TNV_algo_type,
                                                 ProfileUpdateStrategy update_strategy);
 
     virtual TbsEMClient* getTbsEmClient() const {return (NULL);}
     virtual ~ValueProfileCollector();
     MethodProfile* getMethodProfile(Method_Handle mh) const ;
-    ValueMethodProfile* createProfile(Method_Handle mh, uint32 numkeys, uint32 keys[]);
+    ValueMethodProfile* createProfile(Method_Handle mh, U_32 numkeys, U_32 keys[]);
 
     TNVTableManager* getTnvMgr() { return tnvTableManager; }
 private:
@@ -185,11 +185,11 @@ public:
     {}
 public:
     POINTER_SIZE_INT last_value;
-    uint32 num_times_profiled;
-    uint32 profile_tick;
+    U_32 num_times_profiled;
+    U_32 profile_tick;
 };
 
-typedef std::map<uint32, VPInstructionProfileData*> VPDataMap;
+typedef std::map<U_32, VPInstructionProfileData*> VPDataMap;
 class ValueMethodProfile : public MethodProfile {
 public:
     ValueMethodProfile(ValueProfileCollector* pc, Method_Handle mh);
@@ -197,8 +197,8 @@ public:
     void lockProfile() {port_mutex_lock(&lock);}
     void unlockProfile() {port_mutex_unlock(&lock);}
     void dumpValues(std::ostream& os);
-    void addNewValue(uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
-    POINTER_SIZE_INT getResult(uint32 instructionKey);
+    void addNewValue(U_32 instructionKey, POINTER_SIZE_INT valueToAdd);
+    POINTER_SIZE_INT getResult(U_32 instructionKey);
 
     // UpatingState is used to implement UPDATE_FLAGGED_* strategies.
     //     (updatingState == 1) when method profile is being updated to skip
@@ -217,9 +217,9 @@ private:
     uint8 updatingState;
 };
 
-POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, uint32 instructionKey);
-void value_profiler_add_value (Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
-Method_Profile_Handle value_profiler_create_profile(PC_Handle pch, Method_Handle mh, uint32 numkeys, uint32 keys[]);
+POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, U_32 instructionKey);
+void value_profiler_add_value (Method_Profile_Handle mph, U_32 instructionKey, POINTER_SIZE_INT valueToAdd);
+Method_Profile_Handle value_profiler_create_profile(PC_Handle pch, Method_Handle mh, U_32 numkeys, U_32 keys[]);
 void value_profiler_dump_values(Method_Profile_Handle mph, std::ostream& os);
 
 #endif

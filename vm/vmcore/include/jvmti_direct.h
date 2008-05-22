@@ -115,8 +115,8 @@ extern "C" {
 bool jvmti_should_report_event(jvmtiEvent event_type);
 void jvmti_send_vm_start_event(Global_Env *env, JNIEnv *jni_env);
 void jvmti_send_vm_init_event(Global_Env *env);
-void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSize, 
-                                  const void* codeAddr, uint32 mapLength, 
+void jvmti_send_region_compiled_method_load_event(Method *method, U_32 codeSize, 
+                                  const void* codeAddr, U_32 mapLength, 
                                   const AddrLocation* addrLocationMap, 
                                   const void* compileInfo);
 void jvmti_send_chunks_compiled_method_load_event(Method *method);

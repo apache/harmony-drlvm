@@ -340,7 +340,7 @@ Method_Handle si_get_method(StackIterator* si);
  *
  * @return The number of inlined methods.
  */
-uint32 si_get_inline_depth(StackIterator* si);
+U_32 si_get_inline_depth(StackIterator* si);
 
 /**
  * Gets the method handle for the frame iterated by the stack iterator.

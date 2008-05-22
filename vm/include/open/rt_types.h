@@ -199,7 +199,7 @@ typedef struct OpenMethodExecutionParams {
         uint64 * p_r11;
 
         // To restore processor flags during transfer
-        uint32 eflags;
+        U_32 eflags;
 
         Boolean is_ip_past;
     } JitFrameContext;
@@ -208,22 +208,22 @@ typedef struct OpenMethodExecutionParams {
 
     typedef
     struct JitFrameContext {
-        uint32 esp;
-        uint32 *p_ebp;
-        uint32 *p_eip;
+        U_32 esp;
+        U_32 *p_ebp;
+        U_32 *p_eip;
 
         // Callee-saved registers
-        uint32 *p_edi;
-        uint32 *p_esi;
-        uint32 *p_ebx;
+        U_32 *p_edi;
+        U_32 *p_esi;
+        U_32 *p_ebx;
 
         // The scratch registers are currently only valid during GC enumeration.
-        uint32 *p_eax;
-        uint32 *p_ecx;
-        uint32 *p_edx;
+        U_32 *p_eax;
+        U_32 *p_ecx;
+        U_32 *p_edx;
 
         // To restore processor flags during transfer
-        uint32 eflags;
+        U_32 eflags;
 
         Boolean is_ip_past;
     } JitFrameContext;

@@ -205,7 +205,7 @@ vf_Result vf_Context_6::load_stackmaptable() {
 
     read_ptr+=2; //skip uint16 attribute_name_index
 
-    uint32 attribute_length = read_uint32(read_ptr); 
+    U_32 attribute_length = read_uint32(read_ptr); 
     read_ptr+=4;
     U_8* attribute_end = stackmaptable + attribute_length + 6;
 

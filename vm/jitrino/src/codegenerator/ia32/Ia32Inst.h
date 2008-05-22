@@ -165,27 +165,27 @@ public:
         };
 
         /** Constructs a RuntimeInfo instance of RuntimeInfo::Type t and initialize it with given values */
-        RuntimeInfo(RuntimeInfo::Kind k, void * value0, void * value1=0, void * value2=0, void * value3=0, uint32 addOffset=0)
+        RuntimeInfo(RuntimeInfo::Kind k, void * value0, void * value1=0, void * value2=0, void * value3=0, U_32 addOffset=0)
             :kind(k), additionalOffset(addOffset)
             { value[0]=value0; value[1]=value1; value[2]=value2; value[3]=value3; }
 
         /** Returns the the value at index i */
-        void * getValue(uint32 i)const{ assert(i<sizeof(value)/sizeof(value[0])); return value[i]; }
+        void * getValue(U_32 i)const{ assert(i<sizeof(value)/sizeof(value[0])); return value[i]; }
 
-        uint32 getAdditionalOffset()const{ return additionalOffset; }
+        U_32 getAdditionalOffset()const{ return additionalOffset; }
 
         /** Returns the kind of the info */
         RuntimeInfo::Kind getKind()const { return kind; }
     private:
         RuntimeInfo::Kind kind;
         void * value[4];
-        uint32 additionalOffset;
+        U_32 additionalOffset;
     };
 
 public:
 
     /** Returns the ID of the operand */
-    uint32      getId()const{ return id; }
+    U_32      getId()const{ return id; }
 
     /** 
      * Returns the ID of the operand assigned at its creation.
@@ -193,7 +193,7 @@ public:
      * The original ID returned by getFirstID is used in logging and IR dumps
      * for convenience.
     */
-    uint32      getFirstId()const{ return firstId; }
+    U_32      getFirstId()const{ return firstId; }
 
     /** Returns the type of the operand */
     Type * getType()const{ return type; }
@@ -219,7 +219,7 @@ public:
     bool canBePlacedIn(Constraint c)const
         { return !(getConstraint(ConstraintKind_Calculated, c.getSize())&c).isNull(); }
     inline bool canBePlacedIn(OpndKind opndKind)const
-    { return ((uint32)opndKind & constraints[ConstraintKind_Calculated].getKind()) != 0; }
+    { return ((U_32)opndKind & constraints[ConstraintKind_Calculated].getKind()) != 0; }
 
     /** Returns the physical register assigned to the operand */
     RegName getRegName()const{ return isPlacedIn(OpndKind_Reg)?regName:RegName_Null; }
@@ -268,7 +268,7 @@ public:
      * This is an "optimized" version of the isPlacedIn method for OpndKind args.
      */
     inline bool isPlacedIn(OpndKind opndKind)const
-    { return ( (uint32)opndKind & constraints[ConstraintKind_Location].getKind() ) != 0; }
+    { return ( (U_32)opndKind & constraints[ConstraintKind_Location].getKind() ) != 0; }
 
     /** Returns true if the operand IS assigned to any location. */
     bool hasAssignedPhysicalLocation()const
@@ -318,7 +318,7 @@ public:
      * 
      * The refCount value is calculated during IRManager::calculateOpndStatistics.
      */
-    uint32 getRefCount()const{ return refCount; }
+    U_32 getRefCount()const{ return refCount; }
 
     /** Assigns the Calculated constrain to the operand. */
     void setCalculatedConstraint(Constraint c);
@@ -361,7 +361,7 @@ protected:
      */
     void normalizeMemSubOpnds(void);
 
-    void addRefCount(uint32& index, uint32 blockExecCount);
+    void addRefCount(U_32& index, U_32 blockExecCount);
 
 #ifdef _DEBUG
     void checkConstraints();
@@ -371,7 +371,7 @@ protected:
 private:
 
     //-------------------------------------------------------------------------
-    Opnd(uint32 _id, Type * t, Constraint c)
+    Opnd(U_32 _id, Type * t, Constraint c)
         :id(_id), firstId(_id), type(t), 
         defScope(DefScope_Null), definingInst(NULL), refCount(0),
         segReg(RegName_Null), memOpndKind(MemOpndKind_Null),
@@ -381,14 +381,14 @@ private:
         }
 
     //-------------------------------------------------------------------------
-    uint32          id;
-    uint32          firstId;
+    U_32          id;
+    U_32          firstId;
     Type     *      type;
     Constraint      constraints[ConstraintKind_Current];
 
     DefScope        defScope;
     Inst *          definingInst;
-    uint32          refCount;
+    U_32          refCount;
     RegName         segReg;
 
     MemOpndKind         memOpndKind;
@@ -579,7 +579,7 @@ public:
     bool hasKind(Kind k)const{ return (kind&k)==kind; }
 
     /** Returns the id of the instruction. */
-    uint32      getId()const{ return id; }
+    U_32      getId()const{ return id; }
 
     /** Returns the current form of the instruction. */
     Form        getForm()const{ return (Form)form; }
@@ -588,7 +588,7 @@ public:
      * Returns the stack depth at the instruction.
      * This information is calculated in IRManager::calculateStackDepth().
      */
-    uint32      getStackDepth() const { return stackDepth; }
+    U_32      getStackDepth() const { return stackDepth; }
 
     /** Returns the mnemonic of the instruction. */
     Mnemonic    getMnemonic()const{ return mnemonic; }
@@ -605,25 +605,25 @@ public:
 
 
     /** Shortcut: returns the properties of the instruction (bit-mask of Properties). */
-    uint32 getProperties()const
+    U_32 getProperties()const
     { return properties; }
 
     bool getPureDefProperty() const;
 
     /** Returns the sequential index of the instruction after ordering via IRManager::indexInsts. */
-    uint32      getIndex()const{ return index; }
+    U_32      getIndex()const{ return index; }
 
     /** 
      * Returns the number of InstLevel operands in the instruction. 
      * This is an optimized version of getOpndCount(OpndRole_InstLevel|OpndRole_UseDef).
     */
-    uint32      getOpndCount()const{ return opndCount; }
+    U_32      getOpndCount()const{ return opndCount; }
 
     /** 
      * Returns the number of operands in the instruction satisfying the given mask. 
      * Please refer to documentation of enum OpndRole for description of usage of opnd roles as filters. 
      */
-    uint32      getOpndCount(uint32 roles)const
+    U_32      getOpndCount(U_32 roles)const
     { return 
         roles == (OpndRole_InstLevel|OpndRole_UseDef) ? opndCount:
         roles == (OpndRole_InstLevel|OpndRole_Def) ? defOpndCount:
@@ -650,7 +650,7 @@ public:
      * Inst::Opnds::iterator can also be used as index in this method and should be used to iterate
      * over all operands including OpndLevel.
     */
-    Opnd * getOpnd(uint32 index)const
+    Opnd * getOpnd(U_32 index)const
     {   
         Opnd * const * opnds = getOpnds();
         if (index < opndCount)
@@ -662,27 +662,27 @@ public:
      * Returns a mask describing operand roles (|-ed from OpndRole values).
      *
      * The indexing space is common for all operands including OpndLevel
-     * (please see comments to Opnd * getOpnd(uint32 index)const). 
+     * (please see comments to Opnd * getOpnd(U_32 index)const). 
     */
-    uint32  getOpndRoles(uint32 index) const
+    U_32  getOpndRoles(U_32 index) const
     { return index < opndCount ? getOpndRoles()[index] : OpndRole_OpndLevel|OpndRole_Use;   }
 
     /** Returns a const array of all InstLevel operands. */
     Opnd * const * getOpnds()const              { return opnds; }
 
     /** Returns a const array of InstLevel operand roles. */
-    const uint32 * getOpndRoles()const          
-    { uint32 aoc = allocatedOpndCount; return (const uint32*)(opnds + aoc); }
+    const U_32 * getOpndRoles()const          
+    { U_32 aoc = allocatedOpndCount; return (const U_32*)(opnds + aoc); }
 
     /** Returns a const array of InstLevel operand constraints. */
     const Constraint * getConstraints()const    
-    { uint32 aoc = allocatedOpndCount; return (const Constraint*)((const uint32*)(opnds + aoc) + aoc); }
+    { U_32 aoc = allocatedOpndCount; return (const Constraint*)((const U_32*)(opnds + aoc) + aoc); }
 
     /** 
      * Returns the constraint imposed by the instruction for the operand at idx.
      * 
      * The indexing space is common for all operands including OpndLevel
-     * (please see comments to Opnd * getOpnd(uint32 index)const). 
+     * (please see comments to Opnd * getOpnd(U_32 index)const). 
      * 
      * @param idx - operand index to get the constraint for.
      * 
@@ -695,13 +695,13 @@ public:
      * @param size - if this parameter is not OpndSize_Null the resulted constraint 
      * is adjusted to the requested size.
     */
-    Constraint getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size = OpndSize_Null) const;
+    Constraint getConstraint(U_32 idx, U_32 memOpndMask, OpndSize size = OpndSize_Null) const;
 
     /** 
      * Returns true if the position at idx starts or extends the operand live range 
      * (simplistically its a use of the operand).
     */
-    bool isLiveRangeStart(uint32 idx)const
+    bool isLiveRangeStart(U_32 idx)const
     { return (getOpndRoles(idx) & Inst::OpndRole_Use) != 0 && getOpnd(idx)->isSubjectForLivenessAnalysis() && !getPureDefProperty(); }
 
 
@@ -709,7 +709,7 @@ public:
      * Returns true if the position at idx ends the operand live range 
      * (simplistically its a pure def of the operand).
      */
-    bool isLiveRangeEnd(uint32 idx)const
+    bool isLiveRangeEnd(U_32 idx)const
     { return ((getOpndRoles(idx) & Inst::OpndRole_UseDef) == Inst::OpndRole_Def && (getProperties() & Inst::Properties_Conditional)==0) || ((getOpndRoles(idx) & Inst::OpndRole_Def)!=0 && getPureDefProperty()); }
 
 
@@ -717,9 +717,9 @@ public:
      * Sets opnd in the instruction at idx.
      * 
      * The indexing space is common for all operands including OpndLevel
-     * (please see comments to Opnd * getOpnd(uint32 index)const). 
+     * (please see comments to Opnd * getOpnd(U_32 index)const). 
     */
-    void setOpnd(uint32 idx, Opnd * opnd);
+    void setOpnd(U_32 idx, Opnd * opnd);
 
 
     /** 
@@ -728,10 +728,10 @@ public:
      * Works only for InstLevel operands. The total number of operands cannot 
      * exceed pre-allocated capacity.
      */
-    void insertOpnd(uint32 idx, Opnd * opnd, uint32 opndRoles);
+    void insertOpnd(U_32 idx, Opnd * opnd, U_32 opndRoles);
 
     /** Replaces all occurences of opndOld with roles matching opndRoleMask to opndNew */
-    bool replaceOpnd(Opnd * opndOld, Opnd * opndNew, uint32 opndRoleMask=OpndRole_All);
+    bool replaceOpnd(Opnd * opndOld, Opnd * opndNew, U_32 opndRoleMask=OpndRole_All);
 
     /** 
      * Replaces all occurences of operands with roles matching opndRoleMask
@@ -740,7 +740,7 @@ public:
      * The opndMap map is organized as an array indexed by from-operand ID which contains to-operands.
      * The number of entries in the array must be no less than the value returned by IRManager::getOpndCount()
     */
-    bool replaceOpnds(Opnd * const * opndMap, uint32 opndRoleMask=OpndRole_All);
+    bool replaceOpnds(Opnd * const * opndMap, U_32 opndRoleMask=OpndRole_All);
 
     /** Returns true if the instruction has side effect not described by its operands */
     virtual bool hasSideEffect()const
@@ -785,7 +785,7 @@ public:
     Inst * getPrev()const{ return (Inst*)_prev; }
     
     /** Swaps inst's operands at idx0 and idx1  */
-    void swapOperands(uint32 idx0, uint32 idx1);
+    void swapOperands(U_32 idx0, U_32 idx1);
 
     /** 
      * Changes instruction form to native
@@ -807,11 +807,11 @@ public:
     { return getProperties()&&Properties_Conditional; }
 
     /** Sets the offset of native code for this instruction. */
-    void            setCodeOffset(uint32 offset) {codeOffset = offset;}
+    void            setCodeOffset(U_32 offset) {codeOffset = offset;}
     /** Returns the offset of native code for this instruction. */
-    uint32          getCodeOffset()const    {   return codeOffset;  }
+    U_32          getCodeOffset()const    {   return codeOffset;  }
     /** Returns the size of native code for this instruction. */
-    uint32          getCodeSize()const  {   return codeSize;    }
+    U_32          getCodeSize()const  {   return codeSize;    }
 
     /** Returns the pointer to the native code for this instruction. */
     void *          getCodeStartAddr()const;
@@ -834,68 +834,68 @@ public:
 protected:
     //---------------------------------------------------------------
 
-    static void* operator new(size_t sz, MemoryManager& mm, uint32 opndCount); 
+    static void* operator new(size_t sz, MemoryManager& mm, U_32 opndCount); 
 
-    static inline void operator delete(void * p, MemoryManager& mm, uint32 opndCount) {}
+    static inline void operator delete(void * p, MemoryManager& mm, U_32 opndCount) {}
     static inline void operator delete(void * p) {}
 
-    Inst(Mnemonic m, uint32 _id, Form f)
+    Inst(Mnemonic m, U_32 _id, Form f)
         :kind(Kind_Inst), id(_id), mnemonic(m), prefix(InstPrefix_Null),
         form(f), reservedFlags(0), codeSize(0), properties(0), reservedFlags2(0),
         opcodeGroup(0), index(0), codeOffset(0), 
         /*allocatedOpndCount(0), */defOpndCount(0), opndCount(0), stackDepth(0)/*, opnds(0)*/ 
         
         // WARN! commented opnds are assigned in overloaded 'new' operator before the constructor
-        // : void* Inst::operator new(size_t sz, MemoryManager& mm, uint32 opndCount)
+        // : void* Inst::operator new(size_t sz, MemoryManager& mm, U_32 opndCount)
     {}
     virtual ~Inst(){};
 
-    static uint32 getOpndChunkSize(uint32 opndCount){ return opndCount * (sizeof(Opnd*) + sizeof(uint32) * 2); }
+    static U_32 getOpndChunkSize(U_32 opndCount){ return opndCount * (sizeof(Opnd*) + sizeof(U_32) * 2); }
 
     /** sets the size of native code for this instruction */
-    void            setCodeSize(uint32 size) {codeSize = size;}
+    void            setCodeSize(U_32 size) {codeSize = size;}
 
     Opnd ** getOpnds()              { return opnds; }
-    uint32 * getOpndRoles()         
-    { uint32 aoc = allocatedOpndCount; return (uint32*)(opnds + aoc); }
+    U_32 * getOpndRoles()         
+    { U_32 aoc = allocatedOpndCount; return (U_32*)(opnds + aoc); }
     Constraint * getConstraints()   
-    { uint32 aoc = allocatedOpndCount; return (Constraint*)((const uint32*)(opnds + aoc) + aoc); }
-    static uint32 getExplicitOpndIndexFromOpndRoles(uint32 roles)
+    { U_32 aoc = allocatedOpndCount; return (Constraint*)((const U_32*)(opnds + aoc) + aoc); }
+    static U_32 getExplicitOpndIndexFromOpndRoles(U_32 roles)
     { return roles>>16; }
 
 
-    uint32 countOpnds(uint32 roles)const;
+    U_32 countOpnds(U_32 roles)const;
 
-    void setConstraint(uint32 idx, Constraint c)
+    void setConstraint(U_32 idx, Constraint c)
     { assert( (getOpndRoles()[idx] & OpndRole_Explicit) == 0 ); getConstraints()[idx] = c; }
 
     void fixOpndsForOpcodeGroup(IRManager * irManager);
     void assignOpcodeGroup(IRManager * irManager);
 
-    void setStackDepth(const uint32 sd) { stackDepth = sd; }
+    void setStackDepth(const U_32 sd) { stackDepth = sd; }
 
 
     //---------------------------------------------------------------
     Kind                                        kind;
-    uint32                                      id;
+    U_32                                      id;
     Mnemonic                                    mnemonic;
     InstPrefix                                  prefix;
 
-    uint32                                      form:1;
-    uint32                                      reservedFlags:7;
-    uint32                                      codeSize:8;
-    uint32                                      properties:8;
-    uint32                                      reservedFlags2:8;
+    U_32                                      form:1;
+    U_32                                      reservedFlags:7;
+    U_32                                      codeSize:8;
+    U_32                                      properties:8;
+    U_32                                      reservedFlags2:8;
 
     Encoder::OpcodeGroup                *   opcodeGroup;
 
-    uint32                                      index;
-    uint32                                      codeOffset;
+    U_32                                      index;
+    U_32                                      codeOffset;
 
-    uint32                                      allocatedOpndCount:16;
-    uint32                                      defOpndCount:16;
-    uint32                                      opndCount:16;
-    uint32                                      stackDepth:16;
+    U_32                                      allocatedOpndCount:16;
+    U_32                                      defOpndCount:16;
+    U_32                                      opndCount:16;
+    U_32                                      stackDepth:16;
 
     Opnd **                                     opnds;
 
@@ -914,8 +914,8 @@ protected:
 class Inst::Opnds
 {
 public:
-    typedef uint32 iterator;
-    inline Opnds(const Inst * inst, uint32 r)
+    typedef U_32 iterator;
+    inline Opnds(const Inst * inst, U_32 r)
     {
         rolesToCheck = 0;
         roles = NULL;
@@ -956,21 +956,21 @@ public:
         if (index < instEndIndex){
             if (roles == NULL)
                 return index;
-            uint32 r = rolesToCheck;
+            U_32 r = rolesToCheck;
             do { 
-                uint32 ri = roles[index] & r;
+                U_32 ri = roles[index] & r;
                 if ( (ri & Inst::OpndRole_ForIterator) && (ri & Inst::OpndRole_FromEncoder) ) return index; 
             }while (++index < instEndIndex);
         }
         return skipNulls(index);
     }
 
-    uint32 skipNulls(iterator index)const
+    U_32 skipNulls(iterator index)const
     {
         while (index < endIndex){
-            uint32 diffIndex = index - instEndIndex;
+            U_32 diffIndex = index - instEndIndex;
             Opnd * instOpnd = opnds[diffIndex / 4];
-            uint32 subIndex = diffIndex & 3;
+            U_32 subIndex = diffIndex & 3;
             if (subIndex == 0 && instOpnd->getMemOpndKind()==MemOpndKind_Null)
                 index += 4;
             else if (instOpnd->getMemOpndSubOpnd((MemOpndSubOpndKind)(subIndex))==NULL) index++;
@@ -979,7 +979,7 @@ public:
         return index;
     }
 
-    uint32 fill( Opnd ** opnds )const;
+    U_32 fill( Opnd ** opnds )const;
 
     Opnd * getOpnd(iterator index)const
     { 
@@ -990,9 +990,9 @@ public:
         }
     }
 
-    uint32 startIndex, endIndex, instEndIndex;
-    Opnd * const * opnds; const uint32 * roles;
-    uint32 rolesToCheck;
+    U_32 startIndex, endIndex, instEndIndex;
+    Opnd * const * opnds; const U_32 * roles;
+    U_32 rolesToCheck;
 
 };
 
@@ -1026,7 +1026,7 @@ protected:
         : Inst(Mnemonic_NULL, id, Inst::Form_Extended), offset(EmptyUint32)
     {kind=Kind_AliasPseudoInst;}
 
-    uint32 offset;
+    U_32 offset;
 
     friend class    IRManager;
 };
@@ -1066,7 +1066,7 @@ protected:
     virtual bool hasSideEffect()const{ return true; }
 
 public:   
-    StlVector<int32> offsets;
+    StlVector<I_32> offsets;
     const char* desc;
 };
 
@@ -1107,7 +1107,7 @@ public:
     virtual bool isDirect()const
     { return getOpndCount()>0 && getOpnd(getTargetOpndIndex())->isPlacedIn(OpndKind_Imm); }
 
-    uint32 getTargetOpndIndex()const{ return getOpndCount(OpndRole_InstLevel|OpndRole_Def); }
+    U_32 getTargetOpndIndex()const{ return getOpndCount(OpndRole_InstLevel|OpndRole_Def); }
 
     virtual bool hasSideEffect()const { return true; }
 protected:
@@ -1186,10 +1186,10 @@ class SwitchInst : public ControlTransferInst
 public:
 
     /** Returns the basic block for index i */
-    uint32 getNumTargets() const;
-    Node* getTarget(uint32 i)const;
+    U_32 getNumTargets() const;
+    Node* getTarget(U_32 i)const;
     /** Sets the basic block for index i */
-    void setTarget(uint32 i, Node* bb);
+    void setTarget(U_32 i, Node* bb);
 
     Opnd * getTableAddress() const;
     ConstantAreaItem * getConstantAreaItem() const;
@@ -1230,8 +1230,8 @@ class CallingConventionClient
 public:
     struct StackOpndInfo
     {
-        uint32  opndIndex;
-        uint32  offset;
+        U_32  opndIndex;
+        U_32  offset;
         bool operator<(const StackOpndInfo& r)const{ return offset < r.offset; }
     };
 
@@ -1246,7 +1246,7 @@ public:
     void pushInfo(Inst::OpndRole role, Type::Tag typeTag)
     {
         CallingConvention::OpndInfo info;
-        info.typeTag=(uint32)typeTag; info.slotCount=0;
+        info.typeTag=(U_32)typeTag; info.slotCount=0;
         StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
         infos.push_back(info);
     }
@@ -1257,10 +1257,10 @@ public:
     const CallingConvention *   getCallingConvention()const
     { assert(callingConvention!=NULL); return callingConvention; }
 
-    uint32 getArgStackDepth(Inst::OpndRole role)const
+    U_32 getArgStackDepth(Inst::OpndRole role)const
     { return ((role & Inst::OpndRole_UseDef) == Inst::OpndRole_Def) ? defArgStackDepth : useArgStackDepth; }
 
-    uint32 getArgStackDepthAlignment(Inst::OpndRole role) const
+    U_32 getArgStackDepthAlignment(Inst::OpndRole role) const
     { return ((role & Inst::OpndRole_UseDef) == Inst::OpndRole_Def) ? useArgStackDepthAlignment : useArgStackDepthAlignment; }
 
     void setOwnerInst(Inst * oi){ ownerInst = oi; }
@@ -1279,8 +1279,8 @@ protected:
     StlVector<StackOpndInfo>                    defStackOpndInfos;
     StlVector<StackOpndInfo>                    useStackOpndInfos;
     
-    uint32 defArgStackDepth, useArgStackDepth;
-    uint32 defArgStackDepthAlignment, useArgStackDepthAlignment;
+    U_32 defArgStackDepth, useArgStackDepth;
+    U_32 defArgStackDepthAlignment, useArgStackDepthAlignment;
 
 };
 
@@ -1296,9 +1296,9 @@ class EntryPointPseudoInst: public Inst
 public:
     virtual bool isHeaderCriticalInst() const {return true;}
 
-    Opnd * getDefArg(uint32 i)const;
+    Opnd * getDefArg(U_32 i)const;
 
-    uint32 getArgStackDepth()const
+    U_32 getArgStackDepth()const
     { return callingConventionClient.getArgStackDepth(Inst::OpndRole_Def); }
 
     CallingConventionClient& getCallingConventionClient(){ return callingConventionClient; }
@@ -1327,10 +1327,10 @@ class CallInst: public ControlTransferInst
 {
 public:
 
-    uint32 getArgStackDepth()const
+    U_32 getArgStackDepth()const
     { return callingConventionClient.getArgStackDepth(Inst::OpndRole_Use); }
 
-    uint32 getArgStackDepthAlignment() const
+    U_32 getArgStackDepthAlignment() const
     { return callingConventionClient.getArgStackDepthAlignment(Inst::OpndRole_Use); }
     
     CallingConventionClient& getCallingConventionClient(){ return callingConventionClient; }
@@ -1431,20 +1431,20 @@ public:
         Kind_SwitchTableConstantAreaItem=0x100,
     };
 
-    ConstantAreaItem(Kind k, uint32 s, const void * v)
+    ConstantAreaItem(Kind k, U_32 s, const void * v)
         :kind(k), size(s), value(v), address(NULL){}
 
     Kind                getKind()const{ return kind; }
     bool                hasKind(Kind k)const{ return (kind&k)==kind; }
 
-    uint32              getSize()const{ return size; }
+    U_32              getSize()const{ return size; }
     void const *    getValue()const{ return value; }
 
     void *              getAddress()const { return address; }
     void                setAddress(void * addr) { address=addr; }
 protected:
     const Kind          kind;
-    const uint32        size;
+    const U_32        size;
     void const *    value;
     void *              address;
 };

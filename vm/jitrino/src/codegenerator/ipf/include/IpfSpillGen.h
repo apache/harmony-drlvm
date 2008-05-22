@@ -41,8 +41,8 @@ protected:
     void          spillInst(Inst* inst);
     RegOpnd       *spillOpnd(RegOpnd*, bool);
     void          resetSpillRegMasks();
-    int32         getAvailableSpillReg(OpndKind);
-    int32         getAvailableReg(RegBitSet&, int16);
+    I_32         getAvailableSpillReg(OpndKind);
+    I_32         getAvailableReg(RegBitSet&, int16);
     bool          containsStackOpnd(Inst*);
     void          printResult(InstVector&, uint16);
 
@@ -66,11 +66,11 @@ protected:
     InstVector    fillCode;       // buffer for fill insts to be inserted in node inst list
     InstVector    spillCode;      // buffer for spill insts to be inserted in node inst list
     
-    int32         outOffset;      // offset of the first mem out arg (bytes)
-    int32         locOffset;      // offset of the first mem local (bytes)
-    int32         psfOffset;      // offset of previous stack frame (bytes)
-    int32         inOffset;       // offset of the first mem in arg (bytes)
-    int32         maxOffset;      // first unavailable in current frame offset (bytes)
+    I_32         outOffset;      // offset of the first mem out arg (bytes)
+    I_32         locOffset;      // offset of the first mem local (bytes)
+    I_32         psfOffset;      // offset of previous stack frame (bytes)
+    I_32         inOffset;       // offset of the first mem in arg (bytes)
+    I_32         maxOffset;      // first unavailable in current frame offset (bytes)
     
     RegBitSet     spillGrMask;    // gr available for spilling (true - reg is available)
     RegBitSet     spillFrMask;    // fr available for spilling (true - reg is available)

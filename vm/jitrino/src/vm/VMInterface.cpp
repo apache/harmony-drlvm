@@ -449,10 +449,10 @@ methodGetStacknGCInfoBlock(Method_Handle method, JIT_Handle jit)
 }
 
 
-uint32
+U_32
 methodGetStacknGCInfoBlockSize(Method_Handle method, JIT_Handle jit)
 {
-    uint32  size = method_get_info_block_size_jit(method, jit);
+    U_32  size = method_get_info_block_size_jit(method, jit);
     return (size - sizeof(void *));     // skip the header
 }
 
@@ -463,12 +463,12 @@ VMInterface::getTypeHandleFromVTable(void* vtHandle){
 
 
 // TODO: free TLS key on JIT deinitilization
-uint32
+U_32
 VMInterface::flagTLSSuspendRequestOffset(){
-    return (uint32)vm_tls_get_request_offset();
+    return (U_32)vm_tls_get_request_offset();
 }
 
-uint32
+U_32
 VMInterface::flagTLSThreadStateOffset() {
     static UDATA key = 0;
     static size_t offset = 0;
@@ -477,12 +477,12 @@ VMInterface::flagTLSThreadStateOffset() {
         offset = vm_tls_get_offset(key);
     }
     assert(fit32(offset));
-    return (uint32)offset;
+    return (U_32)offset;
 }
 
-int32
+I_32
 VMInterface::getTLSBaseOffset() {
-    return (int32) vm_get_tls_offset_in_segment();
+    return (I_32) vm_get_tls_offset_in_segment();
 }
 
 bool
@@ -596,12 +596,12 @@ VMInterface::getClassDepth(void* vmTypeHandle) {
     return class_get_depth((Class_Handle) vmTypeHandle);
 }
 
-uint32
+U_32
 VMInterface::getArrayLengthOffset() {
     return vector_get_length_offset();
 }
 
-uint32
+U_32
 VMInterface::getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed) {
     //if (isUnboxed)
       //  return vector_first_element_offset_unboxed((Class_Handle) vmElemTypeHandle);
@@ -617,12 +617,12 @@ VMInterface::isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2) {
     return class_is_instanceof((Class_Handle) vmTypeHandle1,(Class_Handle) vmTypeHandle2)?true:false;
 }    
 
-uint32
+U_32
 VMInterface::getArrayElemSize(void * vmTypeHandle) {
     return class_get_array_element_size((Class_Handle) vmTypeHandle);
 }
 
-uint32
+U_32
 VMInterface::getObjectSize(void * vmTypeHandle) {
     return class_get_object_size((Class_Handle) vmTypeHandle);
 }
@@ -663,7 +663,7 @@ void*       VMInterface::getAllocationHandle(void* vmTypeHandle) {
     return (void *) class_get_allocation_handle((Class_Handle) vmTypeHandle);
 }
 
-uint32      VMInterface::getVTableOffset()
+U_32      VMInterface::getVTableOffset()
 {
     return object_get_vtable_offset();
 }
@@ -684,7 +684,7 @@ void*       VMInterface::getTypeHandleFromAllocationHandle(void* vmAllocationHan
 ///////////////////////// MethodDesc //////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-MethodDesc::MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci, uint32 id)
+MethodDesc::MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci, U_32 id)
 : TypeMemberDesc(id, ci), drlMethod(m),
 methodSig(method_get_signature(m)),
 handleMap(NULL),
@@ -711,22 +711,22 @@ bool         MethodDesc::isInstanceInitializer() const {return strcmp(getName(),
 //
 
 const U_8*   MethodDesc::getByteCodes() const   {return method_get_bytecode(drlMethod);}
-uint32       MethodDesc::getByteCodeSize() const {return (uint32) method_get_bytecode_length(drlMethod);}
+U_32       MethodDesc::getByteCodeSize() const {return (U_32) method_get_bytecode_length(drlMethod);}
 uint16       MethodDesc::getMaxStack() const    {return (uint16) method_get_max_stack(drlMethod);}
-uint32       MethodDesc::getNumHandlers() const {return method_get_exc_handler_number(drlMethod);}
-uint32       MethodDesc::getOffset() const      {return method_get_vtable_offset(drlMethod);}
+U_32       MethodDesc::getNumHandlers() const {return method_get_exc_handler_number(drlMethod);}
+U_32       MethodDesc::getOffset() const      {return method_get_vtable_offset(drlMethod);}
 void*        MethodDesc::getIndirectAddress() const {return method_get_indirect_address(drlMethod);}
 void*        MethodDesc::getNativeAddress() const {return method_get_native_func_addr(drlMethod);}
 
-uint32    MethodDesc::getNumVars() const        {return method_get_max_locals(drlMethod);}
+U_32    MethodDesc::getNumVars() const        {return method_get_max_locals(drlMethod);}
 
-uint32    
+U_32    
 MethodDesc::getNumParams() const {
     return method_args_get_number(methodSig);
 }
 
 Type*    
-MethodDesc::getParamType(uint32 paramIndex) const {
+MethodDesc::getParamType(U_32 paramIndex) const {
     Type_Info_Handle typeHandle = method_args_get_type_info(methodSig,paramIndex);
     return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle);
 }
@@ -755,15 +755,15 @@ U_8* MethodDesc::getInfoBlock() const {
     return methodGetStacknGCInfoBlock(drlMethod, getJitHandle());
 }
 
-uint32       MethodDesc::getInfoBlockSize() const {
+U_32       MethodDesc::getInfoBlockSize() const {
     return methodGetStacknGCInfoBlockSize(drlMethod, getJitHandle());
 }
 
-U_8* MethodDesc::getCodeBlockAddress(int32 id) const {
+U_8* MethodDesc::getCodeBlockAddress(I_32 id) const {
     return method_get_code_block_addr_jit_new(drlMethod,getJitHandle(), id);
 }
 
-uint32       MethodDesc::getCodeBlockSize(int32 id) const {
+U_32       MethodDesc::getCodeBlockSize(I_32 id) const {
     return method_get_code_block_size_jit_new(drlMethod,getJitHandle(), id);
 }
 
@@ -779,7 +779,7 @@ TypeMemberDesc::isParentClassIsLikelyExceptionType() const {
 }
 
 const char*
-CompilationInterface::getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken) {
+CompilationInterface::getSignatureString(MethodDesc* enclosingMethodDesc, U_32 methodToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_cp_get_entry_descriptor(enclosingDrlVMClass, (unsigned short)methodToken);
 }
@@ -795,12 +795,12 @@ MethodDesc::setSideEffect(Method_Side_Effects mse) {
 }
 
 void        
-MethodDesc::setNumExceptionHandler(uint32 numHandlers) {
+MethodDesc::setNumExceptionHandler(U_32 numHandlers) {
     method_set_num_target_handlers(drlMethod,getJitHandle(),numHandlers);
 }
 
 void
-MethodDesc::setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
+MethodDesc::setExceptionHandlerInfo(U_32 exceptionHandlerNumber,
                                     U_8*   startAddr,
                                     U_8*   endAddr,
                                     U_8*   handlerAddr,
@@ -866,7 +866,7 @@ FieldDesc::getFieldType() {
     return compilationInterface->getTypeFromDrlVMTypeHandle(typeHandle);
 }
 
-uint32
+U_32
 FieldDesc::getOffset() const {
     return field_get_offset(drlField);
 }
@@ -908,7 +908,7 @@ CompilationInterface::getTypeFromDrlVMTypeHandle(Type_Info_Handle typeHandle) {
         bool lazy = typeManager.isLazyResolutionMode();
         if (lazy && !type_info_is_resolved(typeHandle)) {
             Type* elemType = typeManager.getUnresolvedObjectType();
-            uint32 dims =  type_info_get_num_array_dimensions(typeHandle);
+            U_32 dims =  type_info_get_num_array_dimensions(typeHandle);
             Type* arrayType = NULL;
             while (dims!=0) {
                 arrayType = typeManager.getArrayType(arrayType==NULL ? elemType : arrayType);
@@ -991,14 +991,14 @@ CompilationInterface::compileMethod(MethodDesc *method) {
 
 const void* 
 CompilationInterface::getStringInternAddr(MethodDesc* enclosingMethodDesc,
-                                                uint32 stringToken) {
+                                                U_32 stringToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_get_const_string_intern_addr(enclosingDrlVMClass,stringToken);
 }
 
 Type*
 CompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
-                                         uint32 constantToken) {
+                                         U_32 constantToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     VM_Data_Type drlType = class_cp_get_const_type(enclosingDrlVMClass,constantToken);
     switch (drlType) {
@@ -1016,7 +1016,7 @@ CompilationInterface::getConstantType(MethodDesc* enclosingMethodDesc,
 
 const void*
 CompilationInterface::getConstantValue(MethodDesc* enclosingMethodDesc,
-                                          uint32 constantToken) {
+                                          U_32 constantToken) {
     Class_Handle enclosingDrlVMClass = enclosingMethodDesc->getParentHandle();
     return class_cp_get_const_addr(enclosingDrlVMClass,constantToken);
 }
@@ -1040,7 +1040,7 @@ void         CompilationInterface::setNotifyWhenMethodIsRecompiled(MethodDesc * 
 }
 
 void CompilationInterface::sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
-        uint32 codeSize, void* codeAddr, uint32 mapLength, 
+        U_32 codeSize, void* codeAddr, U_32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo) {
 
     Method_Handle method = methodDesc->getMethodHandle();
@@ -1142,7 +1142,7 @@ void CompilationInterface::unlockMethodData(void)  {
     method_unlock(mh);
 }
 
-U_8* CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, int32 id, 
+U_8* CompilationInterface::allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, I_32 id, 
 bool simulate) {
     return method_allocate_code_block(methodToCompile->getMethodHandle(), getJitHandle(), 
         size, alignment, heat, id, simulate ? CAA_Simulate : CAA_Allocate);
@@ -1166,12 +1166,12 @@ MethodDesc*     CompilationInterface::getMethodDesc(Method_Handle method) {
     return getMethodDesc(method, getJitHandle());
 }
 
-static uint32 getArrayDims(Class_Handle cl, uint32 cpIndex) {
+static U_32 getArrayDims(Class_Handle cl, U_32 cpIndex) {
     return class_cp_get_num_array_dimensions(cl, (unsigned short)cpIndex);
 }
 
-static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclClass, uint32 cpIndex) {
-    uint32 arrayDims = getArrayDims(enclClass, cpIndex);
+static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclClass, U_32 cpIndex) {
+    U_32 arrayDims = getArrayDims(enclClass, cpIndex);
     NamedType * res = typeManager.getUnresolvedObjectType();
     while (arrayDims > 0) {
         res = typeManager.getArrayType(res);
@@ -1180,7 +1180,7 @@ static NamedType* getUnresolvedType(TypeManager& typeManager, Class_Handle enclC
     return res;
 }
 
-NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32 cpIndex) {
+NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, U_32 cpIndex) {
     //this method is allowed to use only for unresolved exception types
     Class_Handle ch = resolve_class(compileHandle,enclClass,cpIndex);
     if (ch == NULL) {
@@ -1192,7 +1192,7 @@ NamedType* CompilationInterface::resolveNamedType(Class_Handle enclClass, uint32
     return res;
 }
 
-NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck checkNew) {
+NamedType* CompilationInterface::getNamedType(Class_Handle enclClass, U_32 cpIndex, ResolveNewCheck checkNew) {
     Class_Handle ch = NULL;
     if (typeManager.isLazyResolutionMode() && !class_cp_is_entry_resolved(enclClass, cpIndex)) {
         const char* className = class_cp_get_class_name(enclClass, cpIndex);
@@ -1222,7 +1222,7 @@ Type* CompilationInterface::getTypeFromDescriptor(Class_Handle enclClass, const 
 }
 
 MethodDesc* 
-CompilationInterface::getSpecialMethod(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getSpecialMethod(Class_Handle enclClass, U_32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1233,7 +1233,7 @@ CompilationInterface::getSpecialMethod(Class_Handle enclClass, uint32 cpIndex) {
 }    
 
 MethodDesc* 
-CompilationInterface::getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getInterfaceMethod(Class_Handle enclClass, U_32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1244,7 +1244,7 @@ CompilationInterface::getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex)
 }    
 
 MethodDesc* 
-CompilationInterface::getStaticMethod(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getStaticMethod(Class_Handle enclClass, U_32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1255,7 +1255,7 @@ CompilationInterface::getStaticMethod(Class_Handle enclClass, uint32 cpIndex) {
 }    
 
 MethodDesc* 
-CompilationInterface::getVirtualMethod(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getVirtualMethod(Class_Handle enclClass, U_32 cpIndex) {
     Method_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1267,7 +1267,7 @@ CompilationInterface::getVirtualMethod(Class_Handle enclClass, uint32 cpIndex) {
 
 
 FieldDesc*  
-CompilationInterface::getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
+CompilationInterface::getNonStaticField(Class_Handle enclClass, U_32 cpIndex, bool putfield) {
     Field_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1281,7 +1281,7 @@ CompilationInterface::getNonStaticField(Class_Handle enclClass, uint32 cpIndex, 
 
 
 FieldDesc*  
-CompilationInterface::getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield) {
+CompilationInterface::getStaticField(Class_Handle enclClass, U_32 cpIndex, bool putfield) {
     Field_Handle res = NULL;
     bool lazy = typeManager.isLazyResolutionMode();
     if (!lazy || class_cp_is_entry_resolved(enclClass, cpIndex)) {
@@ -1307,7 +1307,7 @@ CompilationInterface::getFieldByName(Class_Handle enclClass, const char* name) {
 }
 
 Type*
-CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getFieldType(Class_Handle enclClass, U_32 cpIndex) {
     VM_Data_Type drlType = class_cp_get_field_type(enclClass, (unsigned short)cpIndex);
     bool lazy = typeManager.isLazyResolutionMode();
     switch (drlType) {
@@ -1338,17 +1338,17 @@ CompilationInterface::getFieldType(Class_Handle enclClass, uint32 cpIndex) {
 }
 
 const char* 
-CompilationInterface::getMethodName(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getMethodName(Class_Handle enclClass, U_32 cpIndex) {
     return class_cp_get_entry_name(enclClass, cpIndex);
 }
 
 const char* 
-CompilationInterface::getMethodClassName(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getMethodClassName(Class_Handle enclClass, U_32 cpIndex) {
     return class_cp_get_entry_class_name(enclClass, cpIndex);
 }
 
 const char* 
-CompilationInterface::getFieldSignature(Class_Handle enclClass, uint32 cpIndex) {
+CompilationInterface::getFieldSignature(Class_Handle enclClass, U_32 cpIndex) {
     return class_cp_get_entry_descriptor(enclClass, cpIndex);
 }
 
@@ -1384,7 +1384,7 @@ void GCInterface::enumerateRootReference(void** reference) {
     vm_enumerate_root_reference(reference, FALSE);
 }
 
-void GCInterface::enumerateCompressedRootReference(uint32* reference) {
+void GCInterface::enumerateCompressedRootReference(U_32* reference) {
     vm_enumerate_compressed_root_reference(reference, FALSE);
 }
 
@@ -1396,7 +1396,7 @@ void ThreadDumpEnumerator::enumerateRootReference(void** reference) {
     //vm_check_if_monitor(reference, 0, 0, 0, FALSE, 1);
 }
 
-void ThreadDumpEnumerator::enumerateCompressedRootReference(uint32* reference) {
+void ThreadDumpEnumerator::enumerateCompressedRootReference(U_32* reference) {
     //vm_check_if_monitor(0, 0, reference, 0, FALSE, 2);
 }
 

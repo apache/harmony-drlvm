@@ -50,11 +50,11 @@ public:
     }
 
 
-    CodeBlockHeat getCodeSectionHeat(uint32 sectionID)const;
+    CodeBlockHeat getCodeSectionHeat(U_32 sectionID)const;
 
 protected:
-    uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
+    U_32 getSideEffects()const{ return 0; }
 
     void runImpl();
     bool verify(bool force=false);
@@ -144,7 +144,7 @@ typedef StlMap<POINTER_SIZE_INT, uint16> LocationMap;
 
 class CompiledMethodInfo {
 public:
-    CompiledMethodInfo(MemoryManager& mm, POINTER_SIZE_INT addr, MethodMarkerPseudoInst* outerEntry, uint32 idpth):
+    CompiledMethodInfo(MemoryManager& mm, POINTER_SIZE_INT addr, MethodMarkerPseudoInst* outerEntry, U_32 idpth):
         memoryManager(mm),
         locationMap(memoryManager),
         codeSize(0),
@@ -152,8 +152,8 @@ public:
         outerMethodEntry(outerEntry),
         inlineDepth(idpth)
     {}
-    uint32 getCodeSize() { return codeSize; }
-    uint32 getInlineDepth() { return inlineDepth; }
+    U_32 getCodeSize() { return codeSize; }
+    U_32 getInlineDepth() { return inlineDepth; }
     POINTER_SIZE_INT getCodeAddr() { return codeAddr; }
     MethodMarkerPseudoInst* getOuterMethodEntry() { return outerMethodEntry; }
 
@@ -161,13 +161,13 @@ protected:
     friend class CodeEmitter;
     MemoryManager& memoryManager;
     LocationMap locationMap;
-    uint32 codeSize;
+    U_32 codeSize;
     POINTER_SIZE_INT codeAddr;
     MethodMarkerPseudoInst* outerMethodEntry;
     // inlineDepth == 1 means that CompiledMethod is inlined into irManager->getMethodDesc()
-    uint32 inlineDepth;
+    U_32 inlineDepth;
 
-    void addCodeSize(uint32 size) { codeSize += size; }
+    void addCodeSize(U_32 size) { codeSize += size; }
 
     void includeInst(Inst* inst, uint64 bcOffset) {
         if( inst->hasKind(Inst::Kind_PseudoInst)) {
@@ -193,7 +193,7 @@ static ActionFactory<CodeEmitter> _emitter("emitter");
 //________________________________________________________________________________________
 void CodeEmitter::ConstantAreaLayout::collectItems()
 {
-    for (uint32 i=0, n=irManager->getOpndCount(); i<n; ++i){
+    for (U_32 i=0, n=irManager->getOpndCount(); i<n; ++i){
         Opnd * opnd=irManager->getOpnd(i);
         Opnd::RuntimeInfo * ri=NULL;
         if (opnd->isPlacedIn(OpndKind_Mem)&&opnd->getMemOpndKind()==MemOpndKind_ConstantArea){
@@ -275,8 +275,8 @@ void CodeEmitter::ConstantAreaLayout::finalizeSwitchTables()
         if (item->hasKind(ConstantAreaItem::Kind_SwitchTableConstantAreaItem)){
             void ** table = (void **)item->getAddress();
             Node** bbs=(Node **)item->getValue();
-            uint32 nbb=(uint32)item->getSize()/sizeof(Node*);
-            for (uint32 ibb=0; ibb<nbb; ibb++){
+            U_32 nbb=(U_32)item->getSize()/sizeof(Node*);
+            for (U_32 ibb=0; ibb<nbb; ibb++){
                 BasicBlock* bb=(BasicBlock*)bbs[ibb];
                 assert(bb!=NULL);
                 assert(std::find(nodes.begin(), nodes.end(), bb)!=nodes.end());
@@ -379,7 +379,7 @@ InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap
                 InlineInfoMap::Entry* e = inlineBCMap->newEntry(parentEntry, parentEntry->method, bcOffset);
 
                 //register whole entry chain now
-                inlineBCMap->registerEntry(e, (uint32)nativeInstEndOffset);
+                inlineBCMap->registerEntry(e, (U_32)nativeInstEndOffset);
             }
             if (Log::isEnabled()) {
                 if (!parentEntry) {
@@ -389,7 +389,7 @@ InlineInfoMap::Entry* CodeEmitter::processBlockOffsets(Node* node, InlineInfoMap
                 Log::out()<<" global-bc-offset="<<globalBCMapOffset<<std::endl;
             }
             if (globalBCMapOffset!=ILLEGAL_BC_MAPPING_VALUE) {
-                bcMap->setEntry((uint32)nativeInstStartOffset, globalBCMapOffset);
+                bcMap->setEntry((U_32)nativeInstStartOffset, globalBCMapOffset);
             }
         }
     }
@@ -438,7 +438,7 @@ bool CodeEmitter::verify (bool force)
     if (force || getVerificationLevel() >= 1)
     {
         irManager->updateLivenessInfo();
-        for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++){
+        for (U_32 i=0, n=irManager->getOpndCount(); i<n; i++){
             Opnd * opnd=irManager->getOpnd(i);
             if (!opnd->hasAssignedPhysicalLocation()){
                 VERIFY_OUT("Unassigned operand: " << opnd << ::std::endl);
@@ -482,12 +482,12 @@ void CodeEmitter::emitCode( void ) {
 
         uint8 * blockStartIp = ip;
         assert(fit32(blockStartIp-codeStreamStart));
-        bb->setCodeOffset( (uint32)(blockStartIp-codeStreamStart) );
+        bb->setCodeOffset( (U_32)(blockStartIp-codeStreamStart) );
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
             if( inst->hasKind(Inst::Kind_PseudoInst)) {
                 
                 uint8 * instStartIp = ip;
-                inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
+                inst->setCodeOffset( (U_32)(instStartIp-blockStartIp) );
                 continue;
             }
 
@@ -508,7 +508,7 @@ void CodeEmitter::emitCode( void ) {
                     // if the inst is the only in the bb)
                     Inst* nopInst = irManager->newInst(Mnemonic_NOP);
                     bb->prependInst(nopInst,inst);
-                    nopInst->setCodeOffset( (uint32)(ip-blockStartIp) );
+                    nopInst->setCodeOffset( (U_32)(ip-blockStartIp) );
                     ip = nopInst->emit(ip);
                     // the last two
                     ip = (uint8*)EncoderBase::nops((char*)ip,2);
@@ -522,10 +522,10 @@ void CodeEmitter::emitCode( void ) {
             
             uint8 * instStartIp = ip;
             assert(fit32(instStartIp-blockStartIp));
-            inst->setCodeOffset( (uint32)(instStartIp-blockStartIp) );
+            inst->setCodeOffset( (U_32)(instStartIp-blockStartIp) );
             ip = inst->emit(ip);
         }
-        bb->setCodeSize( (uint32)(ip-blockStartIp) );
+        bb->setCodeSize( (U_32)(ip-blockStartIp) );
     }
 
     //register SOE checks offset to be used in unwind as 0-depth area        
@@ -572,12 +572,12 @@ void CodeEmitter::packCode() {
                     uint8 * instCodeStartAddr = (uint8*)inst->getCodeStartAddr();
                     uint8 * instCodeEndAddr = (uint8*)instCodeStartAddr+inst->getCodeSize();
                     uint8 * targetCodeStartAddr = (uint8*)bbTarget->getCodeStartAddr();
-                    uint32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
+                    U_32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
                     int64 offset=targetCodeStartAddr-instCodeEndAddr;               
                     if (offset >= -128 && offset < 127 && inst->getOpnd(targetOpndIndex)->getSize() != OpndSize_8) {
                         inst->setOpnd(targetOpndIndex, irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int8), offset));
                         uint8 * newInstCodeEndAddr = inst->emit(instCodeStartAddr);
-                        bb->setCodeSize(bb->getCodeSize() + (uint32)(newInstCodeEndAddr - instCodeEndAddr));
+                        bb->setCodeSize(bb->getCodeSize() + (U_32)(newInstCodeEndAddr - instCodeEndAddr));
                         newOpndsCreated = true;
                     } 
                 }
@@ -616,7 +616,7 @@ void CodeEmitter::postPass()
                 uint8 * instCodeStartAddr=(uint8*)inst->getCodeStartAddr();
                 uint8 * instCodeEndAddr=(uint8*)instCodeStartAddr+inst->getCodeSize();
                 uint8 * targetCodeStartAddr=0;
-                uint32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
+                U_32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
                 MethodDesc * md = NULL;
                 if (inst->hasKind(Inst::Kind_BranchInst)){
                     BasicBlock * bbTarget=(BasicBlock*)((BranchInst*)inst)->getTrueTarget();
@@ -654,7 +654,7 @@ void CodeEmitter::postPass()
                     uint8* blockStartIp = (uint8*)bb->getCodeStartAddr();
                     // 10 bytes are dumped with 'nops' ahead of the call especially for this MOV
                     uint8* movAddr = instCodeStartAddr-10;
-                    movInst->setCodeOffset((uint32)(movAddr - blockStartIp));
+                    movInst->setCodeOffset((U_32)(movAddr - blockStartIp));
                     uint8* callAddr = movInst->emit(movAddr);
                     assert(callAddr == instCodeStartAddr);
                     // then dump 2 bytes with nops to keep return ip the same for both
@@ -662,7 +662,7 @@ void CodeEmitter::postPass()
                     EncoderBase::nops((char*)(callAddr), 2);
                     // reemit the call as a register-based at the address 'callAddr+2'
                     inst->emit(callAddr+2);
-                    inst->setCodeOffset( (uint32)(callAddr + 2 - blockStartIp) );
+                    inst->setCodeOffset( (U_32)(callAddr + 2 - blockStartIp) );
                     // the register call is being registered for patching in the same way as immediate calls
                     // code patcher takes care of the correct patching
                     if(md) {
@@ -713,7 +713,7 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc,
 
     // we can not guarantee the (callAddr+1) aligned
     // self-jump is a kind of lock for the time of call patching
-    uint32 movSize =
+    U_32 movSize =
 #ifdef _EM64T_
                      10;
 #else
@@ -769,12 +769,12 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc,
         EncoderBase::nops((char*)(movAddr), 10);
         // emit the call in immediate form
         args.clear();
-        args.add(EncoderBase::Operand(OpndSize_32, (int32)offset));
+        args.add(EncoderBase::Operand(OpndSize_32, (I_32)offset));
         EncoderBase::encode((char*)callAddr, Mnemonic_CALL, args); // 5 bytes
     } else
 #endif
     { // offset fits into 32 bits
-        *(uint32*)(callAddr+1) = (uint32)offset;
+        *(U_32*)(callAddr+1) = (U_32)offset;
     }
 
     // removing self-jump
@@ -787,7 +787,7 @@ bool RuntimeInterface::recompiledMethodEvent(MethodDesc *recompiledMethodDesc,
 }
 
 //________________________________________________________________________________________
-CodeBlockHeat CodeEmitter::getCodeSectionHeat(uint32 sectionID)const
+CodeBlockHeat CodeEmitter::getCodeSectionHeat(U_32 sectionID)const
 {
     CodeBlockHeat heat;
     if (irManager->getCompilationContext()->hasDynamicProfileToUse())
@@ -823,9 +823,9 @@ void CodeEmitter::registerExceptionHandlers()
         registerExceptionRegion((void*)regionStart, (void*)regionEnd, regionDispatchNode);
     }
 
-    uint32 handlerInfoCount=(uint32)exceptionHandlerInfos.size();
+    U_32 handlerInfoCount=(U_32)exceptionHandlerInfos.size();
     irManager->getMethodDesc().setNumExceptionHandler(handlerInfoCount);
-    for (uint32 i=0; i<handlerInfoCount; i++){
+    for (U_32 i=0; i<handlerInfoCount; i++){
         const ExceptionHandlerInfo & info=exceptionHandlerInfos[i];
         if (Log::isEnabled()) {
             Log::out() << "Exception Handler Info [ " << i << "]: " << ::std::endl;
@@ -848,8 +848,8 @@ void CodeEmitter::registerExceptionHandlers()
 
 static bool edge_prior_comparator(const Edge* e1, const Edge* e2) {
     assert(e1->isCatchEdge() && e2->isCatchEdge());
-    uint32 p1 = ((CatchEdge*)e1)->getPriority();
-    uint32 p2 = ((CatchEdge*)e2)->getPriority();
+    U_32 p1 = ((CatchEdge*)e1)->getPriority();
+    U_32 p2 = ((CatchEdge*)e2)->getPriority();
     assert(p1!=p2 || e1==e2);
     return p1 < p2 ? true : p1 > p2 ? false : e1 > e2;
 };
@@ -907,7 +907,7 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                                             Node* node, bool isForward) {
     assert(node!=NULL);
     assert(traversalInfo[node->getId()]==0); //node is white here
-    uint32 nodeId = node->getId();
+    U_32 nodeId = node->getId();
     traversalInfo[nodeId] = 1; //mark node gray
     // preprocess the node
     if (node->getKind() == Node::Kind_Block) {
@@ -931,7 +931,7 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                 methInfo = new(memoryManager) CompiledMethodInfo(memoryManager,
                                                                  (POINTER_SIZE_INT)methMarkerInst->getCodeStartAddr(),
                                                                  oldMethodEntryInst,
-                                                                 (uint32)inlineStack.size());
+                                                                 (U_32)inlineStack.size());
 
                 methodLocationMap[methMarkerInst] = methInfo;
             } else if (inst->getKind() == Inst::Kind_MethodEndPseudoInst) {
@@ -946,14 +946,14 @@ void CodeEmitter::orderNodesAndMarkInlinees(StlList<MethodMarkerPseudoInst*>& in
                     if( ! inst->hasKind(Inst::Kind_PseudoInst)) {
                         POINTER_SIZE_INT instAddr = (POINTER_SIZE_INT)inst->getCodeStartAddr();
                         POINTER_SIZE_INT nextAddr = (POINTER_SIZE_INT)inst->getNext()->getCodeStartAddr();
-                        uint32 instSize = inst->getCodeSize();
+                        U_32 instSize = inst->getCodeSize();
                         if (inst->getMnemonic() == Mnemonic_NOP && instAddr+instSize < nextAddr) {
                             // there is a special case when code patching support generates 3 (ia32) or 13 (em64t) nops
                             // before calls for future runtime patching. First nop is generated as a common CFG inst.
                             // The rest ones are generated directly to the memory using encoder.
                             // Taking this into account:
                             assert(nextAddr > instAddr);
-                            instSizeMap[instAddr] = (uint32)(nextAddr-instAddr);
+                            instSizeMap[instAddr] = (U_32)(nextAddr-instAddr);
                         } else {
                             instSizeMap[instAddr] = instSize;
                         }
@@ -1017,8 +1017,8 @@ void CodeEmitter::reportInlinedMethod(CompiledMethodInfo* methInfo, MethodMarker
 
     POINTER_SIZE_INT methodStartAddr = litStart == litEnd ? methInfo->getCodeAddr() : (*litStart).first;
     POINTER_SIZE_INT prevAddr = 0;
-    uint32 methodSize = 0;
-    uint32 locationMapSize = 0;
+    U_32 methodSize = 0;
+    U_32 locationMapSize = 0;
 
     for (lit = litStart; lit != litEnd; lit++) {
 
@@ -1081,7 +1081,7 @@ void CodeEmitter::reportCompiledInlinees() {
     // send events according to inlining depth
     // depth == 1 - the first level inlinees
     bool found = false;
-    uint32 depth = 1;
+    U_32 depth = 1;
     do {
         found = false;
         for (i = methodLocationMap.begin(); i != itEnd; i++) {

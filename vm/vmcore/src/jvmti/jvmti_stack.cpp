@@ -51,7 +51,7 @@ class JavaStackIterator
     jint depth;
 
     /** number of inlines in current si frame */
-    uint32 inlined_num;
+    U_32 inlined_num;
 
     /** index of inlined frame in current si frame */
     int inlined_depth;
@@ -160,7 +160,7 @@ public:
         uint16 bc;
         // inlined method frame
         if (0 != inlined_depth) {
-            uint32 offset = (uint32) ((char*) ip -
+            U_32 offset = (U_32) ((char*) ip -
                 (char*) cci->get_code_block_addr());
             method = jit->get_inlined_method(
                 cci->get_inline_info(), offset, inlined_depth);

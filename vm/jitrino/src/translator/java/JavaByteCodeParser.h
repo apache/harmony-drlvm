@@ -39,7 +39,7 @@ namespace Jitrino {
 //
 int16    si16(const uint8* bcp);
 uint16   su16(const uint8* bcp);
-int32    si32(const uint8* bcp);
+I_32    si32(const uint8* bcp);
 uint64   si64(const uint8* bcp);
 
 class JavaSwitchTargetsIter;
@@ -57,7 +57,7 @@ public:
         labelStack = NULL;
         noNeedToParse = false;
     }
-    JavaByteCodeParserCallback(MemoryManager& memManager,uint32 byteCodeLength) 
+    JavaByteCodeParserCallback(MemoryManager& memManager,U_32 byteCodeLength) 
         : isLinearPass(false) 
     {
         currentOffset = 0;
@@ -69,11 +69,11 @@ public:
         labelStack = new (memManager) Queue<uint8>(memManager);
         noNeedToParse = false;
     }
-    bool parseByteCode(const uint8* byteCodes,uint32 byteCodeOffset);
+    bool parseByteCode(const uint8* byteCodes,U_32 byteCodeOffset);
     BitSet* getVisited()  { return visited; }
 protected:
     // the current byte codes offset
-    uint32           currentOffset;
+    U_32           currentOffset;
     const bool       isLinearPass;
     bool             linearPassDone;
     BitSet*          visited;
@@ -85,18 +85,18 @@ protected:
     bool noNeedToParse;
 
     // called before each byte code to indicate the next byte code's offset
-    virtual void offset(uint32 offset) = 0;
-    virtual void offset_done(uint32 offset) = 0;
+    virtual void offset(U_32 offset) = 0;
+    virtual void offset_done(U_32 offset) = 0;
     virtual void nop() = 0;
     virtual void aconst_null() = 0;
-    virtual void iconst(int32) = 0;
+    virtual void iconst(I_32) = 0;
     virtual void lconst(int64) = 0;
     virtual void fconst(float) = 0;
     virtual void dconst(double) = 0;
     virtual void bipush(int8) = 0;
     virtual void sipush(int16) = 0;
-    virtual void ldc(uint32) = 0;
-    virtual void ldc2(uint32) = 0;
+    virtual void ldc(U_32) = 0;
+    virtual void ldc2(U_32) = 0;
     virtual void iload(uint16 varIndex) = 0;
     virtual void lload(uint16 varIndex) = 0;
     virtual void fload(uint16 varIndex) = 0;
@@ -110,11 +110,11 @@ protected:
     virtual void baload() = 0;
     virtual void caload() = 0;
     virtual void saload() = 0;
-    virtual void istore(uint16 varIndex,uint32 off) = 0;
-    virtual void lstore(uint16 varIndex,uint32 off) = 0;
-    virtual void fstore(uint16 varIndex,uint32 off) = 0;
-    virtual void dstore(uint16 varIndex,uint32 off) = 0;
-    virtual void astore(uint16 varIndex,uint32 off) = 0;
+    virtual void istore(uint16 varIndex,U_32 off) = 0;
+    virtual void lstore(uint16 varIndex,U_32 off) = 0;
+    virtual void fstore(uint16 varIndex,U_32 off) = 0;
+    virtual void dstore(uint16 varIndex,U_32 off) = 0;
+    virtual void astore(uint16 varIndex,U_32 off) = 0;
     virtual void iastore() = 0;
     virtual void lastore() = 0;
     virtual void fastore() = 0;
@@ -168,7 +168,7 @@ protected:
     virtual void lor() = 0;
     virtual void ixor() = 0;
     virtual void lxor() = 0;
-    virtual void iinc(uint16 varIndex,int32 amount) = 0;
+    virtual void iinc(uint16 varIndex,I_32 amount) = 0;
     virtual void i2l() = 0;
     virtual void i2f() = 0;
     virtual void i2d() = 0;
@@ -189,51 +189,51 @@ protected:
     virtual void fcmpg() = 0;
     virtual void dcmpl() = 0;
     virtual void dcmpg() = 0;
-    virtual void ifeq(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void ifne(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void iflt(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void ifge(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void ifgt(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void ifle(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmpeq(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmpne(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmplt(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmpge(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmpgt(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_icmple(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_acmpeq(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void if_acmpne(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void goto_(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void jsr(uint32 offset, uint32 nextOffset) = 0;
+    virtual void ifeq(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void ifne(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void iflt(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void ifge(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void ifgt(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void ifle(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmpeq(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmpne(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmplt(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmpge(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmpgt(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_icmple(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_acmpeq(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void if_acmpne(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void goto_(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void jsr(U_32 offset, U_32 nextOffset) = 0;
     virtual void ret(uint16 varIndex, const uint8* byteCodes) = 0;
     virtual void tableswitch(JavaSwitchTargetsIter*) = 0;
     virtual void lookupswitch(JavaLookupSwitchTargetsIter*) = 0;
-    virtual void ireturn(uint32 off) = 0;
-    virtual void lreturn(uint32 off) = 0;
-    virtual void freturn(uint32 off) = 0;
-    virtual void dreturn(uint32 off) = 0;
-    virtual void areturn(uint32 off) = 0;
-    virtual void return_(uint32 off) = 0;
-    virtual void getstatic(uint32 constPoolIndex) = 0;
-    virtual void putstatic(uint32 constPoolIndex) = 0;
-    virtual void getfield(uint32 constPoolIndex) = 0;
-    virtual void putfield(uint32 constPoolIndex) = 0;
-    virtual void invokevirtual(uint32 constPoolIndex) = 0;
-    virtual void invokespecial(uint32 constPoolIndex) = 0;
-    virtual void invokestatic(uint32 constPoolIndex) = 0;
-    virtual void invokeinterface(uint32 constPoolIndex,uint32 count) = 0;
-    virtual void new_(uint32 constPoolIndex) = 0;
+    virtual void ireturn(U_32 off) = 0;
+    virtual void lreturn(U_32 off) = 0;
+    virtual void freturn(U_32 off) = 0;
+    virtual void dreturn(U_32 off) = 0;
+    virtual void areturn(U_32 off) = 0;
+    virtual void return_(U_32 off) = 0;
+    virtual void getstatic(U_32 constPoolIndex) = 0;
+    virtual void putstatic(U_32 constPoolIndex) = 0;
+    virtual void getfield(U_32 constPoolIndex) = 0;
+    virtual void putfield(U_32 constPoolIndex) = 0;
+    virtual void invokevirtual(U_32 constPoolIndex) = 0;
+    virtual void invokespecial(U_32 constPoolIndex) = 0;
+    virtual void invokestatic(U_32 constPoolIndex) = 0;
+    virtual void invokeinterface(U_32 constPoolIndex,U_32 count) = 0;
+    virtual void new_(U_32 constPoolIndex) = 0;
     virtual void newarray(uint8 type) = 0;
-    virtual void anewarray(uint32 constPoolIndex) = 0;
+    virtual void anewarray(U_32 constPoolIndex) = 0;
     virtual void arraylength() = 0;
     virtual void athrow() = 0;
-    virtual void checkcast(uint32 constPoolIndex) = 0;
-    virtual int  instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off) = 0;
+    virtual void checkcast(U_32 constPoolIndex) = 0;
+    virtual int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off) = 0;
     virtual void monitorenter() = 0;
     virtual void monitorexit() = 0;
-    virtual void multianewarray(uint32 constPoolIndex,uint8 dimensions) = 0;
-    virtual void ifnull(uint32 targetOffset,uint32 nextOffset) = 0;
-    virtual void ifnonnull(uint32 targetOffset,uint32 nextOffset) = 0;
+    virtual void multianewarray(U_32 constPoolIndex,uint8 dimensions) = 0;
+    virtual void ifnull(U_32 targetOffset,U_32 nextOffset) = 0;
+    virtual void ifnonnull(U_32 targetOffset,U_32 nextOffset) = 0;
 
     virtual bool skipParsing() {return noNeedToParse;}
 
@@ -242,79 +242,79 @@ protected:
 
 class JavaSwitchTargetsIter {
 public:
-    JavaSwitchTargetsIter(const uint8* bcp,uint32 off) {
+    JavaSwitchTargetsIter(const uint8* bcp,U_32 off) {
         // skip over padding
         switchOffset = off;
-        uint32 offset = ((off+4)&~3)-off;
+        U_32 offset = ((off+4)&~3)-off;
         // read in the default target
         defaultTarget = readU4Be(bcp+offset);
         lowValue      = readU4Be(bcp+offset+4);
         highValue     = readU4Be(bcp+offset+8);
         numTargets    = highValue - lowValue + 1;
         nextTarget    = bcp+offset+12;
-        length = ((uint32)(nextTarget-bcp)) + (numTargets * 4);
+        length = ((U_32)(nextTarget-bcp)) + (numTargets * 4);
         nextByteCode = bcp + length;
     }
     bool    hasNext() {
         return (nextTarget < nextByteCode);
     }
-    uint32    getNextTarget() {
+    U_32    getNextTarget() {
         if (hasNext() == false)
             return 0;
-        int32 target = readU4Be(nextTarget);
+        I_32 target = readU4Be(nextTarget);
         nextTarget += 4;
         return target+switchOffset;
     }
-    uint32         getNumTargets()      {return numTargets;}
-    uint32         getLength()          {return length;}
-    uint32         getDefaultTarget()   {return defaultTarget+switchOffset;}
-    uint32         getHighValue()       {return highValue;}
-    uint32         getLowValue()        {return lowValue;}
+    U_32         getNumTargets()      {return numTargets;}
+    U_32         getLength()          {return length;}
+    U_32         getDefaultTarget()   {return defaultTarget+switchOffset;}
+    U_32         getHighValue()       {return highValue;}
+    U_32         getLowValue()        {return lowValue;}
 private:
     const uint8*   nextByteCode;
     const uint8*   nextTarget;
-    uint32         switchOffset;
-    uint32         numTargets;
-    uint32         length;
-     int32         defaultTarget;
-    uint32         highValue;
-    uint32         lowValue;
+    U_32         switchOffset;
+    U_32         numTargets;
+    U_32         length;
+     I_32         defaultTarget;
+    U_32         highValue;
+    U_32         lowValue;
 };
 
 class JavaLookupSwitchTargetsIter {
 public:
-    JavaLookupSwitchTargetsIter(const uint8* bcp,uint32 off) {
+    JavaLookupSwitchTargetsIter(const uint8* bcp,U_32 off) {
         // skip over padding
         lookupOffset = off;
-        uint32 offset = ((off+4)&~3)-off;
+        U_32 offset = ((off+4)&~3)-off;
         // read in the default target
         defaultTarget = readU4Be(bcp+offset);
         numTargets    = readU4Be(bcp+offset+4);
         nextTarget = bcp+offset+8;
-        length = ((uint32)(nextTarget-bcp)) + (numTargets * 8);
+        length = ((U_32)(nextTarget-bcp)) + (numTargets * 8);
         nextByteCode = bcp + length;
     }
     bool      hasNext() {
         return (nextTarget < nextByteCode);
     }
-    uint32    getNextTarget(uint32* key) {
+    U_32    getNextTarget(U_32* key) {
         if (hasNext() == false)
             return 0;
         *key = readU4Be(nextTarget);
-        int32 target = readU4Be(nextTarget+4);
+        I_32 target = readU4Be(nextTarget+4);
         nextTarget += 8;
         return target+lookupOffset;
     }
-    uint32    getNumTargets()        {return numTargets;}
-    uint32    getLength()            {return length;}
-    uint32    getDefaultTarget()    {return defaultTarget+lookupOffset;}
+    U_32    getNumTargets()        {return numTargets;}
+    U_32    getLength()            {return length;}
+    U_32    getDefaultTarget()    {return defaultTarget+lookupOffset;}
 private:
     const uint8*    nextByteCode;
     const uint8*    nextTarget;
-    uint32          lookupOffset;
-    uint32          numTargets;
-    uint32          length;
-     int32          defaultTarget;
+    U_32          lookupOffset;
+    U_32          numTargets;
+    U_32          length;
+     I_32          defaultTarget;
 };
 
 

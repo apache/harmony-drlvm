@@ -33,8 +33,8 @@ class BasicBlock;
 
 class Layouter : public SessionAction {
     void runImpl();
-    uint32 getSideEffects() const {return 0;}
-    uint32 getNeedInfo()const{ return 0;}
+    U_32 getSideEffects() const {return 0;}
+    U_32 getNeedInfo()const{ return 0;}
 };
 
 /**

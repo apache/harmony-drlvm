@@ -117,7 +117,7 @@ RegOpnd *SpillGen::spillOpnd(RegOpnd *stackOpnd, bool spillFlag) {
     // Create scratchOpnd
     OpndKind opndKind     = stackOpnd->getOpndKind();
     DataKind dataKind     = stackOpnd->getDataKind();
-    int32    scratchReg   = getAvailableSpillReg(opndKind);
+    I_32    scratchReg   = getAvailableSpillReg(opndKind);
     RegOpnd  *scratchOpnd = opndManager->newRegOpnd(opndKind, dataKind, scratchReg);
     
     // calculate absolute offset and set it as location on stack opnd
@@ -152,7 +152,7 @@ void SpillGen::resetSpillRegMasks() {
 
 //----------------------------------------------------------------------------------------//
 
-int32 SpillGen::getAvailableSpillReg(OpndKind opndKind) {
+I_32 SpillGen::getAvailableSpillReg(OpndKind opndKind) {
     
     switch(opndKind) {
         case OPND_G_REG: return getAvailableReg(spillGrMask, NUM_G_REG);
@@ -165,7 +165,7 @@ int32 SpillGen::getAvailableSpillReg(OpndKind opndKind) {
     
 //----------------------------------------------------------------------------------------//
 
-int32 SpillGen::getAvailableReg(RegBitSet &regMask, int16 maskSize) {
+I_32 SpillGen::getAvailableReg(RegBitSet &regMask, int16 maskSize) {
     
     for(int16 i=0; i<maskSize; i++) if(regMask[i] == 1) { regMask[i]=0; return i; }
     IPF_ERR << " No available spill reg" << endl;
@@ -226,7 +226,7 @@ void SpillGen::spillFr(RegOpnd *scratchOpnd) {
 
 void SpillGen::spillBr(RegOpnd *scratchOpnd) {
     
-    int32 bufReg   = getAvailableSpillReg(OPND_G_REG);
+    I_32 bufReg   = getAvailableSpillReg(OPND_G_REG);
     Opnd  *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_B, bufReg);
     Inst  *mov     = new(mm) Inst(mm, INST_MOV, p0, bufOpnd, scratchOpnd);
     Inst  *st      = new(mm) Inst(mm, INST_ST, CMPLT_SZ_8, p0, stackAddr, bufOpnd);
@@ -246,7 +246,7 @@ void SpillGen::spillBr(RegOpnd *scratchOpnd) {
 
 void SpillGen::spillPr(RegOpnd *scratchOpnd) {
     
-    int32 bufReg  = getAvailableSpillReg(OPND_G_REG);
+    I_32 bufReg  = getAvailableSpillReg(OPND_G_REG);
     Opnd *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_P, bufReg);
     Opnd *imm1    = opndManager->newImm(1);
     Inst *mov1    = new(mm) Inst(mm, INST_MOV, p0, bufOpnd, opndManager->getR0());
@@ -279,7 +279,7 @@ void SpillGen::fillGr(RegOpnd *scratchOpnd) {
     Inst *ld = new(mm) Inst(mm, INST_LD, completer, p0, scratchOpnd, stackAddr);
     fillCode.push_back(ld);
 
-    // Create sxt instruction for int32 data type
+    // Create sxt instruction for I_32 data type
     if(scratchOpnd->getDataKind() == DATA_I32) {
         Inst *sxt = new(mm) Inst(mm, INST_SXT, CMPLT_XSZ_4, p0, scratchOpnd, scratchOpnd);
         fillCode.push_back(sxt);
@@ -317,7 +317,7 @@ void SpillGen::fillFr(RegOpnd *scratchOpnd) {
 
 void SpillGen::fillBr(RegOpnd *scratchOpnd) {
     
-    int32 bufReg  = getAvailableSpillReg(OPND_G_REG);
+    I_32 bufReg  = getAvailableSpillReg(OPND_G_REG);
     Opnd *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_I64, bufReg);
     Inst *ld      = new(mm) Inst(mm, INST_LD, CMPLT_SZ_8, p0, bufOpnd, stackAddr);
     Inst *mov     = new(mm) Inst(mm, INST_MOV, p0, scratchOpnd, bufOpnd);
@@ -336,7 +336,7 @@ void SpillGen::fillBr(RegOpnd *scratchOpnd) {
 
 void SpillGen::fillPr(RegOpnd *scratchOpnd) {
     
-    int32 bufReg   = getAvailableSpillReg(OPND_G_REG);
+    I_32 bufReg   = getAvailableSpillReg(OPND_G_REG);
     Opnd  *bufOpnd = opndManager->newRegOpnd(OPND_G_REG, DATA_P, bufReg);
     Inst  *ld      = new(mm) Inst(mm, INST_LD, CMPLT_SZ_1, p0, bufOpnd, stackAddr);
     Inst  *cmp     = new(mm) Inst(mm, INST_CMP, CMPLT_CMP_CREL_NE, p0, scratchOpnd, p0, bufOpnd);

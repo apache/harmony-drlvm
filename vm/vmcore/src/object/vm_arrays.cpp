@@ -416,7 +416,7 @@ static void increment_array_copy_counter(uint64 &counter)
 
 // This implementation may be Java specific
 
-ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *dst, int32 dstOffset, int32 length)
+ArrayCopyResult array_copy(ManagedObject *src, I_32 srcOffset, ManagedObject *dst, I_32 dstOffset, I_32 length)
 {
     if (src == ((ManagedObject *)VM_Global_State::loader_env->managed_null) ||
         dst == ((ManagedObject *)VM_Global_State::loader_env->managed_null)) {
@@ -444,8 +444,8 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
     // We haven't determined at this point the types of arrays, but the
     // length is always at the same offset from the start of the array, so we
     // safely cast the pointers to any array type to get the lengths.
-    int32 src_length = get_vector_length((Vector_Handle)src);
-    int32 dst_length = get_vector_length((Vector_Handle)dst);
+    I_32 src_length = get_vector_length((Vector_Handle)src);
+    I_32 dst_length = get_vector_length((Vector_Handle)dst);
     if((srcOffset + length) > src_length || (dstOffset + length) > dst_length)
        return ACR_BadIndices;
 
@@ -512,7 +512,7 @@ ArrayCopyResult array_copy(ManagedObject *src, int32 srcOffset, ManagedObject *d
 #endif // VM_STATS
         memmove(get_vector_element_address_int32(dst, dstOffset),
                 get_vector_element_address_int32(src, srcOffset),
-                length * sizeof(int32));
+                length * sizeof(I_32));
         break;
     case 'J':
 #ifdef VM_STATS

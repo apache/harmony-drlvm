@@ -198,8 +198,8 @@ void Linearizer::doLayout(LinearizerType t, IRManager* irManager) {
 
 void Linearizer::checkLayout(IRManager* irm) {
 #ifdef _DEBUG
-    uint32 maxNodes = irm->getFlowGraph()->getMaxNodeId();
-    StlVector<uint32> numVisits(irm->getMemoryManager(), maxNodes, 0); 
+    U_32 maxNodes = irm->getFlowGraph()->getMaxNodeId();
+    StlVector<U_32> numVisits(irm->getMemoryManager(), maxNodes, 0); 
     StlVector<bool> isBB(irm->getMemoryManager(), maxNodes, false);
     
     // Find basic blocks
@@ -214,7 +214,7 @@ void Linearizer::checkLayout(IRManager* irm) {
                 assert(!wasLast);
                 wasLast = true;
             } else {
-                uint32 id = layoutSucc->getId();
+                U_32 id = layoutSucc->getId();
                 numVisits[id]++;
                 assert(numVisits[id] == 1);
             }
@@ -224,8 +224,8 @@ void Linearizer::checkLayout(IRManager* irm) {
     
     // Check that every basic block has been visited once
     bool wasFirst = false;
-    for (uint32 i = 0; i < maxNodes; i++) {
-        uint32 correctNumVisits = isBB[i] ? 1 : 0;
+    for (U_32 i = 0; i < maxNodes; i++) {
+        U_32 correctNumVisits = isBB[i] ? 1 : 0;
         if (numVisits[i] != correctNumVisits) {
             if (isBB[i] && numVisits[i] == 0 && !wasFirst) {
                 wasFirst = true;

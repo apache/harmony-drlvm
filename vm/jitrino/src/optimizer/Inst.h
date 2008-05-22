@@ -133,7 +133,7 @@ public:
 
     Operation getOperation() const {return operation;}
 
-    uint32 getId() const {return id;}
+    U_32 getId() const {return id;}
 
     PersistentInstructionId getPersistentInstructionId() const {return pid; }
 
@@ -157,16 +157,16 @@ public:
             dst->setInst(this);
     }
 
-    uint32  getNumSrcOperands() const    {return numSrcs;}
+    U_32  getNumSrcOperands() const    {return numSrcs;}
 
-    Opnd*   getSrc(uint32 srcIndex) const {
+    Opnd*   getSrc(U_32 srcIndex) const {
         assert(srcIndex < numSrcs);
         if (srcIndex >= MAX_INST_SRCS)
             return getSrcExtended(srcIndex);
         return srcs[srcIndex];
     }
 
-    void  setSrc(uint32 srcIndex, Opnd* src) {
+    void  setSrc(U_32 srcIndex, Opnd* src) {
         assert(srcIndex < numSrcs);
         if (srcIndex >= MAX_INST_SRCS)
             setSrcExtended(srcIndex, src);
@@ -366,16 +366,16 @@ protected:
     Inst(Opcode op, Modifier modifier, Type::Tag, Opnd* dst, Opnd* src);
     Inst(Opcode op, Modifier modifier, Type::Tag, Opnd* dst, Opnd* src1, Opnd* src2);
     Inst(Opcode op, Modifier modifier, Type::Tag, Opnd* dst, Opnd* src1, Opnd* src2, Opnd *src3);
-    Inst(Opcode op, Modifier modifier, Type::Tag, Opnd* dst, uint32 nSrcs);
+    Inst(Opcode op, Modifier modifier, Type::Tag, Opnd* dst, U_32 nSrcs);
     //
     // fields
     //
     Operation operation;
-    uint32  numSrcs;
+    U_32  numSrcs;
     Opnd*   srcs[MAX_INST_SRCS];
     Opnd*   dst;
     PersistentInstructionId pid;
-    uint32  id;
+    U_32  id;
     
     
     // called from CFG to detect BB->BB block edges
@@ -386,8 +386,8 @@ protected:
     //
     // protected accessor methods that deriving classes should override
     //
-    virtual Opnd* getSrcExtended(uint32 srcIndex) const;
-    virtual void  setSrcExtended(uint32 srcIndex, Opnd* src) {assert(0);}
+    virtual Opnd* getSrcExtended(U_32 srcIndex) const;
+    virtual void  setSrcExtended(U_32 srcIndex, Opnd* src) {assert(0);}
     virtual void  handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
@@ -396,8 +396,8 @@ private:
 
 class LabelInst : public Inst {
 public:
-    uint32    getLabelId() const            {return labelId;}
-    void      setLabelId(uint32 id_)    {labelId = id_;}
+    U_32    getLabelId() const            {return labelId;}
+    void      setLabelId(U_32 id_)    {labelId = id_;}
     bool      isLabel() const               {return true;}
     virtual bool isDispatchLabel() const    {return false;}
     virtual bool isCatchLabel() const       {return false;}
@@ -406,16 +406,16 @@ public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     virtual void printId(::std::ostream&) const;
 protected:
-    LabelInst(uint32 id)
+    LabelInst(U_32 id)
              : Inst(Op_Label, Modifier(), Type::Void, OpndManager::getNullOpnd()),
                labelId(id), state(NULL) {}
-    LabelInst(Opcode opc, uint32 id)
+    LabelInst(Opcode opc, U_32 id)
              : Inst(opc, Modifier(), Type::Void, OpndManager::getNullOpnd()),
                labelId(id), state(NULL) {}
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
-    uint32   labelId;
+    U_32   labelId;
     
     void*    state;     
 };
@@ -427,7 +427,7 @@ public:
     void printId(::std::ostream&) const;
 protected:
     friend class InstFactory;
-    DispatchLabelInst(uint32 labelId) : LabelInst(labelId) {}
+    DispatchLabelInst(U_32 labelId) : LabelInst(labelId) {}
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 };
 
@@ -435,16 +435,16 @@ class CatchLabelInst: public LabelInst {
 public:
     bool      isCatchLabel() const     {return true; }
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
-    uint32    getOrder() const         {return order;}
+    U_32    getOrder() const         {return order;}
     Type*     getExceptionType() const {return exception;}
     void printId(::std::ostream&) const;
 protected:
-    CatchLabelInst(uint32 id, uint32 ord, Type *except)
+    CatchLabelInst(U_32 id, U_32 ord, Type *except)
               : LabelInst(id), order(ord), exception(except) {}
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
-    uint32   order;
+    U_32   order;
     Type     *exception;
 };
 
@@ -454,7 +454,7 @@ public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isMethodEntry() const { return true; }
 protected:
-    MethodEntryInst(uint32 id, MethodDesc* md)
+    MethodEntryInst(U_32 id, MethodDesc* md)
         : LabelInst(Op_MethodEntry, id), methodDesc(md){}
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
@@ -512,7 +512,7 @@ public:
     void       replaceTargetLabel(LabelInst* target) {targetLabel = target;}
     LabelInst* getTargetLabel() const      {return targetLabel;}
     void       swapTargets(LabelInst *target);
-    Edge       *getTakenEdge(uint32 condition);
+    Edge       *getTakenEdge(U_32 condition);
 protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
     virtual Edge::Kind getEdgeKind(const Edge* edge) const;
@@ -542,7 +542,7 @@ private:
 
 class SwitchInst : public Inst {
 public:
-    LabelInst* getTarget(uint32 i) {
+    LabelInst* getTarget(U_32 i) {
         assert(i < numTargets);
         return targetInsts[i];
     }
@@ -550,8 +550,8 @@ public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     bool isSwitch() const {return true;}
     LabelInst* getDefaultTarget() const {return defaultTargetInst;}
-    uint32     getNumTargets() {return numTargets;}
-    void       replaceTargetLabel(uint32 i, LabelInst* target) {
+    U_32     getNumTargets() {return numTargets;}
+    void       replaceTargetLabel(U_32 i, LabelInst* target) {
         assert(i < numTargets);
         targetInsts[i] = target;
     }
@@ -563,26 +563,26 @@ protected:
     virtual void updateControlTransferInst(Node* oldTarget, Node* newTarget); 
 private:
     friend class InstFactory;
-    SwitchInst(Opnd* src, LabelInst** targets, uint32 nTargets, LabelInst* defTarget)
+    SwitchInst(Opnd* src, LabelInst** targets, U_32 nTargets, LabelInst* defTarget)
         : Inst(Op_Switch, Modifier(), Type::Void, OpndManager::getNullOpnd(), src),
           targetInsts(targets), defaultTargetInst(defTarget), numTargets(nTargets) {
     }
     LabelInst** targetInsts;
     LabelInst*  defaultTargetInst;
-    uint32      numTargets;
+    U_32      numTargets;
 };
 
 class ConstInst : public Inst {
 public:
     union ConstValue {
         void*    i;    // I  (can be NULL for ldnull)
-        int32    i4;   // I4
+        I_32    i4;   // I4
         int64    i8;   // I8
         float    s;    // Single
         double   d;    // Double
         struct {
-            int32 dword1;
-            int32 dword2;
+            I_32 dword1;
+            I_32 dword2;
         };
         ConstValue() {dword1=dword2=0;}
     };
@@ -595,7 +595,7 @@ private:
     friend class InstFactory;
     ConstInst(Opnd* d, ConstValue cv)
         : Inst(Op_LdConstant, Modifier(), d->getType()->tag, d) { value = cv; }
-    ConstInst(Opnd* d, int32 i4)
+    ConstInst(Opnd* d, I_32 i4)
         : Inst(Op_LdConstant, Modifier(), Type::Int32, d)  {value.i4 = i4;}
     ConstInst(Opnd* d, int64 i8)
         : Inst(Op_LdConstant, Modifier(), Type::Int64, d)  {value.i8 = i8;}
@@ -613,17 +613,17 @@ private:
 class TokenInst : public Inst {
 public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
-    uint32 getToken() const   {return token;}
+    U_32 getToken() const   {return token;}
     MethodDesc*    getEnclosingMethod()     {return enclosingMethod;}
     bool isToken() const                    {return true;}
 protected:
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
     friend class InstFactory;
-    TokenInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* d, uint32 t, MethodDesc* encMethod)
+    TokenInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* d, U_32 t, MethodDesc* encMethod)
         : Inst(opc, mod, type, d), token(t), enclosingMethod(encMethod) {}
 
-    uint32      token;
+    U_32      token;
     MethodDesc* enclosingMethod;
 };
 
@@ -632,18 +632,18 @@ class LinkingExcInst : public Inst {
 public:
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     Class_Handle     getEnclosingClass()  {return enclosingClass;}
-    uint32           getCPIndex() const   {return cp_index;}
-    uint32           getOperation() const {return operation;}
+    U_32           getCPIndex() const   {return cp_index;}
+    U_32           getOperation() const {return operation;}
 private:
     friend class InstFactory;
     LinkingExcInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* d,
-                   Class_Handle encClass, uint32 cp_ndx, uint32 _operation)
+                   Class_Handle encClass, U_32 cp_ndx, U_32 _operation)
         : Inst(opc, mod, type, d),
           enclosingClass(encClass), cp_index(cp_ndx), operation(_operation) {}
 
     Class_Handle     enclosingClass;
-    uint32           cp_index;
-    uint32           operation;
+    U_32           cp_index;
+    U_32           operation;
 };
 
 // for ldvar, ldvara & stvar instructions
@@ -725,7 +725,7 @@ protected:
                  Modifier mod,
                  Type::Tag ty,
                  Opnd* dst,
-                 uint32 nSrcs_,
+                 U_32 nSrcs_,
                  Opnd** srcs_)
         : Inst(op, mod, ty, dst, nSrcs_),
           extendedSrcs(srcs_), extendedSrcSpace(nSrcs_)
@@ -736,38 +736,38 @@ protected:
         case 1:     srcs[0] = srcs_[0];
         case 0:     break;
         }
-        for (uint32 i=2; i < nSrcs_; i++) {
+        for (U_32 i=2; i < nSrcs_; i++) {
             srcs_[i-MAX_INST_SRCS] = srcs_[i];
             srcs_[i] = 0;
         }
     }
 private:
     friend class InstFactory;
-    Opnd* getSrcExtended(uint32 srcIndex) const {
+    Opnd* getSrcExtended(U_32 srcIndex) const {
         assert(srcIndex < (extendedSrcSpace + MAX_INST_SRCS));
         return extendedSrcs[srcIndex - MAX_INST_SRCS];
     }
-    void  setSrcExtended(uint32 srcIndex, Opnd* src) {
+    void  setSrcExtended(U_32 srcIndex, Opnd* src) {
         assert(srcIndex < (extendedSrcSpace + MAX_INST_SRCS));
         extendedSrcs[srcIndex - MAX_INST_SRCS] = src;
     }
     Opnd**    extendedSrcs;
-    uint32    extendedSrcSpace;
+    U_32    extendedSrcSpace;
 
-    void initSrcs(uint32 nSrcs_, Opnd**srcs_) {
+    void initSrcs(U_32 nSrcs_, Opnd**srcs_) {
         switch (nSrcs_) {
         default:    
         case 2:     srcs[1] = srcs_[1];
         case 1:     srcs[0] = srcs_[0];
         case 0:     break;
         }
-        for (uint32 i=2; i < nSrcs_; i++) {
+        for (U_32 i=2; i < nSrcs_; i++) {
             srcs_[i-MAX_INST_SRCS] = srcs_[i];
             extendedSrcs = srcs_ + MAX_INST_SRCS;
         }
     }
 public:
-    void  setNumSrcs(uint32 nSrcs) {
+    void  setNumSrcs(U_32 nSrcs) {
         assert(nSrcs <= numSrcs);
         numSrcs = nSrcs;
     }
@@ -788,7 +788,7 @@ protected:
              Opnd* src1, Opnd* src2, Type* td)
         : MultiSrcInst(op, mod, ty, dst, src1, src2), type(td) {}
     TypeInst(Opcode op, Modifier mod, Type::Tag ty, Opnd* dst,
-             uint32 nArgs, Opnd** args_, Type* td)
+             U_32 nArgs, Opnd** args_, Type* td)
         : MultiSrcInst(op, mod, ty, dst, nArgs, args_), type(td){}
     virtual void handlePrintEscape(::std::ostream&, char code) const;
 private:
@@ -831,7 +831,7 @@ private:
                     Modifier mod,
                     Type::Tag type,
                     Opnd* dst,
-                    uint32 numSrcs,
+                    U_32 numSrcs,
                     Opnd** srcs,
                     FieldDesc* fd)
         : MultiSrcInst(op, mod, type, dst, numSrcs, srcs), fieldDesc(fd) {}
@@ -853,7 +853,7 @@ protected:
                Modifier mod,
                Type::Tag type,
                Opnd* dst,
-               uint32 nArgs,
+               U_32 nArgs,
                Opnd ** srcs,
                MethodDesc* md)
         : MultiSrcInst(op, mod, type, dst, nArgs, srcs), methodDesc(md) {}
@@ -887,7 +887,7 @@ private:
     MethodCallInst(Opcode op, Modifier mod,
                    Type::Tag type,
                    Opnd* dst,
-                   uint32 nArgs,
+                   U_32 nArgs,
                    Opnd** args_,
                    MethodDesc* md,
                    MemoryManager& mem_mgr)
@@ -900,8 +900,8 @@ public:
     bool isCall() const {return true; }
     void visit(InstFormatVisitor& visitor)  {visitor.accept(this);}
     Opnd*   getFunPtr()             {return srcs[0];}
-    uint32  getNumArgs() const      {return getNumSrcOperands()-1;}
-    Opnd*   getArg(uint32 argIndex) {return getSrc(argIndex+1);}
+    U_32  getNumArgs() const      {return getNumSrcOperands()-1;}
+    Opnd*   getArg(U_32 argIndex) {return getSrc(argIndex+1);}
     Opnd**  getArgs()               {args[0] = srcs[1]; return args;}
 private:
     friend class InstFactory;
@@ -910,7 +910,7 @@ private:
              Type::Tag type,
              Opnd* dst,
              Opnd* ptr,
-             uint32 nArgs,
+             U_32 nArgs,
              Opnd** args_,
              MemoryManager& mem_mgr)
         : Inst(op, mod, type, dst, nArgs+1)
@@ -922,11 +922,11 @@ private:
         case 0:     srcs[0] = ptr;
         }
     }
-    Opnd* getSrcExtended(uint32 srcIndex) const {
+    Opnd* getSrcExtended(U_32 srcIndex) const {
         assert(srcIndex != 1);
         return args[srcIndex - 1];
     }
-    void  setSrcExtended(uint32 srcIndex, Opnd* src) {
+    void  setSrcExtended(U_32 srcIndex, Opnd* src) {
         assert(srcIndex != 1);
         args[srcIndex - 1] = src;
     }
@@ -946,7 +946,7 @@ private:
                       Modifier mod,
                       Type::Tag type,
                       Opnd* dst,
-                      uint32 nArgs,
+                      U_32 nArgs,
                       Opnd** args_,
                       JitHelperCallId id) : Inst(op, mod, type, dst, nArgs),
                                             jitHelperId(id) {
@@ -958,10 +958,10 @@ private:
         case 0:     break;
         }
     }
-    Opnd* getSrcExtended(uint32 srcIndex) const {
+    Opnd* getSrcExtended(U_32 srcIndex) const {
         return args[srcIndex - MAX_INST_SRCS];
     }
-    void  setSrcExtended(uint32 srcIndex, Opnd* src) {
+    void  setSrcExtended(U_32 srcIndex, Opnd* src) {
         args[srcIndex - MAX_INST_SRCS] = src;
     }
     Opnd**    args;
@@ -982,7 +982,7 @@ private:
                      Modifier mod,
                      Type::Tag type,
                      Opnd* dst,
-                     uint32 nArgs,
+                     U_32 nArgs,
                      Opnd** args_,
                      VM_RT_SUPPORT id) 
                      : Inst(op, mod, type, dst, nArgs), vmHelperId(id)
@@ -995,10 +995,10 @@ private:
         case 0:     break;
         }
     }
-    Opnd* getSrcExtended(uint32 srcIndex) const {
+    Opnd* getSrcExtended(U_32 srcIndex) const {
         return args[srcIndex];
     }
-    void  setSrcExtended(uint32 srcIndex, Opnd* src) {
+    void  setSrcExtended(U_32 srcIndex, Opnd* src) {
         args[srcIndex] = src;
     }
     Opnd**    args;
@@ -1014,7 +1014,7 @@ public:
     bool isPhi() const { return true; }
 private:
     friend class InstFactory;
-    PhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_ )
+    PhiInst(Type::Tag type, Opnd* dst, U_32 nArgs, Opnd** args_ )
         : MultiSrcInst(Op_Phi, Modifier(), type, dst, nArgs, args_)
     {
     }
@@ -1077,38 +1077,38 @@ public:
     Inst*    makeBranch(ComparisonModifier mod, Type::Tag, Opnd* src1, Opnd* src2, LabelInst* labelInst);
     Inst*    makeBranch(ComparisonModifier mod, Type::Tag, Opnd* src, LabelInst* labelInst);
     Inst*    makeJump(LabelInst* labelInst);
-    Inst*    makeSwitch(Opnd* src, uint32 nLabels, LabelInst** labelInsts, LabelInst* defaultLabel);
+    Inst*    makeSwitch(Opnd* src, U_32 nLabels, LabelInst** labelInsts, LabelInst* defaultLabel);
     Inst*    makeDirectCall(Opnd* dst, 
                             Opnd* tauNullChecked, Opnd* tauTypesChecked,
-                            uint32 numArgs, Opnd** args, 
+                            U_32 numArgs, Opnd** args, 
                             MethodDesc*);
     Inst*    makeTauVirtualCall(Opnd* dst, 
                                 Opnd* tauNullChecked, Opnd *tauTypesChecked,
-                                uint32 numArgs, Opnd** args, 
+                                U_32 numArgs, Opnd** args, 
                                 MethodDesc*);
     Inst*    makeIndirectCall(Opnd* dst, Opnd* funPtr,
                               Opnd* tauNullCheckedFirstArg, Opnd *tauTypesChecked, 
-                              uint32 numArgs, Opnd** args);
+                              U_32 numArgs, Opnd** args);
     Inst*    makeIndirectMemoryCall(Opnd* dst, Opnd* funPtr, 
                                     Opnd *tauNullCheckedFirstArg, 
                                     Opnd *tauTypesChecked,
-                                    uint32 numArgs, Opnd** args);
+                                    U_32 numArgs, Opnd** args);
     Inst*    makeJitHelperCall(Opnd* dst, JitHelperCallId id, 
                                Opnd* tauNullChecked, Opnd* tauTypesChecked, 
-                               uint32 numArgs, Opnd** args);
-    Inst*    makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, uint32 numArgs,
+                               U_32 numArgs, Opnd** args);
+    Inst*    makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, U_32 numArgs,
                                Opnd** args);
     
 
     Inst*    makeReturn(Opnd* src);
     Inst*    makeReturn();    // void return type
     Inst*    makeCatch(Opnd* dst);
-    Inst*    makeCatchLabel(uint32 labelId, uint32 exceptionOrder, Type* exceptionType);
-    CatchLabelInst*    makeCatchLabel(uint32 exceptionOrder, Type* exceptionType);
+    Inst*    makeCatchLabel(U_32 labelId, U_32 exceptionOrder, Type* exceptionType);
+    CatchLabelInst*    makeCatchLabel(U_32 exceptionOrder, Type* exceptionType);
     Inst*    makeThrow(ThrowModifier mod, Opnd* exceptionObj);
     Inst*    makePseudoThrow();
     Inst*    makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId);
-    Inst*    makeThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation);
+    Inst*    makeThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation);
     Inst*    makeLeave(LabelInst* labelInst);
     Inst*    makeEndFinally();
     Inst*    makeEndFilter();
@@ -1119,13 +1119,13 @@ public:
     // load, store, & mov
     Inst*    makeCopy(Opnd* dst, Opnd* src);
     Inst*    makeDefArg(Modifier, Opnd* arg);
-    Inst*    makeLdConst(Opnd* dst, int32 val);
+    Inst*    makeLdConst(Opnd* dst, I_32 val);
     Inst*    makeLdConst(Opnd* dst, int64 val);
     Inst*    makeLdConst(Opnd* dst, float val);
     Inst*    makeLdConst(Opnd* dst, double val);
     Inst*    makeLdConst(Opnd* dst, ConstInst::ConstValue val);
     Inst*    makeLdNull(Opnd* dst);
-    Inst*    makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, uint32 token);
+    Inst*    makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, U_32 token);
     Inst*    makeLdVar(Opnd* dst, VarOpnd* var);
     Inst*    makeLdVar(Opnd* dst, SsaVarOpnd* var);
     Inst*    makeLdVarAddr(Opnd* dst, VarOpnd* var);
@@ -1182,7 +1182,7 @@ public:
     // alloc
     Inst*    makeNewObj(Opnd* dst, Type* type);
     Inst*    makeNewArray(Opnd* dst, Opnd* numElems, Type* elemType);
-    Inst*    makeNewMultiArray(Opnd* dst, uint32 dimensions, Opnd** numElems, Type* elemType);
+    Inst*    makeNewMultiArray(Opnd* dst, U_32 dimensions, Opnd** numElems, Type* elemType);
     // sync
     Inst*    makeTauMonitorEnter(Opnd* src, Opnd *tauSrcNonNull);
     Inst*    makeTauMonitorExit(Opnd* src, Opnd *tauSrcNonNull);
@@ -1192,10 +1192,10 @@ public:
     Inst*    makeLdLockAddr(Opnd *dst, Opnd *obj);   // result is ref:int16
     Inst*    makeIncRecCount(Opnd *obj, Opnd *oldValue);
     Inst*    makeTauBalancedMonitorEnter(Opnd* dst, Opnd *src, Opnd *lockAddr,
-                                         Opnd *tauSrcNonNull); // result is int32
+                                         Opnd *tauSrcNonNull); // result is I_32
     Inst*    makeBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *enterDst);
     Inst*    makeTauOptimisticBalancedMonitorEnter(Opnd* dst, Opnd *src, Opnd *lockAddr,
-                                                   Opnd *tauSrcNonNull); // result is int32
+                                                   Opnd *tauSrcNonNull); // result is I_32
     Inst*    makeOptimisticBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *enterDst);
     Inst*    makeMonitorEnterFence(Opnd* src);  // elided MonitorEnter, just enforce memory model
     Inst*    makeMonitorExitFence(Opnd* src);   // elided MonitorExit, just enforce memory model
@@ -1224,15 +1224,15 @@ public:
     Inst*    makeSizeof(Opnd* dst, Type* type);
     Inst*    makeBox(Opnd* dst, Opnd* val, Type* type);
     Inst*    makeUnbox(Opnd* dst, Opnd* obj, Type* type);
-    Inst*    makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, uint32 metadataToken);
+    Inst*    makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, U_32 metadataToken);
 
 
     // SSA
-    Inst*    makePhi(Opnd* dst, uint32 numOpnds, Opnd** opnds); // array is copied
+    Inst*    makePhi(Opnd* dst, U_32 numOpnds, Opnd** opnds); // array is copied
     Inst*    makeTauPi(Opnd* dst, Opnd* src, Opnd *tau, PiCondition *cond);
 
     // profile counter increment
-    Inst*    makeIncCounter(uint32 val);
+    Inst*    makeIncCounter(U_32 val);
     Inst*    makePrefetch(Opnd* addr); // prefetch
 
     // compressed references
@@ -1250,7 +1250,7 @@ public:
     // new tau methods
     Inst*    makeTauPoint(Opnd *dst);
     Inst*    makeTauEdge(Opnd *dst);
-    Inst*    makeTauAnd(Opnd *dst, uint32 numOpnds, Opnd** opnds); // array is copied
+    Inst*    makeTauAnd(Opnd *dst, U_32 numOpnds, Opnd** opnds); // array is copied
     Inst*    makeTauUnsafe(Opnd *dst);
     Inst*    makeTauSafe(Opnd *dst);
     Inst*    makeTauCheckCast(Opnd *taudst, Opnd* src, Opnd* tauCheckedNull, Type* type);
@@ -1261,13 +1261,13 @@ public:
     //
     //
     //
-    uint32   createLabelNumber()     {return maxNumLabels++; }
-    uint32   getMaxNumLabels()       {return maxNumLabels;   }
-    uint32   getNumInsts()           {return numInsts;       }
+    U_32   createLabelNumber()     {return maxNumLabels++; }
+    U_32   getMaxNumLabels()       {return maxNumLabels;   }
+    U_32   getNumInsts()           {return numInsts;       }
     
 private:
-    uint32   maxNumLabels;        // number of labels generated
-    uint32   numInsts;            // number of instructions generated
+    U_32   maxNumLabels;        // number of labels generated
+    U_32   numInsts;            // number of instructions generated
     MemoryManager& memManager;
 
     //
@@ -1281,9 +1281,9 @@ private:
     //
     // private helpers for making different types of instructions
     //
-    Opnd**  copyOpnds(Opnd** srcs, uint32 numSrcs);
-    Opnd**  copyOpnds(Opnd* src1, Opnd** srcs, uint32 numSrcs);
-    Opnd**  copyOpnds(Opnd* src1, Opnd* src2, Opnd** srcs, uint32 numSrcs);
+    Opnd**  copyOpnds(Opnd** srcs, U_32 numSrcs);
+    Opnd**  copyOpnds(Opnd* src1, Opnd** srcs, U_32 numSrcs);
+    Opnd**  copyOpnds(Opnd* src1, Opnd* src2, Opnd** srcs, U_32 numSrcs);
 
     //
     // methods for copying instructions
@@ -1324,13 +1324,13 @@ public:
 
 private:
     // makes a copy of a LabelInst
-    LabelInst*          makeLabelInst(uint32 labelId);
-    LabelInst*          makeLabelInst(Opcode opc, uint32 labelId);
-    DispatchLabelInst*  makeDispatchLabelInst(uint32 labelId);
-    CatchLabelInst*     makeCatchLabelInst(uint32 lableId,
-                                       uint32 ord,
+    LabelInst*          makeLabelInst(U_32 labelId);
+    LabelInst*          makeLabelInst(Opcode opc, U_32 labelId);
+    DispatchLabelInst*  makeDispatchLabelInst(U_32 labelId);
+    CatchLabelInst*     makeCatchLabelInst(U_32 lableId,
+                                       U_32 ord,
                                        Type *exceptionType);
-    MethodEntryInst*    makeMethodEntryInst(uint32 labelId, MethodDesc*) ;
+    MethodEntryInst*    makeMethodEntryInst(U_32 labelId, MethodDesc*) ;
     MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*, 
             Opnd *obj, Opnd *retOpnd);
     MethodMarkerInst*   makeMethodMarkerInst(MethodMarkerInst::Kind, MethodDesc*, Opnd *retOpnd);
@@ -1348,9 +1348,9 @@ private:
                                LabelInst* target);
     SwitchInst* makeSwitchInst(Opnd* src,
                                LabelInst** targets,
-                               uint32 nTargets,
+                               U_32 nTargets,
                                LabelInst* defTarget);
-    ConstInst* makeConstInst(Opnd* dst, int32 i4);
+    ConstInst* makeConstInst(Opnd* dst, I_32 i4);
     ConstInst* makeConstInst(Opnd* dst, int64 i8) ;
     ConstInst* makeConstInst(Opnd* dst, float fs);
     ConstInst* makeConstInst(Opnd* dst, double fd) ;
@@ -1359,9 +1359,9 @@ private:
     //
     // fix parameter names!
     //
-    TokenInst* makeTokenInst(Opcode opc, Modifier mod, Type::Tag, Opnd* dst, uint32 t, MethodDesc* encMethod);
+    TokenInst* makeTokenInst(Opcode opc, Modifier mod, Type::Tag, Opnd* dst, U_32 t, MethodDesc* encMethod);
     LinkingExcInst* makeLinkingExcInst(Opcode opc, Modifier mod, Type::Tag type, Opnd* dst,
-                                       Class_Handle encClass, uint32 CPIndex, uint32 operation);
+                                       Class_Handle encClass, U_32 CPIndex, U_32 operation);
     VarAccessInst* makeVarAccessInst(Opcode, Type::Tag, Opnd* dst, VarOpnd* var);
     VarAccessInst* makeVarAccessInst(Opcode, Type::Tag, VarOpnd* var, Opnd* src);
     VarAccessInst* makeVarAccessInst(Opcode, Type::Tag, Opnd* dst,
@@ -1398,7 +1398,7 @@ private:
                            Modifier mod,
                            Type::Tag,
                            Opnd* dst,
-                           uint32 nArgs,
+                           U_32 nArgs,
                            Opnd** args,
                            Type*);
     FieldAccessInst* makeFieldAccessInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, FieldDesc*);
@@ -1414,7 +1414,7 @@ private:
                                          Modifier mod,
                                          Type::Tag type,
                                          Opnd* dst,
-                                         uint32 nSrcs,
+                                         U_32 nSrcs,
                                          Opnd** srcs,
                                          FieldDesc* fd);
     MethodInst* makeMethodInst(Opcode, Modifier mod, Type::Tag type, Opnd* dst, MethodDesc* md);
@@ -1422,7 +1422,7 @@ private:
                                Modifier mod,
                                Type::Tag,
                                Opnd* dst,
-                               uint32 nArgs,
+                               U_32 nArgs,
                                MethodDesc*);
     MethodInst* makeMethodInst(Opcode,
                                Modifier mod,
@@ -1441,46 +1441,46 @@ private:
                                Modifier mod,
                                Type::Tag,
                                Opnd* dst,
-                               uint32 nArgs,
+                               U_32 nArgs,
                                Opnd** args_,
                                MethodDesc*);
     MethodCallInst* makeMethodCallInst(Opcode,
                                        Modifier mod,
                                        Type::Tag,
                                        Opnd* dst,
-                                       uint32 nArgs,
+                                       U_32 nArgs,
                                        Opnd** args_,
                                        MethodDesc*);
     CallInst* makeCallInst(Opcode op, Modifier mod,
                            Type::Tag,
                            Opnd* dst,
                            Opnd* ptr,
-                           uint32 nArgs,
+                           U_32 nArgs,
                            Opnd** args);
     JitHelperCallInst* makeJitHelperCallInst(Opcode op, 
                                              Modifier mod,
                                              Type::Tag,
                                              Opnd* dst,
-                                             uint32 nArgs,
+                                             U_32 nArgs,
                                              Opnd** args_,
                                              JitHelperCallId id);
     VMHelperCallInst* makeVMHelperCallInst(Opcode op, 
                                            Modifier mod,
                                            Type::Tag,
                                            Opnd* dst,
-                                           uint32 nArgs,
+                                           U_32 nArgs,
                                            Opnd** args_,
                                            VM_RT_SUPPORT id);
 
 
-    PhiInst* makePhiInst(Type::Tag type, Opnd* dst, uint32 nArgs, Opnd** args_);
+    PhiInst* makePhiInst(Type::Tag type, Opnd* dst, U_32 nArgs, Opnd** args_);
 
     MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst);
     MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, Opnd* src);
     MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, Opnd* src1, Opnd* src2);
     MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, Opnd* src1, Opnd* src2, Opnd* src3);
     MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, Opnd* src1, Opnd* src2, Opnd* src3, Opnd* src4);
-    MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, uint32 nSrcs, Opnd** srcs);
+    MultiSrcInst* makeMultiSrcInst(Opcode, Modifier mod, Type::Tag, Opnd* dst, U_32 nSrcs, Opnd** srcs);
 };
 
 //

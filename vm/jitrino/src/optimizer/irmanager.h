@@ -154,7 +154,7 @@ public:
     void            setCriticalEdgesSplit() {_lastCriticalEdgeSplitTraversalNum = _flowGraph.getModificationTraversalNum();}
 
     // The minimum Instruction Id in this region.
-    uint32          getMinimumInstId() { return _minRegionInstId; }
+    U_32          getMinimumInstId() { return _minRegionInstId; }
 
     // The DPGO threshold for hotness - blocks with a execution count 
     // greater than this threshold should be considered hot
@@ -193,9 +193,9 @@ private:
     const char*      _inlineOptPath;
     GCBasePointerMap _gcBasePointerMap;
     bool             _inSsa;
-    uint32           _lastSsaFixupTraversalNum;
-    uint32           _lastCriticalEdgeSplitTraversalNum;
-    uint32           _minRegionInstId;
+    U_32           _lastSsaFixupTraversalNum;
+    U_32           _lastCriticalEdgeSplitTraversalNum;
+    U_32           _minRegionInstId;
     double           _heatThreshold;
     bool             _abort;
 

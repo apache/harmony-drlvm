@@ -122,9 +122,9 @@ public:
     bool isDOL() const {return type == DEF_OUT_OF_LOOP;}
     bool isUndefined() const {return type == UNDEF;}
     int getConst() const {assert(getType()==LD_CONST); return val;}
-    void setConst(int32 v) {assert(getType()==LD_CONST); val=v;}
+    void setConst(I_32 v) {assert(getType()==LD_CONST); val=v;}
     int getIncrement() const {assert(getType()==COUNTER); return val;}
-    void setIncrement(int32 v) {assert(getType()==COUNTER); val=v;}
+    void setIncrement(I_32 v) {assert(getType()==COUNTER); val=v;}
     bool isPhiSplit() const {return phiSplit;}
     void markPhiSplit() {assert(isCounter()); phiSplit = true;}
     
@@ -624,7 +624,7 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
     Node* origCheckNode = info->branchInst->getNode();
     Edge* origLoopExitEdge = info->branchTargetIsExit ? origCheckNode->getTrueEdge() : origCheckNode->getFalseEdge();
     
-    uint32 maxNodeId = cfg.getMaxNodeId()+1; //+1 for a split check node
+    U_32 maxNodeId = cfg.getMaxNodeId()+1; //+1 for a split check node
     StlBitVector nodesInLoop(mm, maxNodeId);
     {
         const Nodes& loopNodes = loopNode->getNodesInLoop();
@@ -639,7 +639,7 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
     BitSet aFlags(mm, maxNodeId);
     calculateReachableNodesInLoop(loopNode, origHeader, origCheckNode, aFlags);
     StlBitVector bodyANodes(mm, maxNodeId);
-    for (uint32 i=0;i<maxNodeId;i++) bodyANodes.setBit(i, aFlags.getBit(i));
+    for (U_32 i=0;i<maxNodeId;i++) bodyANodes.setBit(i, aFlags.getBit(i));
     
     //STEP 2: make checkNode a separate node, prepare loop region
     bodyANodes.setBit(origCheckNode->getId(), true);
@@ -668,7 +668,7 @@ static void doUnroll(MemoryManager& mm, IRManager& irm, const LoopUnrollInfo* in
         // while duplicating a region new nodes could be created and 'nodesInRegion' bitvector param is updated. 
         // BodyA is part of the loop -> if new nodes were created in the loop we must track them.
         nodesInLoop.resize(bodyANodes.size());
-        for (uint32 i=0;i<bodyANodes.size();i++) nodesInLoop.setBit(i, bodyANodes.getBit(i) || nodesInLoop.getBit(i));
+        for (U_32 i=0;i<bodyANodes.size();i++) nodesInLoop.setBit(i, bodyANodes.getBit(i) || nodesInLoop.getBit(i));
 
         Node* bodyA2PreCheckNode = nodeRenameTable.getMapping(preCheckNode);
         assert(bodyA2PreCheckNode->getOutDegree()==1 && bodyA2PreCheckNode->getUnconditionalEdgeTarget() == checkNode);

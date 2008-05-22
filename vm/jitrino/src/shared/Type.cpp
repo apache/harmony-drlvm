@@ -29,7 +29,7 @@
 
 namespace Jitrino {
 
-uint32 Type::nextTypeId = 1;
+U_32 Type::nextTypeId = 1;
 
 bool Type::mayAlias(TypeManager* typeManager, Type* t1, Type* t2)
 {
@@ -222,7 +222,7 @@ bool TypeManager::isSubTypeOf(Type *type1, Type *type2) {
             return isSubTypeOf(vnt->getUnderlyingType(), type2);
         }
     case Type::ArrayLength:
-        // Subtype of itself and int32
+        // Subtype of itself and I_32
         return type2==getInt32Type();
     case Type::ArrayElementType:
         // Subtype of the declared array element type
@@ -533,7 +533,7 @@ TypeManager::getMethodPtrType(MethodDesc* methodDesc) {
 }
 
 UnresolvedMethodPtrType*    
-TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex, MethodSignature* sig) {
+TypeManager::getUnresolvedMethodPtrType(ObjectType* enclosingClass, U_32 cpIndex, MethodSignature* sig) {
     PtrHashTable<UnresolvedMethodPtrType>* methodsPerClass = unresMethodPtrTypes.lookup(enclosingClass);
     if (!methodsPerClass) {
         methodsPerClass = new (memManager) PtrHashTable<UnresolvedMethodPtrType>(memManager, 32);
@@ -800,7 +800,7 @@ TypeManager::compressType(Type *uncompRefType)
 //
 //  Returns size of the object
 //
-uint32
+U_32
 ObjectType::getObjectSize() {
     assert(!isUnresolvedObject());
     return VMInterface::getObjectSize(vmTypeHandle);
@@ -834,7 +834,7 @@ ObjectType::getClassDepth() {
 //
 // for array types, returns byte offset of the first element of the array
 //
-uint32    
+U_32    
 ArrayType::getArrayElemOffset()    {
     bool isUnboxed = elemType->isValueType();
     if (elemType->isUnresolvedType()) {
@@ -848,7 +848,7 @@ ArrayType::getArrayElemOffset()    {
 //
 // for array types, returns byte offset of the array's length field
 //
-uint32    
+U_32    
 ArrayType::getArrayLengthOffset() {
     return VMInterface::getArrayLengthOffset();
 }
@@ -905,12 +905,12 @@ void    Type::print(::std::ostream& os) {
     case IntPtr:           s = "intptr"; break;
     case Int8:             s = "int8"; break;
     case Int16:            s = "int16"; break;
-    case Int32:            s = "int32"; break;
+    case Int32:            s = "I_32"; break;
     case Int64:            s = "int64"; break;
     case UIntPtr:          s = "uintptr"; break;
     case UInt8:            s = "uint8"; break;
     case UInt16:           s = "uint16"; break;
-    case UInt32:           s = "uint32"; break;
+    case UInt32:           s = "U_32"; break;
     case UInt64:           s = "uint64"; break;
     case Single:           s = "single"; break;
     case Double:           s = "double"; break;
@@ -987,7 +987,7 @@ void    PtrType::print(::std::ostream& os) {
     pointedToType->print(os);
 }
 
-Type* MethodPtrType::getParamType(uint32 i)
+Type* MethodPtrType::getParamType(U_32 i)
 {
     return (i==0 && object ? typeManager.getSingletonType(object) : methodDesc->getParamType(i));
 }
@@ -1288,15 +1288,15 @@ type_tag_names[] = {
     DECL_TAG_ITEM(NumTypeTags, "XXXX"),
 };
 
-static const uint32 type_tag_names_count = sizeof(type_tag_names)/sizeof(type_tag_names[0]);
+static const U_32 type_tag_names_count = sizeof(type_tag_names)/sizeof(type_tag_names[0]);
 
 #ifdef _DEBUG
 static inline void checkArray() {
     static bool doArrayCheck = true;
     if( !doArrayCheck ) return;
     doArrayCheck = false;
-    for( uint32 i=0; i<type_tag_names_count; i++ ) {
-        assert( (uint32)(type_tag_names[i].tag) == i );
+    for( U_32 i=0; i<type_tag_names_count; i++ ) {
+        assert( (U_32)(type_tag_names[i].tag) == i );
     }
 }
 #else
@@ -1306,7 +1306,7 @@ static inline void checkArray() {
 Type::Tag Type::str2tag(const char * tagname) {
     checkArray();
 
-    for( uint32 i=0; i<type_tag_names_count; i++ ) {
+    for( U_32 i=0; i<type_tag_names_count; i++ ) {
         if( 0 == strcmpi(type_tag_names[i].name, tagname) ) {
             return (Tag)i; // the map is ordered, thus '[i].tag == tag'
         }

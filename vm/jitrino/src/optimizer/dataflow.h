@@ -60,7 +60,7 @@ solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwa
 {
     StlVector<Node *> nodes(mm);
     fg->getNodesPostOrder(nodes, forwards);
-    uint32 numNodes = fg->getMaxNodeId();
+    U_32 numNodes = fg->getMaxNodeId();
     DataflowValue *beforeNode = new (mm) DataflowValue[numNodes];
     DataflowValue *afterNode = new (mm) DataflowValue[numNodes];
     for(unsigned i=0; i<numNodes; i++) {
@@ -79,7 +79,7 @@ solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwa
         rend = nodes.rend();
     for ( ; riter != rend; ++riter) {
         Node *node = *riter;
-        uint32 nodeId = node->getId();
+        U_32 nodeId = node->getId();
         nodeTFs[nodeId] = instance.getNodeBehavior(node);
         queue.push_back(node);
         inQueue.setBit(nodeId);
@@ -87,8 +87,8 @@ solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwa
 
     Node *entryNode = fg->getEntryNode();
     Node *exitNode = fg->getExitNode();
-    uint32 inId = forwards ? entryNode->getId() : exitNode->getId();
-    uint32 firstId = queue[0]->getId();
+    U_32 inId = forwards ? entryNode->getId() : exitNode->getId();
+    U_32 firstId = queue[0]->getId();
     if( !(firstId == inId) ) assert(0);
     beforeNode[firstId] = instance.getEntryValue();
 
@@ -96,7 +96,7 @@ solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwa
         Node *node = queue.front();
         queue.pop_front();
         inQueue.setBit(false);
-        uint32 nodeId = node->getId();
+        U_32 nodeId = node->getId();
         DataflowTF<DataflowValue> *nodeTF = nodeTFs[nodeId];
         if (Log::isEnabled()) {
             Log::out() << "solve: visiting node " << (int) nodeId << ::std::endl;
@@ -124,7 +124,7 @@ solve(ControlFlowGraph*fg, DataflowInstance<DataflowValue> &instance, bool forwa
                 Edge *e = *eiter;
                 Node *target = e->getTargetNode();
                 if (ignoreExceptionEdges && target->isDispatchNode()) continue;
-                uint32 targetId = target->getId();
+                U_32 targetId = target->getId();
                 if (Log::isEnabled()) {
                     Log::out() << "    (checking successor " 
                                << (int) targetId << ", was ";

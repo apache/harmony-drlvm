@@ -36,7 +36,7 @@ public:
     // parses one byte code starting at given offset,
     // updates nextOffset to point at next byte code,
     // returns false if parsing should stop
-    virtual bool parseByteCode(const uint8* byteCodes,uint32 byteCodeOffset) = 0;
+    virtual bool parseByteCode(const uint8* byteCodes,U_32 byteCodeOffset) = 0;
     // called before the parsing starts
     virtual void parseInit() = 0;
     // called after the parsing ends, but not if an error occurs
@@ -46,9 +46,9 @@ public:
     virtual bool skipParsing() {return false;};
     // called when an error occurs during the byte code parsing
     virtual void parseError() = 0;
-    uint32       getNextOffset() {return nextOffset;}
+    U_32       getNextOffset() {return nextOffset;}
 protected:
-    uint32    nextOffset;
+    U_32    nextOffset;
 };
 
 class ByteCodeParser {
@@ -56,7 +56,7 @@ public:
     //
     // creates a new ByteCodeParser
     //
-    ByteCodeParser(const uint8* bc, uint32 length)  {
+    ByteCodeParser(const uint8* bc, U_32 length)  {
         byteCodes = bc;    byteCodeLength = length; byteCodeOffset = 0;
     }
     //
@@ -78,22 +78,22 @@ public:
 
     // Export these values to implement translator optimizations
     const uint8* getByteCodes() {return byteCodes;}
-    uint32 getByteCodeLength()  {return byteCodeLength;}
+    U_32 getByteCodeLength()  {return byteCodeLength;}
 
 private:
     const uint8* byteCodes;
-    uint32       byteCodeLength;
-    uint32       byteCodeOffset;
+    U_32       byteCodeLength;
+    U_32       byteCodeOffset;
 };
 
 //
 // byte code parsing utilities
 //
-#define readU4Le(bytes) (((uint32)(bytes)[3]<<24) | ((uint32)(bytes)[2]<<16) | \
-                         ((uint32)(bytes)[1]<<8)  | (bytes)[0])
+#define readU4Le(bytes) (((U_32)(bytes)[3]<<24) | ((U_32)(bytes)[2]<<16) | \
+                         ((U_32)(bytes)[1]<<8)  | (bytes)[0])
 
-#define readU4Be(bytes) (((uint32)(bytes)[0]<<24) | ((uint32)(bytes)[1]<<16) | \
-                         ((uint32)(bytes)[2]<<8)  | (bytes)[3])
+#define readU4Be(bytes) (((U_32)(bytes)[0]<<24) | ((U_32)(bytes)[1]<<16) | \
+                         ((U_32)(bytes)[2]<<8)  | (bytes)[3])
 
 inline int8     si8(const uint8* bcp)    {return ((int8*)bcp)[0];}
 inline uint8    su8(const uint8* bcp)    {return bcp[0];}

@@ -45,7 +45,7 @@ static void test_requestor_heap_access();
 static void JNICALL test_thread_proc(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args);
 static IDATA HYTHREAD_PROC test_gc_request_thread_proc(void *args);
 static void JNICALL test_java_request_thread_proc(jvmtiEnv * jvmti_env, JNIEnv * jni_env, void *args);
-static uint32 test_waste_time(uint32 count);
+static U_32 test_waste_time(U_32 count);
 
 static hylatch_t wait_threads;
 static hylatch_t start;
@@ -276,7 +276,7 @@ static void JNICALL test_thread_proc(jvmtiEnv * jvmti_env,
                                      JNIEnv * jni_env,
                                      void *args)
 {
-    uint32 xx = 0;
+    U_32 xx = 0;
     IDATA status;
     hythread_t self = hythread_self();
 
@@ -315,7 +315,7 @@ static IDATA HYTHREAD_PROC test_gc_request_thread_proc(void *args)
 {
     char buf[1024];
     uint64 count;
-    uint32 xx = 0;
+    U_32 xx = 0;
     IDATA status;
     hythread_t test_thread = jthread_get_native_thread((jobject)args);
 
@@ -370,7 +370,7 @@ static void JNICALL test_java_request_thread_proc(jvmtiEnv * jvmti_env,
                                                   JNIEnv * jni_env,
                                                   void *args)
 {
-    uint32 xx = 0;
+    U_32 xx = 0;
     IDATA status;
     jobject test_thread = (jobject)args;
 
@@ -411,9 +411,9 @@ static void JNICALL test_java_request_thread_proc(jvmtiEnv * jvmti_env,
 
 // make it static to prevent compiler to optimize
 // reading/writing of this variable
-static uint32 waste_time_int;
+static U_32 waste_time_int;
 
-static uint32 test_waste_time(uint32 count)
+static U_32 test_waste_time(U_32 count)
 {
     for (; count; count--) {
         waste_time_int = waste_time_int * rand();

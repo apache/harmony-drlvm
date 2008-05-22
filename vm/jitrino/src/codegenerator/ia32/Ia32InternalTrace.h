@@ -41,7 +41,7 @@ class InternalTrace : public SessionAction {
 };
 
 void __stdcall methodExit(const char * methodName) stdcall__; 
-void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, CallingConvention::OpndInfo * argInfos) stdcall__;
+void __stdcall methodEntry(const char * methodName, U_32 argInfoCount, CallingConvention::OpndInfo * argInfos) stdcall__;
 void __stdcall fieldWrite(const void * address) stdcall__;
 
 }}; // namespace Ia32

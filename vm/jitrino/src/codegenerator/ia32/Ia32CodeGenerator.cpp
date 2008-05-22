@@ -42,7 +42,7 @@ namespace Ia32
 {
 
 //___________________________________________________________________________________________________
-void _cdecl die(uint32 retCode, const char * message, ...)
+void _cdecl die(U_32 retCode, const char * message, ...)
 {
     ::std::cerr<<"---------- die called (ret code = "<<retCode<<") --------------------------------------"<<std::endl;
     if (message!=NULL){
@@ -59,8 +59,8 @@ void _cdecl die(uint32 retCode, const char * message, ...)
 //___________________________________________________________________________________________________
 class InstructionFormTranslator : public SessionAction {
     void runImpl(){ irManager->translateToNativeForm(); }
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
 };
 
 static ActionFactory<InstructionFormTranslator> _native("native");
@@ -68,8 +68,8 @@ static ActionFactory<InstructionFormTranslator> _native("native");
 //___________________________________________________________________________________________________
 class UserRequestedDie : public SessionAction {
     void runImpl(){ die(10, getArg("msg")); }
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
     bool isIRDumpEnabled(){ return false; }
 };
 
@@ -80,8 +80,8 @@ class UserRequestedBreakPoint : public SessionAction {
     void runImpl(){ 
         irManager->getFlowGraph()->getEntryNode()->prependInst(irManager->newInst(Mnemonic_INT3));
     }
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
     bool isIRDumpEnabled(){ return false; }
 };
 
@@ -97,7 +97,7 @@ static ActionFactory<UserRequestedBreakPoint> _break("break");
 void CodeGenerator::genCode(::Jitrino::SessionAction* sa, ::Jitrino::MethodCodeSelector& inputProvider) {
     LogStream& irdump  = Log::log(LogStream::IRDUMP);
     LogStream& dotdump = Log::log(LogStream::DOTDUMP);
-    uint32 stageId = Log::getStageId();
+    U_32 stageId = Log::getStageId();
     const char* stageName = sa->getName();
     if (irdump.isEnabled()) {
         Log::printStageBegin(irdump.out(), stageId, "IA32", stageName, stageName);

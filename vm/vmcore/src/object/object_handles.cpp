@@ -295,7 +295,7 @@ static ObjectHandlesNew* oh_add_new_handles(ObjectHandlesNew** hs)
     assert(n);
     memset(n, 0, size);
 #ifdef _IPF_
-    n->capacity = (uint32)capacity;
+    n->capacity = (U_32)capacity;
 #else //IA32
     n->capacity = (uint16)capacity;
 #endif //IA32

@@ -32,7 +32,7 @@
 static void default_gc_write_barrier(Managed_Object_Handle);
 static void default_gc_pin_object(Managed_Object_Handle*);
 static void default_gc_unpin_object(Managed_Object_Handle*);
-static int32 default_gc_get_hashcode(Managed_Object_Handle);
+static I_32 default_gc_get_hashcode(Managed_Object_Handle);
 static Managed_Object_Handle default_gc_get_next_live_object(void*);
 static void default_gc_iterate_heap();
 static void default_gc_finalize_on_exit();
@@ -46,20 +46,20 @@ static void default_gc_heap_slot_write_ref(Managed_Object_Handle p_base_of_objec
                                            Managed_Object_Handle *p_slot,
                                            Managed_Object_Handle value);
 static void default_gc_heap_slot_write_ref_compressed(Managed_Object_Handle p_base_of_object_with_slot,
-                                                      uint32 *p_slot,
+                                                      U_32 *p_slot,
                                                       Managed_Object_Handle value);
 static void default_gc_heap_write_global_slot(Managed_Object_Handle *p_slot,
                                               Managed_Object_Handle value);
-static void default_gc_heap_write_global_slot_compressed(uint32 *p_slot,
+static void default_gc_heap_write_global_slot_compressed(U_32 *p_slot,
                                                          Managed_Object_Handle value);
 static void default_gc_heap_wrote_object(Managed_Object_Handle p_base_of_object_just_written);
-static void default_gc_add_compressed_root_set_entry(uint32 *ref);
+static void default_gc_add_compressed_root_set_entry(U_32 *ref);
 static void default_gc_add_root_set_entry_managed_pointer(void **slot,
                                                           Boolean is_pinned);
 static void *default_gc_heap_base_address();
 static void *default_gc_heap_ceiling_address();
 static void default_gc_test_safepoint();
-/* $$$ GMJ static int32 default_gc_get_hashcode(Managed_Object_Handle); */
+/* $$$ GMJ static I_32 default_gc_get_hashcode(Managed_Object_Handle); */
 
 static Boolean default_gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
 static void default_gc_add_weak_root_set_entry(
@@ -70,7 +70,7 @@ static Boolean default_gc_supports_class_unloading();
 Boolean (*gc_supports_compressed_references)() = 0;
 void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned) = 0;
 void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned,Boolean is_short_weak) = 0;
-void (*gc_add_compressed_root_set_entry)(uint32 *ref, Boolean is_pinned) = 0;
+void (*gc_add_compressed_root_set_entry)(U_32 *ref, Boolean is_pinned) = 0;
 void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, Boolean is_pinned) = 0;
 void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned) = 0;
 void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth) = 0;
@@ -82,11 +82,11 @@ void (*gc_heap_slot_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                Managed_Object_Handle *p_slot,
                                Managed_Object_Handle value) = 0;
 void (*gc_heap_slot_write_ref_compressed)(Managed_Object_Handle p_base_of_object_with_slot,
-                                          uint32 *p_slot,
+                                          U_32 *p_slot,
                                           Managed_Object_Handle value) = 0;
 void (*gc_heap_write_global_slot)(Managed_Object_Handle *p_slot,
                                   Managed_Object_Handle value) = 0;
-void (*gc_heap_write_global_slot_compressed)(uint32 *p_slot,
+void (*gc_heap_write_global_slot_compressed)(U_32 *p_slot,
                                              Managed_Object_Handle value) = 0;
 void (*gc_heap_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                  unsigned offset,
@@ -119,9 +119,9 @@ Boolean (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned
 
 void (*gc_pin_object)(Managed_Object_Handle* p_object) = 0;
 void (*gc_unpin_object)(Managed_Object_Handle* p_object) = 0;
-int32 (*gc_get_hashcode)(Managed_Object_Handle obj) = 0;
+I_32 (*gc_get_hashcode)(Managed_Object_Handle obj) = 0;
 Managed_Object_Handle (*gc_get_next_live_object)(void *iterator) = 0;
-int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object) = 0;
+I_32 (*gc_get_hashcode0) (Managed_Object_Handle p_object) = 0;
 void (*gc_iterate_heap)() = 0;
 
 void (*gc_finalize_on_exit)() = 0;
@@ -184,7 +184,7 @@ void vm_add_gc(const char *dllName)
         getFunctionOptional(handle, "gc_add_weak_root_set_entry", dllName,
                 (apr_dso_handle_sym_t) default_gc_add_weak_root_set_entry); 
 
-    gc_add_compressed_root_set_entry = (void (*)(uint32 *ref, Boolean is_pinned)) 
+    gc_add_compressed_root_set_entry = (void (*)(U_32 *ref, Boolean is_pinned)) 
         getFunctionOptional(handle, 
                             "gc_add_compressed_root_set_entry", 
                             dllName,
@@ -208,7 +208,7 @@ void vm_add_gc(const char *dllName)
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_heap_slot_write_ref);
     gc_heap_slot_write_ref_compressed = (void (*)(Managed_Object_Handle p_base_of_object_with_slot,
-                                                  uint32 *p_slot,
+                                                  U_32 *p_slot,
                                                   Managed_Object_Handle value))
         getFunctionOptional(handle,
                             "gc_heap_slot_write_ref_compressed",
@@ -220,7 +220,7 @@ void vm_add_gc(const char *dllName)
                             "gc_heap_write_global_slot",
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_heap_write_global_slot);
-    gc_heap_write_global_slot_compressed = (void (*)(uint32 *p_slot,
+    gc_heap_write_global_slot_compressed = (void (*)(U_32 *p_slot,
                                                      Managed_Object_Handle value))        
         getFunctionOptional(handle,
                             "gc_heap_write_global_slot_compressed",
@@ -253,7 +253,7 @@ void vm_add_gc(const char *dllName)
         getFunctionOptional(handle, "gc_unpin_object", dllName,
             (apr_dso_handle_sym_t)default_gc_unpin_object);
 
-    gc_get_hashcode = (int32 (*)(Managed_Object_Handle))
+    gc_get_hashcode = (I_32 (*)(Managed_Object_Handle))
         getFunctionOptional(handle, "gc_get_hashcode", dllName,
             (apr_dso_handle_sym_t)default_gc_get_hashcode);
 
@@ -277,7 +277,7 @@ void vm_add_gc(const char *dllName)
         getFunctionOptional(handle, "gc_clear_mutator_block_flag", dllName,
             (apr_dso_handle_sym_t)default_gc_clear_mutator_block_flag);
 
-    gc_get_hashcode0 = (int32 (*)(Managed_Object_Handle))
+    gc_get_hashcode0 = (I_32 (*)(Managed_Object_Handle))
         getFunctionOptional(handle, "gc_get_hashcode", dllName, (apr_dso_handle_sym_t) default_gc_get_hashcode);
 
     gc_vm_initialized = (void (*)()) getFunction(handle, "gc_vm_initialized", dllName);
@@ -377,7 +377,7 @@ static void default_gc_heap_slot_write_ref(Managed_Object_Handle UNREF p_base_of
 
 
 static void default_gc_heap_slot_write_ref_compressed(Managed_Object_Handle UNREF p_base_of_object_with_slot,
-                                                      uint32 *p_slot,
+                                                      U_32 *p_slot,
                                                       Managed_Object_Handle value)
 {
     // p_slot is the address of a 32 bit slot holding the offset of a referenced object in the heap.
@@ -405,7 +405,7 @@ static void default_gc_heap_write_global_slot(Managed_Object_Handle *p_slot,
 
 
 
-static void default_gc_heap_write_global_slot_compressed(uint32 *p_slot,
+static void default_gc_heap_write_global_slot_compressed(U_32 *p_slot,
                                                          Managed_Object_Handle value)
 {
     // p_slot is the address of a 32 bit global variable holding the offset of a referenced object in the heap.
@@ -430,7 +430,7 @@ static void default_gc_heap_wrote_object(Managed_Object_Handle UNREF p_base_of_o
 
 
 
-static void default_gc_add_compressed_root_set_entry(uint32 * UNREF ref)
+static void default_gc_add_compressed_root_set_entry(U_32 * UNREF ref)
 {
     LDIE(7, "Fatal GC error: compressed references are not supported.");
 } //default_gc_add_compressed_root_set_entry
@@ -456,7 +456,7 @@ static Boolean default_gc_supports_frontier_allocation(unsigned * UNREF offset_o
     return FALSE;
 }
 
-static int32 default_gc_get_hashcode(Managed_Object_Handle obj) {
+static I_32 default_gc_get_hashcode(Managed_Object_Handle obj) {
     return default_hashcode(obj);
 }
 
@@ -496,7 +496,7 @@ static void default_gc_unpin_object(Managed_Object_Handle*)
 }
 
 /* $$$ GMJ
-static int32 default_gc_get_hashcode(Managed_Object_Handle obj)
+static I_32 default_gc_get_hashcode(Managed_Object_Handle obj)
 {
     return default_hashcode((ManagedObject*) obj);
 }

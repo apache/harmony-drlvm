@@ -50,12 +50,12 @@ public:
     /** struct OpcodeGroupDescription contains the description of an opcode group */
     struct OpcodeGroup {
         Mnemonic                    mnemonic;
-        uint32                      properties;
+        U_32                      properties;
         OpndRolesDescription        opndRoles;
         Constraint                  opndConstraints[IRMaxNativeOpnds];
         OpndRolesDesc               implicitOpndRoles;
         RegName                     implicitOpndRegNames[3];
-        uint32                      extendedToNativeMap[IRMaxExtendedOpnds];
+        U_32                      extendedToNativeMap[IRMaxExtendedOpnds];
         const char *                printMnemonic;
     };
 
@@ -68,10 +68,10 @@ public:
         const OpcodeGroup * opcodeGroup;
     };
 
-    static bool matches(Constraint co, Constraint ci, uint32 opndRoles, bool allowAliases);
+    static bool matches(Constraint co, Constraint ci, U_32 opndRoles, bool allowAliases);
     static const OpcodeGroup* findOpcodeGroup(const FindInfo& fi);
     static bool matches(const OpcodeGroup* og, const FindInfo& fi, bool any);
-    static bool isOpndAllowed(const Encoder::OpcodeGroup * og, uint32 i, Constraint co, bool isExtended, bool any);
+    static bool isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, bool isExtended, bool any);
 
     /**
      * Retunrs an empty opcode group.
@@ -91,10 +91,10 @@ public:
         Constraint constraints[MemOpndSubOpndKind_Count];
     };
 
-    static const MemOpndConstraints * getMemOpndConstraints(uint32 idx)
+    static const MemOpndConstraints * getMemOpndConstraints(U_32 idx)
     { assert(idx<lengthof(memOpndConstraints)); return memOpndConstraints+idx; }
 
-    static Constraint getMemOpndSubOpndConstraint(Constraint memOpndConstraint, uint32 subOpndIndex) {
+    static Constraint getMemOpndSubOpndConstraint(Constraint memOpndConstraint, U_32 subOpndIndex) {
         return getMemOpndConstraints(0)->constraints[subOpndIndex];
     }
 
@@ -108,12 +108,12 @@ public:
     /**
      * Returns properties (see Inst::Properties) for a given mnemonic.
      */
-    static uint32 getMnemonicProperties(Mnemonic mn);
+    static U_32 getMnemonicProperties(Mnemonic mn);
 
     /**
      * Returns properties (see Inst::Properties) for a given MnemonicDesc.
      */
-    static uint32 getMnemonicProperties(const MnemonicDesc& mdesc);
+    static U_32 getMnemonicProperties(const MnemonicDesc& mdesc);
 private:
     /**
      * Empty opcode group.

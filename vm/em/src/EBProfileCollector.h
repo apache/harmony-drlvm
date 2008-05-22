@@ -50,14 +50,14 @@ public:
     };
 
     EBProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit, EB_ProfilerMode _mode,
-        uint32 _eThreshold, uint32 _bThreshold, uint32 _initialTimeout=0, uint32 _timeout=0);
+        U_32 _eThreshold, U_32 _bThreshold, U_32 _initialTimeout=0, U_32 _timeout=0);
         
     virtual ~EBProfileCollector();
 
     virtual TbsEMClient* getTbsEmClient() const {return mode == EB_PCMODE_ASYNC ? (TbsEMClient*)this : NULL;}
     
-    virtual uint32 getInitialTimeout() const {return initialTimeout;}
-    virtual uint32 getTimeout() const {return timeout;}
+    virtual U_32 getInitialTimeout() const {return initialTimeout;}
+    virtual U_32 getTimeout() const {return timeout;}
     virtual void onTimeout();
     virtual MethodProfile* getMethodProfile(Method_Handle mh) const ;
     virtual void classloaderUnloadingCallback(Class_Loader_Handle h);
@@ -65,8 +65,8 @@ public:
     EBMethodProfile* createProfile(Method_Handle mh);
     void syncModeJitCallback(MethodProfile* mp);
 
-    uint32 getEntryThreshold() const {return eThreshold;}
-    uint32 getBackedgeThreshold() const {return bThreshold;}
+    U_32 getEntryThreshold() const {return eThreshold;}
+    U_32 getBackedgeThreshold() const {return bThreshold;}
 
     EB_ProfilerMode getMode() const {return mode;}
 
@@ -75,10 +75,10 @@ private:
     void cleanUnloadedProfiles(bool removeFromGreen);
 
     EB_ProfilerMode mode;
-    uint32 eThreshold;
-    uint32 bThreshold;
-    uint32 initialTimeout;
-    uint32 timeout;
+    U_32 eThreshold;
+    U_32 bThreshold;
+    U_32 initialTimeout;
+    U_32 timeout;
     bool loggingEnabled;
     std::string catName;
     
@@ -105,7 +105,7 @@ class EBMethodProfile : public MethodProfile {
 public:
     EBMethodProfile(EBProfileCollector* pc, Method_Handle mh) 
         : MethodProfile(pc, mh), entryCounter(0), backedgeCounter(0){}
-    uint32 entryCounter, backedgeCounter;
+    U_32 entryCounter, backedgeCounter;
 };
 
 
@@ -114,7 +114,7 @@ void* eb_profiler_get_entry_counter_addr(Method_Profile_Handle mph);
 void*eb_profiler_get_backedge_counter_addr(Method_Profile_Handle mph);
 void  __stdcall eb_profiler_sync_mode_callback(PC_Handle mph);
 char  eb_profiler_is_in_sync_mode(PC_Handle pch);
-uint32 eb_profiler_get_entry_threshold(PC_Handle pch);
-uint32 eb_profiler_get_backedge_threshold(PC_Handle pch);
+U_32 eb_profiler_get_entry_threshold(PC_Handle pch);
+U_32 eb_profiler_get_backedge_threshold(PC_Handle pch);
 
 #endif

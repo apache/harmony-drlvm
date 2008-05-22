@@ -357,7 +357,7 @@ void CodeLayouter::layoutNodes() {
     // sort chains 
     ChainMap order(mm);
     for (ChainListIterator it=chains.begin(); it!=chains.end(); it++) {
-        uint32 weight = calculateChainWeight(*it);  // calculate chain weight
+        U_32 weight = calculateChainWeight(*it);  // calculate chain weight
         order.insert( make_pair(weight, *it) );     // insert pair weight->chain in map
     }
 
@@ -381,11 +381,11 @@ void CodeLayouter::layoutNodes() {
 //----------------------------------------------------------------------------------------//
 // chain weight is exec counters summ of all nodes in the chain
 
-uint32 CodeLayouter::calculateChainWeight(Chain *chain) {
+U_32 CodeLayouter::calculateChainWeight(Chain *chain) {
 
     if (chain->front() == cfg.getEnterNode()) return UINT_MAX;  // enter node always goes first
     
-    uint32 weight = 0;
+    U_32 weight = 0;
     for (ChainIterator it=chain->begin(); it!=chain->end(); it++) {
         if ((*it)->isBb() == false) continue;
         BbNode *node = (BbNode *) *it;

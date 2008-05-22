@@ -29,8 +29,8 @@ namespace  Ia32 {
 
 class APIMagicsHandlerSession: public SessionAction {
     void runImpl();
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return 0; }
     bool isIRDumpEnabled(){ return true; }
 };
 
@@ -38,13 +38,13 @@ static ActionFactory<APIMagicsHandlerSession> _api_magics("api_magic");
 
 static Opnd* getCallDst(CallInst* callInst) {
     Inst::Opnds defs(callInst, Inst::OpndRole_InstLevel | Inst::OpndRole_Def | Inst::OpndRole_Explicit);
-    uint32 idx = defs.begin();
+    U_32 idx = defs.begin();
     return callInst->getOpnd(idx);
 }
-static Opnd* getCallSrc(CallInst* callInst, uint32 n) {
+static Opnd* getCallSrc(CallInst* callInst, U_32 n) {
     Inst::Opnds uses(callInst, Inst::OpndRole_InstLevel | Inst::OpndRole_Use | Inst::OpndRole_Explicit);
-    uint32 idx  = uses.begin(); //the first use is call addr
-    for (uint32 i=0; i<=n; i++) {
+    U_32 idx  = uses.begin(); //the first use is call addr
+    for (U_32 i=0; i<=n; i++) {
         idx = uses.next(idx);
     }
     return  callInst->getOpnd(idx);
@@ -973,7 +973,7 @@ Opnd*  APIMagicHandler::addElemIndexWithLEA(Opnd* array, Opnd* index, RegName ds
 #endif
     Type * indexType = typeManager.getIntPtrType();
         
-    uint32 elemSize = 0;
+    U_32 elemSize = 0;
     if (elemType->isReference()
         && Type::isCompressedReference(elemType->tag, irm->getCompilationInterface()) 
         && !elemType->isCompressedReference()) {

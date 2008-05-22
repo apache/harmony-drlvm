@@ -61,7 +61,7 @@ BOOLEAN class_is_array(Class_Handle cl) {
 
 
 static unsigned countLeadingChars(const char* str, char c) {
-    uint32 n=0;
+    U_32 n=0;
     while (str[n]==c) {
         n++;
     }
@@ -306,7 +306,7 @@ method_allocate_code_block(Method_Handle m,
     JIT *jit = (JIT *)j;
     assert(jit);
 
-    uint32 drlHeat;
+    U_32 drlHeat;
     if (heat == CodeBlockHeatMin)
         drlHeat = CODE_BLOCK_HEAT_COLD;
     else if (heat == CodeBlockHeatMax)
@@ -369,7 +369,7 @@ const U_8* method_get_bytecode(Method_Handle m)
 
 
 
-uint32
+U_32
 method_get_bytecode_length(Method_Handle m)
 {
     assert(m);
@@ -378,7 +378,7 @@ method_get_bytecode_length(Method_Handle m)
 
 
 
-uint32 method_get_max_locals(Method_Handle m)
+U_32 method_get_max_locals(Method_Handle m)
 {
     assert(m);
     return m->get_max_locals();
@@ -667,7 +667,7 @@ const char* class_cp_get_const_string(Class_Handle cl, U_16 index)
 
 
 // Returns the address where the interned version of the string is stored: this will be the address
-// of a slot containing a Java_java_lang_String* or a uint32 compressed reference. Also interns the
+// of a slot containing a Java_java_lang_String* or a U_32 compressed reference. Also interns the
 // string so that the JIT can load a reference to the interned string without checking if it is null.
 const void *class_get_const_string_intern_addr(Class_Handle cl, unsigned short index)
 {
@@ -1409,8 +1409,8 @@ BOOLEAN field_is_injected(Field_Handle f)
 
 struct GC_VTable {
     Class_Handle ch;  // for debugging
-    uint32 num_ref_fields;
-    uint32 *ref_fields_offsets;
+    U_32 num_ref_fields;
+    U_32 *ref_fields_offsets;
     unsigned is_array : 1;
     unsigned is_primitive : 1;
 };
@@ -1500,7 +1500,7 @@ unsigned class_get_referent_offset(Class_Handle ch)
     return referent->get_offset();
 }
 
-void* class_alloc_via_classloader(Class_Handle ch, int32 size)
+void* class_alloc_via_classloader(Class_Handle ch, I_32 size)
 {
     assert(ch);
     assert(size >= 0);
@@ -1592,7 +1592,7 @@ Method_Handle method_get_overriding_method(Class_Handle ch, Method_Handle mh)
 
 
 
-int32 vector_get_length(Vector_Handle vector)
+I_32 vector_get_length(Vector_Handle vector)
 {
     assert(vector);
     // XXX- need some assert that "vector" is really an array type
@@ -1601,7 +1601,7 @@ int32 vector_get_length(Vector_Handle vector)
 
 
 
-Managed_Object_Handle *vector_get_element_address_ref(Vector_Handle vector, int32 idx)
+Managed_Object_Handle *vector_get_element_address_ref(Vector_Handle vector, I_32 idx)
 {
     assert(vector);
     Managed_Object_Handle *elem = (Managed_Object_Handle *)get_vector_element_address_ref(vector, idx);

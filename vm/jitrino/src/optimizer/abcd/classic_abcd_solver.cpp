@@ -49,7 +49,7 @@ void TwoStateOpndToEdgeListMap::setState(bool is_lower)
     }
 }
 
-void TwoStateOpndToEdgeListMap::addEdge(uint32 opnd_id, IneqEdge* edge)
+void TwoStateOpndToEdgeListMap::addEdge(U_32 opnd_id, IneqEdge* edge)
 {
     MapIdTo2stList::iterator it = _map.find(opnd_id);
     if ( it == _map.end() ) {
@@ -62,7 +62,7 @@ void TwoStateOpndToEdgeListMap::addEdge(uint32 opnd_id, IneqEdge* edge)
 }
 
 void TwoStateOpndToEdgeListMap::addEdgeSingleState
-    (uint32 opnd_id, IneqEdge *edge, bool is_lower)
+    (U_32 opnd_id, IneqEdge *edge, bool is_lower)
 {
     MapIdTo2stList::iterator it = _map.find(opnd_id);
     if ( it == _map.end() ) {
@@ -75,7 +75,7 @@ void TwoStateOpndToEdgeListMap::addEdgeSingleState
 }
 
 TwoStateEdgeList::iterator
-    TwoStateOpndToEdgeListMap::eListBegin(uint32 opnd_id) const
+    TwoStateOpndToEdgeListMap::eListBegin(U_32 opnd_id) const
 {
     MapIdTo2stList::const_iterator it = _map.find(opnd_id);
     if ( it == _map.end() ) {
@@ -85,7 +85,7 @@ TwoStateEdgeList::iterator
 }
 
 TwoStateEdgeList::iterator
-    TwoStateOpndToEdgeListMap::eListEnd(uint32 opnd_id) const
+    TwoStateOpndToEdgeListMap::eListEnd(U_32 opnd_id) const
 {
     MapIdTo2stList::const_iterator it = _map.find(opnd_id);
     if ( it == _map.end() ) {
@@ -125,7 +125,7 @@ InequalityGraph::edge_iterator InequalityGraph::outEdgesEnd(IOpnd* opnd) const
     return _opnd_to_outedges_map_2st.eListEnd(opnd->getID());
 }
 
-void InequalityGraph::addEdge(IOpnd* from, IOpnd* to, int32 distance)
+void InequalityGraph::addEdge(IOpnd* from, IOpnd* to, I_32 distance)
 {
     assert(!has_other_opnd_with_same_id(_id_to_opnd_map, from));
     assert(!has_other_opnd_with_same_id(_id_to_opnd_map, to));
@@ -147,14 +147,14 @@ void InequalityGraph::setState(bool is_lower)
     _opnd_to_outedges_map_2st.setState(is_lower);
 }
 
-void InequalityGraph::addEdge(uint32 id_from, uint32 id_to, int32 distance)
+void InequalityGraph::addEdge(U_32 id_from, U_32 id_to, I_32 distance)
 {
     IOpnd* from = getOpndById(id_from);
     IOpnd* to = getOpndById(id_to);
     addEdge(from, to, distance);
 }
 
-IOpnd* InequalityGraph::getOpndById(uint32 id) const
+IOpnd* InequalityGraph::getOpndById(U_32 id) const
 {
     IdToOpndMap::const_iterator it = _id_to_opnd_map.find(id);
     assert(it != _id_to_opnd_map.end());
@@ -162,7 +162,7 @@ IOpnd* InequalityGraph::getOpndById(uint32 id) const
 }
 
 void InequalityGraph::addEdgeSingleState
-     (uint32 id_from, uint32 id_to, int32 distance, bool is_lower)
+     (U_32 id_from, U_32 id_to, I_32 distance, bool is_lower)
 {
     IOpnd* from = getOpndById(id_from);
     IOpnd* to = getOpndById(id_to);
@@ -170,7 +170,7 @@ void InequalityGraph::addEdgeSingleState
 }
 
 void InequalityGraph::addEdgeSingleState
-     (IOpnd* from, IOpnd* to, int32 distance, bool is_lower)
+     (IOpnd* from, IOpnd* to, I_32 distance, bool is_lower)
 {
     assert(!has_other_opnd_with_same_id(_id_to_opnd_map, from));
     assert(!has_other_opnd_with_same_id(_id_to_opnd_map, to));
@@ -294,7 +294,7 @@ void InequalityGraph::printDotBody(std::ostream& os) const
     }
 }
 
-IOpnd* InequalityGraph::findOpnd(uint32 id) const
+IOpnd* InequalityGraph::findOpnd(U_32 id) const
 {
     IdToOpndMap::const_iterator it = _id_to_opnd_map.find(id);
     if ( it == _id_to_opnd_map.end() ) {
@@ -310,7 +310,7 @@ TrueReducedFalseChart* BoundAllocator::create_empty_TRFChart()
     return new (_mem_mgr) TrueReducedFalseChart(this);
 }
 
-Bound* BoundAllocator::newBound(int32 val, const BoundState& bs)
+Bound* BoundAllocator::newBound(I_32 val, const BoundState& bs)
 {
     return new (_mem_mgr) Bound(val, bs);
 }
@@ -327,7 +327,7 @@ Bound* BoundAllocator::create_dec1(Bound* bound)
                     bound->getBoundState());
 }
 
-Bound* BoundAllocator::create_dec_const(Bound* bound, int32 cnst)
+Bound* BoundAllocator::create_dec_const(Bound* bound, I_32 cnst)
 {
     return newBound(bound->_bound - cnst, bound->getBoundState());
 }
@@ -359,7 +359,7 @@ bool Bound::eq(Bound* bound1, Bound* bound2)
         Bound::leq(bound1, bound2) && Bound::leq(bound2, bound1);
 }
 
-bool Bound::leq_int32(Bound* bound1, int32 value) 
+bool Bound::leq_int32(Bound* bound1, I_32 value) 
 { 
     assert(bound1);
     return bound1->isUpper() ? 
@@ -367,7 +367,7 @@ bool Bound::leq_int32(Bound* bound1, int32 value)
         bound1->_bound >= value;
 }
 
-bool Bound::int32_leq(int32 value, Bound* bound1) 
+bool Bound::int32_leq(I_32 value, Bound* bound1) 
 { 
     assert(bound1);
     return bound1->isUpper() ? 
@@ -376,10 +376,10 @@ bool Bound::int32_leq(int32 value, Bound* bound1)
 }
 
 // returns (dst_val - src_val <= bound)
-bool Bound::const_distance_leq(int32 src_val, int32 dst_val, Bound* bound)
+bool Bound::const_distance_leq(I_32 src_val, I_32 dst_val, Bound* bound)
 {
     assert(bound);
-    int32 distance = dst_val - src_val;
+    I_32 distance = dst_val - src_val;
     assert(distance + src_val == dst_val);
     return Bound::int32_leq(distance, bound);
 }
@@ -632,7 +632,7 @@ void ActiveOpnds::print(std::ostream& os) const
 //------------------------------------------------------------------------------
 
 bool ClassicAbcdSolver::demandProve
-     (IOpnd* source, IOpnd* dest, int32 bound_int, bool prove_upper_bound)
+     (IOpnd* source, IOpnd* dest, I_32 bound_int, bool prove_upper_bound)
 {
     assert(source && dest);
     _source_opnd = source;
@@ -666,7 +666,7 @@ bool ClassicAbcdSolver::demandProve
 
 void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest, 
                                                            Bound* bound, 
-                                                           uint32 prn_level, 
+                                                           U_32 prn_level, 
                                                       meet_func_t meet_f)
 {
     InequalityGraph::edge_iterator in_it = _igraph.inEdgesBegin(dest);
@@ -711,7 +711,7 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
 // prove that distance between '_source_opnd' and 'dest' is <= bound
 //
 ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound, 
-        uint32 prn_level)
+        U_32 prn_level)
 {
     Printer prn(prn_level, Log::out());
     if ( Log::isEnabled() ) {
@@ -801,7 +801,7 @@ ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound,
 void ClassicAbcdSolver::Printer::prnLevel()
 {
     if (Log::isEnabled()) {
-        for (uint32 i = 0; i < _level; i++) {
+        for (U_32 i = 0; i < _level; i++) {
             _os << "    ";
         }
     }
@@ -1081,7 +1081,7 @@ void testPaperIGraph()
 
 void printExampleGraph()
 {
-    uint32 opnd_id = 0;
+    U_32 opnd_id = 0;
     IOpnd op0(opnd_id++), op1(opnd_id++, true), op2(opnd_id++, true, true);
 
     op2.setConstant(25);
@@ -1183,7 +1183,7 @@ void testOverflow()
 }
 
 void verifyNodesRange
-     (const uint32* ids_gold, uint32 id_count,
+     (const U_32* ids_gold, U_32 id_count,
       const InequalityGraph::edge_iterator& begin_range,
       const InequalityGraph::edge_iterator& end_range, bool check_src_nodes)
 {
@@ -1191,13 +1191,13 @@ void verifyNodesRange
     //    it is far from optimal asymptotically
     InequalityGraph::edge_iterator it = begin_range;
     InequalityGraph::edge_iterator end = end_range;
-    uint32 found_count = 0;
+    U_32 found_count = 0;
     for (; it != end; it.next()) {
         IneqEdge* edge = it.get();
         IOpnd* op = check_src_nodes ? edge->getSrc() : edge->getDst();
-        uint32 op_id = op->getID();
+        U_32 op_id = op->getID();
         bool found = false;
-        for (uint32 i = 0; i < id_count; i++) {
+        for (U_32 i = 0; i < id_count; i++) {
             if ( op_id == ids_gold[i] ) {
                 found = true;
                 found_count++;
@@ -1210,7 +1210,7 @@ void verifyNodesRange
 }
 
 void assertInNodesEqual(InequalityGraph& g,
-     IOpnd& opnd, const uint32* ids_gold, uint32 id_count)
+     IOpnd& opnd, const U_32* ids_gold, U_32 id_count)
 {
     const InequalityGraph::edge_iterator in_iter = g.inEdgesBegin(&opnd),
           in_end = g.inEdgesEnd(&opnd);
@@ -1219,7 +1219,7 @@ void assertInNodesEqual(InequalityGraph& g,
 }
 
 void assertOutNodesEqual(InequalityGraph& g,
-     IOpnd& opnd, const uint32* ids_gold, uint32 id_count)
+     IOpnd& opnd, const U_32* ids_gold, U_32 id_count)
 {
     const InequalityGraph::edge_iterator out_iter = g.outEdgesBegin(&opnd),
           out_end = g.outEdgesEnd(&opnd);
@@ -1249,7 +1249,7 @@ void testTwoStateOpndToEdgeListMap()
     {
         TwoStateEdgeList::iterator it = edges_map_2st.eListBegin(1),
             it_end = edges_map_2st.eListEnd(1);
-        uint32 found = 0;
+        U_32 found = 0;
         for (; it != it_end; it.next() ) {
             UNUSED IneqEdge* e = it.get();
             assert(e == &e1 || e == &e2 || e == &e3);
@@ -1262,7 +1262,7 @@ void testTwoStateOpndToEdgeListMap()
     {
         TwoStateEdgeList::iterator it = edges_map_2st.eListBegin(1),
             it_end = edges_map_2st.eListEnd(1);
-        uint32 found = 0;
+        U_32 found = 0;
         for (; it != it_end; it.next() ) {
             UNUSED IneqEdge* e = it.get();
             assert(e == &e1 || e == &e2);
@@ -1305,31 +1305,31 @@ void testBasicIGraphOperations()
 
     g.setState(true /* is_lower */);
     {
-        const uint32 i1_in_gold[] = {0, 3, length.getID()};
+        const U_32 i1_in_gold[] = {0, 3, length.getID()};
         assertInNodesEqual(g, i1, i1_in_gold, 3);
-        const uint32 i1_out_gold[] = {2};
+        const U_32 i1_out_gold[] = {2};
         assertOutNodesEqual(g, i1, i1_out_gold, 1);
-        const uint32 i2_in_gold[] = {1, length.getID()};
+        const U_32 i2_in_gold[] = {1, length.getID()};
         assertInNodesEqual(g, i2, i2_in_gold, 2);
-        const uint32 i3_out_gold[] = {1};
+        const U_32 i3_out_gold[] = {1};
         assertOutNodesEqual(g, i3, i3_out_gold, 1);
     }
 
     g.setState(false /* is_lower */);
     {
-        const uint32 i1_in_gold[] = {0, 3};
+        const U_32 i1_in_gold[] = {0, 3};
         assertInNodesEqual(g, i1, i1_in_gold, 2);
-        const uint32 i1_out_gold[] = {2};
+        const U_32 i1_out_gold[] = {2};
         assertOutNodesEqual(g, i1, i1_out_gold, 1);
-        const uint32 i2_in_gold[] = {1, length.getID(), 3};
+        const U_32 i2_in_gold[] = {1, length.getID(), 3};
         assertInNodesEqual(g, i2, i2_in_gold, 3);
-        const uint32 i3_out_gold[] = {1, 2};
+        const U_32 i3_out_gold[] = {1, 2};
         assertOutNodesEqual(g, i3, i3_out_gold, 2);
     }
 
     g.setState(true /* is_lower */);
     {
-        const uint32 i3_out_gold[] = {1};
+        const U_32 i3_out_gold[] = {1};
         assertOutNodesEqual(g, i3, i3_out_gold, 1);
     }
     std::ofstream f;

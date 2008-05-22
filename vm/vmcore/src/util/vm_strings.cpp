@@ -218,8 +218,8 @@ static void string_set_fields_separate(ManagedObject* str, unsigned length, unsi
     assert(f_value_offset);
 
     U_8* str_raw = (U_8*)str;
-    *(uint32*)(str_raw+f_count_offset) = length;
-    *(uint32*)(str_raw+f_offset_offset) = offset;
+    *(U_32*)(str_raw+f_count_offset) = length;
+    *(U_32*)(str_raw+f_offset_offset) = offset;
     STORE_REFERENCE(str, str_raw+f_value_offset, chars);
 }
 
@@ -369,7 +369,7 @@ unsigned string_get_length(ManagedObject* str)
 
     if (f_count_offset == 0) init_fields();
     U_8* str_raw = (U_8*)str;
-    return *(uint32*)(str_raw+f_count_offset);
+    return *(U_32*)(str_raw+f_count_offset);
 }
 
 // returns length in characters
@@ -416,7 +416,7 @@ static void string_get_buffer(ManagedObject* str, StringBuffer* buf)
     assert(f_value_char_offset);
 
     U_8* str_raw = (U_8*)str;
-    unsigned offset = *(uint32*)(str_raw + f_offset_offset);
+    unsigned offset = *(U_32*)(str_raw + f_offset_offset);
     Vector_Handle char_array = get_raw_reference_pointer((ManagedObject**)(str_raw+f_value_char_offset));
     if (char_array) {
         buf->is_compressed = false;
@@ -434,7 +434,7 @@ static void string_get_buffer(ManagedObject* str, StringBuffer* buf)
 const uint16* string_get_unicode_chars(ManagedObject* string)
 {
     assert(string);
-    uint32 unicode_size = string_get_length(string);
+    U_32 unicode_size = string_get_length(string);
     StringBuffer buf;
     string_get_buffer(string, &buf);
     uint16* unicode_chars = (uint16*)STD_MALLOC(sizeof(uint16)*(unicode_size+1));
@@ -457,7 +457,7 @@ const uint16* string_get_unicode_chars(ManagedObject* string)
 const char* string_get_utf8_chars(ManagedObject* string)
 {
     assert(string);
-    uint32 unicode_size = string_get_length(string);
+    U_32 unicode_size = string_get_length(string);
     StringBuffer buf;
     string_get_buffer(string, &buf);
     char* utf_chars;

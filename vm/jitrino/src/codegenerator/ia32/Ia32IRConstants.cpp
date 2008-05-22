@@ -94,10 +94,10 @@ ConditionMnemonic   swapConditionMnemonic(ConditionMnemonic cm)
 }
 
 //_________________________________________________________________________________________________
-uint32 countOnes(uint32 mask)
+U_32 countOnes(U_32 mask)
 {
-    uint32 count=0;
-    for (uint32 m=1; m; m<<=1) if ((mask & m)!=0) count++;
+    U_32 count=0;
+    for (U_32 m=1; m; m<<=1) if ((mask & m)!=0) count++;
     return count;
 }
 

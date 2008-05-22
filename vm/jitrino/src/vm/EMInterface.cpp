@@ -48,8 +48,8 @@ MethodProfile* ProfilingInterface::getMethodProfile(MemoryManager& mm, ProfileTy
     } else if (type == ProfileType_Value) {
         p = new (mm) ValueMethodProfile(mpHandle, md, profileAccessInterface);
     } else {
-        uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
-        uint32* bCounter = (uint32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
+        U_32* eCounter = (U_32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
+        U_32* bCounter = (U_32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
         p = new (mm) EntryBackedgeMethodProfile(mpHandle, md, eCounter, bCounter);
     }
     return p;
@@ -80,7 +80,7 @@ bool ProfilingInterface::hasMethodProfile(ProfileType type, MethodDesc& md, JITP
     return false;
 }
 
-uint32 ProfilingInterface::getProfileMethodCount(MethodDesc& md, JITProfilingRole role) const {
+U_32 ProfilingInterface::getProfileMethodCount(MethodDesc& md, JITProfilingRole role) const {
     assert(jitRole == role);
     PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
     ProfileType pcType = ProfileType_Edge;
@@ -94,11 +94,11 @@ uint32 ProfilingInterface::getProfileMethodCount(MethodDesc& md, JITProfilingRol
     if (mph == NULL) {
         return 0;
     }
-    uint32* counterAddr = NULL;
+    U_32* counterAddr = NULL;
     if (pcType == ProfileType_Edge) { 
-        counterAddr = (uint32*)profileAccessInterface->edge_profiler_get_entry_counter_addr(mph);
+        counterAddr = (U_32*)profileAccessInterface->edge_profiler_get_entry_counter_addr(mph);
     } else {
-        counterAddr = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mph);
+        counterAddr = (U_32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mph);
     }
     return *counterAddr;
 }
@@ -151,8 +151,8 @@ EntryBackedgeMethodProfile* ProfilingInterface::createEBMethodProfile(MemoryMana
     PC_Handle pcHandle = getPCHandle(ProfileType_EntryBackedge);
     Method_Profile_Handle mpHandle = profileAccessInterface->eb_profiler_create_profile(pcHandle, md.getMethodHandle());
     assert(mpHandle!=0);
-    uint32* eCounter = (uint32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
-    uint32* bCounter = (uint32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
+    U_32* eCounter = (U_32*)profileAccessInterface->eb_profiler_get_entry_counter_addr(mpHandle);
+    U_32* bCounter = (U_32*)profileAccessInterface->eb_profiler_get_backedge_counter_addr(mpHandle);
 
     EntryBackedgeMethodProfile* p = new (mm) EntryBackedgeMethodProfile(mpHandle, md, eCounter, bCounter);
     return p;
@@ -161,9 +161,9 @@ EntryBackedgeMethodProfile* ProfilingInterface::createEBMethodProfile(MemoryMana
 
 EdgeMethodProfile* ProfilingInterface::createEdgeMethodProfile( MemoryManager& mm,
                                                                   MethodDesc& md,
-                                                                  uint32 numCounters,
-                                                                  uint32* counterKeys,
-                                                                  uint32 checkSum )
+                                                                  U_32 numCounters,
+                                                                  U_32* counterKeys,
+                                                                  U_32 checkSum )
 {
     assert(isProfilingEnabled(ProfileType_Edge, JITProfilingRole_GEN));
     PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
@@ -177,8 +177,8 @@ EdgeMethodProfile* ProfilingInterface::createEdgeMethodProfile( MemoryManager& m
 
 ValueMethodProfile* ProfilingInterface::createValueMethodProfile(MemoryManager& mm,
                                                                     MethodDesc& md,
-                                                                    uint32 numKeys,
-                                                                    uint32* Keys)
+                                                                    U_32 numKeys,
+                                                                    U_32* Keys)
 {
     assert(isProfilingEnabled(ProfileType_Value, JITProfilingRole_GEN));
     PC_Handle pcHandle = getPCHandle(ProfileType_Value);
@@ -191,7 +191,7 @@ ValueMethodProfile* ProfilingInterface::createValueMethodProfile(MemoryManager& 
 }
 
 
-uint32 ProfilingInterface::getMethodEntryThreshold() const {
+U_32 ProfilingInterface::getMethodEntryThreshold() const {
     PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
     if (pcHandle != NULL) {
         return profileAccessInterface->edge_profiler_get_entry_threshold(pcHandle);
@@ -202,7 +202,7 @@ uint32 ProfilingInterface::getMethodEntryThreshold() const {
     return 0;
 }
 
-uint32 ProfilingInterface::getBackedgeThreshold() const {
+U_32 ProfilingInterface::getBackedgeThreshold() const {
     PC_Handle pcHandle = getPCHandle(ProfileType_Edge);
     if (pcHandle != NULL) {
         return profileAccessInterface->edge_profiler_get_backedge_threshold(pcHandle);
@@ -225,24 +225,24 @@ ProfilingInterface::PC_Callback_Fn* ProfilingInterface::getEBProfilerSyncModeCal
 }
 
 
-uint32  EdgeMethodProfile::getNumCounters() const {
+U_32  EdgeMethodProfile::getNumCounters() const {
     return profileAccessInterface->edge_profiler_get_num_counters(getHandle());
 }
 
-uint32  EdgeMethodProfile::getCheckSum() const {
+U_32  EdgeMethodProfile::getCheckSum() const {
     return profileAccessInterface->edge_profiler_get_checksum(getHandle());
 }
 
-uint32* EdgeMethodProfile::getEntryCounter() const {
-    return (uint32*)profileAccessInterface->edge_profiler_get_entry_counter_addr(getHandle());
+U_32* EdgeMethodProfile::getEntryCounter() const {
+    return (U_32*)profileAccessInterface->edge_profiler_get_entry_counter_addr(getHandle());
 }
 
-uint32* EdgeMethodProfile::getCounter(uint32 key) const  {
-    uint32* counter = (uint32*)profileAccessInterface->edge_profiler_get_counter_addr(getHandle(), key);
+U_32* EdgeMethodProfile::getCounter(U_32 key) const  {
+    U_32* counter = (U_32*)profileAccessInterface->edge_profiler_get_counter_addr(getHandle(), key);
     return counter;
 }
 
-POINTER_SIZE_INT ValueMethodProfile::getTopValue(uint32 instructionKey) const {
+POINTER_SIZE_INT ValueMethodProfile::getTopValue(U_32 instructionKey) const {
     return profileAccessInterface->value_profiler_get_top_value(getHandle(), instructionKey);
 }
 

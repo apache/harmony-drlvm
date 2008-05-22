@@ -43,11 +43,11 @@ struct Annotation;
 // Constant Java values
 ///////////////////////////////////////////////////////////////////////////////
 union Const_Java_Value {
-    uint32 i;
+    U_32 i;
     int64 j;
     struct {
-        uint32 lo_bytes;
-        uint32 hi_bytes;
+        U_32 lo_bytes;
+        U_32 hi_bytes;
     } l;
     float f;
     double d;

@@ -176,19 +176,19 @@ inline POINTER_SIZE_INT atomic_casptrsz(volatile POINTER_SIZE_INT* mem,
 #endif
 }
 
-inline uint32 atomic_cas32(volatile unsigned int *mem,
+inline U_32 atomic_cas32(volatile unsigned int *mem,
                                            apr_uint32_t swap,
                                            apr_uint32_t cmp) 
-{  return (uint32)apr_atomic_cas32(mem, swap, cmp); }
+{  return (U_32)apr_atomic_cas32(mem, swap, cmp); }
 
-inline uint32 atomic_inc32(volatile unsigned int *mem)
-{  return (uint32)apr_atomic_inc32(mem); }
+inline U_32 atomic_inc32(volatile unsigned int *mem)
+{  return (U_32)apr_atomic_inc32(mem); }
 
-inline uint32 atomic_dec32(volatile unsigned int  *mem)
-{  return (uint32)apr_atomic_dec32(mem); }
+inline U_32 atomic_dec32(volatile unsigned int  *mem)
+{  return (U_32)apr_atomic_dec32(mem); }
 
-inline uint32 atomic_add32(volatile unsigned int  *mem, unsigned int  val) 
-{  return (uint32)apr_atomic_add32(mem, val); }
+inline U_32 atomic_add32(volatile unsigned int  *mem, unsigned int  val) 
+{  return (U_32)apr_atomic_add32(mem, val); }
 
 #ifndef _WINDOWS_
 #include <sys/mman.h>

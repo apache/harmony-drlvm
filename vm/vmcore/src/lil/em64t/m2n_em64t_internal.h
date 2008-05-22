@@ -111,7 +111,7 @@ char * m2n_gen_set_local_handles_imm(char * buf, unsigned bytes_to_m2n, const Im
                            Negative value means that current rsp is above m2n bottom.
  */
 char * m2n_gen_push_m2n(char * buf, Method_Handle method, frame_type current_frame_type, bool handles,
-                        unsigned num_callee_saves, unsigned num_std_need_to_save, int32 bytes_to_m2n_top);
+                        unsigned num_callee_saves, unsigned num_std_need_to_save, I_32 bytes_to_m2n_top);
 unsigned m2n_push_m2n_size(unsigned num_callee_saves, unsigned num_std_need_to_save);
 
 /**
@@ -124,7 +124,7 @@ unsigned m2n_push_m2n_size(unsigned num_callee_saves, unsigned num_std_need_to_s
  * @param handles As for push_m2n, frees the handles if true.
  */
 char * m2n_gen_pop_m2n(char * buf, bool handles, unsigned num_callee_saves,
-                       int32 bytes_to_m2n_bottom, unsigned preserve_ret);
+                       I_32 bytes_to_m2n_bottom, unsigned preserve_ret);
 unsigned m2n_pop_m2n_size(bool handles, unsigned num_callee_saves, unsigned preserve_ret);
 
 // returns top of the specified frame on the stack (it should point to return ip)

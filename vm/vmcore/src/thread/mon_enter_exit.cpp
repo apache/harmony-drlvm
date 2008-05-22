@@ -38,14 +38,14 @@
 
 static void vm_monitor_exit_default(ManagedObject *p_obj);
 static void vm_monitor_enter_default(ManagedObject *p_obj);
-static uint32 vm_monitor_try_enter_default(ManagedObject *p_obj);
-static uint32 vm_monitor_try_exit_default(ManagedObject *p_obj);
+static U_32 vm_monitor_try_enter_default(ManagedObject *p_obj);
+static U_32 vm_monitor_try_exit_default(ManagedObject *p_obj);
 
 
 void (*vm_monitor_enter)(ManagedObject *p_obj) = 0;
 void (*vm_monitor_exit)(ManagedObject *p_obj) = 0;
-uint32 (*vm_monitor_try_enter)(ManagedObject *p_obj) = 0;
-uint32 (*vm_monitor_try_exit)(ManagedObject *p_obj) = 0;
+U_32 (*vm_monitor_try_enter)(ManagedObject *p_obj) = 0;
+U_32 (*vm_monitor_try_exit)(ManagedObject *p_obj) = 0;
 
 
 void vm_enumerate_root_set_mon_arrays()
@@ -126,12 +126,12 @@ static void vm_monitor_exit_default(ManagedObject *p_obj)
     hythread_suspend_disable();
 }
 
-static uint32 vm_monitor_try_enter_default(ManagedObject *p_obj) {
-    return (uint32)hythread_thin_monitor_try_enter((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
+static U_32 vm_monitor_try_enter_default(ManagedObject *p_obj) {
+    return (U_32)hythread_thin_monitor_try_enter((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
 }
 
-static uint32 vm_monitor_try_exit_default(ManagedObject *p_obj) {
-    return (uint32)hythread_thin_monitor_exit((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
+static U_32 vm_monitor_try_exit_default(ManagedObject *p_obj) {
+    return (U_32)hythread_thin_monitor_exit((hythread_thin_monitor_t *)p_obj->get_obj_info_addr());
 }
 
 

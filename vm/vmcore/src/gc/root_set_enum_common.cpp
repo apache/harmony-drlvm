@@ -99,7 +99,7 @@ static void vm_enumerate_class_static(Class* c)
                     // The field is static and it is a reference.
                     REFS_RUNTIME_SWITCH_IF
 #ifdef REFS_RUNTIME_OR_COMPRESSED
-                        vm_enumerate_compressed_root_reference((uint32 *)f->get_address(), FALSE);
+                        vm_enumerate_compressed_root_reference((U_32 *)f->get_address(), FALSE);
 #endif // REFS_RUNTIME_OR_COMPRESSED
                     REFS_RUNTIME_SWITCH_ELSE
 #ifdef REFS_RUNTIME_OR_UNCOMPRESSED
@@ -193,7 +193,7 @@ vm_enumerate_weak_root_reference(void **ref, BOOLEAN is_pinned)
 } //vm_enumerate_weak_root_reference
 
 
-// Resembles vm_enumerate_root_reference() but is passed the address of a uint32 slot containing a compressed reference.
+// Resembles vm_enumerate_root_reference() but is passed the address of a U_32 slot containing a compressed reference.
 VMEXPORT void vm_enumerate_compressed_root_reference(U_32 *ref, BOOLEAN is_pinned)
 {
     assert(REFS_IS_COMPRESSED_MODE);
@@ -309,10 +309,10 @@ void vm_enumerate_root_set_single_thread_on_stack(StackIterator* si)
             if (cci->has_inline_info()) {
                 JIT *jit = cci->get_jit();
                 NativeCodePtr ip = si_get_ip(si);
-                uint32 inlined_depth = si_get_inline_depth(si);
+                U_32 inlined_depth = si_get_inline_depth(si);
                 if (inlined_depth) {
-                    uint32 offset = (uint32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
-                    for (uint32 i = inlined_depth; i > 0; i--) {
+                    U_32 offset = (U_32)((POINTER_SIZE_INT)ip - (POINTER_SIZE_INT)cci->get_code_block_addr());
+                    for (U_32 i = inlined_depth; i > 0; i--) {
                         Method* m = jit->get_inlined_method(cci->get_inline_info(), offset, i);
                         assert (m);
                         cl = m->get_class()->get_class_loader();

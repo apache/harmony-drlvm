@@ -803,7 +803,7 @@ Simplifier::simplifySub(Type* type, Modifier modifier,
     if (src1 == src2) {
         ConstInst::ConstValue zeroval;
         switch(type->tag) {
-        case Type::Int32: return genLdConstant((int32)0)->getDst();
+        case Type::Int32: return genLdConstant((I_32)0)->getDst();
         case Type::Int64: return genLdConstant((int64)0)->getDst();
         default: assert(0); return NULL;
         }
@@ -922,7 +922,7 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
         Inst *inst1 = src1->getInst();
         Type::Tag typeTag1 = inst1->getType();
         int64 val64;
-        int32 val32;
+        I_32 val32;
         if (ConstantFolder::isConstant(src1->getInst(), val64) &&
             (inst2->getOpcode() == Op_Conv) &&
             (((typeTag2 == Type::Int8) && (((uint64)val64) <= 0xff)) ||
@@ -943,18 +943,18 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
         }
     } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
            (inst2->getOpcode() == Op_Conv) &&
-           (((typeTag2 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
-            ((typeTag2 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
-            ((typeTag2 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
+           (((typeTag2 == Type::Int8) && (((U_32)val32) <= 0xff)) ||
+            ((typeTag2 == Type::Int16) && (((U_32)val32) <= 0xffff)) ||
+            ((typeTag2 == Type::Int32) && (((U_32)val32) <= 0xffffffff)))) {
         Opnd *src2opnd = inst2->getSrc(0);
         if (src2opnd->getType() == src2->getType()) {
         return genAnd(theType, src1, src2opnd)->getDst();
         }
     } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
            (inst1->getOpcode() == Op_Conv) &&
-           (((typeTag1 == Type::Int8) && (((uint32)val32) <= 0xff)) ||
-            ((typeTag1 == Type::Int16) && (((uint32)val32) <= 0xffff)) ||
-            ((typeTag1 == Type::Int32) && (((uint32)val32) <= 0xffffffff)))) {
+           (((typeTag1 == Type::Int8) && (((U_32)val32) <= 0xff)) ||
+            ((typeTag1 == Type::Int16) && (((U_32)val32) <= 0xffff)) ||
+            ((typeTag1 == Type::Int32) && (((U_32)val32) <= 0xffffffff)))) {
         Opnd *src1opnd = inst1->getSrc(0);
         if (src1opnd->getType() == src1->getType()) {
         return genAnd(theType, src1opnd, src2)->getDst();
@@ -980,17 +980,17 @@ Simplifier::simplifyAnd(Type* theType, Opnd* src1, Opnd* src2) {
         }
     } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
            (inst2->getOpcode() == Op_TauLdInd) &&
-           (((typeTag2 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
-            ((typeTag2 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
-            ((typeTag2 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
+           (((typeTag2 == Type::UInt8) && (((U_32)val32) == 0xff)) ||
+            ((typeTag2 == Type::UInt16) && (((U_32)val32) == 0xffff)) ||
+            ((typeTag2 == Type::UInt32) && (((U_32)val32) == 0xffffffff)))) {
         if (theType == src2->getType()) {
         return src2;
         }
     } else if (ConstantFolder::isConstant(src2->getInst(), val32) &&
            (inst1->getOpcode() == Op_TauLdInd) &&
-           (((typeTag1 == Type::UInt8) && (((uint32)val32) == 0xff)) ||
-            ((typeTag1 == Type::UInt16) && (((uint32)val32) == 0xffff)) ||
-            ((typeTag1 == Type::UInt32) && (((uint32)val32) == 0xffffffff)))) {
+           (((typeTag1 == Type::UInt8) && (((U_32)val32) == 0xff)) ||
+            ((typeTag1 == Type::UInt16) && (((U_32)val32) == 0xffff)) ||
+            ((typeTag1 == Type::UInt32) && (((U_32)val32) == 0xffffffff)))) {
         if (theType == src1->getType()) {
         return src1;
         }
@@ -1192,14 +1192,14 @@ Simplifier::simplifyMul(Type* type,
             case Type::Int32:
             case Type::UInt32:
                 if (src1isConstant) {
-                    int32 multiplier;
+                    I_32 multiplier;
                     bool t = ConstantFolder::isConstant(src1->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
                     Opnd *product = planMul32(multiplier, src2);
                     return product;
                 } else { // src2isConstant
-                    int32 multiplier;
+                    I_32 multiplier;
                     bool t = ConstantFolder::isConstant(src2->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
@@ -1295,7 +1295,7 @@ Simplifier::simplifyMulHi(Type* type,
             switch (type->tag) {
             case Type::Int32:
             case Type::UInt32:
-                return genLdConstant((int32) 0)->getDst();
+                return genLdConstant((I_32) 0)->getDst();
             case Type::Int64:
             case Type::UInt64:
                 return genLdConstant((int64) 0)->getDst();
@@ -1330,7 +1330,7 @@ Simplifier::simplifyMulHi(Type* type,
             case Type::UInt32:
                 if (src1isConstant) {
                     TypeManager &tm = irManager.getTypeManager();
-                    int32 multiplier;
+                    I_32 multiplier;
                     bool t = ConstantFolder::isConstant(src1->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
@@ -1341,7 +1341,7 @@ Simplifier::simplifyMulHi(Type* type,
                                             Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                             src2)->getDst();
                     Opnd *product = planMul32(multiplier, src2_64);
-                    Opnd *thirtytwo = genLdConstant((int32)(32))->getDst();
+                    Opnd *thirtytwo = genLdConstant((I_32)(32))->getDst();
                     Opnd *shifted = genShr(dstType64, 
                                            Modifier(UnsignedOp)|Modifier(ShiftMask_None),
                                            product, thirtytwo)->getDst();
@@ -1350,7 +1350,7 @@ Simplifier::simplifyMulHi(Type* type,
                                         shifted)->getDst();
                     return res;
                 } else { // src2isConstant
-                    int32 multiplier;
+                    I_32 multiplier;
                     bool t = ConstantFolder::isConstant(src2->getInst(), 
                                                         multiplier);
                     if( !t) assert(0);
@@ -1361,7 +1361,7 @@ Simplifier::simplifyMulHi(Type* type,
                                             Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                             src1)->getDst();
                     Opnd *product = planMul32(multiplier, src1_64);
-                    Opnd *thirtytwo = genLdConstant((int32)(32))->getDst();
+                    Opnd *thirtytwo = genLdConstant((I_32)(32))->getDst();
                     Opnd *shifted = genShr(dstType64, 
                                            Modifier(UnsignedOp)|Modifier(ShiftMask_None),
                                            product, thirtytwo)->getDst();
@@ -1489,30 +1489,30 @@ Simplifier::simplifyTauDiv(Type* dstType,
             (dstType->tag == Type::Int32) &&
             mod.isSigned()) {
 
-            int32 denom = value2.i4;
+            I_32 denom = value2.i4;
             // note that 0 and 1 were handled above
             if (denom == -1) {
                 // convert to neg
                 Opnd *res = genNeg(dstType, src1)->getDst();
                 return res;
-            } else if (isPowerOf2<int32>(denom)) {
+            } else if (isPowerOf2<I_32>(denom)) {
                 // convert to shift and such
-                int32 absdenom = (denom < 0) ? -denom : denom;
-                int k = whichPowerOf2<int32,32>(absdenom);
-                Opnd *kminus1 = genLdConstant((int32)(k - 1))->getDst();
+                I_32 absdenom = (denom < 0) ? -denom : denom;
+                int k = whichPowerOf2<I_32,32>(absdenom);
+                Opnd *kminus1 = genLdConstant((I_32)(k - 1))->getDst();
                 // make k-1 copies of the sign bit
                 Opnd *shiftTheSign = genShr(dstType, 
                                             Modifier(SignedOp)|Modifier(ShiftMask_None),
                                             src1, kminus1)->getDst();
                 // we 32-k zeros in on left to put copies of sign on right
-                Opnd *t32minusk = genLdConstant((int32)(32-k))->getDst();
+                Opnd *t32minusk = genLdConstant((I_32)(32-k))->getDst();
                 // if (n<0), this is 2^k-1, else 0
                 Opnd *kminus1ones = genShr(dstType, 
                                            Modifier(UnsignedOp)|Modifier(ShiftMask_None),
                                            shiftTheSign, t32minusk)->getDst();
                 Opnd *added = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                      src1, kminus1ones)->getDst();
-                Opnd *kOpnd = genLdConstant((int32)k)->getDst();
+                Opnd *kOpnd = genLdConstant((I_32)k)->getDst();
                 Opnd *res = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
                                    added, kOpnd)->getDst();
                 if (denom != absdenom) { // ((denom < 0) && (k < 31))
@@ -1521,8 +1521,8 @@ Simplifier::simplifyTauDiv(Type* dstType,
                 return res;
             } else {
                 // convert to MulHi and such
-                int32 magicNum, shiftBy;
-                getMagic<int32, uint32, 32>(denom, &magicNum, &shiftBy);
+                I_32 magicNum, shiftBy;
+                getMagic<I_32, U_32, 32>(denom, &magicNum, &shiftBy);
                 
                 Opnd *mulRes;
                 if (optimizerFlags.use_mulhi) {
@@ -1537,7 +1537,7 @@ Simplifier::simplifyTauDiv(Type* dstType,
                                           src1)->getDst();
                     Opnd *mulRes64 = genMul(dstType64, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), magicOpnd,
                                             src64)->getDst();
-                    Opnd *constant32 = genLdConstant((int32)32)->getDst();
+                    Opnd *constant32 = genLdConstant((I_32)32)->getDst();
                     Opnd *mulRes64h = genShr(dstType64, 
                                              Modifier(SignedOp)|Modifier(ShiftMask_None),
                                              mulRes64,
@@ -1558,7 +1558,7 @@ Simplifier::simplifyTauDiv(Type* dstType,
                 Opnd *shiftByOpnd = genLdConstant(shiftBy)->getDst();
                 mulRes = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
                                 mulRes, shiftByOpnd)->getDst();
-                Opnd *thirtyOne = genLdConstant((int32)31)->getDst();
+                Opnd *thirtyOne = genLdConstant((I_32)31)->getDst();
                 Opnd *oneIfNegative = genShr(dstType,
                                              Modifier(UnsignedOp)|Modifier(ShiftMask_None),
                                              ((denom < 0) 
@@ -1613,7 +1613,7 @@ Simplifier::simplifyTauRem(Type* dstType,
         if (ConstantFolder::isConstantOne(src2)) {
             ConstInst::ConstValue zeroval;
             switch(dstType->tag) {
-            case Type::Int32: return genLdConstant((int32)0)->getDst();
+            case Type::Int32: return genLdConstant((I_32)0)->getDst();
             case Type::Int64: return genLdConstant((int64)0)->getDst();
             default: assert(0); return NULL;
             }
@@ -1627,22 +1627,22 @@ Simplifier::simplifyTauRem(Type* dstType,
         Inst *src2inst = src2->getInst();
         ConstInst::ConstValue cv;
         if (ConstantFolder::isConstant(src2inst, cv.i4)) {
-            int32 denom = cv.i4;
+            I_32 denom = cv.i4;
             if ((denom == -1) || (denom == 1)) {
                 //
                 // s1 % +-1 -> 0 
                 //
-                return genLdConstant((int32)0)->getDst();
+                return genLdConstant((I_32)0)->getDst();
             }
-            if (isPowerOf2<int32>(denom)) {
-                int k = whichPowerOf2<int32,32>(denom);
-                int32 maskInt = (((int32)0x1)<<k)-1;
+            if (isPowerOf2<I_32>(denom)) {
+                int k = whichPowerOf2<I_32,32>(denom);
+                I_32 maskInt = (((I_32)0x1)<<k)-1;
                 Opnd *maskOpnd = genLdConstant(maskInt)->getDst();
                 Opnd *maskedOpnd = genAnd(src1->getType(),
                                           src1, maskOpnd)->getDst();
                 Opnd *res = maskedOpnd;
                 if (denom < 0) {
-                    int32 signInt = ((int32)-1) ^ maskInt;
+                    I_32 signInt = ((I_32)-1) ^ maskInt;
                     Opnd *extendedSign 
                         = genLdConstant(signInt)->getDst();
                     res = genOr(src1->getType(), res, extendedSign)->getDst();
@@ -1750,35 +1750,35 @@ Simplifier::simplifyConv(Type* dstType,
         if (dstType == src->getType())
         return src;
     }
-    int32 val32;
+    I_32 val32;
     if (ConstantFolder::isConstant(src0->getInst(), val32) &&
         (((toType == Type::UInt8)
-          && (((uint32)val32) <= 0xff)) ||
+          && (((U_32)val32) <= 0xff)) ||
              ((toType == Type::Int8) 
-          && (((uint32)val32) <= 0x7f)) ||
+          && (((U_32)val32) <= 0x7f)) ||
          ((toType == Type::UInt16)
-          && (((uint32)val32) <= 0xffff)) ||
+          && (((U_32)val32) <= 0xffff)) ||
          ((toType == Type::Int16) 
-          && (((uint32)val32) <= 0x7fff)) ||
+          && (((U_32)val32) <= 0x7fff)) ||
          ((toType == Type::UInt32)
-          && (((uint32)val32) <= 0xffffffff)) ||
+          && (((U_32)val32) <= 0xffffffff)) ||
          ((toType == Type::Int32) 
-          && (((uint32)val32) <= 0x7fffffff)))) {
+          && (((U_32)val32) <= 0x7fffffff)))) {
         if (dstType == src->getType())
         return src;
     } else if (ConstantFolder::isConstant(src1->getInst(), val32) &&
         (((toType == Type::UInt8)
-          && (((uint32)val32) <= 0xff)) ||
+          && (((U_32)val32) <= 0xff)) ||
              ((toType == Type::Int8)
-              && (((uint32)val32) <= 0x7f)) ||
+              && (((U_32)val32) <= 0x7f)) ||
          ((toType == Type::UInt16)
-          && (((uint32)val32) <= 0xffff)) ||
+          && (((U_32)val32) <= 0xffff)) ||
          ((toType == Type::Int16) 
-          && (((uint32)val32) <= 0x7fff)) ||
+          && (((U_32)val32) <= 0x7fff)) ||
          ((toType == Type::UInt32)
-          && (((uint32)val32) <= 0xffffffff)) ||
+          && (((U_32)val32) <= 0xffffffff)) ||
          ((toType == Type::Int32) 
-          && (((uint32)val32) <= 0x7fffffff)))) {
+          && (((U_32)val32) <= 0x7fffffff)))) {
         if (dstType == src->getType())
         return src;
     }
@@ -1915,7 +1915,7 @@ Simplifier::simplifyCmp(Type* dstType,
             if (ConstantFolder::isConstantZero(src1) && 
                 ((mod & Cmp_Mask)==Cmp_GT_Un)) {
                 switch (dstType->tag) {
-                case Type::Int32: return genLdConstant((int32)0)->getDst();
+                case Type::Int32: return genLdConstant((I_32)0)->getDst();
                 default:
                     break;
                 }
@@ -1924,7 +1924,7 @@ Simplifier::simplifyCmp(Type* dstType,
     } else if (ConstantFolder::isConstantZero(src2) &&
                ((mod & Cmp_Mask) == Cmp_GTE_Un)) {
         switch (dstType->tag) {
-        case Type::Int32: return genLdConstant((int32)1)->getDst();
+        case Type::Int32: return genLdConstant((I_32)1)->getDst();
         default:
             break;
         }
@@ -1933,9 +1933,9 @@ Simplifier::simplifyCmp(Type* dstType,
     if ((src1 == src2) && !Type::isFloatingPoint(instType)) {
         switch (mod & Cmp_Mask) {
         case Cmp_EQ: case Cmp_GTE: case Cmp_GTE_Un:
-            return genLdConstant((int32)1)->getDst();
+            return genLdConstant((I_32)1)->getDst();
         case Cmp_NE_Un: case Cmp_GT: case Cmp_GT_Un:
-            return genLdConstant((int32)0)->getDst();
+            return genLdConstant((I_32)0)->getDst();
         default:
             assert(0);
         }
@@ -1977,7 +1977,7 @@ Simplifier::simplifyCmp3(Type* dstType,
                                         srcInst1->getValue(), 
                                         srcInst2->getValue(), res)) {
                 if (res.i4) {
-                    return genLdConstant((int32)1)->getDst();
+                    return genLdConstant((I_32)1)->getDst();
                 } else {
                     ComparisonModifier mod2 = mod;
                     if (Type::isFloatingPoint(instType)) {
@@ -1992,10 +1992,10 @@ Simplifier::simplifyCmp3(Type* dstType,
                     if (ConstantFolder::foldCmp(instType, mod2,
                                                 srcInst2->getValue(), 
                                                 srcInst1->getValue(), res)) {
-                        if ((uint32)res.i4) {
-                            return genLdConstant((int32)-1)->getDst();
+                        if ((U_32)res.i4) {
+                            return genLdConstant((I_32)-1)->getDst();
                         } else {
-                            return genLdConstant((int32)0)->getDst();
+                            return genLdConstant((I_32)0)->getDst();
                         }
                     }                    
                 }
@@ -2007,9 +2007,9 @@ Simplifier::simplifyCmp3(Type* dstType,
     if ((src1 == src2) && !Type::isFloatingPoint(instType)) {
         switch (mod & Cmp_Mask) {
         case Cmp_EQ: case Cmp_GTE: case Cmp_GTE_Un:
-            return genLdConstant((int32)1)->getDst();
+            return genLdConstant((I_32)1)->getDst();
         case Cmp_NE_Un: case Cmp_GT: case Cmp_GT_Un:
-            return genLdConstant((int32)0)->getDst();
+            return genLdConstant((I_32)0)->getDst();
         default:
             assert(0);
         }
@@ -2238,7 +2238,7 @@ Simplifier::simplifyCmpOfCmp3(Type::Tag instType,
     ConstInst::ConstValue valC;
     if (src1->getInst()->getOpcode() == Op_Cmp3) {
         if (ConstantFolder::isConstant(src2->getInst(), valC)) {
-            int32 val = valC.i4;
+            I_32 val = valC.i4;
             if (((val == 0) && (mod == Cmp_GT)) ||
                 ((val == 1) && ((mod == Cmp_GTE) || (mod == Cmp_EQ)))) {
                 // test == 1
@@ -2284,7 +2284,7 @@ Simplifier::simplifyCmpOfCmp3(Type::Tag instType,
         }            
     } else if (src2->getInst()->getOpcode() == Op_Cmp3) {
         if (ConstantFolder::isConstant(src1->getInst(), valC)) {
-            int32 val = valC.i4;
+            I_32 val = valC.i4;
             // val cmp Cmp3
             if ((val == 1) && (mod == Cmp_EQ)) {
                 // 1 == test
@@ -2343,7 +2343,7 @@ Simplifier::simplifyCmpOfCmp(Type::Tag instType,
 {
     ConstInst::ConstValue valC;
     if (ConstantFolder::isConstant(src1->getInst(), valC)) {
-        int32 val = valC.i4;
+        I_32 val = valC.i4;
         if (((val == 0) && (mod == Cmp_NE_Un)) ||
             ((val == 1) && (mod == Cmp_EQ))) {
             // same test as src1;
@@ -2363,7 +2363,7 @@ Simplifier::simplifyCmpOfCmp(Type::Tag instType,
             return true;
         }
     } else if (ConstantFolder::isConstant(src2->getInst(), valC)) {
-        int32 val = valC.i4;
+        I_32 val = valC.i4;
         if (((val == 0) && ((mod == Cmp_GT) || (mod == Cmp_NE_Un)
                             || (mod == Cmp_GT_Un))) ||
             ((val == 1) && ((mod == Cmp_GTE) || (mod == Cmp_EQ)
@@ -2793,19 +2793,19 @@ Simplifier::canFoldBranch(Type::Tag instType,
 }
 
 bool
-Simplifier::simplifySwitch(uint32 numLabels,
+Simplifier::simplifySwitch(U_32 numLabels,
                            LabelInst* label[],
                            LabelInst* defaultLabel,
                            Opnd* src) {
     assert(numLabels > 0);
     // check for just 1 target
     LabelInst* label1 = label[0];
-    uint32 i;
+    U_32 i;
     for (i = 1; i<numLabels; i++) {
         if (label[i] != label1) return false; // we have >1 distinct labels
     }
     // have just 1 target;
-    Opnd* numTargets = genLdConstant((int32) numLabels)->getDst();
+    Opnd* numTargets = genLdConstant((I_32) numLabels)->getDst();
     genBranch(Type::Int32, Cmp_GT_Un, label1, numTargets, src);
     return true;
 }
@@ -2846,9 +2846,9 @@ Simplifier::simplifyTauCheckBounds(Opnd* arrayLen, Opnd* index, bool &alwaysThro
     ConstInst* constIndex = index->getInst()->asConstInst();
     if (constArrayLen && constIndex) {
         // compare the constant size and index
-        int32 result = 0;
-        int32 lenv = constArrayLen->getValue().i4;
-        int32 idxv = constIndex->getValue().i4;
+        I_32 result = 0;
+        I_32 lenv = constArrayLen->getValue().i4;
+        I_32 idxv = constIndex->getValue().i4;
         if (ConstantFolder::foldCmp32(Cmp_GT_Un,
                       lenv, idxv, result)) {
             if (result == 1) {
@@ -2881,9 +2881,9 @@ Simplifier::simplifyTauCheckLowerBound(Opnd* lb, Opnd *idx, bool &alwaysThrows) 
     ConstInst* constIndex = idx->getInst()->asConstInst();
     if (constLB != NULL && constIndex != NULL) {
         // compare the constant size and index
-        int32 result = 0;
-        int32 lbv = constLB->getValue().i4;
-        int32 idxv = constIndex->getValue().i4;
+        I_32 result = 0;
+        I_32 lbv = constLB->getValue().i4;
+        I_32 idxv = constIndex->getValue().i4;
         if (ConstantFolder::foldCmp32(Cmp_GT,
                                       lbv,
                                       idxv,
@@ -2922,9 +2922,9 @@ Simplifier::simplifyTauCheckUpperBound(Opnd* idx, Opnd* ub, bool &alwaysThrows) 
     ConstInst* constIndex = idx->getInst()->asConstInst();
     if (constUB != NULL && constIndex != NULL) {
         // compare the constant size and index
-        int32 result = 0;
-        int32 idxv = constIndex->getValue().i4;
-        int32 ubv = constUB->getValue().i4;
+        I_32 result = 0;
+        I_32 idxv = constIndex->getValue().i4;
+        I_32 ubv = constUB->getValue().i4;
         if (ConstantFolder::foldCmp32(Cmp_GT,
                                       ubv,
                                       idxv,
@@ -2959,7 +2959,7 @@ Simplifier::simplifyTauCheckUpperBound(Opnd* idx, Opnd* ub, bool &alwaysThrows) 
 //
 Opnd*
 Simplifier::simplifyTauCheckZero(Opnd* opnd, bool &alwaysThrows) {
-    int32 value;
+    I_32 value;
     if (ConstantFolder::isConstant(opnd->getInst(), value)) {
         if (value != 0)
             return genTauSafe()->getDst(); // check is safe by construction
@@ -2983,10 +2983,10 @@ Simplifier::simplifyTauCheckZero(Opnd* opnd, bool &alwaysThrows) {
 Opnd*
 Simplifier::simplifyTauCheckDivOpnds(Opnd* src1, Opnd* src2, bool &alwaysThrows) {
     // look for anything other than src1=MAXNEGINT, src2=-1
-    int32 value;
+    I_32 value;
     bool elim = false;
     if (ConstantFolder::isConstant(src1->getInst(), value)) {
-        if ((uint32)value != 0x80000000) {
+        if ((U_32)value != 0x80000000) {
             // overflow can't happen
             elim = true;
         } else if (ConstantFolder::isConstant(src2->getInst(), value) &&
@@ -3000,7 +3000,7 @@ Simplifier::simplifyTauCheckDivOpnds(Opnd* src1, Opnd* src2, bool &alwaysThrows)
         elim = true;
     }
     if (!elim) {
-        // above constant folders return false if opnd is not int32
+        // above constant folders return false if opnd is not I_32
         // try int64 instead
         int64 value64;
         if (ConstantFolder::isConstant(src1->getInst(), value64)) {
@@ -3096,17 +3096,17 @@ Simplifier::simplifyTauInstanceOf(Opnd* src, Opnd* tauCheckedNull, Type* type) {
     bool srcIsNonNull = (tauCheckedNull->getInst()->getOpcode() != Op_TauUnsafe);
     if (srcIsNonNull &&
         irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type)) {
-        return genLdConstant((int32)1)->getDst();
+        return genLdConstant((I_32)1)->getDst();
     } 
 
     // If src is definitely a null object, then the result is 0.
     if ((!srcIsNonNull) && isNullObject(src)) {
-        return genLdConstant((int32)0)->getDst();
+        return genLdConstant((I_32)0)->getDst();
     }
 
     if (isExactType(src) &&
         !irManager.getTypeManager().isResolvedAndSubClassOf(srcType, type))
-        return genLdConstant((int32)0)->getDst();
+        return genLdConstant((I_32)0)->getDst();
 
     return NULL;
 }
@@ -3473,7 +3473,7 @@ Simplifier::simplifyTauLdInd(Modifier mod, Type* dstType, Type::Tag type, Opnd *
 
 Opnd *
 Simplifier::simplifyLdRef(Modifier mod, Type* dstType,
-                          uint32 token, MethodDesc* enclosingMethod)
+                          U_32 token, MethodDesc* enclosingMethod)
 {
     const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     if (optimizerFlags.reduce_compref && 
@@ -3567,7 +3567,7 @@ Simplifier::simplifyTauVirtualCall(MethodDesc* methodDesc,
                                    Type* returnType,
                                    Opnd* tauNullCheckedFirstArg,
                                    Opnd* tauTypesChecked,
-                                   uint32 numArgs,
+                                   U_32 numArgs,
                                    Opnd* args[])
 {
     //
@@ -3593,7 +3593,7 @@ Simplifier::simplifyIndirectCallInst(    Opnd* funPtr,
                                          Type* returnType,
                                          Opnd* tauNullCheckedFirstArg,
                                          Opnd* tauTypesChecked,
-                                        uint32 numArgs,
+                                        U_32 numArgs,
                                         Opnd** args)
 {
     return simplifyIndirectMemoryCallInst(funPtr, returnType, 
@@ -3606,7 +3606,7 @@ Simplifier::simplifyIndirectMemoryCallInst(Opnd* funPtr,
                                            Type* returnType,
                                            Opnd* tauNullCheckedFirstArg,
                                            Opnd* tauTypesChecked,
-                                          uint32 numArgs,
+                                          U_32 numArgs,
                                           Opnd** args)
 {
     // if funptr is a load of a fun slot that does not go through a vtable, then
@@ -3626,10 +3626,10 @@ Simplifier::simplifyIndirectMemoryCallInst(Opnd* funPtr,
 Opnd*
 Simplifier::simplifyTauAnd(MultiSrcInst *inst)
 {
-    uint32 nsrcs = inst->getNumSrcOperands();
-    uint32 nsrcs0 = nsrcs;
+    U_32 nsrcs = inst->getNumSrcOperands();
+    U_32 nsrcs0 = nsrcs;
     {
-        for (uint32 i = 0; i < nsrcs; ++i) {
+        for (U_32 i = 0; i < nsrcs; ++i) {
             Opnd *srci = inst->getSrc(i);
             Opcode opcode = srci->getInst()->getOpcode();
             if (opcode == Op_TauUnsafe) {
@@ -3710,12 +3710,12 @@ Simplifier::caseBranch(BranchInst* inst) {
 Inst*
 Simplifier::caseSwitch(SwitchInst* inst) {
     Opnd* index = inst->getSrc(0);
-    int32 value;
+    I_32 value;
     if(ConstantFolder::isConstant(index->getInst(), value)) {
         foldSwitch(inst, value);
         return NULL;
     } else {
-        uint32 numTarget = inst->getNumTargets();
+        U_32 numTarget = inst->getNumTargets();
         LabelInst** targets = inst->getTargets();
         LabelInst* defaultTarget = inst->getDefaultTarget();
         if(simplifySwitch(numTarget, targets, defaultTarget, index)) {
@@ -3730,7 +3730,7 @@ Simplifier::caseIndirectCall(CallInst* inst) {
     Opnd* dst = inst->getDst();
     Type* returnType = dst->isNull()? irManager.getTypeManager().getVoidType() : dst->getType();
     Opnd** args = inst->getArgs();
-    uint32 numArgs = inst->getNumArgs();
+    U_32 numArgs = inst->getNumArgs();
     assert(numArgs >= 2);
     Opnd* tauNullCheckedFirstArg = args[0];
     Opnd* tauTypesChecked = args[1];
@@ -3751,7 +3751,7 @@ Simplifier::caseIndirectMemoryCall(CallInst* inst) {
     Opnd* dst = inst->getDst();
     Type* returnType = dst->isNull()? irManager.getTypeManager().getVoidType() : dst->getType();
     Opnd** args = inst->getArgs();
-    uint32 numArgs = inst->getNumArgs();
+    U_32 numArgs = inst->getNumArgs();
     assert(numArgs >= 2);
     Opnd* tauNullCheckedFirstArg = args[0];
     Opnd* tauTypesChecked = args[1];
@@ -3801,7 +3801,7 @@ SimplifierWithInstFactory::foldBranch(BranchInst* br, bool isTaken) {
 }
 
 void  
-SimplifierWithInstFactory::foldSwitch(SwitchInst* switchInst, uint32 index) {
+SimplifierWithInstFactory::foldSwitch(SwitchInst* switchInst, U_32 index) {
     FlowGraph::foldSwitch(flowGraph, switchInst,index);
 }
 
@@ -3811,13 +3811,13 @@ SimplifierWithInstFactory::eliminateCheck(Inst* checkInst, bool alwaysThrows) {
     FlowGraph::eliminateCheck(flowGraph, currentCfgNode,checkInst,alwaysThrows);
 }
 
-uint32
+U_32
 SimplifierWithInstFactory::simplifyControlFlowGraph() {
     if (Log::isEnabled()) {
         Log::out() << "Starting simplifyControlFlowGraph" << ::std::endl;
     }
 
-    uint32 numInstOptimized = 0;
+    U_32 numInstOptimized = 0;
     MemoryManager memManager("SimplifierWithInstFactory::simplifyControlFlowGraph");
     BitSet* reachableNodes = new (memManager) BitSet(memManager,flowGraph.getMaxNodeId());
     BitSet* unreachableInsts = 
@@ -4152,7 +4152,7 @@ SimplifierWithInstFactory::genDirectCall(
                                       Type* returnType,
                                       Opnd* tauNullCheckedFirstArg,
                                       Opnd* tauTypesChecked,
-                                     uint32 numArgs,
+                                     U_32 numArgs,
                                       Opnd* args[])
 {
     Opnd* dst;
@@ -4169,7 +4169,7 @@ SimplifierWithInstFactory::genDirectCall(
     return inst;
 }
 Inst*
-SimplifierWithInstFactory::genLdConstant(int32 val) {
+SimplifierWithInstFactory::genLdConstant(I_32 val) {
     Opnd* dst = opndManager.createSsaTmpOpnd(typeManager.getInt32Type());
     Inst* inst = instFactory.makeLdConst(dst, val);
     insertInst(inst);
@@ -4219,7 +4219,7 @@ SimplifierWithInstFactory::genTauLdInd(Modifier mod, Type* type, Type::Tag ldTyp
 
 Inst* 
 SimplifierWithInstFactory::genLdRef(Modifier mod, Type* type, 
-                                    uint32 token,
+                                    U_32 token,
                                     MethodDesc *methodDesc)
 {
     Opnd* dst = opndManager.createSsaTmpOpnd(type);
@@ -4499,7 +4499,7 @@ SimplifierWithInstFactory::genThrowSystemException(CompilationInterface::SystemE
 
 
 static Class_Handle getClassHandle(Opnd* opnd) {
-    //class handle can be: unmanaged ptr (from magics) or pointer_size_int const (int32 or int64) if loaded as a const
+    //class handle can be: unmanaged ptr (from magics) or pointer_size_int const (I_32 or int64) if loaded as a const
     //assert(opnd->getType()->isUnmanagedPtr() || opnd->getType()->isInt4() || opnd->getType()->isInt8());
     assert(opnd->getType()->isUnmanagedPtr());
     Inst* inst = opnd->getInst();
@@ -4518,7 +4518,7 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassIsArray:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::isArrayType(ch));
+                res = genLdConstant((I_32)VMInterface::isArrayType(ch));
             }
             break;
         case ClassGetAllocationHandle:
@@ -4533,25 +4533,25 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassGetTypeSize:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::getObjectSize(ch));
+                res = genLdConstant((I_32)VMInterface::getObjectSize(ch));
             }
             break;
         case ClassGetArrayElemSize:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::getArrayElemSize(ch));
+                res = genLdConstant((I_32)VMInterface::getArrayElemSize(ch));
             }
             break;
         case ClassIsInterface:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::isInterfaceType(ch));
+                res = genLdConstant((I_32)VMInterface::isInterfaceType(ch));
             }
             break;
         case ClassIsFinal:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::isFinalType(ch));
+                res = genLdConstant((I_32)VMInterface::isFinalType(ch));
             }
             break;
         case ClassGetArrayClass:
@@ -4565,7 +4565,7 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
         case ClassIsFinalizable:
             ch = getClassHandle(inst->getSrc(0));
             if (ch) {
-                res = genLdConstant((int32)VMInterface::isFinalizable(ch));
+                res = genLdConstant((I_32)VMInterface::isFinalizable(ch));
             }
             break;
         case ClassGetFastCheckDepth:
@@ -4573,7 +4573,7 @@ Inst* Simplifier::simplifyJitHelperCall(JitHelperCallInst* inst) {
             if (ch) {
                 int depth = 0;
                 if (VMInterface::getClassFastInstanceOfFlag(ch)) {
-                    depth = (int32)VMInterface::getClassDepth(ch);
+                    depth = (I_32)VMInterface::getClassDepth(ch);
                 }
                 res = genLdConstant(depth);
             }

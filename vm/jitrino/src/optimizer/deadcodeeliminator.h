@@ -65,9 +65,9 @@ public:
     static void fixInfiniteLoops(IRManager& irm, const InfiniteLoopsInfo& info);
 
 private:
-    void sweepInst(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, uint32 minInstId, uint32 maxInstId, bool canRemoveStvars);
+    void sweepInst(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet, uint8 *usedInstWidth, U_32 minInstId, U_32 maxInstId, bool canRemoveStvars);
     void sweepInst1(Node* node, Inst* inst, BitSet& usefulInstSet, BitSet& usefulVarSet,
-                    uint32 minInstId, uint32 maxInstId, bool canRemoveStvars); // if we're skipping instWidth
+                    U_32 minInstId, U_32 maxInstId, bool canRemoveStvars); // if we're skipping instWidth
     static Opnd* findDefiningTemp(Opnd* var);
     void markEssentialPseudoThrows(LoopNode* loopNode, BitSet& essentialNodes);
 

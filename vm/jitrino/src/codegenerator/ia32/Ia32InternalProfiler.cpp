@@ -31,7 +31,7 @@ namespace Ia32{
 
     struct BBStats {
         int64 * bbExecCount;
-        uint32 *    counters;
+        U_32 *    counters;
 
         BBStats() : bbExecCount(NULL), counters(NULL) {}
     };
@@ -90,7 +90,7 @@ struct Filter {
         bool    isOR;
 
         FilterAttr<Mnemonic>                                mnemonic;
-        FilterAttr<int32>                                   operandNumber;
+        FilterAttr<I_32>                                   operandNumber;
         FilterAttr<Opnd::RuntimeInfo::Kind>                 rtKind;
         FilterAttr<VM_RT_SUPPORT>                           rtHelperID;
         FilterAttr<std::string>                             rtIntHelperName;
@@ -262,7 +262,7 @@ void InternalProfilerAct::readConfig(Config * config) {
     bool rc = false;
     if (configFile.is_open()) {
         std::string line;
-        uint32 ln = 0;
+        U_32 ln = 0;
         bool opened = false;
         int num = -1;
         while (std::getline(configFile, line)) {
@@ -289,7 +289,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                         config->counters[num].filter.isOR=true;
                     } else if ((int)line.find(std::string(config->counters[num].name)+"=")!=-1) {
                         char * val = (char *)std::strstr(line.c_str(),"=")+1;
-                        for(uint32 i = 0; i < config->counters.size(); i++) {
+                        for(U_32 i = 0; i < config->counters.size(); i++) {
                             if(std::string(config->counters[i].name) == val) {
                                 config->counters[num].filter = config->counters[i].filter;
                                 break;
@@ -330,7 +330,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             } else {
                                 config->counters[num].filter.isInitialized=true;
                                 config->counters[num].filter.operandFilters[opNum].opndRole.isInitialized=true;
-                                for (uint32 i = 0; i<lengthof(opndRoles); i++) {
+                                for (U_32 i = 0; i<lengthof(opndRoles); i++) {
                                     if(std::string(opndRoles[i].name) == val)
                                         config->counters[num].filter.operandFilters[opNum].opndRole.value=opndRoles[i].value;
                                 }
@@ -357,7 +357,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             } else {
                                 config->counters[num].filter.isInitialized=true;
                                 config->counters[num].filter.operandFilters[opNum].memOpndKind.isInitialized=true;
-                                for (uint32 i = 0; i<lengthof(memOpndKinds); i++) {
+                                for (U_32 i = 0; i<lengthof(memOpndKinds); i++) {
                                     if(std::string(memOpndKinds[i].name) == val)
                                         config->counters[num].filter.operandFilters[opNum].memOpndKind.value=memOpndKinds[i].value;
                                 }
@@ -369,7 +369,7 @@ void InternalProfilerAct::readConfig(Config * config) {
                             config->counters[num].filter.rtKind.isNegative=true;
                         } else {
                             config->counters[num].filter.isInitialized=true;
-                            for (uint32 i = 0; i<lengthof(rtKinds); i++) {
+                            for (U_32 i = 0; i<lengthof(rtKinds); i++) {
                                 if(std::string(rtKinds[i].name) == val)
                                     config->counters[num].filter.rtKind.value=rtKinds[i].value;
                             }
@@ -529,7 +529,7 @@ void InternalProfilerAct::dumpIt() {
         fname = "iprof.stat";
     std::ofstream outFile(fname, std::ios::ate);
     outFile << "Method name\t";
-    for(uint32 i = 0; i < config->counters.size(); i++) {
+    for(U_32 i = 0; i < config->counters.size(); i++) {
         std::string fName = config->counters[i].title != "" ? config->counters[i].title : config->counters[i].name;
         outFile << fName << "\t";
     }
@@ -539,7 +539,7 @@ void InternalProfilerAct::dumpIt() {
         MethodStats * stats = *it;
         outFile << stats->methodName.c_str()  << "\t";
         BBStats bbs = stats->bbStats[-1];
-        for(uint32 i = 0; i < config->counters.size(); i++) {
+        for(U_32 i = 0; i < config->counters.size(); i++) {
             int64 count;
             std::string name = config->counters[i].name;
             if((name == "ByteCodeSize") || (name == "ExcHandlersNum")) {
@@ -580,7 +580,7 @@ void InternalProfilerAct::dumpIt() {
                 if(iter->first == -1)
                     continue;
                 outFile << "BB_" << iter->first << "_" << stats->methodName.c_str() << "\t";
-                for(uint32 i = 0; i < config->counters.size(); i++) {
+                for(U_32 i = 0; i < config->counters.size(); i++) {
                     int64 outValue = iter->second.counters[i] * (*(iter->second.bbExecCount));
                     outFile <<  outValue << "\t";
                 }
@@ -601,16 +601,16 @@ void InternalProfiler::addCounters(MethodDesc& methodDesc) {
     InternalProfilerAct& storage = *static_cast<InternalProfilerAct*>(getAction());
     storage.statistics->push_back(ms);
     //method external properties, no need to count
-    uint32 cSize = (uint32)storage.config->counters.size();
+    U_32 cSize = (U_32)storage.config->counters.size();
     if (!cSize)
         return;
-    ms->bbStats[-1].counters= new(mm) uint32[cSize];
-    for(uint32 i = 0; i < cSize ; i++) {
+    ms->bbStats[-1].counters= new(mm) U_32[cSize];
+    for(U_32 i = 0; i < cSize ; i++) {
         ms->bbStats[-1].counters[i] = 0;
     }
     ms->bbStats[-1].bbExecCount= new(mm) int64[1];
     *(ms->bbStats[-1].bbExecCount)  = 0;
-    for(uint32 i  = 0; i < cSize ; i++) {
+    for(U_32 i  = 0; i < cSize ; i++) {
         Counter c  = storage.config->counters[i];
         if(c.name == std::string("ByteCodeSize")) {
             ms->bbStats[-1].bbExecCount= new(mm) int64[1];
@@ -628,13 +628,13 @@ void InternalProfiler::addCounters(MethodDesc& methodDesc) {
     for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()){
-            ms->bbStats[node->getId()].counters= new(mm) uint32[cSize];
-            for(uint32 i = 0; i < cSize ; i++) {
+            ms->bbStats[node->getId()].counters= new(mm) U_32[cSize];
+            for(U_32 i = 0; i < cSize ; i++) {
                 ms->bbStats[node->getId()].counters[i] = 0;
             }
             for (Inst * inst=(Inst*)node->getFirstInst(); inst!=NULL; inst=inst->getNextInst()){
                 if(!inst->hasKind(Inst::Kind_PseudoInst) || inst->hasKind(Inst::Kind_EntryPointPseudoInst)) {
-                    for(uint32 i  = 0; i < cSize ; i++) {
+                    for(U_32 i  = 0; i < cSize ; i++) {
                         Counter c  = storage.config->counters[i];
                         if(std::string(c.name) == "MaxBBExec" || std::string(c.name) == "HottestBBNum" || std::string(c.name) == "BBExec" ) {
                                 ms->bbStats[node->getId()].counters[i] =1;
@@ -740,7 +740,7 @@ bool InternalProfiler::passFilter(Inst * inst, Filter& filter) {
             if(!opndFltr.isInitialized)
                 continue;
             if(opndFltr.opNum == -1) {
-                for(uint32 i = 0; i < inst->getOpndCount(Inst::OpndRole_All) ; i++) {
+                for(U_32 i = 0; i < inst->getOpndCount(Inst::OpndRole_All) ; i++) {
                     Opnd * opnd = inst->getOpnd(i);
                     res = passOpndFilter(inst, opnd, filter, opndFltr);
 

@@ -31,7 +31,7 @@ namespace Jitrino {
 
 namespace Ia32 {
 
-typedef StlHashMap<uint32, uint16>      BCByNCMap;
+typedef StlHashMap<U_32, uint16>      BCByNCMap;
 /**
    * Bcmap is simple storage with precise mapping between native offset in a method to
    * byte code, i.e. if there is no byte code for certain native offset in a method then
@@ -42,17 +42,17 @@ class BcMap {
 public:
     BcMap(MemoryManager& memMgr) : theMap(memMgr) {}
 
-    uint32 getByteSize() const {
-        return 4 /*size*/+(uint32)theMap.size() * (4 + 2/*native offset + bc offset*/);
+    U_32 getByteSize() const {
+        return 4 /*size*/+(U_32)theMap.size() * (4 + 2/*native offset + bc offset*/);
     }
 
     void write(U_8* image) {
-        *((uint32*)image)=(uint32)theMap.size();
-        uint32 imageOffset = 4;
+        *((U_32*)image)=(U_32)theMap.size();
+        U_32 imageOffset = 4;
         for (BCByNCMap::const_iterator it = theMap.begin(), end = theMap.end(); it!=end; it++) {
-            uint32 nativeOffset = it->first;
+            U_32 nativeOffset = it->first;
             uint16 bcOffset = it->second;
-            *((uint32*)(image + imageOffset)) = nativeOffset;
+            *((U_32*)(image + imageOffset)) = nativeOffset;
             imageOffset+=4;
             *((uint16*)(image + imageOffset)) = bcOffset;
             imageOffset+=2;
@@ -61,20 +61,20 @@ public:
     }
 
     POINTER_SIZE_INT readByteSize(const U_8* image) const {
-        uint32 sizeOfMap = *(uint32*)image;;
+        U_32 sizeOfMap = *(U_32*)image;;
         return 4 + sizeOfMap * (4+2);
     }
 
     
-    void setEntry(uint32 key, uint16 value) {
+    void setEntry(U_32 key, uint16 value) {
         theMap[key] =  value;
     }
 
-    static uint16 get_bc_offset_for_native_offset(uint32 ncOffset, U_8* image) {
-        uint32 mapSize = *(uint32*)image; //read map size
-        uint32 imageOffset=4;
-        for (uint32 i = 0; i < mapSize; i++) {
-            uint32 nativeOffset = *(uint32*)(image+imageOffset);
+    static uint16 get_bc_offset_for_native_offset(U_32 ncOffset, U_8* image) {
+        U_32 mapSize = *(U_32*)image; //read map size
+        U_32 imageOffset=4;
+        for (U_32 i = 0; i < mapSize; i++) {
+            U_32 nativeOffset = *(U_32*)(image+imageOffset);
             imageOffset+=4;
             uint16 bcOffset = *(uint16*)(image+imageOffset);
             imageOffset+=2;
@@ -85,11 +85,11 @@ public:
         return ILLEGAL_BC_MAPPING_VALUE;
     }
 
-    static uint32 get_native_offset_for_bc_offset(uint16 bcOff, U_8* image) {
-        uint32 mapSize = *(uint32*)image; //read map size
-        uint32 imageOffset=4;
-        for (uint32 i = 0; i < mapSize; i++) {
-            uint32 nativeOffset = *(uint32*)(image+imageOffset);
+    static U_32 get_native_offset_for_bc_offset(uint16 bcOff, U_8* image) {
+        U_32 mapSize = *(U_32*)image; //read map size
+        U_32 imageOffset=4;
+        for (U_32 i = 0; i < mapSize; i++) {
+            U_32 nativeOffset = *(U_32*)(image+imageOffset);
             imageOffset+=4;
             uint16 bcOffset = *(uint16*)(image+imageOffset);
             imageOffset+=2;

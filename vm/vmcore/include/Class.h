@@ -138,7 +138,7 @@ union ConstPoolEntry {
     } error;
 
     /** CONSTANT_Integer.*/
-    uint32 int_value;
+    U_32 int_value;
     /** CONSTANT_Float.*/
     float float_value;
     /** CONSTANT_Long and CONSTANT_Double.
@@ -146,8 +146,8 @@ union ConstPoolEntry {
     * ConstPoolEntry and leave the second ConstPoolEntry of the long/double
     * unused.*/
     struct {
-        uint32 low_bytes;
-        uint32 high_bytes;
+        U_32 low_bytes;
+        U_32 high_bytes;
     } CONSTANT_8byte;
     /** CONSTANT_NameAndType.*/
     struct {
@@ -445,7 +445,7 @@ public:
      * in the constant pool.
      * @param[in] index - an index in the constant pool
      * @return The value of a 32-bit constant stored in the constant pool.*/
-    uint32 get_4byte(uint16 index) const {
+    U_32 get_4byte(uint16 index) const {
         assert(get_tag(index) == CONSTANT_Integer
             || get_tag(index) == CONSTANT_Float);
         return m_entries[index].int_value;
@@ -454,7 +454,7 @@ public:
     /** Gets an integer value for a constant stored in the constant pool.
      * @param[in] index - an index in the constant pool
      * @return The value of integer constant stored in the constant pool.*/
-    uint32 get_int(uint16 index) const {
+    U_32 get_int(uint16 index) const {
         assert(get_tag(index) == CONSTANT_Integer);
         return m_entries[index].int_value;
     }
@@ -471,7 +471,7 @@ public:
      * stored in the constant pool.
      * @param[in] index - an index in the constant pool
      * @return A value of low 32-bits of 64-bit constant.*/
-    uint32 get_8byte_low_word(uint16 index) const {
+    U_32 get_8byte_low_word(uint16 index) const {
         assert(get_tag(index) == CONSTANT_Long
             || get_tag(index) == CONSTANT_Double);
         return m_entries[index].CONSTANT_8byte.low_bytes;
@@ -481,7 +481,7 @@ public:
      * stored in the constant pool.
      * @param[in] index - an index in the constant pool
      * @return A value of high 32-bits of 64-bit constant.*/
-    uint32 get_8byte_high_word(uint16 index) const {
+    U_32 get_8byte_high_word(uint16 index) const {
         assert(get_tag(index) == CONSTANT_Long
             || get_tag(index) == CONSTANT_Double);
         return m_entries[index].CONSTANT_8byte.high_bytes;
@@ -815,7 +815,7 @@ private:
     Package* m_package;
 
     // Distance in the hierarchy from java/lang/Object
-    uint32 m_depth;
+    U_32 m_depth;
 
     // The field m_is_suitable_for_fast_instanceof should be 0
     // if depth==0 or depth>=vm_max_fast_instanceof_depth()
@@ -1047,7 +1047,7 @@ private:
 
     // Number of "padding" bytes added per class instance to its fields to
     // make each field at least 32 bits
-    uint32 m_num_field_padding_bytes;
+    U_32 m_num_field_padding_bytes;
 public:
 
     /** Initializes class-member variables to their initial values.
@@ -1122,7 +1122,7 @@ public:
     
     /** Gets depth in the hierarchy of the given class.
      * @return A number of classes in the super-class hierarchy.*/
-    uint32 get_depth() const { return m_depth; }
+    U_32 get_depth() const { return m_depth; }
     bool get_fast_instanceof_flag() const { return m_is_suitable_for_fast_instanceof; }
 
     /** Gets the vtable for the given class.

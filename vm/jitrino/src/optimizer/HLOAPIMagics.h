@@ -75,7 +75,7 @@ public:
     Opnd* genTauAnd(Opnd* src1, Opnd* src2);
     Opnd* genAdd(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2);
     Opnd* genSub(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2);
-    Opnd* genLdConstant(int32 val);
+    Opnd* genLdConstant(I_32 val);
     Opnd* genArrayLen(Type* dstType, Type::Tag type, Opnd* array, Opnd* tauNonNull);
     Opnd* genTauArrayLen(Type* dstType, Type::Tag type, Opnd* array,
                          Opnd* tauNullChecked, Opnd *tauTypeChecked);

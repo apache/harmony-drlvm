@@ -215,7 +215,7 @@ static void ti_add_root_set_entry_interior_pointer(
 }
 
 static void ti_add_compressed_root_set_entry(
-        uint32 *ref, 
+        U_32 *ref, 
         Boolean UNREF pinned)
 {
     assert(REFS_IS_COMPRESSED_MODE);
@@ -347,7 +347,7 @@ void ti_enumerate_roots(TIEnv *ti_env, hythread_iterator_t iterator)
     void (*save_gc_add_root_set_entry_interior_pointer)
         (void **slot, int offset, Boolean pinned);
     void (*save_gc_add_compressed_root_set_entry)
-        (uint32 *ref, Boolean pinned);
+        (U_32 *ref, Boolean pinned);
 
     // save away old values
     save_gc_add_root_set_entry =

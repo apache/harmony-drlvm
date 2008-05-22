@@ -43,7 +43,7 @@ a set of auxilary functions
 */
 class InstCodeSelector : public InstructionCallback {
 public:
-    virtual void throwLinkingException(Class_Handle encClass, uint32 cp_ndx, uint32 opcode);
+    virtual void throwLinkingException(Class_Handle encClass, U_32 cp_ndx, U_32 opcode);
 
     static void onCFGInit(IRManager& irManager);
 
@@ -60,7 +60,7 @@ public:
     //
     virtual CG_OpndHandle*  tauPoint(); // tied to control flow reaching this point
     virtual CG_OpndHandle*  tauEdge(); // tied to previous branch
-    virtual CG_OpndHandle*  tauAnd(uint32 numArgs, CG_OpndHandle** args);
+    virtual CG_OpndHandle*  tauAnd(U_32 numArgs, CG_OpndHandle** args);
     virtual CG_OpndHandle*  tauUnsafe(); // no dependence info; operation may depend on any branch
     virtual CG_OpndHandle*  tauSafe();   // operation is always safe
 
@@ -92,7 +92,7 @@ public:
     CG_OpndHandle* xor_(IntegerOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2);
     CG_OpndHandle* not_(IntegerOp::Types,CG_OpndHandle* src);
     CG_OpndHandle* shladd(IntegerOp::Types,CG_OpndHandle* value,
-                          uint32 shiftAmount, CG_OpndHandle* addto);
+                          U_32 shiftAmount, CG_OpndHandle* addto);
     CG_OpndHandle* shl(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount);
     CG_OpndHandle* shr(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount);
     CG_OpndHandle* shru(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount);
@@ -106,7 +106,7 @@ public:
     void           jump() { // do nothing
     }
 
-    void           tableSwitch(CG_OpndHandle* src, uint32 nTargets);       
+    void           tableSwitch(CG_OpndHandle* src, U_32 nTargets);       
     void           throwException(CG_OpndHandle* exceptionObj, bool createStackTrace);
     void            throwSystemException(CompilationInterface::SystemExceptionId);
     CG_OpndHandle* convToInt(ConvertToIntOp::Types,bool isSigned, bool isZeroExtend,
@@ -119,7 +119,7 @@ public:
     CG_OpndHandle*  convToUPtr(PtrType * dstType, CG_OpndHandle* src);
 
 
-    CG_OpndHandle* ldc_i4(int32 val);
+    CG_OpndHandle* ldc_i4(I_32 val);
     CG_OpndHandle* ldc_i8(int64 val);
     CG_OpndHandle* ldc_s(float val);
     CG_OpndHandle* ldc_d(double val);
@@ -167,8 +167,8 @@ public:
     CG_OpndHandle* tau_ldElem(Type *dstType, CG_OpndHandle* array, CG_OpndHandle* index, 
                           bool autoUncompressRef, 
                           CG_OpndHandle* tauBaseNonNull, CG_OpndHandle* tauIdxIsInBounds);
-    CG_OpndHandle* ldVarAddr(uint32 varId);
-    CG_OpndHandle* ldVar(Type* dstType, uint32 varId);
+    CG_OpndHandle* ldVarAddr(U_32 varId);
+    CG_OpndHandle* ldVar(Type* dstType, U_32 varId);
     CG_OpndHandle* tau_arrayLen(Type* dstType,ArrayType* arrayType, Type* lenType, CG_OpndHandle* base,
                             CG_OpndHandle* tauArrayNonNull, CG_OpndHandle* tauIsArray);
     void           tau_stInd(CG_OpndHandle* src, CG_OpndHandle* ptr, Type::Tag memType, 
@@ -187,36 +187,36 @@ public:
                              bool autoCompressRef, CG_OpndHandle* tauBaseNonNull,
                              CG_OpndHandle* tauAddressInRange, CG_OpndHandle* tauElemTypeChecked);
 
-    void           stVar(CG_OpndHandle* src, uint32 varId);
+    void           stVar(CG_OpndHandle* src, U_32 varId);
     CG_OpndHandle* newObj(ObjectType* objType);     
     CG_OpndHandle* newArray(ArrayType* arrayType, CG_OpndHandle* numElems);
-    CG_OpndHandle* newMultiArray(ArrayType* arrayType, uint32 numDims, CG_OpndHandle** dims);
-    CG_OpndHandle* ldRef(Type *dstType, MethodDesc* enclosingMethod,uint32 stringToken, bool uncompress);
-    CG_OpndHandle* ldToken(Type *dstType,MethodDesc* enclosingMethod,uint32 token);
+    CG_OpndHandle* newMultiArray(ArrayType* arrayType, U_32 numDims, CG_OpndHandle** dims);
+    CG_OpndHandle* ldRef(Type *dstType, MethodDesc* enclosingMethod,U_32 stringToken, bool uncompress);
+    CG_OpndHandle* ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token);
 
-    void           incCounter(Type *counterType,uint32 counter);
+    void           incCounter(Type *counterType,U_32 counter);
     void           ret();
     void           ret(CG_OpndHandle* returnValue);
 
-    CG_OpndHandle* defArg(uint32 position, Type *type);
+    CG_OpndHandle* defArg(U_32 position, Type *type);
     CG_OpndHandle* ldFunAddr(Type* dstType, MethodDesc *desc);
     CG_OpndHandle* tau_ldVirtFunAddr(Type* dstType, CG_OpndHandle* vtableAddr, 
                                 MethodDesc *desc, CG_OpndHandle *tauVtableHasDesc);
     CG_OpndHandle* tau_ldVTableAddr(Type *dstType, CG_OpndHandle* base, CG_OpndHandle *tauBaseNonNull);
     CG_OpndHandle* getVTableAddr(Type *dstType, ObjectType *base);
     CG_OpndHandle* tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base,NamedType* vtableTypeDesc);
-    CG_OpndHandle* calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
+    CG_OpndHandle* calli(U_32 numArgs,CG_OpndHandle** args, Type* retType,
                          CG_OpndHandle* methodPtr);
-    CG_OpndHandle* tau_calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
+    CG_OpndHandle* tau_calli(U_32 numArgs,CG_OpndHandle** args, Type* retType,
                              CG_OpndHandle* methodPtr, CG_OpndHandle* nonNullFirstArgTau,
                              CG_OpndHandle* tauTypesChecked);
-    CG_OpndHandle* call(uint32 numArgs, CG_OpndHandle** args, Type* retType, MethodDesc *desc);
-    CG_OpndHandle* tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    CG_OpndHandle* call(U_32 numArgs, CG_OpndHandle** args, Type* retType, MethodDesc *desc);
+    CG_OpndHandle* tau_call(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                             MethodDesc *desc, CG_OpndHandle *nonNullFirstArgTau,
                             CG_OpndHandle *tauTypesChecked);
-    CG_OpndHandle* tau_callvirt(uint32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked);
-    CG_OpndHandle* callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
-    CG_OpndHandle* callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    CG_OpndHandle* tau_callvirt(U_32 numArgs,CG_OpndHandle** args, Type* retType, MethodDesc *desc,             CG_OpndHandle* tauNullChecked, CG_OpndHandle* tauTypesChecked);
+    CG_OpndHandle* callhelper(U_32 numArgs, CG_OpndHandle** args, Type* retType,JitHelperCallOp::Id callId);
+    CG_OpndHandle* callvmhelper(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                 VM_RT_SUPPORT callId);
     
     CG_OpndHandle* box(ObjectType * boxedType, CG_OpndHandle* val);
@@ -275,9 +275,9 @@ public:
     //
     //  Additional instruction selection methods
     //
-    void   genSwitchDispatch(uint32 numTargets,Opnd *switchSrc);
+    void   genSwitchDispatch(U_32 numTargets,Opnd *switchSrc);
     void   genReturn();
-    CG_OpndHandle* runtimeHelperCall(uint32 numArgs, CG_OpndHandle** args,
+    CG_OpndHandle* runtimeHelperCall(U_32 numArgs, CG_OpndHandle** args,
                       Type *retType, 
                       VM_RT_SUPPORT helper,
                       Type *typeArgument,
@@ -293,7 +293,7 @@ public:
         assert(switchSrcOpnd != NULL);
         return switchSrcOpnd;
     }
-    uint32           getSwitchNumTargets() {
+    U_32           getSwitchNumTargets() {
         assert(switchNumTargets > 0);
         return switchNumTargets;
     }
@@ -363,15 +363,15 @@ private:
     Opnd *              zxtInt32(Opnd *opnd);
     void                sxtOneInt32(Opnd*& opnd1, Opnd*& opnd2);
     void                zxtOneInt32(Opnd*& opnd1, Opnd*& opnd2);
-    bool                opndIsFoldableImm(Opnd * opnd, uint32  nbits,
-                                          int32& imm);
+    bool                opndIsFoldableImm(Opnd * opnd, U_32  nbits,
+                                          I_32& imm);
     Opnd *          doSetf(Opnd * opnd);
     Type *              divOpType(DivOp::Types op);
     Type *              integerOpType(IntegerOp::Types opType);
-    Opnd *          addOffset(Opnd * addr, Opnd * base, uint32 offset);
-    Opnd*           buildOffset(uint32 offset, MemoryAttribute::Context context);
-    Opnd*           buildOffsetPlusHeapbase(uint32 offset, MemoryAttribute::Context context);
-    Opnd*           addVtableBaseAndOffset(Opnd *addr, CG_OpndHandle* compPtr, uint32 offset);
+    Opnd *          addOffset(Opnd * addr, Opnd * base, U_32 offset);
+    Opnd*           buildOffset(U_32 offset, MemoryAttribute::Context context);
+    Opnd*           buildOffsetPlusHeapbase(U_32 offset, MemoryAttribute::Context context);
+    Opnd*           addVtableBaseAndOffset(Opnd *addr, CG_OpndHandle* compPtr, U_32 offset);
     void                simpleMemCopy(Opnd *dst, Opnd *src, OpndSize size,
                                       Opnd *dstBaseTau, Opnd *dstOffsetTau,
                                       Opnd *srcBaseTau, Opnd *srcOffsetTau);
@@ -386,8 +386,8 @@ private:
                                     bool autoCompressRef, Opnd *baseTau, Opnd *offsetAndTypeTau);
     Type *              getFieldRefType(Type *dstType, Type::Tag memType);
     void                simplifyTypeTag(Type::Tag& tag,Type *ptr);
-    Opnd **         createReturnArray(Type * retType, uint32& numRegRet);
-    void                assignCallArgs(CallInst *call, uint32 numArgs, CG_OpndHandle **args, 
+    Opnd **         createReturnArray(Type * retType, U_32& numRegRet);
+    void                assignCallArgs(CallInst *call, U_32 numArgs, CG_OpndHandle **args, 
                                        Type *retType, bool isHelperCall);
     CG_OpndHandle*      assignCallRet(CallInst *call, Type *retType, bool isHelperCall);
     Opnd *           doInt32Divide(Opnd * fA, Opnd * fB);
@@ -411,7 +411,7 @@ private:
         SyncFenceFlag_EnforceEnterFence = 0x1,
         SyncFenceFlag_EnforceExitFence  = 0x2
     };
-    uint32       getSyncFenceFlag();
+    U_32       getSyncFenceFlag();
     //
     //  Set/clear current predicate operand to be assigned to the generated instructions
     //
@@ -436,20 +436,20 @@ private:
     MemoryManager                   memManager; // for local data
     Node*                           currentBasicBlock;
     Opnd **                         vars;
-    uint32                          inArgPos;
+    U_32                          inArgPos;
     int                             persistentId;
 #ifdef _DEBUG
-    uint32                          nextInArg;
+    U_32                          nextInArg;
 #endif
     bool                            seenReturn;
     Opnd *                          switchSrcOpnd;
-    uint32                          switchNumTargets;
+    U_32                          switchNumTargets;
     PersistentInstructionId         currPersistentId;
     Opnd *                          currPredOpnd;
     static VM_RT_SUPPORT
                                  divOpHelperIds[],
                                  remOpHelperIds[];
-    static uint32 _tauUnsafe;
+    static U_32 _tauUnsafe;
 };
 
 

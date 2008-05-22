@@ -43,8 +43,8 @@ bool gc_heap_slot_cas_ref_compressed (Managed_Object_Handle p_base_of_object_wit
 
     bool result =
         (apr_atomic_cas32(
-            (uint32*)p_slot, (uint32)compressed_value, (uint32)compressed_expected)
-        == (uint32)compressed_expected);
+            (U_32*)p_slot, (U_32)compressed_value, (U_32)compressed_expected)
+        == (U_32)compressed_expected);
 
     // TODO: uncomment foolowing line for GC
     //INTERNAL(gc_write_barrier) (p_base_of_object_with_slot);
@@ -145,7 +145,7 @@ JNIEXPORT jboolean compareAndSetIntField
     U_8* java_ref = (U_8*)h->object;
     jint* field_addr = (jint*)(java_ref + offset);
     bool result =
-      (apr_atomic_cas32((uint32*)field_addr, (uint32)value, (uint32)expected) == (uint32)expected);
+      (apr_atomic_cas32((U_32*)field_addr, (U_32)value, (U_32)expected) == (U_32)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
@@ -240,7 +240,7 @@ JNIEXPORT jboolean compareAndSetIntArray
             index);
 
     bool result =
-      (apr_atomic_cas32((uint32 *)field_addr, (uint32)value, (uint32)expected) == (uint32)expected);
+      (apr_atomic_cas32((U_32 *)field_addr, (U_32)value, (U_32)expected) == (U_32)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);

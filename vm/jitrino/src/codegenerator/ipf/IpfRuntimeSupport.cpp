@@ -93,27 +93,27 @@ void RuntimeSupport::makeRuntimeInfo() {
 
     IPF_LOG << endl << "  Make Stack Info" << endl;
     StackInfo *stackInfo = makeStackInfo();
-    uint32 stackInfoSize = sizeof(StackInfo);
+    U_32 stackInfoSize = sizeof(StackInfo);
     IPF_LOG << "    stack info size (bytes): " << stackInfoSize << endl;
 
     IPF_LOG << endl << "  Make Root Seet Info" << endl;
     Uint32Vector rootSetInfo(mm);
     makeRootSetInfo(rootSetInfo);
-    uint32 rootSetInfoSize = ROOT_SET_HEADER_SIZE + rootSetInfo.size() * sizeof(uint32);
+    U_32 rootSetInfoSize = ROOT_SET_HEADER_SIZE + rootSetInfo.size() * sizeof(U_32);
     IPF_LOG << "    GC root set info size (bytes): " << rootSetInfoSize << endl;
 
     // create info block
-    uint32 infoBlockSize = stackInfoSize + rootSetInfoSize;
+    U_32 infoBlockSize = stackInfoSize + rootSetInfoSize;
     U_8*   infoBlock     = compilationInterface.allocateInfoBlock(infoBlockSize);
 
     // write stack info
     *((StackInfo *)infoBlock) = *stackInfo;
 
     // write root set info
-    uint32 *gcInfo = (uint32 *)(infoBlock + sizeof(StackInfo));
-    uint32 j       = ROOT_SET_HEADER_SIZE / sizeof(uint32); 
+    U_32 *gcInfo = (U_32 *)(infoBlock + sizeof(StackInfo));
+    U_32 j       = ROOT_SET_HEADER_SIZE / sizeof(U_32); 
     gcInfo[0] = rootSetInfoSize;
-    for (uint32 i=0; i<rootSetInfo.size(); i++, j++) {
+    for (U_32 i=0; i<rootSetInfo.size(); i++, j++) {
         gcInfo[j] = rootSetInfo[i];
     }
 }
@@ -233,15 +233,15 @@ void RuntimeSupport::inserFakeLastNode(NodeVector &nodes) {
 
 StackInfo* RuntimeSupport::makeStackInfo() {
     
-    int32  rpBak          = opndManager->rpBak;
-    int32  prBak          = opndManager->prBak;
-    int32  pfsBak         = opndManager->pfsBak;
-    int32  unatBak        = opndManager->unatBak;
-    uint32 savedGrMask    = opndManager->savedGrMask;
-    uint32 savedFrMask    = opndManager->savedFrMask;
-    uint32 savedBrMask    = opndManager->savedBrMask;
-    uint32 memStackSize   = opndManager->memStackSize;
-    int32  savedBase      = opndManager->savedBase;
+    I_32  rpBak          = opndManager->rpBak;
+    I_32  prBak          = opndManager->prBak;
+    I_32  pfsBak         = opndManager->pfsBak;
+    I_32  unatBak        = opndManager->unatBak;
+    U_32 savedGrMask    = opndManager->savedGrMask;
+    U_32 savedFrMask    = opndManager->savedFrMask;
+    U_32 savedBrMask    = opndManager->savedBrMask;
+    U_32 memStackSize   = opndManager->memStackSize;
+    I_32  savedBase      = opndManager->savedBase;
 
     if(LOG_ON) {
         if (rpBak!=LOCATION_INVALID   && rpBak>=S_OUTARG_BASE)      { IPF_ERR << " rpBak = " << rpBak << endl; }
@@ -487,8 +487,8 @@ void RuntimeSupport::makeRootSetInfo(Uint32Vector &info) {
 
 void RuntimeSupport::writeSpInfo(Uint32Vector &info, uint64 spAddr, RegOpndVector &ptrs) {
 
-    uint32 spAddrHight = spAddr;                                // hight part of spAddr
-    uint32 spAddrLow   = spAddr >> 32;                          // low   part of spAddr
+    U_32 spAddrHight = spAddr;                                // hight part of spAddr
+    U_32 spAddrLow   = spAddr >> 32;                          // low   part of spAddr
     uint16 sizePos     = info.size();
 
     info.push_back(0);                                          // push safe point info size (placeholder)
@@ -497,21 +497,21 @@ void RuntimeSupport::writeSpInfo(Uint32Vector &info, uint64 spAddr, RegOpndVecto
 
     IPF_LOG << "      address: " << hex << spAddr << dec << "  alive pointers locations:";
     for (uint16 i=0; i<ptrs.size(); i++) {
-        int32 location = toInt32(ptrs[i]);                 // get mptr location
+        I_32 location = toInt32(ptrs[i]);                 // get mptr location
         info.push_back(location);                       // push base location
         IPF_LOG << " " << location;
     }
 
-    info[sizePos] = (info.size() - sizePos) * sizeof(uint32);
+    info[sizePos] = (info.size() - sizePos) * sizeof(U_32);
     IPF_LOG << "  size: " << info[sizePos] << endl;
 }
 
 //----------------------------------------------------------------------------------------//
 // returns opnd location in form to store in info block
 
-int32 RuntimeSupport::toInt32(RegOpnd *opnd) {
+I_32 RuntimeSupport::toInt32(RegOpnd *opnd) {
     
-    int32 location = opnd->getValue();
+    I_32 location = opnd->getValue();
     if (LOG_ON && location >= S_OUTARG_BASE) IPF_ERR << " location = " << location << endl;
     if (opnd->isMem() == true)            location += NUM_G_REG;
     if (opnd->getDataKind() == DATA_MPTR) location = - (location + 1);

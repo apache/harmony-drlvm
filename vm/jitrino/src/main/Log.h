@@ -67,10 +67,10 @@ public:
 
 #endif
 
-    static void printStageBegin (std::ostream&, uint32 stageId, const char * stageGroup, const char * stageName, const char * stageTag);
-    static void printStageEnd   (std::ostream&, uint32 stageId, const char * stageGroup, const char * stageName, const char * stageTag);
-    static void printIRDumpBegin(std::ostream&, uint32 stageId, const char * stageName, const char * subKind);
-    static void printIRDumpEnd  (std::ostream&, uint32 stageId, const char * stageName, const char * subKind);
+    static void printStageBegin (std::ostream&, U_32 stageId, const char * stageGroup, const char * stageName, const char * stageTag);
+    static void printStageEnd   (std::ostream&, U_32 stageId, const char * stageGroup, const char * stageName, const char * stageTag);
+    static void printIRDumpBegin(std::ostream&, U_32 stageId, const char * stageName, const char * subKind);
+    static void printIRDumpEnd  (std::ostream&, U_32 stageId, const char * stageName, const char * subKind);
 
     static char* makeDotFileName (const char* suffix);
 

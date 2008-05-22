@@ -115,12 +115,12 @@ Constraint Encoder::getAllRegs(OpndKind regKind)
     return Constraint();
 }
 
-uint32 Encoder::getMnemonicProperties(Mnemonic mn)
+U_32 Encoder::getMnemonicProperties(Mnemonic mn)
 {
     return getMnemonicProperties(*getMnemonicDesc(mn));
 };
 
-uint32 Encoder::getMnemonicProperties(const MnemonicDesc& mdesc)
+U_32 Encoder::getMnemonicProperties(const MnemonicDesc& mdesc)
 {
     return (mdesc.flags & MF_CONDITIONAL ? Inst::Properties_Conditional:0) | 
             (mdesc.flags & MF_SYMMETRIC ? Inst::Properties_Symmetric : 0) |
@@ -129,7 +129,7 @@ uint32 Encoder::getMnemonicProperties(const MnemonicDesc& mdesc)
 };
 
 //_________________________________________________________________________________________________
-bool Encoder::matches(Constraint co, Constraint ci, uint32 opndRoles,
+bool Encoder::matches(Constraint co, Constraint ci, U_32 opndRoles,
                       bool allowAliases)
 {
     return co.isNull() || !(ci&co).isNull() || 
@@ -144,7 +144,7 @@ Encoder::findOpcodeGroup(const FindInfo& fi)
     assert(m != Mnemonic_Null && m < Mnemonic_Count);
     const OpcodeGroupsHolder& mi = getOpcodeGroups()[m];
     // first, find better matching for already assigned operands
-    for (uint32 i=0; i<mi.count; i++) {
+    for (U_32 i=0; i<mi.count; i++) {
         const OpcodeGroup* og=mi.opgroups+i;
         if (matches(og, fi, false)) {
             return og;
@@ -152,7 +152,7 @@ Encoder::findOpcodeGroup(const FindInfo& fi)
     }
 
     // now find any matching suitable for the type constraint (initial)
-    for (uint32 i=0; i<mi.count; i++) {
+    for (U_32 i=0; i<mi.count; i++) {
         const OpcodeGroup* og=mi.opgroups+i;
         if (matches(og, fi, true)) {
             return og;
@@ -176,8 +176,8 @@ bool Encoder::matches(const OpcodeGroup* og, const FindInfo& fi,
             return false;
         }
     }
-    for (uint32 i = 0, n = fi.opndCount; i < n; i++) {
-        uint32 idx = fi.isExtended ? og->extendedToNativeMap[i] : i;
+    for (U_32 i = 0, n = fi.opndCount; i < n; i++) {
+        U_32 idx = fi.isExtended ? og->extendedToNativeMap[i] : i;
         Constraint co=fi.opndConstraints[idx];
         if (any) {
             co = Constraint(OpndKind_Any, co.getSize());
@@ -190,9 +190,9 @@ bool Encoder::matches(const OpcodeGroup* og, const FindInfo& fi,
 
 //_________________________________________________________________________________________________
 bool 
-Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, uint32 i, Constraint co, bool isExtended, bool any)
+Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, bool isExtended, bool any)
 {
-        uint32 idx = isExtended ? og->extendedToNativeMap[i] : i;
+        U_32 idx = isExtended ? og->extendedToNativeMap[i] : i;
         assert(idx<IRMaxNativeOpnds);
 
         Constraint ci=og->opndConstraints[idx];
@@ -212,7 +212,7 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
     EncoderBase::Operands args;
 
     Opnd * const * opnds = inst->getOpnds();
-    const uint32 * roles = inst->getOpndRoles();
+    const U_32 * roles = inst->getOpndRoles();
 
     for( int idx=0, n=inst->getOpndCount(); idx<n; idx++ ) { 
         if (!(roles[idx] & Inst::OpndRole_Explicit)) continue;
@@ -385,7 +385,7 @@ void Encoder::buildOGHolder(OpcodeGroupsHolder * mitem,
             //
 
             if (canBeIncluded(og, od)) {
-                for (uint32 j=0; j<og.opndRoles.count; j++) {
+                for (U_32 j=0; j<og.opndRoles.count; j++) {
                     og.opndConstraints[j].unionWith(od.opndConstraints[j]);
                 }
                 break;
@@ -399,7 +399,7 @@ void Encoder::buildOGHolder(OpcodeGroupsHolder * mitem,
             OpcodeGroup& og = mitem->opgroups[mitem->count];
             initOG(og, mdesc);
             og.opndRoles = od.opndRoles;
-            for (uint32 j=0; j<og.opndRoles.count; j++) {
+            for (U_32 j=0; j<og.opndRoles.count; j++) {
                 og.opndConstraints[j].unionWith(od.opndConstraints[j]);
             }
             ++mitem->count;
@@ -464,22 +464,22 @@ void Encoder::initOG(OpcodeGroup& og, const MnemonicDesc& mdesc)
 
 void Encoder::finalizeOG(OpcodeGroup& og) {
 
-    uint32 etmIdx = 0;
-    for (uint32 i = 0; i < og.opndRoles.count; i++) {
+    U_32 etmIdx = 0;
+    for (U_32 i = 0; i < og.opndRoles.count; i++) {
         if (getOpndRoles(og.opndRoles, i) & Inst::OpndRole_Def){
             og.extendedToNativeMap[etmIdx++] = i;
         }
         }
     assert(etmIdx == og.opndRoles.defCount);
-    for (uint32 i = 0; i < og.opndRoles.count; i++) {
+    for (U_32 i = 0; i < og.opndRoles.count; i++) {
         if (getOpndRoles(og.opndRoles, i) & Inst::OpndRole_Use) {
             og.extendedToNativeMap[etmIdx++] = i;
     }
         }
-    assert(etmIdx == (uint32)(og.opndRoles.defCount + og.opndRoles.useCount));
+    assert(etmIdx == (U_32)(og.opndRoles.defCount + og.opndRoles.useCount));
 
-    uint32 memOpnds = 0;
-    for (uint32 i = 0; i < og.opndRoles.count; i++) {
+    U_32 memOpnds = 0;
+    for (U_32 i = 0; i < og.opndRoles.count; i++) {
         if (og.opndConstraints[i].getKind() & OpndKind_Mem)
             memOpnds++;
     }

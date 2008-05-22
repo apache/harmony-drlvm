@@ -27,7 +27,7 @@
 
 namespace Jitrino {
 
-VariableIncarnation::VariableIncarnation(uint32 offset, Type* t)
+VariableIncarnation::VariableIncarnation(U_32 offset, Type* t)
 : definingOffset(offset), declaredType(t), opnd(NULL)
 {
     _prev = _next = NULL;
@@ -152,7 +152,7 @@ void SlotVar::print(::std::ostream& out) {
 }
 
 
-bool SlotVar::addVarIncarnations(SlotVar* var, MemoryManager& mm, uint32 linkOffset) {
+bool SlotVar::addVarIncarnations(SlotVar* var, MemoryManager& mm, U_32 linkOffset) {
     assert(var->_prev == NULL);
     SlotVar* this_sv = this;
     while(this_sv->_next) this_sv = (SlotVar*)this_sv->_next;
@@ -274,7 +274,7 @@ void  StateInfo::addExceptionInfo(CatchBlock *info) {
     }
 }
 
-void StateInfo::cleanFinallyInfo(uint32 offset)
+void StateInfo::cleanFinallyInfo(U_32 offset)
 {
     for (unsigned k=0; k < stackDepth; k++) {
         if (stack[k].jsrLabelOffset == offset) {
@@ -295,9 +295,9 @@ public:
           compilationInterface(ci), enclosingMethod(method),
           prevCatch(NULL), nextRegionId(0) {}
 
-    uint32 parseHandlers() {
-        uint32 numHandlers = enclosingMethod->getNumHandlers();
-        for (uint32 i=0; i<numHandlers; i++) {
+    U_32 parseHandlers() {
+        U_32 numHandlers = enclosingMethod->getNumHandlers();
+        for (U_32 i=0; i<numHandlers; i++) {
             unsigned short beginOffset,endOffset,handlerOffset,handlerClassIndex;
             enclosingMethod->getHandlerInfo(i,&beginOffset,&endOffset,
                 &handlerOffset,&handlerClassIndex);
@@ -313,7 +313,7 @@ public:
     }
 
     void addHandlerForCatchBlock(CatchBlock* block, 
-                                      uint32 handlerOffset,
+                                      U_32 handlerOffset,
                                       Type*  exceptionType) {
         jitrino_assert( exceptionType);
         assert(!exceptionType->isUnresolvedType());//must be resolved by verifier
@@ -346,7 +346,7 @@ public:
         
     }
 
-    CatchBlock* splitBlockWithOffset(CatchBlock* block, uint32 offset)
+    CatchBlock* splitBlockWithOffset(CatchBlock* block, U_32 offset)
     {
         CatchBlock* newBlock = 
             new (memManager) CatchBlock(nextRegionId++, 
@@ -370,10 +370,10 @@ public:
         return newBlock;
     }
 
-    bool catchBlock(uint32 tryOffset,
-                            uint32 tryLength,
-                            uint32 handlerOffset,
-                            uint32 exceptionTypeToken)  {
+    bool catchBlock(U_32 tryOffset,
+                            U_32 tryLength,
+                            U_32 handlerOffset,
+                            U_32 exceptionTypeToken)  {
  
         if (Log::isEnabled()) Log::out() << "CatchBlock @ " << (int)tryOffset << "," 
             << (int)tryOffset+(int)tryLength
@@ -381,7 +381,7 @@ public:
              << " exception type " << (int)exceptionTypeToken << ","
              << " numCatch " << numCatch << ::std::endl;
 
-        uint32 endOffset = tryOffset + tryLength;
+        U_32 endOffset = tryOffset + tryLength;
         prepass.setLabel(handlerOffset);
         prepass.setLabel(tryOffset);
         prepass.setLabel(endOffset);
@@ -487,13 +487,13 @@ public:
         return 1; // all exceptionTypes are OK
     }
 
-    uint32 numCatch;
+    U_32 numCatch;
     MemoryManager&            memManager;
     JavaLabelPrepass&      prepass;
     CompilationInterface&   compilationInterface;
     MethodDesc*             enclosingMethod;
     CatchBlock*             prevCatch;
-    uint32                  nextRegionId;
+    U_32                  nextRegionId;
 };
 
 
@@ -514,7 +514,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
    exceptionTable(mm),
    problemTypeToken(MAX_UINT32)
 {
-    uint32 numByteCodes = methodDesc.getByteCodeSize();
+    U_32 numByteCodes = methodDesc.getByteCodeSize();
     //nextIsLabel = false;
     int32Type = typeManager.getInt32Type();
     int64Type = typeManager.getInt64Type();
@@ -528,7 +528,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     int numStack = methodDesc.getMaxStack()+1;
     stateInfo.stack  = new (memManager) StateInfo::SlotInfo[numVars+numStack];
     stateInfo.stackDepth = numVars;
-    for (uint32 k=0; k < numVars+numStack; k++) {
+    for (U_32 k=0; k < numVars+numStack; k++) {
         struct StateInfo::SlotInfo *slot = &stateInfo.stack[k];
         slot->type = NULL;
         slot->slotFlags = 0;
@@ -555,8 +555,8 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     }
     hasJsrLabels = false;
     isFallThruLabel = true;
-    uint32 numArgs = methodDesc.getNumParams();
-    for (uint32 i=0, j=0; i<numArgs; i++,j++) {
+    U_32 numArgs = methodDesc.getNumParams();
+    for (U_32 i=0, j=0; i<numArgs; i++,j++) {
         Type *type;
         struct StateInfo::SlotInfo *slot = &stateInfo.stack[j];
         if (actualArgs != NULL) { 
@@ -589,7 +589,7 @@ JavaLabelPrepass::JavaLabelPrepass(MemoryManager& mm,
     stateTable->setStateInfo(&stateInfo, 0, false);
 }
 
-void JavaLabelPrepass::offset(uint32 offset) {
+void JavaLabelPrepass::offset(U_32 offset) {
     bytecodevisited->setBit(offset,true);
     if (offset==0)
         stateTable->restoreStateInfo(&stateInfo, offset);
@@ -602,7 +602,7 @@ void JavaLabelPrepass::offset(uint32 offset) {
             propagateStateInfo(offset,isFallThruLabel);
             isFallThruLabel = true;
         }
-        if (Log::isEnabled()) Log::out() << "BASICBLOCK " << (int32)offset << " #" << blockNumber << std::endl;
+        if (Log::isEnabled()) Log::out() << "BASICBLOCK " << (I_32)offset << " #" << blockNumber << std::endl;
         ++blockNumber;
         visited->setBit(offset,true);
         stateTable->restoreStateInfo(&stateInfo,offset);
@@ -615,7 +615,7 @@ void JavaLabelPrepass::offset(uint32 offset) {
 
 
 
-void JavaLabelPrepass::setLabel(uint32 offset) {
+void JavaLabelPrepass::setLabel(U_32 offset) {
     if (labels->getBit(offset)) // this label is already seen
         return;
     if (Log::isEnabled()) Log::out() << "SET LABEL " << (int) offset << " #" << (int) numLabels << ::std::endl;
@@ -624,30 +624,30 @@ void JavaLabelPrepass::setLabel(uint32 offset) {
 }
 
 struct LabelOffsetVisitor : public BitSet::Visitor {
-    LabelOffsetVisitor(uint32* l) : labelOffset(l) {}
-    void visit(uint32 elem) {*labelOffset++ = elem;}
-    uint32* labelOffset;
+    LabelOffsetVisitor(U_32* l) : labelOffset(l) {}
+    void visit(U_32 elem) {*labelOffset++ = elem;}
+    U_32* labelOffset;
 };
 
 
 // called to indicate end of parsing
 void JavaLabelPrepass::parseDone() {
-    labelOffsets = new (memManager) uint32[numLabels];
+    labelOffsets = new (memManager) U_32[numLabels];
     struct LabelOffsetVisitor avisitor(labelOffsets);
     labels->visitElems(avisitor);
     if (Log::isEnabled()) Log::out() << ::std::endl << "================= PREPASS IS FINISHED =================" << ::std::endl << ::std::endl;
 }
 
-uint32 JavaLabelPrepass::getLabelId(uint32 offset) {
+U_32 JavaLabelPrepass::getLabelId(U_32 offset) {
     if (numLabels == 0)
-        return (uint32) -1;
-    uint32 lo = 0;
-    uint32 hi = numLabels-1;
+        return (U_32) -1;
+    U_32 lo = 0;
+    U_32 hi = numLabels-1;
     if (offset > labelOffsets[hi] || offset < labelOffsets[lo])
         // not in this set
-        return (uint32) -1;
+        return (U_32) -1;
     while (hi-lo > 4) {
-        uint32 mid = lo + ((hi-lo) >> 1);
+        U_32 mid = lo + ((hi-lo) >> 1);
         if (offset < labelOffsets[mid]) 
             hi = mid;
         else
@@ -659,23 +659,23 @@ uint32 JavaLabelPrepass::getLabelId(uint32 offset) {
             return lo;
         lo++;
     }
-    return (uint32) -1;
+    return (U_32) -1;
 }
 
-VariableIncarnation* JavaLabelPrepass::getVarInc(uint32 offset, uint32 index)
+VariableIncarnation* JavaLabelPrepass::getVarInc(U_32 offset, U_32 index)
 {
     int numStack = methodDesc.getMaxStack()+1;
-    uint32 key = offset*(numVars+numStack)+index;
-    StlHashMap<uint32,VariableIncarnation*>::iterator iter = localVars.find(key);
+    U_32 key = offset*(numVars+numStack)+index;
+    StlHashMap<U_32,VariableIncarnation*>::iterator iter = localVars.find(key);
     if (iter==localVars.end()) return NULL;
     return (*iter).second;
 }
 
-VariableIncarnation* JavaLabelPrepass::getOrCreateVarInc(uint32 offset, uint32 index, Type* type)
+VariableIncarnation* JavaLabelPrepass::getOrCreateVarInc(U_32 offset, U_32 index, Type* type)
 {
     int numStack = methodDesc.getMaxStack()+1;
-    uint32 key = offset*(numVars+numStack)+index;
-    StlHashMap<uint32,VariableIncarnation*>::iterator iter = localVars.find(key);
+    U_32 key = offset*(numVars+numStack)+index;
+    StlHashMap<U_32,VariableIncarnation*>::iterator iter = localVars.find(key);
     VariableIncarnation* var;
     if (iter==localVars.end()) {
         var = new(memManager) VariableIncarnation(offset, type);
@@ -688,7 +688,7 @@ VariableIncarnation* JavaLabelPrepass::getOrCreateVarInc(uint32 offset, uint32 i
 
 void JavaLabelPrepass::createMultipleDefVarOpnds(IRBuilder* irBuilder)
 {
-    StlHashMap<uint32,VariableIncarnation*>::iterator iter;
+    StlHashMap<U_32,VariableIncarnation*>::iterator iter;
     for(iter = localVars.begin(); iter!=localVars.end(); ++iter) {
         VariableIncarnation* var = (*iter).second;
         var->createMultipleDefVarOpnd(irBuilder);
@@ -726,7 +726,7 @@ void    JavaLabelPrepass::pushType(Type *type) {
 }
 
 
-void    JavaLabelPrepass::pushType(Type *type, uint32 varNumber) {
+void    JavaLabelPrepass::pushType(Type *type, U_32 varNumber) {
     stateInfo.push(type).setVarNumber(varNumber);
 }
 
@@ -788,7 +788,7 @@ void JavaLabelPrepass::parseError() {
 // branches
 //
 
-void JavaLabelPrepass::checkTargetForRestart(uint32 target) {
+void JavaLabelPrepass::checkTargetForRestart(U_32 target) {
     // If the target of a branch has been visited, but has no state info, then we
     // will not merge information such as variable incarnations from that first visit
     // with the information from the current branch.
@@ -801,13 +801,13 @@ void JavaLabelPrepass::checkTargetForRestart(uint32 target) {
     }
 }
 
-void JavaLabelPrepass::propagateStateInfo(uint32 offset, bool isFallThru) {
+void JavaLabelPrepass::propagateStateInfo(U_32 offset, bool isFallThru) {
     setLabel(offset);
     stateTable->setStateInfo(&stateInfo,offset,isFallThru);
 }
 
 
-void JavaLabelPrepass::ifeq(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::ifeq(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -816,7 +816,7 @@ void JavaLabelPrepass::ifeq(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifne(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::ifne(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -825,7 +825,7 @@ void JavaLabelPrepass::ifne(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::iflt(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::iflt(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -834,7 +834,7 @@ void JavaLabelPrepass::iflt(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifge(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::ifge(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -843,7 +843,7 @@ void JavaLabelPrepass::ifge(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifgt(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::ifgt(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -852,7 +852,7 @@ void JavaLabelPrepass::ifgt(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifle(uint32 targetOffset,uint32 nextOffset) {
+void JavaLabelPrepass::ifle(U_32 targetOffset,U_32 nextOffset) {
     popAndCheck(int32Type);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -861,7 +861,7 @@ void JavaLabelPrepass::ifle(uint32 targetOffset,uint32 nextOffset) {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmpeq(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmpeq(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -871,7 +871,7 @@ void JavaLabelPrepass::if_icmpeq(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmpne(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmpne(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -881,7 +881,7 @@ void JavaLabelPrepass::if_icmpne(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmplt(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmplt(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -891,7 +891,7 @@ void JavaLabelPrepass::if_icmplt(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmpge(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmpge(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -901,7 +901,7 @@ void JavaLabelPrepass::if_icmpge(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmpgt(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmpgt(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -911,7 +911,7 @@ void JavaLabelPrepass::if_icmpgt(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_icmple(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_icmple(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(int32Type); 
     popAndCheck(int32Type);
     setStackVars();
@@ -921,7 +921,7 @@ void JavaLabelPrepass::if_icmple(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_acmpeq(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_acmpeq(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(A);
     popAndCheck(A);
     setStackVars();
@@ -931,7 +931,7 @@ void JavaLabelPrepass::if_acmpeq(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::if_acmpne(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::if_acmpne(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(A);
     popAndCheck(A);
     setStackVars();
@@ -941,7 +941,7 @@ void JavaLabelPrepass::if_acmpne(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifnull(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::ifnull(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(A);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -950,7 +950,7 @@ void JavaLabelPrepass::ifnull(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::ifnonnull(uint32 targetOffset,uint32 nextOffset)    {
+void JavaLabelPrepass::ifnonnull(U_32 targetOffset,U_32 nextOffset)    {
     popAndCheck(A);
     setStackVars();
     checkTargetForRestart(targetOffset);
@@ -959,7 +959,7 @@ void JavaLabelPrepass::ifnonnull(uint32 targetOffset,uint32 nextOffset)    {
     setLabel(nextOffset);
     isFallThruLabel = targetOffset > nextOffset;
 }
-void JavaLabelPrepass::goto_(uint32 targetOffset,uint32 nextOffset)        {
+void JavaLabelPrepass::goto_(U_32 targetOffset,U_32 nextOffset)        {
     setStackVars();
     checkTargetForRestart(targetOffset);
     propagateStateInfo(targetOffset,false);
@@ -968,17 +968,17 @@ void JavaLabelPrepass::goto_(uint32 targetOffset,uint32 nextOffset)        {
 //
 // returns
 //
-void JavaLabelPrepass::ireturn(uint32 off) {popAndCheck(int32Type); }
-void JavaLabelPrepass::lreturn(uint32 off) {popAndCheck(int64Type); }
-void JavaLabelPrepass::freturn(uint32 off) {popAndCheck(singleType);}
-void JavaLabelPrepass::dreturn(uint32 off) {popAndCheck(doubleType);}
-void JavaLabelPrepass::areturn(uint32 off) {popAndCheck(A);         }
-void JavaLabelPrepass::return_(uint32 off) {                        }
+void JavaLabelPrepass::ireturn(U_32 off) {popAndCheck(int32Type); }
+void JavaLabelPrepass::lreturn(U_32 off) {popAndCheck(int64Type); }
+void JavaLabelPrepass::freturn(U_32 off) {popAndCheck(singleType);}
+void JavaLabelPrepass::dreturn(U_32 off) {popAndCheck(doubleType);}
+void JavaLabelPrepass::areturn(U_32 off) {popAndCheck(A);         }
+void JavaLabelPrepass::return_(U_32 off) {                        }
 
 //
 // jsr/ret
 //
-void JavaLabelPrepass::jsr(uint32 targetOffset, uint32 nextOffset) {
+void JavaLabelPrepass::jsr(U_32 targetOffset, U_32 nextOffset) {
     stateTable->createStateInfo(targetOffset)->setSubroutineEntry();
     setSubroutineEntry(targetOffset);
     hasJsrLabels = true;
@@ -1000,7 +1000,7 @@ void JavaLabelPrepass::ret(uint16 varIndex, const uint8* byteCodes) {
     assert(var);
     var->setMultipleDefs();
     setStackVars();
-    uint32 subEntryOffset = slot->jsrLabelOffset;
+    U_32 subEntryOffset = slot->jsrLabelOffset;
     stateInfo.cleanFinallyInfo(subEntryOffset);
     assert(retToSubEntryMap.find(currentOffset) == retToSubEntryMap.end() ||
         retToSubEntryMap[currentOffset] == subEntryOffset);
@@ -1009,7 +1009,7 @@ void JavaLabelPrepass::ret(uint16 varIndex, const uint8* byteCodes) {
     JsrEntryToJsrNextMap::const_iterator iter;
     for (iter = sub_entry_range.first; iter != sub_entry_range.second; iter++) {
         assert((*iter).first == subEntryOffset);
-        uint32 jsrNextOffset = (*iter).second;
+        U_32 jsrNextOffset = (*iter).second;
 
         // according to JVM Spec:
         //      When executing the ret instruction, which implements a
@@ -1040,7 +1040,7 @@ void JavaLabelPrepass::tableswitch(JavaSwitchTargetsIter* iter) {
 void JavaLabelPrepass::lookupswitch(JavaLookupSwitchTargetsIter* iter) {
     popAndCheck(int32Type);
     setStackVars();
-    uint32 dummy;
+    U_32 dummy;
     while (iter->hasNext()) 
         propagateStateInfo(iter->getNextTarget(&dummy),false);
     propagateStateInfo(iter->getDefaultTarget(),false);
@@ -1053,7 +1053,7 @@ void JavaLabelPrepass::lookupswitch(JavaLookupSwitchTargetsIter* iter) {
 
 void JavaLabelPrepass::nop()                               {}
 void JavaLabelPrepass::aconst_null()                       { pushType(typeManager.getNullObjectType()); }
-void JavaLabelPrepass::iconst(int32 val)                   { pushType(int32Type); }
+void JavaLabelPrepass::iconst(I_32 val)                   { pushType(int32Type); }
 void JavaLabelPrepass::lconst(int64 val)                   { pushType(int64Type); }
 void JavaLabelPrepass::fconst(float val)                   { pushType(singleType); }
 void JavaLabelPrepass::dconst(double val)                  { pushType(doubleType); }
@@ -1066,11 +1066,11 @@ void JavaLabelPrepass::fload(uint16 varIndex)              { genLoad(singleType,
 void JavaLabelPrepass::dload(uint16 varIndex)              { genLoad(doubleType,varIndex); }
 void JavaLabelPrepass::aload(uint16 varIndex)              { genTypeLoad(varIndex); }
 
-void JavaLabelPrepass::istore(uint16 varIndex,uint32 off)  { genStore(int32Type,varIndex,off); }
-void JavaLabelPrepass::lstore(uint16 varIndex,uint32 off)  { genStore(int64Type,varIndex,off); }
-void JavaLabelPrepass::fstore(uint16 varIndex,uint32 off)  { genStore(singleType,varIndex,off); }
-void JavaLabelPrepass::dstore(uint16 varIndex,uint32 off)  { genStore(doubleType,varIndex,off); }
-void JavaLabelPrepass::astore(uint16 varIndex,uint32 off)  { genTypeStore(varIndex,off); }
+void JavaLabelPrepass::istore(uint16 varIndex,U_32 off)  { genStore(int32Type,varIndex,off); }
+void JavaLabelPrepass::lstore(uint16 varIndex,U_32 off)  { genStore(int64Type,varIndex,off); }
+void JavaLabelPrepass::fstore(uint16 varIndex,U_32 off)  { genStore(singleType,varIndex,off); }
+void JavaLabelPrepass::dstore(uint16 varIndex,U_32 off)  { genStore(doubleType,varIndex,off); }
+void JavaLabelPrepass::astore(uint16 varIndex,U_32 off)  { genTypeStore(varIndex,off); }
 
 void JavaLabelPrepass::iaload()                            { genArrayLoad(int32Type); }
 void JavaLabelPrepass::laload()                            { genArrayLoad(int64Type); }
@@ -1147,7 +1147,7 @@ void JavaLabelPrepass::fcmpg()                             { genCompare(singleTy
 void JavaLabelPrepass::dcmpl()                             { genCompare(doubleType);}
 void JavaLabelPrepass::dcmpg()                             { genCompare(doubleType);}
 
-void JavaLabelPrepass::new_(uint32 constPoolIndex)         { 
+void JavaLabelPrepass::new_(U_32 constPoolIndex)         { 
     StateInfo::SlotInfo slot;
     StateInfo::setNonNull(&slot);
     StateInfo::setExactType(&slot);
@@ -1184,7 +1184,7 @@ void JavaLabelPrepass::newarray(uint8 etype)                {
 }
 
 
-void JavaLabelPrepass::anewarray(uint32 constPoolIndex)    { 
+void JavaLabelPrepass::anewarray(U_32 constPoolIndex)    { 
     popAndCheck(int32Type); 
     StateInfo::SlotInfo slot;
     StateInfo::setNonNull(&slot);
@@ -1207,7 +1207,7 @@ void JavaLabelPrepass::athrow() {
     popAndCheck(A); 
 }
 
-void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    { 
+void JavaLabelPrepass::checkcast(U_32 constPoolIndex)    { 
     StateInfo::SlotInfo slot = stateInfo.stack[stateInfo.stackDepth - 1];
     if ( (slot.type) &&
          (slot.type->tag == Type::NullObject ) &&
@@ -1220,7 +1220,7 @@ void JavaLabelPrepass::checkcast(uint32 constPoolIndex)    {
     pushType(type);
 }
 
-int JavaLabelPrepass::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
+int JavaLabelPrepass::instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)   {
     popType();
     pushType(int32Type);
     return 3;  // length of instanceof
@@ -1228,11 +1228,11 @@ int JavaLabelPrepass::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32
 void JavaLabelPrepass::monitorenter()                      { popAndCheck(A); }
 void JavaLabelPrepass::monitorexit()                       { popAndCheck(A); }
 
-void JavaLabelPrepass::iinc(uint16 varIndex,int32 amount)  { 
+void JavaLabelPrepass::iinc(uint16 varIndex,I_32 amount)  { 
     stateInfo.stack[varIndex].vars->getVarIncarnation()->setMultipleDefs();
 }
 
-void JavaLabelPrepass::ldc(uint32 constPoolIndex)          {
+void JavaLabelPrepass::ldc(U_32 constPoolIndex)          {
     // load 32-bit quantity or string from constant pool
     Type* constantType =
                 compilationInterface.getConstantType(&methodDesc,constPoolIndex);
@@ -1246,7 +1246,7 @@ void JavaLabelPrepass::ldc(uint32 constPoolIndex)          {
         jitrino_assert( 0);
     }
 }
-void JavaLabelPrepass::ldc2(uint32 constPoolIndex)         {
+void JavaLabelPrepass::ldc2(U_32 constPoolIndex)         {
     // load 64-bit quantity from constant pool
     Type* constantType =
                 compilationInterface.getConstantType(&methodDesc,constPoolIndex);
@@ -1259,7 +1259,7 @@ void JavaLabelPrepass::ldc2(uint32 constPoolIndex)         {
     }
 }
 
-void JavaLabelPrepass::getstatic(uint32 constPoolIndex)    {
+void JavaLabelPrepass::getstatic(U_32 constPoolIndex)    {
     FieldDesc *fdesc = compilationInterface.getStaticField(methodDesc.getParentHandle(), constPoolIndex, false);
     Type* fieldType = 0;
     if (fdesc && fdesc->isStatic()) {
@@ -1272,7 +1272,7 @@ void JavaLabelPrepass::getstatic(uint32 constPoolIndex)    {
     pushType(typeManager.toInternalType(fieldType));
 }
 
-void JavaLabelPrepass::putstatic(uint32 constPoolIndex)    {
+void JavaLabelPrepass::putstatic(U_32 constPoolIndex)    {
     FieldDesc *fdesc = compilationInterface.getStaticField(methodDesc.getParentHandle(), constPoolIndex, true);
     Type* fieldType = fdesc ? fdesc->getFieldType() : NULL;
     if (fieldType){
@@ -1284,7 +1284,7 @@ void JavaLabelPrepass::putstatic(uint32 constPoolIndex)    {
     } 
 }
 
-void JavaLabelPrepass::getfield(uint32 constPoolIndex)     {
+void JavaLabelPrepass::getfield(U_32 constPoolIndex)     {
     popAndCheck(A);//obj
     FieldDesc *fdesc = compilationInterface.getNonStaticField(methodDesc.getParentHandle(), constPoolIndex, false);
     Type* fieldType = NULL;
@@ -1298,7 +1298,7 @@ void JavaLabelPrepass::getfield(uint32 constPoolIndex)     {
     pushType(typeManager.toInternalType(fieldType));
 }
 
-void JavaLabelPrepass::putfield(uint32 constPoolIndex)     {
+void JavaLabelPrepass::putfield(U_32 constPoolIndex)     {
     FieldDesc *fdesc = compilationInterface.getNonStaticField(methodDesc.getParentHandle(), constPoolIndex, true);
     Type* fieldType = fdesc ? fdesc->getFieldType() : NULL;
     if (fieldType){
@@ -1311,7 +1311,7 @@ void JavaLabelPrepass::putfield(uint32 constPoolIndex)     {
     popAndCheck(A);
 }
 
-void JavaLabelPrepass::invokevirtual(uint32 constPoolIndex){
+void JavaLabelPrepass::invokevirtual(U_32 constPoolIndex){
     MethodDesc *mdesc = compilationInterface.getVirtualMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
@@ -1322,7 +1322,7 @@ void JavaLabelPrepass::invokevirtual(uint32 constPoolIndex){
     }
 }
 
-void JavaLabelPrepass::invokespecial(uint32 constPoolIndex){
+void JavaLabelPrepass::invokespecial(U_32 constPoolIndex){
     MethodDesc* mdesc = compilationInterface.getSpecialMethod(methodDesc.getParentHandle(),constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
@@ -1333,7 +1333,7 @@ void JavaLabelPrepass::invokespecial(uint32 constPoolIndex){
         pseudoInvoke(methodSig_string);
     }
 }
-void JavaLabelPrepass::invokestatic(uint32 constPoolIndex) {
+void JavaLabelPrepass::invokestatic(U_32 constPoolIndex) {
     MethodDesc *mdesc = compilationInterface.getStaticMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
@@ -1342,7 +1342,7 @@ void JavaLabelPrepass::invokestatic(uint32 constPoolIndex) {
         pseudoInvoke(methodSig_string);
     }
 }
-void JavaLabelPrepass::invokeinterface(uint32 constPoolIndex,uint32 count) {
+void JavaLabelPrepass::invokeinterface(U_32 constPoolIndex,U_32 count) {
     MethodDesc *mdesc = compilationInterface.getInterfaceMethod(methodDesc.getParentHandle(), constPoolIndex);
     if (mdesc) {// resolution was successful
         invoke(mdesc);
@@ -1352,7 +1352,7 @@ void JavaLabelPrepass::invokeinterface(uint32 constPoolIndex,uint32 count) {
         pseudoInvoke(methodSig_string);
     }
 }
-void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
+void JavaLabelPrepass::multianewarray(U_32 constPoolIndex,uint8 dimensions) {
     for (int i =0; i < dimensions; i++) {
         popAndCheck(int32Type);
     }
@@ -1364,7 +1364,7 @@ void JavaLabelPrepass::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
 void JavaLabelPrepass::pseudoInvoke(const char* methodSig) {
 
     assert(methodSig);
-    uint32 numArgs = getNumArgsBySignature(methodSig); 
+    U_32 numArgs = getNumArgsBySignature(methodSig); 
 
     // pop numArgs items
     for (int i=numArgs-1; i>=0; i--)
@@ -1380,11 +1380,11 @@ void JavaLabelPrepass::pseudoInvoke(const char* methodSig) {
     }
 }
 
-uint32 JavaLabelPrepass::getNumArgsBySignature(const char* methodSig) 
+U_32 JavaLabelPrepass::getNumArgsBySignature(const char* methodSig) 
 {
     assert(methodSig);
     assert(*methodSig == '(');
-    uint32 numArgs = 0; 
+    U_32 numArgs = 0; 
 
     // start just after '(' and go until ')' counting 'numArgs' 
     for(++methodSig ;*methodSig != ')'; methodSig++) {
@@ -1424,12 +1424,12 @@ Type* JavaLabelPrepass::getRetTypeBySignature(CompilationInterface& ci, Class_Ha
     assert(*origSig== '(' || *origSig == ')');
     while( *(origSig++) != ')' ); 
 
-    uint32 stub=0;
+    U_32 stub=0;
     return getTypeByDescriptorString(ci, enclClass, origSig, stub);
 }
 
-Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, uint32& len) {
-    uint32 arrayDim = 0;
+Type* JavaLabelPrepass::getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, U_32& len) {
+    U_32 arrayDim = 0;
     len=1;
     Type* resType = NULL;
     // collect array dimension if any
@@ -1649,7 +1649,7 @@ void JavaLabelPrepass::swap() {
 void JavaLabelPrepass::genReturn(Type *type) {
 }
 
-void JavaLabelPrepass::genStore(Type *type, uint32 index, uint32 offset) {
+void JavaLabelPrepass::genStore(Type *type, U_32 index, U_32 offset) {
     stateInfo.stack[index].jsrLabelOffset = stateInfo.stack[stateInfo.stackDepth-1].jsrLabelOffset;
     popAndCheck(type);
     stateInfo.stack[index].type     = type;
@@ -1658,7 +1658,7 @@ void JavaLabelPrepass::genStore(Type *type, uint32 index, uint32 offset) {
     propagateLocalVarToHandlers(index);
 }
 
-void JavaLabelPrepass::genTypeStore(uint32 index, uint32 offset) {
+void JavaLabelPrepass::genTypeStore(U_32 index, U_32 offset) {
     StateInfo::SlotInfo& slot = popType();
     Type *type = slot.type;
     stateInfo.stack[index].type     = type;
@@ -1677,7 +1677,7 @@ void JavaLabelPrepass::genTypeStore(uint32 index, uint32 offset) {
     propagateLocalVarToHandlers(index);
 }
 
-void JavaLabelPrepass::genLoad(Type *type, uint32 index) {
+void JavaLabelPrepass::genLoad(Type *type, U_32 index) {
     assert(stateInfo.stack[index].type == type);
     pushType(type,index);
     stateInfo.stack[stateInfo.stackDepth-1].jsrLabelOffset = stateInfo.stack[index].jsrLabelOffset;
@@ -1687,7 +1687,7 @@ void JavaLabelPrepass::genLoad(Type *type, uint32 index) {
     }
 }
 
-void JavaLabelPrepass::genTypeLoad(uint32 index) {
+void JavaLabelPrepass::genTypeLoad(U_32 index) {
     Type *type = stateInfo.stack[index].type;
     SlotVar* vars = stateInfo.stack[index].vars;
     if (vars) {
@@ -1759,7 +1759,7 @@ void JavaLabelPrepass::genCompare   (Type *type) {
 
 
 
-const char*     JavaLabelPrepass::methodSignatureString(uint32 cpIndex) {
+const char*     JavaLabelPrepass::methodSignatureString(U_32 cpIndex) {
     return compilationInterface.getSignatureString(&methodDesc,cpIndex);
 }
 
@@ -1771,7 +1771,7 @@ void StateTable::copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from
     to.vars = from.vars ? new (memManager) SlotVar(from.vars, memManager) : NULL;
 }
 
-void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru, bool varsOnly) {
+void  StateTable::setStateInfo(StateInfo *inState, U_32 offset, bool isFallThru, bool varsOnly) {
     if(Log::isEnabled()) {
         Log::out() << "SETSTATE offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
@@ -1828,7 +1828,7 @@ void  StateTable::setStateInfo(StateInfo *inState, uint32 offset, bool isFallThr
     }
 }
 
-void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVars, bool includeStack)
+void  StateTable::setStackInfo(StateInfo *inState, U_32 offset, bool includeVars, bool includeStack)
 {
     if (Log::isEnabled()) Log::out() << "SETSTACK " << includeVars << ", " << includeStack << ::std::endl;
     unsigned stackDepth = inState->stackDepth;
@@ -1882,7 +1882,7 @@ void  StateTable::setStackInfo(StateInfo *inState, uint32 offset, bool includeVa
     }
 }
 
-void StateTable::rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar) {
+void StateTable::rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, U_32 offset, bool isVar) {
 
     Type *intype = inSlot->type;
     slot->type = intype;
@@ -1902,7 +1902,7 @@ void StateTable::rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* 
     slot->jsrLabelOffset = inSlot->jsrLabelOffset;
 }
 
-void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar) {
+void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, U_32 offset, bool isVar) {
 
     if (!getStateInfo(offset)->isVisited()) {
         if (!slot->type && !slot->vars) {
@@ -1963,7 +1963,7 @@ void StateTable::mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* sl
 }
 
 
-void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
+void  StateTable::setStateInfoFromFinally(StateInfo *inState, U_32 offset) {
     if(Log::isEnabled()) {
         Log::out() << "SETSTATE FROM FINALLY offset=" <<(int)offset << " depth=" << inState->stackDepth << ::std::endl;
         printState(inState);
@@ -2006,11 +2006,11 @@ void  StateTable::setStateInfoFromFinally(StateInfo *inState, uint32 offset) {
     }
 }
 
-void JavaLabelPrepass::print_loc_vars(uint32 offset, uint32 index)
+void JavaLabelPrepass::print_loc_vars(U_32 offset, U_32 index)
 {
     int numStack = methodDesc.getMaxStack()+1;
-    uint32 key = offset*(numVars+numStack)+index;
-    StlHashMap<uint32,VariableIncarnation*>::iterator iter = localVars.find(key);
+    U_32 key = offset*(numVars+numStack)+index;
+    StlHashMap<U_32,VariableIncarnation*>::iterator iter = localVars.find(key);
     if (iter==localVars.end()) {
         Log::out() << "localVars[offset=" << offset 
                     << "][index=" << index << "] is empty" << ::std::endl;
@@ -2021,7 +2021,7 @@ void JavaLabelPrepass::print_loc_vars(uint32 offset, uint32 index)
     }
 }
 
-void JavaLabelPrepass::propagateLocalVarToHandlers(uint32 varIndex)
+void JavaLabelPrepass::propagateLocalVarToHandlers(U_32 varIndex)
 {
     assert(varIndex < numVars);
     struct StateInfo::SlotInfo *inSlot = &stateInfo.stack[varIndex];
@@ -2036,7 +2036,7 @@ void JavaLabelPrepass::propagateLocalVarToHandlers(uint32 varIndex)
                     handler != NULL; 
                     handler = handler->getNextHandler() ) {
 
-                        uint32 handler_offset = handler->getBeginOffset();
+                        U_32 handler_offset = handler->getBeginOffset();
                         struct StateInfo::SlotInfo *slot = &stateTable->getStateInfo(handler_offset)->stack[varIndex];
                         if (Log::isEnabled()) Log::out() << "HANDLER SLOT " << varIndex 
                             << " merged to offset " << handler_offset << ::std::endl;

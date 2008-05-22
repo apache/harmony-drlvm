@@ -173,7 +173,7 @@ void LoopNode::markNodesOfLoop() {
     backwardMarkNode(header, dom);
     
     //restore traversal nums
-    uint32 fgTraversalNum = loopTree->fg->getTraversalNum();
+    U_32 fgTraversalNum = loopTree->fg->getTraversalNum();
     for (Nodes::const_iterator it = nodesInLoop.begin(), end = nodesInLoop.end(); it!=end; ++it) {
         Node* node = *it;
         assert(node->getTraversalNum() == fgTraversalNum + 1);
@@ -203,7 +203,7 @@ Edge* LoopTree::coalesceEdges(Edges& edges) {
     Node* block = fg->createNode(header->getKind());
     
     if (coalesceCallback!=NULL) {
-        coalesceCallback->coalesce(header, block, (uint32)edges.size());
+        coalesceCallback->coalesce(header, block, (U_32)edges.size());
     }
     //retarget all edges
     for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
@@ -257,7 +257,7 @@ void LoopTree::rebuild(bool doNormalization, bool ignoreUnreachable) {
     headerMap.clear();
     ((LoopNode*)root)->clear();
 
-    uint32 numBlocks = fg->getNodeCount();
+    U_32 numBlocks = fg->getNodeCount();
     headerMap.resize(numBlocks); 
 
     formLoopHierarchy(headers);
@@ -276,7 +276,7 @@ bool LoopTree::isLoopHeader(const Node* node) const {
 
 LoopNode* LoopTree::getLoopNode(const Node* node, bool containingLoop) const {
     assert(isValid());
-    uint32 df = node->getDfNum();
+    U_32 df = node->getDfNum();
     if (df >= headerMap.size()) {
         return NULL; //invalid DF can be caused by unreachable node
     }
@@ -295,7 +295,7 @@ Node* LoopTree::getLoopHeader(const Node* node, bool containingLoop) const {
     return header;
 }
 
-uint32 LoopTree::getLoopDepth(const Node* node) const {
+U_32 LoopTree::getLoopDepth(const Node* node) const {
     LoopNode* header = getLoopNode(node, false);
     return header == 0 ? 0 : header->getDepth();
 }

@@ -58,9 +58,9 @@ public:
     virtual bool getBcLocationForNative(MethodDesc* method, POINTER_SIZE_INT native_pc, uint16 *bc_pc);
     virtual bool getNativeLocationForBc(MethodDesc* method,  uint16 bc_pc, POINTER_SIZE_INT *native_pc);
 
-    virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset);
-    virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
-    virtual uint16  getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth);
+    virtual U_32          getInlineDepth(InlineInfoPtr ptr, U_32 offset);
+    virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth);
+    virtual uint16  getInlinedBc(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth);
 
 };
 

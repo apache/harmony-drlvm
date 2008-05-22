@@ -87,15 +87,15 @@ void LoopBuilder::showFlags(std::ostream& os) {
 template <class IDFun>
 class LoopMarker {
 public:
-    static uint32 markNodesOfLoop(StlBitVector& nodesInLoop, Node* header, Node* tail);
+    static U_32 markNodesOfLoop(StlBitVector& nodesInLoop, Node* header, Node* tail);
 private:
-    static uint32 backwardMarkNode(StlBitVector& nodesInLoop, Node* node, StlBitVector& visited);
-    static uint32 countInsts(Node* node);
+    static U_32 backwardMarkNode(StlBitVector& nodesInLoop, Node* node, StlBitVector& visited);
+    static U_32 countInsts(Node* node);
 };
 
 template <class IDFun>
-uint32 LoopMarker<IDFun>::countInsts(Node* node) {
-    uint32 count = 0;
+U_32 LoopMarker<IDFun>::countInsts(Node* node) {
+    U_32 count = 0;
     Inst* first = (Inst*)node->getFirstInst();
     if (first != NULL) {
         for(Inst* inst = first->getNextInst(); inst != NULL; inst = inst->getNextInst())
@@ -105,14 +105,14 @@ uint32 LoopMarker<IDFun>::countInsts(Node* node) {
 }
 
 template <class IDFun>
-uint32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop, 
+U_32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop, 
                                 Node* node, 
                                 StlBitVector& visited) {
     static IDFun getId;
     if(visited.setBit(node->getId()))
         return 0;
 
-    uint32 count = countInsts(node);
+    U_32 count = countInsts(node);
     nodesInLoop.setBit(getId(node));
 
     const Edges& inEdges = node->getInEdges();
@@ -128,16 +128,16 @@ uint32 LoopMarker<IDFun>::backwardMarkNode(StlBitVector& nodesInLoop,
 // traverse graph backward starting from tail until header is reached
 //
 template <class IDFun>
-uint32 LoopMarker<IDFun>::markNodesOfLoop(StlBitVector& nodesInLoop,
+U_32 LoopMarker<IDFun>::markNodesOfLoop(StlBitVector& nodesInLoop,
                                Node* header,
                                Node* tail) {
     static IDFun getId;
-    uint32 maxSize = ::std::max(getId(header), getId(tail));
+    U_32 maxSize = ::std::max(getId(header), getId(tail));
     MemoryManager tmm("LoopBuilder::markNodesOfLoop.tmm");
     StlBitVector visited(tmm, maxSize);
 
     // mark header is visited
-    uint32 count = countInsts(header);
+    U_32 count = countInsts(header);
     nodesInLoop.setBit(getId(header));
     visited.setBit(header->getId());
 
@@ -286,8 +286,8 @@ bool LoopBuilder::isVariantInst(Inst* inst, StlHashSet<Opnd*>& variantOpnds) {
         return true;
 
     // Check for variant src.
-    uint32 n = inst->getNumSrcOperands();
-    for(uint32 i = 0; i < n; ++i) {
+    U_32 n = inst->getNumSrcOperands();
+    for(U_32 i = 0; i < n; ++i) {
         Opnd* src = inst->getSrc(i);
         if (variantOpnds.find(src) != variantOpnds.end())
             return true;
@@ -427,12 +427,12 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
             preheader = header->getInEdges().back()->getSourceNode();
 
         // Temporary memory for peeling
-        uint32 maxSize = fg.getMaxNodeId();
+        U_32 maxSize = fg.getMaxNodeId();
         MemoryManager tmm("LoopBuilder::peelLoops.tmm");
         
         // Compute nodes in loop
         StlBitVector nodesInLoop(tmm, maxSize);
-        uint32 loopSize = LoopMarker<IdentifyByID>::markNodesOfLoop(nodesInLoop, header, tail);
+        U_32 loopSize = LoopMarker<IdentifyByID>::markNodesOfLoop(nodesInLoop, header, tail);
 
         // Operand renaming table for duplicated nodes
         OpndRenameTable* duplicateTable = new (tmm) OpndRenameTable(tmm);
@@ -796,7 +796,7 @@ friend class LoopBuilder;
 public:
     EdgeCoalescerCallbackImpl(IRManager& _irm) : ssaAffected(false), irm(_irm){}
     
-    virtual void coalesce(Node* header, Node* newPreHeader, uint32 numEdges) {
+    virtual void coalesce(Node* header, Node* newPreHeader, U_32 numEdges) {
         InstFactory& instFactory = irm.getInstFactory();
         OpndManager& opndManager = irm.getOpndManager();
         Inst* labelInst = (Inst*)header->getFirstInst();
@@ -814,8 +814,8 @@ public:
                 Inst *newInst = instFactory.makePhi(newDst, 0, 0);
                 PhiInst *newPhiInst = newInst->asPhiInst();
                 assert(newPhiInst);
-                uint32 n = phi->getNumSrcOperands();
-                for (uint32 i=0; i<n; i++) {
+                U_32 n = phi->getNumSrcOperands();
+                for (U_32 i=0; i<n; i++) {
                     instFactory.appendSrc(newPhiInst, phi->getSrc(i));
                 }
                 PhiInst *phiInst = phi->asPhiInst();

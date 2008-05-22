@@ -60,7 +60,7 @@ RegStack::RegStack() :
 
 //----------------------------------------------------------------------------------------//
 
-int32 RegStack::newInReg(int32 inArgPosition) { 
+I_32 RegStack::newInReg(I_32 inArgPosition) { 
 
     if (inRegSize < inArgPosition+1) inRegSize = inArgPosition+1;
     return G_INARG_BASE + inArgPosition;
@@ -68,7 +68,7 @@ int32 RegStack::newInReg(int32 inArgPosition) {
 
 //----------------------------------------------------------------------------------------//
 
-int32 RegStack::newOutReg(int32 outArgPosition) { 
+I_32 RegStack::newOutReg(I_32 outArgPosition) { 
 
     if (outRegSize < outArgPosition+1) {
         outRegSize = outArgPosition+1;
@@ -85,8 +85,8 @@ bool RegStack::isOutReg(RegOpnd* opnd) {
 
     if (opnd->getOpndKind() != OPND_G_REG) return false; // opnd is not gr - ignore
 
-    int32 firstOutRegArg = G_OUTARG_BASE - outRegSize + 1;
-    int32 location       = opnd->getLocation();
+    I_32 firstOutRegArg = G_OUTARG_BASE - outRegSize + 1;
+    I_32 location       = opnd->getLocation();
     if (location < firstOutRegArg) return false; // location is less then first outArg - ignore
     if (location >= NUM_G_REG)     return false; // location is greater then last outArg - ignore
     return true;                                 // it is out reg arg
@@ -108,21 +108,21 @@ MemStack::MemStack() {
 //----------------------------------------------------------------------------------------//
 // returns location (not offset!) for new in stack opnd
 
-int32 MemStack::newInSlot(int32 inArgPosition) {
+I_32 MemStack::newInSlot(I_32 inArgPosition) {
     
-    int32 offset = (inArgPosition - MAX_REG_ARG) * ARG_SLOT_SIZE;
+    I_32 offset = (inArgPosition - MAX_REG_ARG) * ARG_SLOT_SIZE;
     return S_INARG_BASE + offset;
 }
 
 //----------------------------------------------------------------------------------------//
 // increments locMemSize and returns location (not offset!) for new local stack opnd
 
-int32 MemStack::newLocSlot(DataKind dataKind) {
+I_32 MemStack::newLocSlot(DataKind dataKind) {
     
     if (inBase > 0) IPF_ERR << endl;            // new loc slot makes illegal in arg offsets
 
     int16 size   = IpfType::getSize(dataKind);
-    int32 offset = align(locMemSize, size);     // align memory address to natural boundary
+    I_32 offset = align(locMemSize, size);     // align memory address to natural boundary
     locMemSize = offset + size;                 // increase current local area size
     
     return S_LOCAL_BASE + offset;
@@ -131,12 +131,12 @@ int32 MemStack::newLocSlot(DataKind dataKind) {
 //----------------------------------------------------------------------------------------//
 // increments outMemSize and returns location (not offset!) for new out stack opnd
 
-int32 MemStack::newOutSlot(int32 outArgPosition) {
+I_32 MemStack::newOutSlot(I_32 outArgPosition) {
 
     if (locBase+inBase > 0) IPF_ERR << endl;    // new out slot makes illegal in arg and local offsets
     
-    int32 offset  = (outArgPosition - MAX_REG_ARG) * ARG_SLOT_SIZE;
-    int32 newSize = offset + ARG_SLOT_SIZE;
+    I_32 offset  = (outArgPosition - MAX_REG_ARG) * ARG_SLOT_SIZE;
+    I_32 newSize = offset + ARG_SLOT_SIZE;
     if(outMemSize < newSize) outMemSize = newSize;
     
     return S_OUTARG_BASE + offset;
@@ -147,7 +147,7 @@ int32 MemStack::newOutSlot(int32 outArgPosition) {
     
 void MemStack::calculateOffset(RegOpnd* opnd) {
     
-    int32 location = opnd->getLocation();
+    I_32 location = opnd->getLocation();
     location = calculateOffset(location);
     opnd->setLocation(location);
 }
@@ -155,7 +155,7 @@ void MemStack::calculateOffset(RegOpnd* opnd) {
 //----------------------------------------------------------------------------------------//
 // converts area local offset (location) in absolute offset + S_BASE
     
-int32 MemStack::calculateOffset(int32 location) {
+I_32 MemStack::calculateOffset(I_32 location) {
     
     if(location < S_OUTARG_BASE) { // offset has been calculated
         return location;
@@ -179,7 +179,7 @@ int32 MemStack::calculateOffset(int32 location) {
 //----------------------------------------------------------------------------------------//
 // return current location in local area
     
-int32 MemStack::getSavedBase() {
+I_32 MemStack::getSavedBase() {
 
     outBase   = outMemSize+locMemSize > 0 ? S_SCRATCH_SIZE : 0;
     locBase   = outBase + align(outMemSize, S_SCRATCH_SIZE);
@@ -188,7 +188,7 @@ int32 MemStack::getSavedBase() {
 
 //----------------------------------------------------------------------------------------//
 
-int32 MemStack::getMemStackSize() {
+I_32 MemStack::getMemStackSize() {
 
     outBase = outMemSize+locMemSize > 0 ? S_SCRATCH_SIZE : 0;
     locBase = outBase + align(outMemSize, S_SCRATCH_SIZE);
@@ -199,10 +199,10 @@ int32 MemStack::getMemStackSize() {
     
 //----------------------------------------------------------------------------------------//
     
-int32 MemStack::align(int32 val, int32 size) {
+I_32 MemStack::align(I_32 val, I_32 size) {
 
-    int32 mask = -size;
-    int32 buf  = val & mask;
+    I_32 mask = -size;
+    I_32 buf  = val & mask;
     return buf<val ? buf+size : buf;
 }
 
@@ -265,7 +265,7 @@ Opnd *OpndManager::newOpnd(OpndKind opndKind) {
 
 //----------------------------------------------------------------------------------------//
 
-RegOpnd *OpndManager::newRegOpnd(OpndKind opndKind, DataKind dataKind, int32 location) {
+RegOpnd *OpndManager::newRegOpnd(OpndKind opndKind, DataKind dataKind, I_32 location) {
     return new(mm) RegOpnd(mm, maxOpndId++, opndKind, dataKind, location);
 }
 
@@ -295,9 +295,9 @@ MethodRef *OpndManager::newMethodRef(MethodDesc *method) {
 
 //----------------------------------------------------------------------------------------//
 
-Opnd *OpndManager::newInArg(OpndKind opndKind, DataKind dataKind, uint32 inArgPosition) {
+Opnd *OpndManager::newInArg(OpndKind opndKind, DataKind dataKind, U_32 inArgPosition) {
 
-    int32 location = LOCATION_INVALID;
+    I_32 location = LOCATION_INVALID;
     bool  isFp     = IpfType::isFloating(dataKind);
 
     if (inArgPosition < MAX_REG_ARG) {
@@ -435,13 +435,13 @@ void OpndManager::initCompBases(BbNode *enterNode) {
 //----------------------------------------------------------------------------------------//
 // tryes to find available location for the opndKind/dataKind taking in account mask of used regs 
 
-int32 OpndManager::newLocation(OpndKind  opndKind, 
+I_32 OpndManager::newLocation(OpndKind  opndKind, 
                                DataKind  dataKind, 
                                RegBitSet usedMask, 
                                bool      isPreserved) {
     
     RegBitSet &unusedMask = usedMask.flip(); 
-    int32 location = LOCATION_INVALID;
+    I_32 location = LOCATION_INVALID;
     
     if (isPreserved == false) {                             // it is scratch location
         location = newScratchReg(opndKind, unusedMask);     // try to find scratch register
@@ -457,7 +457,7 @@ int32 OpndManager::newLocation(OpndKind  opndKind,
 //----------------------------------------------------------------------------------------//
 // tryes to find available scratch register for the opndKind taking in account mask of unused regs 
 
-int32 OpndManager::newScratchReg(OpndKind opndKind, RegBitSet &unusedMask) {
+I_32 OpndManager::newScratchReg(OpndKind opndKind, RegBitSet &unusedMask) {
 
     RegBitSet mask;
     int16     maskSize = 0;
@@ -478,7 +478,7 @@ int32 OpndManager::newScratchReg(OpndKind opndKind, RegBitSet &unusedMask) {
 //----------------------------------------------------------------------------------------//
 // tryes to find available preserved register for the opndKind taking in account mask of unused regs 
 
-int32 OpndManager::newPreservReg(OpndKind opndKind, RegBitSet &unusedMask) {
+I_32 OpndManager::newPreservReg(OpndKind opndKind, RegBitSet &unusedMask) {
 
     RegBitSet mask;
     int16     maskSize = 0;

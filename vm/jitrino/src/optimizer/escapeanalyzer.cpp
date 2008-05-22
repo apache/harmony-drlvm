@@ -91,7 +91,7 @@ isPotentiallyEscapingInst(Inst* inst) {
 // Also, StVar instructions are assumed to escape until we have SSA form.
 //
 static bool
-isEscapingSrcObject(Inst* inst,uint32 srcIndex) {
+isEscapingSrcObject(Inst* inst,U_32 srcIndex) {
     // only care about escapes of object types
     Type* srcType = inst->getSrc(srcIndex)->getType();
     if (srcType->isObject() == false && srcType->isManagedPtr() == false)
@@ -206,7 +206,7 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
     }
 }
 
-uint32
+U_32
 EscapeAnalyzer::doAnalysis() {
     MemoryManager memManager("EscapeAnalyzer::doAnalysis");
     StlDeque<Inst*> candidateSet(memManager);
@@ -236,7 +236,7 @@ EscapeAnalyzer::doAnalysis() {
             if (isPotentiallyEscapingInst(inst) == false)
                 continue;
             escapingInsts.setBit(inst->getId(),true);
-            for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+            for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
                 if (isEscapingSrcObject(inst,i) == false)
                     continue;
                 // src escapes
@@ -247,7 +247,7 @@ EscapeAnalyzer::doAnalysis() {
     //
     // Print out non-escaping instructions
     //
-    uint32 numTrapped = 0;
+    U_32 numTrapped = 0;
     while (candidateSet.empty() == false) {
          Inst* inst = candidateSet.front();
          candidateSet.pop_front();
@@ -343,7 +343,7 @@ initialize(Inst* inst,
                     // this instruction creates a free ptr/ref
                     workList.push_back(inst);
                 }
-                for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+                for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
                     if (isRefOrPtrType(inst->getSrc(i))) {
                         workList.push_back(inst->getSrc(i)->getInst());
                     }
@@ -357,7 +357,7 @@ initialize(Inst* inst,
                     // this instruction creates a free ptr/ref
                     workList.push_back(inst);
                 }
-                for (uint32 i=1; i<inst->getNumSrcOperands(); i++) {
+                for (U_32 i=1; i<inst->getNumSrcOperands(); i++) {
                     if (isRefOrPtrType(inst->getSrc(i))) {
                         workList.push_back(inst->getSrc(i)->getInst());
                     }
@@ -391,7 +391,7 @@ initialize(Inst* inst,
     }
 }
 
-uint32 
+U_32 
 EscapeAnalyzer::doAggressiveAnalysis() {
     //
     // Initialization:
@@ -432,7 +432,7 @@ EscapeAnalyzer::doAggressiveAnalysis() {
    while (freeWorkList.empty() == false) {
        freeWorkList.pop_front();
    }
-   uint32 numTrapped = 0;
+   U_32 numTrapped = 0;
    return numTrapped;
 }
 
@@ -449,7 +449,7 @@ DefUseBuilder::initialize(ControlFlowGraph& fg) {
 }
 
 void
-DefUseBuilder::addDefUse(Inst* defInst,Inst* useInst,uint32 srcIndex) {
+DefUseBuilder::addDefUse(Inst* defInst,Inst* useInst,U_32 srcIndex) {
     DefUseLink* newLink = new (memoryManager) DefUseLink(useInst,srcIndex,NULL);
     newLink->next = defUseTable[defInst];
     defUseTable[defInst] = newLink;
@@ -457,7 +457,7 @@ DefUseBuilder::addDefUse(Inst* defInst,Inst* useInst,uint32 srcIndex) {
 
 void
 DefUseBuilder::addUses(Inst* useInst) {
-    for (uint32 i=0; i<useInst->getNumSrcOperands(); i++) {
+    for (U_32 i=0; i<useInst->getNumSrcOperands(); i++) {
         SsaOpnd* opnd = useInst->getSrc(i)->asSsaOpnd();
         if(opnd != NULL)
             addDefUse(useInst->getSrc(i)->getInst(),useInst,i);
@@ -465,7 +465,7 @@ DefUseBuilder::addUses(Inst* useInst) {
 }
 
 DefUseLink*
-DefUseBuilder::getDefUse(Inst* defInst, Inst* useInst, uint32 srcIndex) {
+DefUseBuilder::getDefUse(Inst* defInst, Inst* useInst, U_32 srcIndex) {
     DefUseLink* duLink = defUseTable[defInst];
 
     while(duLink != NULL) {
@@ -484,7 +484,7 @@ DefUseBuilder::removeDef(Inst* defInst) {
 }
 
 void
-DefUseBuilder::removeDefUse(Inst* defInst, Inst* useInst, uint32 srcIndex) {
+DefUseBuilder::removeDefUse(Inst* defInst, Inst* useInst, U_32 srcIndex) {
     DefUseLink* duLink = defUseTable[defInst];
     DefUseLink* prevLink = NULL;
 

@@ -43,7 +43,7 @@ IpfMethodCodeSelector::IpfMethodCodeSelector(Cfg                  &cfg,
 
 //----------------------------------------------------------------------------------------//
 
-void IpfMethodCodeSelector::genVars(uint32 numVars, VarCodeSelector &varCodeSelector) {
+void IpfMethodCodeSelector::genVars(U_32 numVars, VarCodeSelector &varCodeSelector) {
 
     IPF_LOG << endl << "  Select variables" << endl;
     IpfVarCodeSelector ipfVarCodeSelector(cfg, opnds);
@@ -58,7 +58,7 @@ void IpfMethodCodeSelector::setMethodDesc(MethodDesc *methodDesc_) {
 
 //----------------------------------------------------------------------------------------//
 
-void IpfMethodCodeSelector::genCFG(uint32           numNodes, 
+void IpfMethodCodeSelector::genCFG(U_32           numNodes, 
                                    CFGCodeSelector &codeSelector, 
                                    bool             useProfile) {
 
@@ -85,7 +85,7 @@ IpfVarCodeSelector::IpfVarCodeSelector(Cfg &cfg, OpndVector &opnds) :
 
 //----------------------------------------------------------------------------------------//
 
-uint32 IpfVarCodeSelector::defVar(Type *varType, bool isAddressTaken, bool isPinned) {
+U_32 IpfVarCodeSelector::defVar(Type *varType, bool isAddressTaken, bool isPinned) {
 
     OpndKind  opndKind = IpfInstCodeSelector::toOpndKind(varType->tag);
     DataKind  dataKind = IpfInstCodeSelector::toDataKind(varType->tag);
@@ -106,7 +106,7 @@ uint32 IpfVarCodeSelector::defVar(Type *varType, bool isAddressTaken, bool isPin
 
 //----------------------------------------------------------------------------------------//
 
-void IpfVarCodeSelector::setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) {}
+void IpfVarCodeSelector::setManagedPointerBase(U_32 managedPtrVarNum, U_32 baseVarNum) {}
 
 //========================================================================================//
 // IpfCfgCodeSelector
@@ -126,12 +126,12 @@ IpfCfgCodeSelector::IpfCfgCodeSelector(Cfg                  &cfg,
 
 //----------------------------------------------------------------------------------------//
 
-uint32 IpfCfgCodeSelector::genDispatchNode(uint32 numInEdges, 
-                                           uint32 numOutEdges, 
+U_32 IpfCfgCodeSelector::genDispatchNode(U_32 numInEdges, 
+                                           U_32 numOutEdges, 
                                            const StlVector<MethodDesc*>& inlineInfo,
                                            double cnt) {
 
-    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (uint32) cnt, NODE_DISPATCH);
+    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (U_32) cnt, NODE_DISPATCH);
     nodes.push_back(node);
 
     IPF_LOG << endl << "    Generate Dispatch node" << node->getId() << endl;
@@ -140,13 +140,13 @@ uint32 IpfCfgCodeSelector::genDispatchNode(uint32 numInEdges,
 
 //----------------------------------------------------------------------------------------//
 
-uint32 IpfCfgCodeSelector::genBlock(uint32            numInEdges, 
-                                    uint32            numOutEdges, 
+U_32 IpfCfgCodeSelector::genBlock(U_32            numInEdges, 
+                                    U_32            numOutEdges, 
                                     BlockKind         blockKind, 
                                     BlockCodeSelector &codeSelector, 
                                     double            cnt) {
 
-    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (uint32)cnt);
+    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (U_32)cnt);
 
     nodes.push_back(node);
     if(blockKind == Prolog) cfg.setEnterNode(node);
@@ -160,11 +160,11 @@ uint32 IpfCfgCodeSelector::genBlock(uint32            numInEdges,
 
 //----------------------------------------------------------------------------------------//
 
-uint32  IpfCfgCodeSelector::genUnwindNode(uint32 numInEdges, 
-                                          uint32 numOutEdges, 
+U_32  IpfCfgCodeSelector::genUnwindNode(U_32 numInEdges, 
+                                          U_32 numOutEdges, 
                                           double cnt) {
 
-    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (uint32) cnt, NODE_UNWIND);
+    Node *node = new(mm) Node(mm, opndManager->getNextNodeId(), (U_32) cnt, NODE_UNWIND);
     nodes.push_back(node);
 
     IPF_LOG << endl << "    Generate Unwind node" << node->getId() << endl;
@@ -173,9 +173,9 @@ uint32  IpfCfgCodeSelector::genUnwindNode(uint32 numInEdges,
 
 //----------------------------------------------------------------------------------------//
 
-uint32 IpfCfgCodeSelector::genExitNode(uint32 numInEdges, double cnt) {
+U_32 IpfCfgCodeSelector::genExitNode(U_32 numInEdges, double cnt) {
 
-    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (uint32) cnt);
+    BbNode *node = new(mm) BbNode(mm, opndManager->getNextNodeId(), (U_32) cnt);
     nodes.push_back(node);
     cfg.setExitNode(node);
 
@@ -185,8 +185,8 @@ uint32 IpfCfgCodeSelector::genExitNode(uint32 numInEdges, double cnt) {
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::genUnconditionalEdge(uint32 tailNodeId,
-                                              uint32 headNodeId, 
+void IpfCfgCodeSelector::genUnconditionalEdge(U_32 tailNodeId,
+                                              U_32 headNodeId, 
                                               double prob) {
 
     IPF_LOG << "    Generate Unconditional edge node" << nodes[tailNodeId]->getId();
@@ -198,7 +198,7 @@ void IpfCfgCodeSelector::genUnconditionalEdge(uint32 tailNodeId,
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::genTrueEdge(uint32 tailNodeId, uint32 headNodeId, double prob) {
+void IpfCfgCodeSelector::genTrueEdge(U_32 tailNodeId, U_32 headNodeId, double prob) {
 
     IPF_LOG << "    Generate True          edge node" << nodes[tailNodeId]->getId();
     IPF_LOG << " -> node" << nodes[headNodeId]->getId() << endl;
@@ -209,7 +209,7 @@ void IpfCfgCodeSelector::genTrueEdge(uint32 tailNodeId, uint32 headNodeId, doubl
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::genFalseEdge(uint32 tailNodeId, uint32 headNodeId, double prob) {
+void IpfCfgCodeSelector::genFalseEdge(U_32 tailNodeId, U_32 headNodeId, double prob) {
 
     IPF_LOG << "    Generate False         edge node" << nodes[tailNodeId]->getId();
     IPF_LOG << " -> node" << nodes[headNodeId]->getId() << endl;
@@ -220,11 +220,11 @@ void IpfCfgCodeSelector::genFalseEdge(uint32 tailNodeId, uint32 headNodeId, doub
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::genSwitchEdges(uint32  tailNodeId, 
-                                        uint32  numTargets, 
-                                        uint32 *targets, 
+void IpfCfgCodeSelector::genSwitchEdges(U_32  tailNodeId, 
+                                        U_32  numTargets, 
+                                        U_32 *targets, 
                                         double *probs, 
-                                        uint32  defaultTarget) {
+                                        U_32  defaultTarget) {
 
     BbNode         *tailNode       = (BbNode *)nodes[tailNodeId];
     InstVector     &insts          = tailNode->getInsts();
@@ -236,7 +236,7 @@ void IpfCfgCodeSelector::genSwitchEdges(uint32  tailNodeId,
     Edge           *edge           = NULL;
 
     bool   defadded = false;
-    uint32 i        = 0;
+    U_32 i        = 0;
 
     IPF_LOG << "    Generate Switch     tailNodeId=" << tailNodeId 
         << "; defaultTarget=" << defaultTarget << endl;
@@ -269,8 +269,8 @@ void IpfCfgCodeSelector::genSwitchEdges(uint32  tailNodeId,
 //--------------------------------------------------------------------------------//
 // edge from try region to dispatch node 
 
-void IpfCfgCodeSelector::genExceptionEdge(uint32 tailNodeId, 
-                                          uint32 headNodeId, 
+void IpfCfgCodeSelector::genExceptionEdge(U_32 tailNodeId, 
+                                          U_32 headNodeId, 
                                           double prob) {
 
     Node *tailNode = nodes[tailNodeId];
@@ -285,9 +285,9 @@ void IpfCfgCodeSelector::genExceptionEdge(uint32 tailNodeId,
 //----------------------------------------------------------------------------------------//
 // edge from dispatch node to exception handler 
 
-void IpfCfgCodeSelector::genCatchEdge(uint32  tailNodeId, 
-                                      uint32  headNodeId, 
-                                      uint32  priority, 
+void IpfCfgCodeSelector::genCatchEdge(U_32  tailNodeId, 
+                                      U_32  headNodeId, 
+                                      U_32  priority, 
                                       Type   *exceptionType, 
                                       double  prob) {
 
@@ -303,8 +303,8 @@ void IpfCfgCodeSelector::genCatchEdge(uint32  tailNodeId,
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::genExitEdge(uint32 tailNodeId,
-                                     uint32 headNodeId,
+void IpfCfgCodeSelector::genExitEdge(U_32 tailNodeId,
+                                     U_32 headNodeId,
                                      double prob) {
 
     Node *tailNode=nodes[tailNodeId];
@@ -319,10 +319,10 @@ void IpfCfgCodeSelector::genExitEdge(uint32 tailNodeId,
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::setLoopInfo(uint32 nodeId, 
+void IpfCfgCodeSelector::setLoopInfo(U_32 nodeId, 
                                      bool   isLoopHeader, 
                                      bool   hasContainingLoopHeader, 
-                                     uint32 headerId) {
+                                     U_32 headerId) {
 
     if (hasContainingLoopHeader == false) return;
     
@@ -334,7 +334,7 @@ void IpfCfgCodeSelector::setLoopInfo(uint32 nodeId,
 
 //----------------------------------------------------------------------------------------//
 
-void IpfCfgCodeSelector::setPersistentId(uint32 nodeId, uint32 persistentId) {}
+void IpfCfgCodeSelector::setPersistentId(U_32 nodeId, U_32 persistentId) {}
 
 } //namespace IPF
 } //namespace Jitrino 

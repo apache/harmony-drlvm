@@ -1016,7 +1016,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
         {
             Opnd *opnd = inst->getDst();
 
-            for (uint32 exactTypeCount = 0; exactTypeCount < 2; ++exactTypeCount) {
+            for (U_32 exactTypeCount = 0; exactTypeCount < 2; ++exactTypeCount) {
                 bool exactType = (exactTypeCount != 0);
             
                 StlVectorSet<Type *> *reduceTypes = shouldReduceSsaOpnd(opnd, exactType);
@@ -1099,7 +1099,7 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
         {
             Opnd *opnd = inst->getDst();
 
-            for (uint32 exactTypeCount = 0; exactTypeCount < 2; ++exactTypeCount) {
+            for (U_32 exactTypeCount = 0; exactTypeCount < 2; ++exactTypeCount) {
                 bool exactType = (exactTypeCount != 0);
 
                 StlVectorSet<Type *> *reduceTypes = shouldReduceSsaOpnd(opnd, exactType);
@@ -1134,9 +1134,9 @@ void TauWalkerState::reduceVarTaus(Inst *inst)
                         
                         Opnd *newDst = reduceSsaOpnd(inst->getDst(), baseTauOpnd, type, exactType);
                         if (!newDst->getInst()){
-                            uint32 numOpnds = inst->getNumSrcOperands();
+                            U_32 numOpnds = inst->getNumSrcOperands();
                             Opnd** newOpnds = new (mm) Opnd*[numOpnds];
-                            for (uint32 i=0; i<numOpnds; ++i) {
+                            for (U_32 i=0; i<numOpnds; ++i) {
                                 Opnd *oldOpnd = inst->getSrc(i);
                                 Opnd *newOpnd = reduceSsaOpnd(oldOpnd, baseTauOpnd, type, exactType);
                                 newOpnds[i] = newOpnd;
@@ -1178,8 +1178,8 @@ void TauWalkerState::replaceReducibleTaus(Inst *inst)
         inst->unlink();
         return;
     }
-    uint32 numSrcs = inst->getNumSrcOperands();
-    for (uint32 i=0; i<numSrcs; ++i) {
+    U_32 numSrcs = inst->getNumSrcOperands();
+    for (U_32 i=0; i<numSrcs; ++i) {
         Opnd *srci = inst->getSrc(i);
         Opnd *found = lookupCopyMapping(srci);
         if (found) {

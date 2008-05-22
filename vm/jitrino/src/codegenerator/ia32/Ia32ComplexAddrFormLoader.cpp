@@ -53,7 +53,7 @@ protected:
     bool checkIsScale(Inst * inst);
     void walkThroughOpnds(SubOpndsTable& table);
 private:
-    uint32 refCountThreshold;
+    U_32 refCountThreshold;
 };
 
 static ActionFactory<ComplexAddrFormLoader> _cafl("cafl");
@@ -67,9 +67,9 @@ ComplexAddrFormLoader::runImpl() {
     }
 
     StlMap<Opnd *, bool> memOpnds(irManager->getMemoryManager());
-    uint32 opndCount = irManager->getOpndCount();
+    U_32 opndCount = irManager->getOpndCount();
     irManager->calculateOpndStatistics();
-    for (uint32 i = 0; i < opndCount; i++) {
+    for (U_32 i = 0; i < opndCount; i++) {
         Opnd * opnd = irManager->getOpnd(i);
         if(opnd->isPlacedIn(OpndKind_Mem)) {
             Opnd * baseOp = opnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
@@ -177,7 +177,7 @@ ComplexAddrFormLoader::walkThroughOpnds(SubOpndsTable& table) {
         return;
     } 
 
-    uint32 defCount = instUp->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+    U_32 defCount = instUp->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
     if(instUp->getMnemonic()==Mnemonic_ADD) {
         Opnd * src1 = instUp->getOpnd(defCount);
         Opnd * src2 = instUp->getOpnd(defCount+1);

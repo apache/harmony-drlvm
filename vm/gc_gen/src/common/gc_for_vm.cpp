@@ -335,7 +335,7 @@ unsigned int gc_time_since_last_gc()
 
 #ifndef USE_32BITS_HASHCODE
 #define GCGEN_HASH_MASK 0x1fc
-int32 gc_get_hashcode(Managed_Object_Handle p_object) 
+I_32 gc_get_hashcode(Managed_Object_Handle p_object) 
 {  
    Partial_Reveal_Object *obj = (Partial_Reveal_Object *)p_object;
    if(!obj) return 0;
@@ -357,10 +357,10 @@ int32 gc_get_hashcode(Managed_Object_Handle p_object)
    return hash;
 }
 #else //USE_32BITS_HASHCODE
-int32 gc_get_hashcode(Managed_Object_Handle p_object)
+I_32 gc_get_hashcode(Managed_Object_Handle p_object)
 {
 #if defined(USE_UNIQUE_MARK_SWEEP_GC) || defined(USE_UNIQUE_MOVE_COMPACT_GC)
-  return (int32)0;//p_object;
+  return (I_32)0;//p_object;
 #endif
 
   Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_object;

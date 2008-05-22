@@ -29,7 +29,7 @@ namespace Jitrino {
 
 class IOpnd {
 public:
-    IOpnd(uint32 id, bool is_phi = false, bool is_constant = false) :
+    IOpnd(U_32 id, bool is_phi = false, bool is_constant = false) :
         _id(id), _phi(is_phi), _const(is_constant), 
         _unconstrained(false), _value(0)
     {}
@@ -43,21 +43,21 @@ public:
     void setIsConstant(bool s = true) { _const = s; }
     bool isConstant() const { return _const; }
 
-    void setConstant(int32 val) { setIsConstant(true); _value = val; }
-    int32 getConstant() const { assert(isConstant()); return _value; }
+    void setConstant(I_32 val) { setIsConstant(true); _value = val; }
+    I_32 getConstant() const { assert(isConstant()); return _value; }
 
     void setUnconstrained(bool unc) { _unconstrained = unc; }
     bool isUnconstrained() { return _unconstrained; }
 
-    void setID(uint32 id) { _id = id; }
-    uint32 getID() const { return _id; }
+    void setID(U_32 id) { _id = id; }
+    U_32 getID() const { return _id; }
 
     virtual void printName(std::ostream& os) const;
     void printFullName(std::ostream& os) const;
 private:
-    uint32 _id;
+    U_32 _id;
     bool   _phi, _const, _unconstrained;
-    int32  _value;
+    I_32  _value;
 };
 
 class BoundState {
@@ -86,16 +86,16 @@ private:
 
 class IneqEdge {
 public:
-    IneqEdge(IOpnd* src, IOpnd* dst, int32 len) :
+    IneqEdge(IOpnd* src, IOpnd* dst, I_32 len) :
         _src(src), _dst(dst), _length(len)
     {}
     IOpnd* getSrc() const { return _src; }
     IOpnd* getDst() const { return _dst; }
-    int32 getLength() const { return _length; }
-    void setLength(int32 len) { _length = len; }
+    I_32 getLength() const { return _length; }
+    void setLength(I_32 len) { _length = len; }
 private:
     IOpnd *_src, *_dst;
-    int32 _length;
+    I_32 _length;
 };
 
 typedef StlList<IneqEdge*> EdgeList;
@@ -227,7 +227,7 @@ private:
 };
 
 class TwoStateOpndToEdgeListMap {
-    typedef StlMap<uint32, TwoStateEdgeList* > MapIdTo2stList;
+    typedef StlMap<U_32, TwoStateEdgeList* > MapIdTo2stList;
 public:
     TwoStateOpndToEdgeListMap(MemoryManager& mm) :
         _is_lower(false),
@@ -239,13 +239,13 @@ public:
 
     bool isLowerState() { return _is_lower; }
 
-    void addEdge(uint32 opnd_id, IneqEdge* edge);
+    void addEdge(U_32 opnd_id, IneqEdge* edge);
 
-    void addEdgeSingleState(uint32 opnd_id, IneqEdge *edge, bool is_lower);
+    void addEdgeSingleState(U_32 opnd_id, IneqEdge *edge, bool is_lower);
 
-    TwoStateEdgeList::iterator eListBegin(uint32 opnd_id) const;
+    TwoStateEdgeList::iterator eListBegin(U_32 opnd_id) const;
 
-    TwoStateEdgeList::iterator eListEnd(uint32 opnd_id) const;
+    TwoStateEdgeList::iterator eListEnd(U_32 opnd_id) const;
 private:
     friend class InequalityGraph;
 
@@ -268,7 +268,7 @@ class InequalityGraph {
 public:
     typedef TwoStateEdgeList::iterator edge_iterator;
 private:
-    typedef StlMap<uint32, StlList<IneqEdge*> > OpndEdgeMap;
+    typedef StlMap<U_32, StlList<IneqEdge*> > OpndEdgeMap;
 
 public:
     InequalityGraph(MemoryManager& mem_mgr) : 
@@ -288,16 +288,16 @@ public:
     bool isLowerState() { return _is_lower; }
 
     // add edge by operands visible in all states
-    void addEdge(IOpnd* from, IOpnd* to, int32 distance);
+    void addEdge(IOpnd* from, IOpnd* to, I_32 distance);
 
     // add edge by operand IDs visible in all states
-    void addEdge(uint32 id_from, uint32 id_to, int32 distance);
+    void addEdge(U_32 id_from, U_32 id_to, I_32 distance);
 
     // add edge by operand IDs visible in a given state
-    void addEdgeSingleState(uint32 id_from, uint32 id_to, int32 distance, bool is_lower);
+    void addEdgeSingleState(U_32 id_from, U_32 id_to, I_32 distance, bool is_lower);
 
     // add edge by operands visible in a given state
-    void addEdgeSingleState(IOpnd* from, IOpnd* to, int32 distance, bool is_lower);
+    void addEdgeSingleState(IOpnd* from, IOpnd* to, I_32 distance, bool is_lower);
 
     void addOpnd(IOpnd* opnd);
 
@@ -313,13 +313,13 @@ public:
 
     bool isEmpty() const { return _id_to_opnd_map.empty(); }
 
-    IOpnd* findOpnd(uint32 id) const;
+    IOpnd* findOpnd(U_32 id) const;
 
     MemoryManager& getMemoryManager() { return _mem_mgr; }
 private:
     friend class InequalityOpndIterator;
     friend class InequalityGraphPrinter;
-    typedef StlMap<uint32, IOpnd*> IdToOpndMap;
+    typedef StlMap<U_32, IOpnd*> IdToOpndMap;
 
     static bool has_other_opnd_with_same_id(IdToOpndMap& map, IOpnd* opnd);
 
@@ -327,7 +327,7 @@ private:
     void printDotBody(std::ostream& os) const;
     void printDotEnd(std::ostream& os) const;
 
-    IOpnd* getOpndById(uint32 id) const;
+    IOpnd* getOpndById(U_32 id) const;
 
     enum PrnEdgeType
     {
@@ -356,10 +356,10 @@ private:
 
 class Bound : public HasBoundState {
 public:
-    Bound(int32 bnd, const BoundState& bs) : HasBoundState(bs), _bound(bnd) {}
+    Bound(I_32 bnd, const BoundState& bs) : HasBoundState(bs), _bound(bnd) {}
 
-    // bound - int32 -> Bound
-    Bound(Bound* bound, int32 val, const BoundState& bs);
+    // bound - I_32 -> Bound
+    Bound(Bound* bound, I_32 val, const BoundState& bs);
 
     void printFullName(std::ostream& os);
 
@@ -367,16 +367,16 @@ public:
 
     static bool eq(Bound* bound1, Bound* bound2);
 
-    static bool leq_int32(Bound* bound1, int32 value);
+    static bool leq_int32(Bound* bound1, I_32 value);
 
-    static bool int32_leq(int32 value, Bound* bound1);
+    static bool int32_leq(I_32 value, Bound* bound1);
 
     // returns (dst_val - src_val <= bound)
-    static bool const_distance_leq(int32 src_val, int32 dst_val, Bound* bound);
+    static bool const_distance_leq(I_32 src_val, I_32 dst_val, Bound* bound);
 
 private:
     friend class BoundAllocator;
-    int32 _bound;
+    I_32 _bound;
 };
 
 class TrueReducedFalseChart;
@@ -389,7 +389,7 @@ public:
 
     Bound* create_dec1(Bound* bound);
 
-    Bound* create_dec_const(Bound* bound, int32 cnst);
+    Bound* create_dec_const(Bound* bound, I_32 cnst);
 
     TrueReducedFalseChart* create_empty_TRFChart();
 
@@ -398,7 +398,7 @@ private:
 
     MemoryManager& getMemoryManager() { return _mem_mgr; }
 
-    Bound* newBound(int32 val, const BoundState& bs);
+    Bound* newBound(I_32 val, const BoundState& bs);
     MemoryManager& _mem_mgr;
 };
 
@@ -519,17 +519,17 @@ public:
     {}
 
     bool demandProve
-        (IOpnd* source, IOpnd* dest, int32 bound_int, bool prove_upper_bound);
+        (IOpnd* source, IOpnd* dest, I_32 bound_int, bool prove_upper_bound);
 
 private:
-    ProveResult prove(IOpnd* dest, Bound* bound, uint32 prn_level);
+    ProveResult prove(IOpnd* dest, Bound* bound, U_32 prn_level);
 
     void updateMemDistanceWithPredecessors
-        (IOpnd* dest, Bound* bound, uint32 prn_level, meet_func_t meet_f);
+        (IOpnd* dest, Bound* bound, U_32 prn_level, meet_func_t meet_f);
 
     class Printer {
     public:
-        Printer(uint32 level, std::ostream& os) : _level(level), _os(os) {}
+        Printer(U_32 level, std::ostream& os) : _level(level), _os(os) {}
 
         void prnLevel();
 
@@ -538,7 +538,7 @@ private:
         void prnStrLn(const char* str);
 
     private:
-        uint32 _level;
+        U_32 _level;
         std::ostream& _os; 
     };
 

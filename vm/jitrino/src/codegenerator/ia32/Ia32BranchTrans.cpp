@@ -108,8 +108,8 @@ static bool branchDirection (int64 v1, int64 v2, OpndSize sz,ConditionMnemonic m
             v2 = int64(int16(v2));
             break;
         case OpndSize_32:
-            v1 = int64(int32(v1));
-            v2 = int64(int32(v2));
+            v1 = int64(I_32(v1));
+            v2 = int64(I_32(v2));
             break;
         default:
             break;
@@ -368,8 +368,8 @@ void BranchTranslator::eliminateSignCheck() {
         Inst * cmpInst = brachInst->getPrevInst();
 
         if (cmpInst && falseInst) {
-            uint32 prevDefCount = cmpInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
-            uint32 falseDefCount = falseInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+            U_32 prevDefCount = cmpInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+            U_32 falseDefCount = falseInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
             Inst * nextFalse = falseInst->getNextInst();
 
             // check if we have following in current BB:

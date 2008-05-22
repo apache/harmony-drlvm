@@ -320,7 +320,7 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     *ss++ = (char)0x00;
     *ss++ = (char)0x00;
     *ss++ = (char)0x00;
-    ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((uint32)&((VM_thread *)0)->_gc_private_information));
+    ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((U_32)&((VM_thread *)0)->_gc_private_information));
 #endif // !PLATFORM_POSIX
 */
     ss = push(ss,  eax_opnd);
@@ -351,7 +351,7 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
     *ss++ = (char)0x00;
     *ss++ = (char)0x00;
     *ss++ = (char)0x00;
-    ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((uint32)&((VM_thread *)0)->_gc_private_information));
+    ss = alu(ss, add_opc,  eax_opnd,  Imm_Opnd((U_32)&((VM_thread *)0)->_gc_private_information));
 #endif // !PLATFORM_POSIX
 */  
     ss = push(ss,  eax_opnd);
@@ -672,7 +672,7 @@ Vector_Handle rth_multianewarrayhelper()
     Class* c = (Class*)p_args[0];
     unsigned dims = p_args[1];
     assert(dims<=max_dim);
-    uint32* lens_base = (uint32*)(p_args+2);
+    U_32* lens_base = (U_32*)(p_args+2);
     for(unsigned i = 0; i < dims; i++) {
         lens[i] = lens_base[dims-i-1];
     }

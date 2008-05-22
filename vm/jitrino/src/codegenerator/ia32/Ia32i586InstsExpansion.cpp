@@ -47,8 +47,8 @@ class I586InstsExpansion : public SessionAction {
     void lowerToX87();
     void lowerToSSE();
 
-    uint32 getNeedInfo()const{ return 0; }
-    uint32 getSideEffects()const{ return hasSideEffects ? SideEffect_InvalidatesLivenessInfo: 0; }
+    U_32 getNeedInfo()const{ return 0; }
+    U_32 getSideEffects()const{ return hasSideEffects ? SideEffect_InvalidatesLivenessInfo: 0; }
     bool isIRDumpEnabled(){ return hasSideEffects;}
 
     bool hasSideEffects;

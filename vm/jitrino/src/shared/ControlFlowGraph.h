@@ -103,7 +103,7 @@ public:
    *
    * @return The unique edge ID that is constant for lifetime of this edge.
    */
-    uint32 getId() const {return id;}
+    U_32 getId() const {return id;}
 
   /** 
    * Returns the edge kind.
@@ -213,10 +213,10 @@ protected:
     *
     * @param[in] _id - a new edge ID 
     */
-    void setId(uint32 _id) {id = _id;}
+    void setId(U_32 _id) {id = _id;}
 
     /// The unique edge ID within CFG.
-    uint32 id;
+    U_32 id;
 
     /// The <code>Source</code> or the <code>Tail</code> node of the edge.
     Node *source;
@@ -455,7 +455,7 @@ public:
    *
    * @return The unique node ID in the containing flow graph.
    */
-    uint32 getId() const {return id;}
+    U_32 getId() const {return id;}
 
   /** 
    * Gets the depth-first numbering of the given node computed during the last 
@@ -469,7 +469,7 @@ public:
    *      <code>isForward</code> parameter is <code>TRUE</code> in the 
    *      <code>orderNodes(isForward)</code> method call.
    */
-    uint32 getDfNum() const {return dfNumber;}
+    U_32 getDfNum() const {return dfNumber;}
     
   /** 
    * Gets the pre-num numbering of the given node computed during the last pass.
@@ -477,7 +477,7 @@ public:
    *
    * @return The pre-num numbering of the given node.
    */
-    uint32 getPreNum() const {return preNumber;}
+    U_32 getPreNum() const {return preNumber;}
     
   /** 
    * Gets the post-num numbering of the given node computed during the last pass.
@@ -485,7 +485,7 @@ public:
    *
    * @return The post-num numbering of the given node.
    */
-    uint32 getPostNum() const {return postNumber;}
+    U_32 getPostNum() const {return postNumber;}
 
     
   /**
@@ -730,14 +730,14 @@ public:
    *
    * @return The number of outgoing edges of the node.
    */
-    uint32 getOutDegree() const {return (uint32)getOutEdges().size();}
+    U_32 getOutDegree() const {return (U_32)getOutEdges().size();}
     
   /** 
    * Gets the number of incoming edges to the node. 
    *
    * @return The number of incoming edges to the node.
    */
-    uint32 getInDegree() const {return (uint32)getInEdges().size();}
+    U_32 getInDegree() const {return (U_32)getInEdges().size();}
 
   /** 
    * Checks whether the node has only one outgoing edge. 
@@ -808,7 +808,7 @@ public:
    *
    * @return  The number of instructions in the node. 
    */
-    uint32 getInstCount(bool ignoreLabels = true) const;
+    U_32 getInstCount(bool ignoreLabels = true) const;
 
   /** 
    * Checks whether not a single instruction is in the node.
@@ -858,7 +858,7 @@ public:
    *
    * @return The traversal number for the node.
    */
-    uint32 getTraversalNum() const {return traversalNumber;}
+    U_32 getTraversalNum() const {return traversalNumber;}
     
   /** 
    * Sets a new traversal number of the node, usually 
@@ -866,7 +866,7 @@ public:
    *
    * @param[in] num - a new traversal number
    */
-    void setTraversalNum(uint32 num) {traversalNumber = num;}
+    void setTraversalNum(U_32 num) {traversalNumber = num;}
 
   /** 
    * Gets the second instruction in the node.
@@ -918,7 +918,7 @@ protected:
    * 
    * @param[in] _id - a new node ID 
    */
-    void setId(uint32 _id) {id = _id;}
+    void setId(U_32 _id) {id = _id;}
 
 
   /**
@@ -929,32 +929,32 @@ protected:
     void insertInst(CFGInst* prev, CFGInst* newInst);
 
     /// The unique ID of the node in CFG.
-    uint32 id;
+    U_32 id;
     
   /** 
    * The depth-first number of the node in CFG. 
    * It is updated every time CFG is ordered.
    */
-    uint32 dfNumber;
+    U_32 dfNumber;
 
   /** 
    * The pre-number of the node in CFG. 
    * It is updated every time CFG is ordered.
    */
-    uint32 preNumber;
+    U_32 preNumber;
     
   /** 
    * The post-number of the node in CFG. 
    * It is updated every time CFG is ordered.
    */
-    uint32 postNumber;
+    U_32 postNumber;
 
   /** 
    * The number of times the node was traversed by the 
    * ordering algorithms.
    * It is updated every time CFG is ordered.
    */
-    uint32 traversalNumber;
+    U_32 traversalNumber;
 
     /// The type of the node.
     Kind   kind;
@@ -1132,7 +1132,7 @@ public:
    * 
    * @return The maximum node ID.
    */
-    uint32 getMaxNodeId() const {return nodeIDGenerator;}
+    U_32 getMaxNodeId() const {return nodeIDGenerator;}
     
   /** 
    * Creates a new specified node. Add instruction to the node.
@@ -1188,7 +1188,7 @@ public:
    *
    * @return The number of reachable nodes in the graph.
    */
-    uint32 getNodeCount() { if(!hasValidOrdering()) orderNodes(); return nodeCount; }
+    U_32 getNodeCount() { if(!hasValidOrdering()) orderNodes(); return nodeCount; }
     
   /** 
    * Gets the cached postorder collection of nodes in the graph.
@@ -1288,7 +1288,7 @@ public:
    * 
    * @return The maximum edge ID.
    */
-    uint32 getMaxEdgeId() const {return edgeIDGenerator;}
+    U_32 getMaxEdgeId() const {return edgeIDGenerator;}
 
   /** 
    * Removes the edge from CFG. Updates <code>Source</code> and 
@@ -1374,7 +1374,7 @@ public:
    *
    * @return The traversal number
    */
-    uint32 getTraversalNum() const {return traversalNumber;}
+    U_32 getTraversalNum() const {return traversalNumber;}
     
   /** 
    * Sets the traversal number.
@@ -1385,7 +1385,7 @@ public:
    * @param[in] newTraversalNum - a new traversal number
    */
 
-    void setTraversalNum(uint32 newTraversalNum) {traversalNumber = newTraversalNum;}
+    void setTraversalNum(U_32 newTraversalNum) {traversalNumber = newTraversalNum;}
 
   /** 
    * The modification traversal number is the traversal number of the
@@ -1393,7 +1393,7 @@ public:
    * 
    * @return The modification traversal number.
    */
-    uint32 getModificationTraversalNum() const { return lastModifiedTraversalNumber; }
+    U_32 getModificationTraversalNum() const { return lastModifiedTraversalNumber; }
 
   /** 
    * The edge removal traversal number is the modification traversal number of 
@@ -1401,7 +1401,7 @@ public:
    * 
    * @return The edge removal traversal number.
    */
-    uint32 getEdgeRemovalTraversalNum() const { return lastEdgeRemovalTraversalNumber; }
+    U_32 getEdgeRemovalTraversalNum() const { return lastEdgeRemovalTraversalNumber; }
 
   /** 
    * The ordering traversal number is the traversal number after the last depth
@@ -1410,7 +1410,7 @@ public:
    *
    * @return The ordering traversal number.
    */
-    uint32 getOrderingTraversalNum() const { return lastOrderingTraversalNumber; }
+    U_32 getOrderingTraversalNum() const { return lastOrderingTraversalNumber; }
 
   /** 
    * Checks if CFG nodes have valid ordering, that is there was no modification
@@ -1718,7 +1718,7 @@ protected:
    
     template <class Container>
     void getNodesDFS(Container* preOrderContainer, Container* postOrderContainer, Node* node, bool isForward=true) {
-        uint32 marked = traversalNumber;
+        U_32 marked = traversalNumber;
         node->setTraversalNum(marked);
         if(isForward) {
             node->dfNumber = currentPreNumber;
@@ -1786,26 +1786,26 @@ protected:
     Nodes postOrderCache;
 
     /// The ID generator for nodes, which is incremented every time a new node is added to the graph.
-    uint32 nodeIDGenerator;
+    U_32 nodeIDGenerator;
     /// The ID generator for edges, which is incremented every time a new edge is added to the graph.
-    uint32 edgeIDGenerator;
+    U_32 edgeIDGenerator;
     /// The number of reachable nodes in the graph, which is updated every time the graph is ordered.
-    uint32 nodeCount;
+    U_32 nodeCount;
     /// The last graph traversal number used to track graph modifications.
-    uint32 traversalNumber;
+    U_32 traversalNumber;
     /// The given field is assigned to the <code>traversalNumber</code> value every time the graph is modified.
-    uint32 lastModifiedTraversalNumber;
+    U_32 lastModifiedTraversalNumber;
     /// The given field is assigned to the <code>traversalNumber</code> value every time the graph is ordered.
-    uint32 lastOrderingTraversalNumber;
+    U_32 lastOrderingTraversalNumber;
     /// The given field is assigned to the <code>traversalNumber</code> value every time any edge is removed from the graph.
-    uint32 lastEdgeRemovalTraversalNumber;
+    U_32 lastEdgeRemovalTraversalNumber;
     /// The given field is assigned to the <code>traversalNumber</code> value every time the profile information is recalculated.
-    uint32 lastProfileUpdateTraversalNumber;
+    U_32 lastProfileUpdateTraversalNumber;
 
     /// The temporary field used by ordering algorithms.
-    uint32 currentPreNumber;
+    U_32 currentPreNumber;
     /// The temporary field used by ordering algorithms.
-    uint32 currentPostNumber;
+    U_32 currentPostNumber;
 
     /// Tells whether the graph is annotated with the edge profile.
     bool annotatedWithEdgeProfile;

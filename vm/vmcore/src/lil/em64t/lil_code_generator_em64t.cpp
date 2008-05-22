@@ -346,7 +346,7 @@ private:
             if (fp_param_cnt < LcgEM64TContext::MAX_FR_OUTPUTS) {
                 if (take_inputs_from_stack) {
                     // compute rsp-relative offset of the bottom of FR save area
-                    int32 offset = context.get_input_fr_save_offset() +
+                    I_32 offset = context.get_input_fr_save_offset() +
                         fp_param_cnt * LcgEM64TContext::FR_SIZE;
                     return new(mem) LcgEM64TLoc(LLK_FStk, offset);
                 } else {
@@ -361,7 +361,7 @@ private:
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
                 // compute rsp-relative offset of the top of the activation frame
-                int32 offset = context.get_stk_size();
+                I_32 offset = context.get_stk_size();
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
@@ -375,7 +375,7 @@ private:
             if (gp_param_cnt < LcgEM64TContext::MAX_GR_OUTPUTS) {
                 if (take_inputs_from_stack) {
                     // compute rsp-relative offset of the bottom of GR save area
-                    int32 offset = context.get_input_gr_save_offset() +
+                    I_32 offset = context.get_input_gr_save_offset() +
                         gp_param_cnt * LcgEM64TContext::GR_SIZE;
                     return new(mem) LcgEM64TLoc(LLK_GStk, offset);
                 } else {
@@ -390,7 +390,7 @@ private:
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
                 // compute rsp-relative offset of the top of the activation frame
-                int32 offset = context.get_stk_size();
+                I_32 offset = context.get_stk_size();
                 // skip rip
                 offset += LcgEM64TContext::GR_SIZE;
                 // skip size allocated for preceding inputs
@@ -438,7 +438,7 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack;
+                I_32 offset = gp_on_stack;
 #ifndef _WIN64
                 offset += fp_on_stack;
 #endif
@@ -455,7 +455,7 @@ private:
                 unsigned fp_on_stack = fp_param_cnt > LcgEM64TContext::MAX_FR_OUTPUTS
                     ? (fp_param_cnt - LcgEM64TContext::MAX_FR_OUTPUTS)
                     * LcgEM64TContext::FR_SIZE : 0;
-                int32 offset = gp_on_stack;
+                I_32 offset = gp_on_stack;
 #ifndef _WIN64
                 offset += fp_on_stack;
 #endif
@@ -546,7 +546,7 @@ private:
     inline const M_Opnd & get_m_opnd(const LcgEM64TLoc * loc) const {
         assert(loc->kind == LLK_GStk || loc->kind == LLK_FStk);
         void * const mem_ptr = mem.alloc(sizeof(M_Base_Opnd));
-        return *(new(mem_ptr) M_Base_Opnd(rsp_reg, (int32)loc->addr));
+        return *(new(mem_ptr) M_Base_Opnd(rsp_reg, (I_32)loc->addr));
     }
 
     inline const RM_Opnd & get_rm_opnd(const LcgEM64TLoc * loc) const {
@@ -558,7 +558,7 @@ private:
         return get_m_opnd(loc);
     }
 
-    inline void adjust_stack_pointer(int32 offset) {
+    inline void adjust_stack_pointer(I_32 offset) {
         if (offset != 0) {
             buf = alu(buf, add_opc, rsp_opnd, get_imm_opnd(offset), size_64);
         }
@@ -626,7 +626,7 @@ private:
         }
     }
 
-    void shift_op_imm_rm(const LcgEM64TLoc * dest, int32 imm_val, const LcgEM64TLoc * src) {
+    void shift_op_imm_rm(const LcgEM64TLoc * dest, I_32 imm_val, const LcgEM64TLoc * src) {
         assert(dest->kind == LLK_Gr || dest->kind == LLK_GStk);
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
         // this code sequence can be optimized if dest is located in memory
@@ -634,7 +634,7 @@ private:
         bin_op_rm_rm(LO_Shl, dest, dest, src);
     }
 
-    void shift_op_rm_imm(const LcgEM64TLoc * dest, const LcgEM64TLoc * src, int32 imm_val) {
+    void shift_op_rm_imm(const LcgEM64TLoc * dest, const LcgEM64TLoc * src, I_32 imm_val) {
         const Imm_Opnd & imm = get_imm_opnd(imm_val);
         if (src->kind == LLK_Gr) {
         if (dest->kind == LLK_Gr) {
@@ -660,7 +660,7 @@ private:
 
     // subtract op where the first op is immediate
     // (allowed only for intefer values)
-    void sub_op_imm_rm(const LcgEM64TLoc * dest, int32 imm_val, const LcgEM64TLoc * src) {
+    void sub_op_imm_rm(const LcgEM64TLoc * dest, I_32 imm_val, const LcgEM64TLoc * src) {
         assert(dest->kind == LLK_Gr || dest->kind == LLK_GStk);
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
         // TODO: this code sequence can be optimized if dest is located in memory
@@ -668,7 +668,7 @@ private:
     }
 
     void alu_op_rm_imm(const ALU_Opcode alu_opc, const LcgEM64TLoc * dest,
-                       const LcgEM64TLoc * src, int32 imm_val) {
+                       const LcgEM64TLoc * src, I_32 imm_val) {
         assert(alu_opc < n_alu);
         assert(dest->kind == LLK_Gr || dest->kind == LLK_GStk);
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
@@ -733,7 +733,7 @@ private:
 
     // where the second operand is immediate (allowed only for integer values!)
     void bin_op_rm_imm(LilOperation o, const LcgEM64TLoc* dest,
-                       const LcgEM64TLoc* src, int32 imm_val) {
+                       const LcgEM64TLoc* src, I_32 imm_val) {
         assert(dest->kind == LLK_Gr || dest->kind == LLK_GStk);
         assert(src->kind == LLK_Gr || src->kind == LLK_GStk);
 
@@ -887,7 +887,7 @@ private:
                 return *(new(M_Index_Opnd_mem) M_Index_Opnd(
                     base_loc != NULL ? get_r_opnd(base_loc).reg_no() : n_reg,
                     index_loc != NULL ?  get_r_opnd(index_loc).reg_no() : n_reg,
-                    (uint32)offset, scale));
+                    (U_32)offset, scale));
         }
 
         // check if it's enough to use only one temporary register
@@ -896,13 +896,13 @@ private:
                 buf = mov(buf, tmp_reg, get_m_opnd(base_loc), size_64);
                 return *(new(M_Index_Opnd_mem) M_Index_Opnd(tmp_reg.reg_no(),
                     index_loc != NULL ?  get_r_opnd(index_loc).reg_no() : n_reg,
-                    (uint32)offset, scale));
+                    (U_32)offset, scale));
             }
             if (is_index_in_mem) {
                 buf = mov(buf, tmp_reg, get_m_opnd(index_loc), size_64);
                 return *(new(M_Index_Opnd_mem) M_Index_Opnd(
                     base_loc != NULL ? get_r_opnd(base_loc).reg_no() : n_reg,
-                    tmp_reg.reg_no(), (uint32)offset, scale));
+                    tmp_reg.reg_no(), (U_32)offset, scale));
             }
             DIE(("Should never reach this point"));
         }
@@ -911,7 +911,7 @@ private:
         const LcgEM64TLoc * ret_loc =
             new(mem) LcgEM64TLoc(LLK_Gr, LcgEM64TContext::get_index_in_map(tmp_reg.reg_no()));
         if (index_loc != NULL) {
-            int32 shift = scale / 4 + 1;
+            I_32 shift = scale / 4 + 1;
             bin_op_rm_imm(LO_Shl, ret_loc, index_loc, shift);
             if (base_loc != NULL) {
                 bin_op_rm_rm(LO_Add, ret_loc, ret_loc, base_loc);
@@ -939,7 +939,7 @@ private:
             move_imm(ret_loc, offset);
             offset = 0;
         }
-        return *(new(M_Index_Opnd_mem) M_Base_Opnd(get_r_opnd(ret_loc).reg_no(), (uint32)offset));
+        return *(new(M_Index_Opnd_mem) M_Base_Opnd(get_r_opnd(ret_loc).reg_no(), (U_32)offset));
     }
 
     // sets up stack frame
@@ -980,7 +980,7 @@ private:
         }  
 
         // compute the rsp-relative offset of the top of the GR save area
-        int32 offset = (int32)context.get_input_gr_save_offset() +
+        I_32 offset = (I_32)context.get_input_gr_save_offset() +
             context.get_stk_input_gr_save_size();
         // store GR inputs to the computed locations
         for (int i = context.get_num_gr_inputs() - 1; i >= 0; i--) {
@@ -991,7 +991,7 @@ private:
             buf = mov(buf, dest, r_opnd);
         }
         // compute the rsp-relative offset of the top of the FR save area
-        offset = (int32)context.get_input_fr_save_offset() +
+        offset = (I_32)context.get_input_fr_save_offset() +
             context.get_stk_input_fr_save_size();
         // store FR inputs to the computed locations
         for (int i = context.get_num_fr_inputs() - 1; i >= 0; i--) {
@@ -1010,7 +1010,7 @@ private:
             return;
         }
         // compute the rsp-relative offset of the bottom of the FR save area
-        int32 offset = (int32)context.get_input_fr_save_offset();
+        I_32 offset = (I_32)context.get_input_fr_save_offset();
         // restore FR inputs
         for (unsigned i = 0; i < context.get_num_fr_inputs(); i++) {
             const XMM_Opnd & r_opnd =
@@ -1020,7 +1020,7 @@ private:
             offset += LcgEM64TContext::FR_SIZE;
         }
         // compute the rsp-relative offset of the bottom of the GR save area
-        offset = (int32)context.get_input_gr_save_offset();
+        offset = (I_32)context.get_input_gr_save_offset();
         // restore GR inputs
         for (unsigned i = 0; i < context.get_num_gr_inputs(); i++) {
             const R_Opnd & r_opnd =
@@ -1147,7 +1147,7 @@ public:
     }
 
     void alloc(LilVariable * var, unsigned sz) {
-        int32 alloc_offset = context.get_alloc_start_offset() + current_alloc;
+        I_32 alloc_offset = context.get_alloc_start_offset() + current_alloc;
         // the actual size allocated will always be a multiple of 8
         current_alloc += align_8(sz);
         // var = sp + alloc_offset
@@ -1174,10 +1174,10 @@ public:
             if (lil_operand_is_immed(op1) && lil_operand_is_immed(op2)) {
                 // type-convert to get signed types of same length
                 assert(fit32(get_imm_value(op1)));
-                int32 op1_imm = (int32)get_imm_value(op1);
+                I_32 op1_imm = (I_32)get_imm_value(op1);
                 assert(fit32(get_imm_value(op2)));
-                int32 op2_imm = (int32)get_imm_value(op2); 
-                int32 result = 0;
+                I_32 op2_imm = (I_32)get_imm_value(op2); 
+                I_32 result = 0;
                 switch (o) {
                 case LO_Add:
                     result = op1_imm + op2_imm;
@@ -1197,7 +1197,7 @@ public:
                 move_imm(dest_loc, result);
             } else if (lil_operand_is_immed(op1)) {
                 assert(fit32(get_imm_value(op1)));
-                const int32 op1_imm = (int32)get_imm_value(op1);
+                const I_32 op1_imm = (I_32)get_imm_value(op1);
                 const LcgEM64TLoc * op2_loc = get_op_loc(op2, false);
                 switch (o) {
                 case LO_Add:
@@ -1217,7 +1217,7 @@ public:
             } else if (lil_operand_is_immed(op2)) {
                 const LcgEM64TLoc*  op1_loc = get_op_loc(op1, false);
                 assert(fit32(get_imm_value(op2)));
-                const int32 op2_imm = (int32)get_imm_value(op2);
+                const I_32 op2_imm = (I_32)get_imm_value(op2);
                 bin_op_rm_imm(o, dest_loc, op1_loc, op2_imm);
             } else {  // both operands non-immediate
                 const LcgEM64TLoc * src1_loc = get_op_loc(op1, false);
@@ -1227,8 +1227,8 @@ public:
         } else { // unary operation
             if (lil_operand_is_immed(op1)) {
                 assert(fit32(get_imm_value(op1)));
-                int32 imm = (int32)get_imm_value(op1);
-                int32 result = 0;
+                I_32 imm = (I_32)get_imm_value(op1);
+                I_32 result = 0;
                 switch (o) {
                 case LO_Neg:
                     result = -imm;
@@ -1237,22 +1237,22 @@ public:
                     result = ~imm;
                     break;
                 case LO_Sx1:
-                    result = (int32) (int8) imm;
+                    result = (I_32) (int8) imm;
                     break;
                 case LO_Sx2:
-                    result = (int32) (int16) imm;
+                    result = (I_32) (int16) imm;
                     break;
                 case LO_Sx4:
-                    result = (int32) (int32) imm;
+                    result = (I_32) (I_32) imm;
                     break;
                 case LO_Zx1:
-                    result = (int32) (uint64) (uint8) imm;
+                    result = (I_32) (uint64) (uint8) imm;
                     break;
                 case LO_Zx2:
-                    result = (int32) (uint64) (uint16) imm;
+                    result = (I_32) (uint64) (uint16) imm;
                     break;
                 case LO_Zx4:
-                    result = (int32) (uint64) (uint32) imm;
+                    result = (I_32) (uint64) (U_32) imm;
                     break;
                 default:
                     DIE(("Unexpected operation"));  // control should never reach this point
@@ -1669,7 +1669,7 @@ move_to_destination:
         take_inputs_from_stack = true;
 
         // rsp-relative offset of the top of the m2n frame
-        int32 offset = context.get_m2n_offset() + context.get_stk_m2n_size();
+        I_32 offset = context.get_m2n_offset() + context.get_stk_m2n_size();
 
         buf = m2n_gen_push_m2n(buf, method, current_frame_type, handles,
             lil_cs_get_max_locals(cs), lil_ic_get_num_std_places(ic), offset);

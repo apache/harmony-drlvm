@@ -49,9 +49,9 @@ static void dbg_point() {}
 // Helper function, removes element idx from vector in O(1) time
 // Moves last element in vector to idx and reduce size by 1
 // WARN: elements order could be changed!
-static void removeElementAt(GCSafePointPairs& pairs, uint32 idx) {
+static void removeElementAt(GCSafePointPairs& pairs, U_32 idx) {
     assert(!pairs.empty());
-    uint32 newSize = (uint32)pairs.size() - 1;
+    U_32 newSize = (U_32)pairs.size() - 1;
     assert(idx<=newSize);
     if (idx < newSize) {
         pairs[idx] = pairs[newSize];
@@ -62,7 +62,7 @@ static void removeElementAt(GCSafePointPairs& pairs, uint32 idx) {
 
 void GCSafePointsInfo::removePairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr) const {
 #ifdef _DEBUG_
-    uint32 nPairs = 0;
+    U_32 nPairs = 0;
 #endif 
     for (int i = (int)pairs.size(); --i>=0;) {
         MPtrPair& p = pairs[i];
@@ -121,8 +121,8 @@ bool GCSafePointsInfo::blockHasSafePoints(const Node* b) {
 }
 
 
-uint32 GCSafePointsInfo::getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap ) {
-    uint32 n = 0;
+U_32 GCSafePointsInfo::getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap ) {
+    U_32 n = 0;
     for (Inst * inst=(Inst*)b->getFirstInst(); inst!=NULL; inst=inst->getNextInst()){
         if (isGCSafePoint(inst)) {
             if (pairsMap!=NULL) { // if pairs!=NULL counts only gcpoints with non-empty pairs
@@ -173,11 +173,11 @@ void GCSafePointsInfo::insertLivenessFilters() {
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()) {
-            uint32 numInsts = node->getInstCount();
+            U_32 numInsts = node->getInstCount();
             if (numInsts < LIVENESS_FILTER_INST_INTERVAL) {
                 continue;
             }
-            uint32 objOps  = 0;
+            U_32 objOps  = 0;
             for (Inst* inst = (Inst*)node->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
                 if (inst->getOpndCount() == 0 && ((inst->getKind() == Inst::Kind_MethodEndPseudoInst) 
                         || (inst->getKind() == Inst::Kind_MethodEntryPseudoInst))
@@ -250,14 +250,14 @@ void GCSafePointsInfo::calculateMPtrs() {
     }
         
     GCSafePointPairs tmpPairs(mm);
-    uint32 nIterations = lt->getMaxLoopDepth() + 1;
+    U_32 nIterations = lt->getMaxLoopDepth() + 1;
     bool changed = true;
     bool restart = false;
 
 #ifdef _DEBUG 
     nIterations++; //one more extra iteration to check on debug that nothing changed
 #endif 
-    for (uint32 iteration = 0; iteration < nIterations ; ) {
+    for (U_32 iteration = 0; iteration < nIterations ; ) {
         changed = false;
         for (Nodes::const_reverse_iterator it = postOrderedNodes.rbegin(), end = postOrderedNodes.rend(); it!=end; ++it) {
             Node* node = *it;
@@ -265,7 +265,7 @@ void GCSafePointsInfo::calculateMPtrs() {
                 continue;
             }
             tmpPairs.clear();
-            uint32 instsBefore = instsAdded;
+            U_32 instsBefore = instsAdded;
             derivePairsOnEntry(node, tmpPairs);
             if (instsBefore!=instsAdded) {
                 restart = true;
@@ -318,7 +318,7 @@ void GCSafePointsInfo::calculateMPtrs() {
 #endif
 }
 
-static inline int adjustOffsets(int32 offsetBefore, int32 dOffset) {
+static inline int adjustOffsets(I_32 offsetBefore, I_32 dOffset) {
     if (offsetBefore == MPTR_OFFSET_UNKNOWN || dOffset == MPTR_OFFSET_UNKNOWN) {
         return MPTR_OFFSET_UNKNOWN;
     }
@@ -337,13 +337,13 @@ static bool isHeapBase(Opnd* immOpnd) {
 #endif
 }
 
-int32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
+I_32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
     if (offsetOpnd->isPlacedIn(OpndKind_Immediate)) {
         if (offsetOpnd->getImmValue() == 0 && offsetOpnd->getRuntimeInfo()!=NULL) {
             irm.resolveRuntimeInfo(offsetOpnd);
         }
         assert(!isHeapBase(offsetOpnd));
-        return (int32)offsetOpnd->getImmValue();
+        return (I_32)offsetOpnd->getImmValue();
     }
     return MPTR_OFFSET_UNKNOWN;
 }
@@ -395,7 +395,7 @@ void GCSafePointsInfo::updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMpt
 static void add_static(Opnd* opnd, StlSet<Opnd*>& set, Opnd* cause) {
     set.insert(opnd);
     if (Log::isEnabled()) {
-        Log::out()<<"Registering as static opnd, firstId="<<opnd->getFirstId()<<" reason-opndid:"<<(cause?cause->getFirstId() : (uint32)-1)<<std::endl;
+        Log::out()<<"Registering as static opnd, firstId="<<opnd->getFirstId()<<" reason-opndid:"<<(cause?cause->getFirstId() : (U_32)-1)<<std::endl;
     }
 }
 
@@ -437,8 +437,8 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
     runLivenessFilter(inst, res);//filter pairs with dead mptrs from list
 
     Inst::Opnds opnds(inst, Inst::OpndRole_Explicit | Inst::OpndRole_Auxilary |Inst::OpndRole_UseDef);
-    uint32 defIndex = opnds.begin();
-    uint32 useIndex1 = opnds.next(defIndex);
+    U_32 defIndex = opnds.begin();
+    U_32 useIndex1 = opnds.next(defIndex);
 
     if (defIndex >= opnds.end() || useIndex1 >= opnds.end() 
         || (inst->getOpndRoles(defIndex) & Inst::OpndRole_Def) == 0 
@@ -474,21 +474,21 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
         } else { //def of mptr
             // detect which operand is base
             Opnd* fromOpnd = inst->getOpnd(useIndex1);
-            uint32 useIndex2 = opnds.next(useIndex1);
+            U_32 useIndex2 = opnds.next(useIndex1);
             Opnd* fromOpnd2 = useIndex2!=opnds.end() ? inst->getOpnd(useIndex2) : NULL;
             if (!(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr())) {
                 assert(fromOpnd2!=NULL);
                 Opnd* tmp = fromOpnd; fromOpnd = fromOpnd2; fromOpnd2 = tmp;
             }
             assert(fromOpnd->getType()->isObject() || fromOpnd->getType()->isManagedPtr());
-            int32 offset = MPTR_OFFSET_UNKNOWN;
+            I_32 offset = MPTR_OFFSET_UNKNOWN;
             if (inst->getMnemonic() == Mnemonic_LEA) {
                 assert(fromOpnd->isPlacedIn(OpndKind_Memory));
                 Opnd* scaleOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale);
                 if (scaleOpnd == NULL) {
                     Opnd* displOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
                     assert(displOpnd!=NULL);
-                    offset = (int32)displOpnd->getImmValue();
+                    offset = (I_32)displOpnd->getImmValue();
                 }
                 fromOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
             } else if (fromOpnd2!=NULL) {
@@ -512,7 +512,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
             //Do nothing, calls return only bases
         } else {
             Opnd* fromOpnd = NULL;
-            int32 offset = 0;
+            I_32 offset = 0;
             Mnemonic mn = inst->getMnemonic();
 
             Mnemonic conditionalMnem = getBaseConditionMnemonic(mn);
@@ -549,7 +549,7 @@ void GCSafePointsInfo::updatePairsOnInst(Inst* inst, GCSafePointPairs& res) {
                         if (scaleOpnd == NULL) {
                             Opnd* displOpnd = fromOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
                             assert(displOpnd!=NULL);
-                            offset = (int32)displOpnd->getImmValue();
+                            offset = (I_32)displOpnd->getImmValue();
                         } else {
                             offset = MPTR_OFFSET_UNKNOWN;
                         }
@@ -604,9 +604,9 @@ void GCSafePointsInfo::derivePairsOnEntry(const Node* node, GCSafePointPairs& re
 
     //step 2: merge pairs with the same (mptr, base) and process ambiguos pairs
     bool needToFilterDeadPairs = false;
-    uint32 instsAddedBefore = instsAdded;
+    U_32 instsAddedBefore = instsAdded;
     std::sort(res.begin(), res.end());
-    for (uint32 i=0, n = (uint32)res.size(); i < n; i++) {
+    for (U_32 i=0, n = (U_32)res.size(); i < n; i++) {
         MPtrPair& p1 = res[i];
         Opnd* newBase = NULL; //new base opnd to merge ambiguos mptrs
         while (i+1 < n) {
@@ -622,7 +622,7 @@ void GCSafePointsInfo::derivePairsOnEntry(const Node* node, GCSafePointPairs& re
                     if (newBase == NULL) { //first pass for this ambiguous mptrs fix them all
                         newBase = irm.newOpnd(p1.base->getType());
                         opndsAdded++;
-                        uint32 dInsts = 0;
+                        U_32 dInsts = 0;
                         for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
                             Edge* edge = *ite;
                             Node * predNode =edge->getSourceNode();
@@ -688,12 +688,12 @@ void GCSafePointsInfo::filterLiveMPtrsOnGCSafePoints() {
         if (!node->isBlockNode()) {
             continue;
         }
-        uint32 nSafePoints = getNumSafePointsInBlock((BasicBlock*)node, &pairsByGCSafePointInstId);
+        U_32 nSafePoints = getNumSafePointsInBlock((BasicBlock*)node, &pairsByGCSafePointInstId);
         if (nSafePoints == 0) {
             continue;
         }
         // ok this basic block has safepoints        
-        uint32 nSafePointsTmp = nSafePoints;
+        U_32 nSafePointsTmp = nSafePoints;
         // remove pairs with dead mptr, use liveness to do it;
         ls.clear();
         irm.getLiveAtExit(node, ls);
@@ -746,10 +746,10 @@ void GCSafePointsInfo::checkPairsOnNodeExits() const {
                 Node * predNode2 =edge2->getSourceNode();
                 const GCSafePointPairs& pairs2 = *pairsByNode[predNode2->getDfNum()];
                 //now check that for every mptr in pairs1 there is a pair in pairs2 with the same mptr
-                for (uint32 i1 = 0, n1 = (uint32)pairs1.size();i1<n1; i1++) {
+                for (U_32 i1 = 0, n1 = (U_32)pairs1.size();i1<n1; i1++) {
                     const MPtrPair& p1 = pairs1[i1];
                     if (ls->getBit(p1.mptr->getId())) {
-                        for (uint32 i2 = 0; ; i2++) {
+                        for (U_32 i2 = 0; ; i2++) {
                             assert(i2 < pairs2.size());
                             const MPtrPair& p2 = pairs2[i2];
                             if (p1.mptr == p2.mptr) {
@@ -759,10 +759,10 @@ void GCSafePointsInfo::checkPairsOnNodeExits() const {
                     }
                 }
                 // and vice versa
-                for (uint32 i2 = 0, n2 = (uint32)pairs2.size();i2<n2; i2++) {
+                for (U_32 i2 = 0, n2 = (U_32)pairs2.size();i2<n2; i2++) {
                     const MPtrPair& p2 = pairs2[i2];
                     if (ls->getBit(p2.mptr->getId())) {
-                        for (uint32 i1 = 0; ; i1++) {
+                        for (U_32 i1 = 0; ; i1++) {
                             assert(i1 < pairs1.size());
                             const MPtrPair& p1 = pairs1[i1];
                             if (p1.mptr == p2.mptr) {
@@ -783,18 +783,18 @@ void GCSafePointsInfo::checkPairsOnGCSafePoints() const {
     }
     AutoTimer tm(phase2Checker);
     const Nodes& nodes = irm.getFlowGraph()->getNodes();
-    uint32 nOpnds = irm.getOpndCount();
+    U_32 nOpnds = irm.getOpndCount();
     BitSet ls(mm, nOpnds);
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         if (!node->isBlockNode()) {
             continue;
         }
-        uint32 nSafePoints = getNumSafePointsInBlock((BasicBlock*)node);
+        U_32 nSafePoints = getNumSafePointsInBlock((BasicBlock*)node);
         if (nSafePoints== 0) {
             continue;
         }
-        uint32 nSafePointsTmp = nSafePoints;
+        U_32 nSafePointsTmp = nSafePoints;
         irm.getLiveAtExit(node, ls);
         for (Inst * inst=(Inst*)node->getLastInst(); nSafePointsTmp > 0; inst=inst->getPrevInst()) {
             assert(inst!=NULL);
@@ -810,7 +810,7 @@ void GCSafePointsInfo::checkPairsOnGCSafePoints() const {
                         if (staticMptrs.find(opnd)!= staticMptrs.end()) {
                             continue;
                         }
-                        for (uint32 j=0; ; j++) {
+                        for (U_32 j=0; ; j++) {
                             assert(j<pairs.size());
                             const MPtrPair&  pair = pairs[j];
                             if (pair.mptr == opnd) {
@@ -825,7 +825,7 @@ void GCSafePointsInfo::checkPairsOnGCSafePoints() const {
     }
 }
 
-static uint32 select_1st(const std::pair<uint32, GCSafePointPairs*>& p) {return p.first;}
+static U_32 select_1st(const std::pair<U_32, GCSafePointPairs*>& p) {return p.first;}
 
 
 void GCSafePointsInfo::dump(const char* stage) const {
@@ -834,13 +834,13 @@ void GCSafePointsInfo::dump(const char* stage) const {
     Log::out()<<"========================================================================"<<std::endl;
     //sort by inst id
     const GCSafePointPairsMap& map = pairsByGCSafePointInstId;
-    StlVector<uint32> insts(mm, map.size());
+    StlVector<U_32> insts(mm, map.size());
     std::transform(map.begin(), map.end(), insts.begin(), select_1st);
     std::sort(insts.begin(), insts.end());
     
     //for every inst sort by mptr id and dump
     for (size_t i = 0; i<insts.size(); i++) {
-        uint32 id = insts[i];
+        U_32 id = insts[i];
         const GCSafePointPairs* pairs = map.find(id)->second;
         Log::out()<<"inst="<<id<<" num_pairs="<<pairs->size()<<std::endl;
         GCSafePointPairs cloned = *pairs;
@@ -876,7 +876,7 @@ void GCPointsBaseLiveRangeFixer::runImpl() {
     AutoTimer tm(saveResultsTimer);
     const Nodes& nodes = irManager->getFlowGraph()->getNodes();
     StlVector<Opnd*> basesAndMptrs(mm); 
-    StlVector<int32> offsets(mm);
+    StlVector<I_32> offsets(mm);
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node *node = *it;
         if (!node->isBlockNode()) {

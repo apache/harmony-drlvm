@@ -125,8 +125,8 @@ public:
      */
     void    ip(char * _ip)
     {
-        assert((uint32)(_ip - m_buf) == (uint64)(_ip - m_buf));
-        m_size = (uint32)(_ip - m_buf);
+        assert((U_32)(_ip - m_buf) == (uint64)(_ip - m_buf));
+        m_size = (U_32)(_ip - m_buf);
         assert(m_size < total_size);
         // Need to be done here, and not in ip(void).
         // Otherwise, the following usage template:
@@ -792,7 +792,7 @@ private:
  *  - FR reg may hold both #dbl64 and #flt32
  *  - FR operations may have either memory or FR reg as second operand, but 
  *  not immediate
- *  - GR reg is wide enough to carry int32
+ *  - GR reg is wide enough to carry I_32
  *  - GR reg is wide enough to carry a memory address
  *  - a memory may be addressed using complex address form cosists of 
  *      base and index registers, displacement and a scale for index. The 
@@ -988,7 +988,7 @@ public:
    /**
    * Generates n-byte long NOP instruction.
    */
-    void nop(uint32 n) {
+    void nop(U_32 n) {
         if (is_trace_on()) {
             trace(string("nop"), to_str((int)n), string());
         }
@@ -1475,7 +1475,7 @@ private:
     /// Implementation of alu().
     void alu_impl(ALU op, const Opnd& op0, const Opnd& op1);
    //Implementation of nop()
-    void nop_impl(uint32 n);
+    void nop_impl(U_32 n);
     /// Implementation of cmovcc().
     void cmovcc_impl(COND c, const Opnd& op0, const Opnd& op1);
     /// Implementation of cmpxchg().

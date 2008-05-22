@@ -578,7 +578,7 @@ JIT_Result DrlEMImpl::compileMethod(Method_Handle mh) {
 //______________________________________________________________________________
 // Profile collectors initialization and recompilation
 
-static uint32 toNum(const std::string& numStr, bool *rc ) {
+static U_32 toNum(const std::string& numStr, bool *rc ) {
     if (isNum(numStr)) {
         *rc = true;
         return atoi(numStr.c_str());
@@ -610,17 +610,17 @@ ProfileCollector* DrlEMImpl::createProfileCollector(const std::string& profilerN
         }
         
         bool ok = false;
-        uint32 eThreshold = toNum(getParam(config, profilerName+".entryThreshold"), &ok);//todo: default values..
+        U_32 eThreshold = toNum(getParam(config, profilerName+".entryThreshold"), &ok);//todo: default values..
             if (!ok) {
             LECHO(9, "EM: illegal '{0}' value" << "entryThreshold");
             return NULL;
             }
-                uint32 bThreshold = toNum(getParam(config, profilerName+".backedgeThreshold"), &ok);
+                U_32 bThreshold = toNum(getParam(config, profilerName+".backedgeThreshold"), &ok);
         if (!ok) {
             LECHO(9, "EM: illegal '{0}' value" << "backedgeThreshold");
             return NULL;
         }
-        uint32 tbsTimeout = 0, tbsInitialTimeout = 0;
+        U_32 tbsTimeout = 0, tbsInitialTimeout = 0;
         if (ebMode == EBProfileCollector::EB_PCMODE_ASYNC) {
             tbsTimeout= toNum(getParam(config, profilerName+".tbsTimeout"), &ok);
             if (!ok) {

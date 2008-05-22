@@ -125,14 +125,14 @@ read_uint16(uint8 *addr) {
     return (int16)((addr[0] << 8) + addr[1]);
 }
 
-static inline int32
+static inline I_32
 read_int32(uint8 *addr) {
-    uint32 res = (addr[0] << 24) + (addr[1] << 16) + (addr[2] << 8) + addr[3];
-    return (int32) res;
+    U_32 res = (addr[0] << 24) + (addr[1] << 16) + (addr[2] << 8) + addr[3];
+    return (I_32) res;
 }
 
 
-static void throwAIOOBE(int32 index) {
+static void throwAIOOBE(I_32 index) {
     char buf[64];
     sprintf(buf, "%i", index);
     DEBUG("****** ArrayIndexOutOfBoundsException ******\n");
@@ -222,7 +222,7 @@ Opcode_SIPUSH(StackFrame& frame) {
 static inline void
 Opcode_ALOAD(StackFrame& frame) {
     // get value from local variable
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
     Value& val = frame.locals(varId);
     ASSERT_TAGS(frame.locals.ref(varId));
    
@@ -238,7 +238,7 @@ Opcode_ALOAD(StackFrame& frame) {
 static inline void
 Opcode_WIDE_ALOAD(StackFrame& frame) {
     // get value from local variable
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
     Value& val = frame.locals(varId);
     ASSERT_TAGS(frame.locals.ref(varId));
    
@@ -253,7 +253,7 @@ Opcode_WIDE_ALOAD(StackFrame& frame) {
 static inline void
 Opcode_ILOAD(StackFrame& frame) {
     // get value from local variable
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
     Value& val = frame.locals(varId);
     ASSERT_TAGS(!frame.locals.ref(varId));
    
@@ -267,7 +267,7 @@ Opcode_ILOAD(StackFrame& frame) {
 static inline void
 Opcode_WIDE_ILOAD(StackFrame& frame) {
     // get value from local variable
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
     Value& val = frame.locals(varId);
     ASSERT_TAGS(!frame.locals.ref(varId));
    
@@ -315,7 +315,7 @@ DEF_OPCODE_ILOAD_N(3) // Opcode_ILOAD_3
 static inline void
 Opcode_LLOAD(StackFrame& frame) {
     // store value to local variable
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
 
     frame.stack.push(2);
     frame.stack.pick(s1) = frame.locals(varId + l1);
@@ -330,7 +330,7 @@ Opcode_LLOAD(StackFrame& frame) {
 static inline void
 Opcode_WIDE_LLOAD(StackFrame& frame) {
     // store value to local variable
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
 
     frame.stack.push(2);
     frame.stack.pick(s1) = frame.locals(varId + l1);
@@ -368,7 +368,7 @@ Opcode_ASTORE(StackFrame& frame) {
     ASSERT_TAGS(frame.stack.ref());
 
     // store value to local variable
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
     frame.locals(varId) = val;
     frame.locals.ref(varId) = frame.stack.ref();
 
@@ -384,7 +384,7 @@ Opcode_ISTORE(StackFrame& frame) {
     ASSERT_TAGS(!frame.stack.ref());
 
     // store value to local variable
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
     frame.locals(varId) = val;
     frame.locals.ref(varId) = FLAG_NONE;
 
@@ -399,7 +399,7 @@ Opcode_WIDE_ASTORE(StackFrame& frame) {
     ASSERT_TAGS(frame.stack.ref());
 
     // store value to local variable
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
 
     frame.locals(varId) = val;
     frame.locals.ref(varId) = frame.stack.ref();
@@ -416,7 +416,7 @@ Opcode_WIDE_ISTORE(StackFrame& frame) {
     ASSERT_TAGS(!frame.stack.ref());
 
     // store value to local variable
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
     frame.locals(varId) = val;
     frame.locals.ref(varId) = FLAG_NONE;
 
@@ -462,7 +462,7 @@ DEF_OPCODE_ISTORE_N(3) // Opcode_ASTORE_3
 
 static inline void
 Opcode_LSTORE(StackFrame& frame) {
-    uint32 varId = read_uint8(frame.ip + 1);
+    U_32 varId = read_uint8(frame.ip + 1);
     ASSERT_TAGS(!frame.stack.ref(0));
     ASSERT_TAGS(!frame.stack.ref(1));
     frame.locals(varId + l1) = frame.stack.pick(s1);
@@ -476,7 +476,7 @@ Opcode_LSTORE(StackFrame& frame) {
 
 static inline void
 Opcode_WIDE_LSTORE(StackFrame& frame) {
-    uint32 varId = read_uint16(frame.ip + 2);
+    U_32 varId = read_uint16(frame.ip + 2);
     ASSERT_TAGS(!frame.stack.ref(0));
     ASSERT_TAGS(!frame.stack.ref(1));
     frame.locals(varId + l1) = frame.stack.pick(s1);
@@ -648,7 +648,7 @@ DEF_OPCODE_MATH_32_32_TO_32(IAND,  res.i = arg1.i & arg0.i)  // Opcode_IAND
 DEF_OPCODE_MATH_32_32_TO_32(IXOR,  res.i = arg1.i ^ arg0.i)  // Opcode_IXOR
 DEF_OPCODE_MATH_32_32_TO_32(ISHL,  res.i = arg1.i << (arg0.i & 0x1f)) // Opcode_ISHL
 DEF_OPCODE_MATH_32_32_TO_32(ISHR,  res.i = arg1.i >> (arg0.i & 0x1f)) // Opcode_ISHR
-DEF_OPCODE_MATH_32_32_TO_32(IUSHR, res.i = ((uint32)arg1.i) >> (arg0.i & 0x1f))   // Opcode_IUSHR
+DEF_OPCODE_MATH_32_32_TO_32(IUSHR, res.i = ((U_32)arg1.i) >> (arg0.i & 0x1f))   // Opcode_IUSHR
 
 DEF_OPCODE_MATH_32_32_TO_32(FADD,  res.f = arg1.f + arg0.f)   // Opcode_FADD
 DEF_OPCODE_MATH_32_32_TO_32(FSUB,  res.f = arg1.f - arg0.f)   // Opcode_FSUB
@@ -687,7 +687,7 @@ DEF_OPCODE_MATH_64_TO_64(DNEG, res.d = -arg.d)     // Opcode_DNEG
 
 
 DEF_OPCODE_MATH_32_TO_32(I2F, res.f = (float) arg.i)     // Opcode_I2F
-//DEF_OPCODE_MATH_32_TO_32(F2I, res.i = (int32) arg.f)     // Opcode_F2I
+//DEF_OPCODE_MATH_32_TO_32(F2I, res.i = (I_32) arg.f)     // Opcode_F2I
 DEF_OPCODE_MATH_32_TO_32(I2B, res.i = (int8) arg.i)      // Opcode_I2B
 DEF_OPCODE_MATH_32_TO_32(I2S, res.i = (int16) arg.i)     // Opcode_I2S
 DEF_OPCODE_MATH_32_TO_32(I2C, res.i = (uint16) arg.i)    // Opcode_I2C
@@ -706,9 +706,9 @@ DEF_OPCODE_MATH_64_TO_64(L2D, res.d = (double) arg.i64)  // Opcode_L2D
 #endif
 
 DEF_OPCODE_MATH_64_TO_32(D2F, res.f = (float) arg.d)     // Opcode_D2F
-//DEF_OPCODE_MATH_64_TO_32(D2I, res.i = (int32) arg.d)     // Opcode_D2I
+//DEF_OPCODE_MATH_64_TO_32(D2I, res.i = (I_32) arg.d)     // Opcode_D2I
 DEF_OPCODE_MATH_64_TO_32(L2F, res.f = (float) arg.i64)   // Opcode_L2F
-DEF_OPCODE_MATH_64_TO_32(L2I, res.i = (int32) arg.i64)   // Opcode_L2I
+DEF_OPCODE_MATH_64_TO_32(L2I, res.i = (I_32) arg.i64)   // Opcode_L2I
 
 #if defined (__INTEL_COMPILER)
 #pragma warning( pop )
@@ -730,9 +730,9 @@ Opcode_D2I(StackFrame& frame) {
         if (isnan(arg.d)) {
             res.i = 0;
         } else if (arg.d > 0) {
-            res.i = (int32)2147483647;
+            res.i = (I_32)2147483647;
         } else {
-            res.i = (int32)2147483648u;
+            res.i = (I_32)2147483648u;
         }
     }
 
@@ -750,14 +750,14 @@ Opcode_F2I(StackFrame& frame) {
     int max_exp = (0x7F + 31) << 23;
 
     if (exponent < max_exp) {
-        arg.i = (int32) arg.f;
+        arg.i = (I_32) arg.f;
     } else {
         if (isnan(arg.f)) {
             arg.i = 0;
         } else if (arg.f > 0) {
-            arg.i = (int32)2147483647;
+            arg.i = (I_32)2147483647;
         } else {
-            arg.i = (int32)2147483648u;
+            arg.i = (I_32)2147483648u;
         }
     }
     frame.ip++;
@@ -836,8 +836,8 @@ Opcode_##CODE(StackFrame& frame) {                              \
 #pragma warning (disable:1683) // to get rid of remark #1683: explicit conversion of a 64-bit integral type to a smaller integral type
 #endif
 
-DEF_OPCODE_DIV_32_32_TO_32(IDIV,  res.i = (int32)((int64) arg1.i / arg0.i))   // Opcode_IDIV
-DEF_OPCODE_DIV_32_32_TO_32(IREM,  res.i = (int32)((int64) arg1.i % arg0.i))   // Opcode_IREM
+DEF_OPCODE_DIV_32_32_TO_32(IDIV,  res.i = (I_32)((int64) arg1.i / arg0.i))   // Opcode_IDIV
+DEF_OPCODE_DIV_32_32_TO_32(IREM,  res.i = (I_32)((int64) arg1.i % arg0.i))   // Opcode_IREM
 
 #if defined (__INTEL_COMPILER)
 #pragma warning( pop )
@@ -896,7 +896,7 @@ Opcode_LREM(StackFrame& frame) {
 #define DEF_OPCODE_CMP(CMP,check)                   \
 static inline void                                  \
 Opcode_##CMP(StackFrame& frame) {                   \
-    int32 val = frame.stack.pick().i;               \
+    I_32 val = frame.stack.pick().i;               \
     frame.stack.ref() = FLAG_NONE; /* for OPCODE_IFNULL */ \
     DEBUG_BYTECODE("val = " << (int)val);                    \
     if (val check) {                                \
@@ -921,8 +921,8 @@ DEF_OPCODE_CMP(IFLT,<0)  // Opcode_IFLT
 #define DEF_OPCODE_IF_ICMPXX(NAME,cmp)                          \
 static inline void                                              \
 Opcode_IF_ICMP ## NAME(StackFrame& frame) {                     \
-    int32 val0 = frame.stack.pick(1).i;                         \
-    int32 val1 = frame.stack.pick(0).i;                         \
+    I_32 val0 = frame.stack.pick(1).i;                         \
+    I_32 val1 = frame.stack.pick(0).i;                         \
     frame.stack.ref(1) = FLAG_NONE;                             \
     frame.stack.ref(0) = FLAG_NONE;                             \
     if (val0 cmp val1) {                                        \
@@ -961,7 +961,7 @@ Opcode_LCMP(StackFrame& frame) {
 }
 
 static bool
-ldc(StackFrame& frame, uint32 index) {
+ldc(StackFrame& frame, U_32 index) {
     Class* clazz = frame.method->get_class();
     ConstantPool& cp = clazz->get_constant_pool();
 
@@ -1016,21 +1016,21 @@ ldc(StackFrame& frame, uint32 index) {
 
 static inline void
 Opcode_LDC(StackFrame& frame) {
-    uint32 index = read_uint8(frame.ip + 1);
+    U_32 index = read_uint8(frame.ip + 1);
     if (!ldc(frame, index)) return;
     frame.ip += 2;
 }
 
 static inline void
 Opcode_LDC_W(StackFrame& frame) {
-    uint32 index = read_uint16(frame.ip + 1);
+    U_32 index = read_uint16(frame.ip + 1);
     if(!ldc(frame, index)) return;
     frame.ip += 3;
 }
 
 static inline void
 Opcode_LDC2_W(StackFrame& frame) {
-    uint32 index = read_uint16(frame.ip + 1);
+    U_32 index = read_uint16(frame.ip + 1);
 
     Class *clazz = frame.method->get_class();
     ConstantPool& cp = clazz->get_constant_pool();
@@ -1078,7 +1078,7 @@ Opcode_NEWARRAY(StackFrame& frame) {
     // TODO: is it possible to optimize?
     // array data size = length << (type & 3);
     // how it can be usable?
-    int32 length = frame.stack.pick().i;
+    I_32 length = frame.stack.pick().i;
 
     if (length < 0) {
         interp_throw_exception("java/lang/NegativeArraySizeException");
@@ -1107,7 +1107,7 @@ Opcode_ANEWARRAY(StackFrame& frame) {
 
     Class *arrayClass = interp_class_get_array_of_class(objClass);
 
-    int32 length = frame.stack.pick().i;
+    I_32 length = frame.stack.pick().i;
 
     if (length < 0) {
         interp_throw_exception("java/lang/NegativeArraySizeException");
@@ -1235,7 +1235,7 @@ Opcode_MULTIANEWARRAY(StackFrame& frame) {
 
 static inline void
 Opcode_NEW(StackFrame& frame) {
-    uint32 classId = read_uint16(frame.ip + 1);
+    U_32 classId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Class *objClass = interp_resolve_class_new(clazz, classId);
@@ -1378,7 +1378,7 @@ Opcode_DUP2_X2(StackFrame& frame) {
 
 static inline void
 Opcode_IINC(StackFrame& frame) {
-    uint32 varNum = read_uint8(frame.ip + 1);
+    U_32 varNum = read_uint8(frame.ip + 1);
     int incr = read_int8(frame.ip + 2);
     frame.locals(varNum).i += incr;
     DEBUG_BYTECODE("var" << (int)varNum << " += " << incr);
@@ -1387,7 +1387,7 @@ Opcode_IINC(StackFrame& frame) {
 
 static inline void
 Opcode_WIDE_IINC(StackFrame& frame) {
-    uint32 varNum = read_uint16(frame.ip + 2);
+    U_32 varNum = read_uint16(frame.ip + 2);
     int incr = read_int16(frame.ip + 4);
     frame.locals(varNum).i += incr;
     DEBUG_BYTECODE(" += " << incr);
@@ -1417,8 +1417,8 @@ Opcode_AALOAD(StackFrame& frame) {
         return;
     }
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(st_ref);
-    uint32 length = get_vector_length(array);
-    uint32 pos = frame.stack.pick(0).u;
+    U_32 length = get_vector_length(array);
+    U_32 pos = frame.stack.pick(0).u;
 
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
@@ -1448,8 +1448,8 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
         return;                                                                 \
     }                                                                           \
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);               \
-    uint32 length = get_vector_length(array);                                   \
-    uint32 pos = frame.stack.pick(0).u;                                         \
+    U_32 length = get_vector_length(array);                                   \
+    U_32 pos = frame.stack.pick(0).u;                                         \
                                                                                 \
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos); \
                                                                                 \
@@ -1469,7 +1469,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
 DEF_OPCODE_XALOAD(BALOAD, int8, int8, i)
 DEF_OPCODE_XALOAD(CALOAD, uint16, uint16, u)
 DEF_OPCODE_XALOAD(SALOAD, int16, int16, i)
-DEF_OPCODE_XALOAD(IALOAD, int32, int32, i)
+DEF_OPCODE_XALOAD(IALOAD, int32, I_32, i)
 DEF_OPCODE_XALOAD(FALOAD, f32, float, f)
 
 static inline void
@@ -1480,8 +1480,8 @@ Opcode_LALOAD(StackFrame& frame) {
         return;
     }
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
-    uint32 length = get_vector_length(array);
-    uint32 pos = frame.stack.pick(0).u;
+    U_32 length = get_vector_length(array);
+    U_32 pos = frame.stack.pick(0).u;
 
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
@@ -1505,8 +1505,8 @@ Opcode_AASTORE(StackFrame& frame) {
         return;
     }
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
-    uint32 length = get_vector_length(array);
-    uint32 pos = frame.stack.pick(1).u;
+    U_32 length = get_vector_length(array);
+    U_32 pos = frame.stack.pick(1).u;
 
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
@@ -1546,8 +1546,8 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
         return;                                                                 \
     }                                                                           \
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);               \
-    uint32 length = get_vector_length(array);                                   \
-    uint32 pos = frame.stack.pick(1).u;                                         \
+    U_32 length = get_vector_length(array);                                   \
+    U_32 pos = frame.stack.pick(1).u;                                         \
                                                                                 \
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos); \
                                                                                 \
@@ -1571,7 +1571,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
 DEF_OPCODE_IASTORE(CASTORE, uint16, uint16, u)
 DEF_OPCODE_IASTORE(BASTORE, int8, int8, i)
 DEF_OPCODE_IASTORE(SASTORE, int16, int16, i)
-DEF_OPCODE_IASTORE(IASTORE, int32, int32, i)
+DEF_OPCODE_IASTORE(IASTORE, int32, I_32, i)
 DEF_OPCODE_IASTORE(FASTORE, f32, float, f)
 
 #if defined (__INTEL_COMPILER)
@@ -1586,8 +1586,8 @@ Opcode_LASTORE(StackFrame& frame) {
         return;
     }
     Vector_Handle array = (Vector_Handle) UNCOMPRESS_INTERP(ref);
-    uint32 length = get_vector_length(array);
-    uint32 pos = frame.stack.pick(2).u;
+    U_32 length = get_vector_length(array);
+    U_32 pos = frame.stack.pick(2).u;
 
     DEBUG_BYTECODE("length = " << (int)length << " pos = " << (int)pos);
 
@@ -1606,7 +1606,7 @@ Opcode_LASTORE(StackFrame& frame) {
 
 static inline void
 Opcode_PUTSTATIC(StackFrame& frame) {
-    uint32 fieldId = read_uint16(frame.ip + 1);
+    U_32 fieldId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Field *field = interp_resolve_static_field(clazz, fieldId, true);
@@ -1656,26 +1656,26 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
-            *(uint32*)addr = (uint8) frame.stack.pick().u;
+            *(U_32*)addr = (uint8) frame.stack.pick().u;
             frame.stack.pop();
             break;
         case VM_DATA_TYPE_CHAR:
-            *(uint32*)addr = (uint16) frame.stack.pick().u;
+            *(U_32*)addr = (uint16) frame.stack.pick().u;
             frame.stack.pop();
             break;
 
         case VM_DATA_TYPE_INT8:
-            *(int32*)addr = (int8) frame.stack.pick().i;
+            *(I_32*)addr = (int8) frame.stack.pick().i;
             frame.stack.pop();
             break;
         case VM_DATA_TYPE_INT16:
-            *(int32*)addr = (int16) frame.stack.pick().i;
+            *(I_32*)addr = (int16) frame.stack.pick().i;
             frame.stack.pop();
             break;
 #endif
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
-            *(int32*)addr = frame.stack.pick().i;
+            *(I_32*)addr = frame.stack.pick().i;
             frame.stack.pop();
             break;
 
@@ -1705,7 +1705,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 
 static inline void
 Opcode_GETSTATIC(StackFrame& frame) {
-    uint32 fieldId = read_uint16(frame.ip + 1);
+    U_32 fieldId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Field *field = interp_resolve_static_field(clazz, fieldId, false);
@@ -1750,7 +1750,7 @@ Opcode_GETSTATIC(StackFrame& frame) {
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_CHAR:
-            frame.stack.pick().u = *(uint32*)addr;
+            frame.stack.pick().u = *(U_32*)addr;
             break;
 
         case VM_DATA_TYPE_INT8:
@@ -1758,7 +1758,7 @@ Opcode_GETSTATIC(StackFrame& frame) {
 #endif
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
-            frame.stack.pick().i = *(int32*)addr;
+            frame.stack.pick().i = *(I_32*)addr;
             break;
         case VM_DATA_TYPE_ARRAY:
         case VM_DATA_TYPE_CLASS:
@@ -1788,7 +1788,7 @@ Opcode_GETSTATIC(StackFrame& frame) {
 
 static inline void
 Opcode_PUTFIELD(StackFrame& frame) {
-    uint32 fieldId = read_uint16(frame.ip + 1);
+    U_32 fieldId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Field *field = interp_resolve_nonstatic_field(clazz, fieldId, true);
@@ -1845,32 +1845,32 @@ Opcode_PUTFIELD(StackFrame& frame) {
 
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
-            *(uint32*)addr = (uint8)frame.stack.pick(0).u;
+            *(U_32*)addr = (uint8)frame.stack.pick(0).u;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
 
         case VM_DATA_TYPE_INT8:
-            *(int32*)addr = (int8)frame.stack.pick(0).i;
+            *(I_32*)addr = (int8)frame.stack.pick(0).i;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
 
         case VM_DATA_TYPE_CHAR:
-            *(uint32*)addr = (uint16)frame.stack.pick(0).u;
+            *(U_32*)addr = (uint16)frame.stack.pick(0).u;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
 
         case VM_DATA_TYPE_INT16:
-            *(int32*)addr = (int16)frame.stack.pick(0).i;
+            *(I_32*)addr = (int16)frame.stack.pick(0).i;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
 #endif
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
-            *(int32*)addr = frame.stack.pick(0).i;
+            *(I_32*)addr = frame.stack.pick(0).i;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
@@ -1903,7 +1903,7 @@ Opcode_PUTFIELD(StackFrame& frame) {
 
 static inline void
 Opcode_GETFIELD(StackFrame& frame) {
-    uint32 fieldId = read_uint16(frame.ip + 1);
+    U_32 fieldId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Field *field = interp_resolve_nonstatic_field(clazz, fieldId, false);
@@ -1930,32 +1930,32 @@ Opcode_GETFIELD(StackFrame& frame) {
 
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
-            frame.stack.pick(0).u = (uint32) *(uint8*)addr;
+            frame.stack.pick(0).u = (U_32) *(uint8*)addr;
             break;
 
         case VM_DATA_TYPE_INT8:
-            frame.stack.pick(0).i = (int32) *(int8*)addr;
+            frame.stack.pick(0).i = (I_32) *(int8*)addr;
             break;
 
         case VM_DATA_TYPE_CHAR:
-            frame.stack.pick(0).u = (uint32) *(uint16*)addr;
+            frame.stack.pick(0).u = (U_32) *(uint16*)addr;
             break;
 
         case VM_DATA_TYPE_INT16:
-            frame.stack.pick(0).i = (int32) *(int16*)addr;
+            frame.stack.pick(0).i = (I_32) *(int16*)addr;
             break;
 
 #else // ia32 - not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_CHAR:
-            frame.stack.pick(0).u = *(uint32*)addr;
+            frame.stack.pick(0).u = *(U_32*)addr;
             break;
         case VM_DATA_TYPE_INT8:
         case VM_DATA_TYPE_INT16:
 #endif
         case VM_DATA_TYPE_INT32:
         case VM_DATA_TYPE_F4:
-            frame.stack.pick(0).i = *(int32*)addr;
+            frame.stack.pick(0).i = *(I_32*)addr;
             break;
 
         case VM_DATA_TYPE_ARRAY:
@@ -1987,7 +1987,7 @@ Opcode_GETFIELD(StackFrame& frame) {
 
 static inline void
 Opcode_INVOKEVIRTUAL(StackFrame& frame) {
-    uint32 methodId = read_uint16(frame.ip + 1);
+    U_32 methodId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Method *method = interp_resolve_virtual_method(clazz, methodId);
@@ -2005,7 +2005,7 @@ Opcode_INVOKEVIRTUAL(StackFrame& frame) {
 
 static inline void
 Opcode_INVOKEINTERFACE(StackFrame& frame) {
-    uint32 methodId = read_uint16(frame.ip + 1);
+    U_32 methodId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Method *method = interp_resolve_interface_method(clazz, methodId);
@@ -2023,7 +2023,7 @@ Opcode_INVOKEINTERFACE(StackFrame& frame) {
 
 static inline void
 Opcode_INVOKESTATIC(StackFrame& frame) {
-    uint32 methodId = read_uint16(frame.ip + 1);
+    U_32 methodId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Method *method = interp_resolve_static_method(clazz, methodId);
@@ -2045,7 +2045,7 @@ Opcode_INVOKESTATIC(StackFrame& frame) {
 
 static inline void
 Opcode_INVOKESPECIAL(StackFrame& frame) {
-    uint32 methodId = read_uint16(frame.ip + 1);
+    U_32 methodId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
 
     Method *method = interp_resolve_special_method(clazz, methodId);
@@ -2068,10 +2068,10 @@ Opcode_TABLESWITCH(StackFrame& frame) {
     uint8* ip = frame.ip + 1;
     ip = ((ip - (uint8*)frame.method->get_byte_code_addr() + 3) & ~3)
         + (uint8*)frame.method->get_byte_code_addr();
-    int32 deflt = read_int32(ip);
-    int32 low =   read_int32(ip+4);
-    int32 high =    read_int32(ip+8);
-    int32 val = frame.stack.pick().i;
+    I_32 deflt = read_int32(ip);
+    I_32 low =   read_int32(ip+4);
+    I_32 high =    read_int32(ip+8);
+    I_32 val = frame.stack.pick().i;
     frame.stack.pop();
     DEBUG_BYTECODE("val = " << val << " low = " << low << " high = " << high);
     if (val < low || val > high) {
@@ -2089,13 +2089,13 @@ Opcode_LOOKUPSWITCH(StackFrame& frame) {
     uint8* ip = frame.ip + 1;
     ip = ((ip - (uint8*)frame.method->get_byte_code_addr() + 3) & ~3)
         + (uint8*)frame.method->get_byte_code_addr();
-    int32 deflt = read_int32(ip);
-    int32 num = read_int32(ip+4);
-    int32 val = frame.stack.pick().i;
+    I_32 deflt = read_int32(ip);
+    I_32 num = read_int32(ip+4);
+    I_32 val = frame.stack.pick().i;
     frame.stack.pop();
 
     for(int i = 0; i < num; i++) {
-        int32 key = read_int32(ip + 8 + i * 8);
+        I_32 key = read_int32(ip + 8 + i * 8);
         if (val == key) {
             frame.ip = oldip + read_int32(ip + 12 + i * 8);
             return;
@@ -2124,7 +2124,7 @@ Opcode_GOTO_W(StackFrame& frame) {
 
 static inline void
 Opcode_JSR(StackFrame& frame) {
-    uint32 retAddr = (uint32)(frame.ip + 3 -
+    U_32 retAddr = (U_32)(frame.ip + 3 -
         (uint8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
@@ -2135,7 +2135,7 @@ Opcode_JSR(StackFrame& frame) {
 
 static inline void
 Opcode_JSR_W(StackFrame& frame) {
-    uint32 retAddr = (uint32)(frame.ip + 5 -
+    U_32 retAddr = (U_32)(frame.ip + 5 -
         (uint8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
@@ -2146,22 +2146,22 @@ Opcode_JSR_W(StackFrame& frame) {
 
 static inline void
 Opcode_RET(StackFrame& frame) {
-    uint32 varNum = read_uint8(frame.ip + 1);
-    uint32 retAddr = frame.locals(varNum).u;
+    U_32 varNum = read_uint8(frame.ip + 1);
+    U_32 retAddr = frame.locals(varNum).u;
     assert(frame.locals.ref(varNum) == FLAG_RET_ADDR);
     frame.ip = retAddr + (uint8*)frame.method->get_byte_code_addr();
 }
 
 static inline void
 Opcode_WIDE_RET(StackFrame& frame) {
-    uint32 varNum = read_uint16(frame.ip + 2);
-    uint32 retAddr = frame.locals(varNum).u;
+    U_32 varNum = read_uint16(frame.ip + 2);
+    U_32 retAddr = frame.locals(varNum).u;
     frame.ip = retAddr + (uint8*)frame.method->get_byte_code_addr();
 }
 
 static inline void
 Opcode_CHECKCAST(StackFrame& frame) {
-    uint32 classId = read_uint16(frame.ip + 1);
+    U_32 classId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
     Class *objClass = interp_resolve_class(clazz, classId);
     if (!objClass) return; // exception
@@ -2179,7 +2179,7 @@ Opcode_CHECKCAST(StackFrame& frame) {
 
 static inline void
 Opcode_INSTANCEOF(StackFrame& frame) {
-    uint32 classId = read_uint16(frame.ip + 1);
+    U_32 classId = read_uint16(frame.ip + 1);
     Class *clazz = frame.method->get_class();
     Class *objClass = interp_resolve_class(clazz, classId);
     if (!objClass) return; // exception
@@ -2271,13 +2271,13 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
     DEBUG_BYTECODE("Searching for exception handler:");
     DEBUG_BYTECODE("   In " << m);
 
-    uint32 ip = (uint32)(frame.ip - (uint8*)m->get_byte_code_addr());
+    U_32 ip = (U_32)(frame.ip - (uint8*)m->get_byte_code_addr());
     DEBUG_BYTECODE("ip = " << (int)ip);
 
     // When VM is in shutdown stage we need to execute final block to
     // release monitors and propogate an exception to the upper frames.
     if (VM_Global_State::loader_env->IsVmShutdowning()) {
-        for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
+        for(U_32 i = 0; i < m->num_bc_exception_handlers(); i++) {
             Handler *h = m->get_bc_exception_handler_info(i);
             if (h->get_catch_type_index() == 0 &&
                 h->get_start_pc() <= ip && ip < h->get_end_pc()) {
@@ -2290,7 +2290,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
 
     Class *clazz = m->get_class();
 
-    for(uint32 i = 0; i < m->num_bc_exception_handlers(); i++) {
+    for(U_32 i = 0; i < m->num_bc_exception_handlers(); i++) {
         Handler *h = m->get_bc_exception_handler_info(i);
         DEBUG_BYTECODE("handler" << (int) i
                 << ": start_pc=" << (int) h->get_start_pc()
@@ -2299,7 +2299,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
         if (ip < h->get_start_pc()) continue;
         if (ip >= h->get_end_pc()) continue;
 
-        uint32 catch_type_index = h->get_catch_type_index();
+        U_32 catch_type_index = h->get_catch_type_index();
 
         if (catch_type_index) {
             // 0 - is handler for all
@@ -3131,19 +3131,19 @@ interpreter_execute_method(
             frame.locals(pos++).f = args[arg++].f;
             break;
         case JAVA_TYPE_SHORT:
-            frame.locals(pos++).i = (int32)args[arg++].s;
+            frame.locals(pos++).i = (I_32)args[arg++].s;
             break;
         case JAVA_TYPE_CHAR:
-            frame.locals(pos++).i = (uint32)args[arg++].c;
+            frame.locals(pos++).i = (U_32)args[arg++].c;
             break;
         case JAVA_TYPE_BYTE:
-            frame.locals(pos++).i = (int32)args[arg++].b;
+            frame.locals(pos++).i = (I_32)args[arg++].b;
             break;
         case JAVA_TYPE_BOOLEAN:
-            frame.locals(pos++).i = (int32)args[arg++].z;
+            frame.locals(pos++).i = (I_32)args[arg++].z;
             break;
         default:
-            frame.locals(pos++).u = (uint32)args[arg++].i;
+            frame.locals(pos++).u = (U_32)args[arg++].i;
             break;
         }
         iter = advance_arg_iterator(iter);

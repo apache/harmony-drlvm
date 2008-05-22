@@ -39,22 +39,22 @@ namespace Ia32{
 #undef  offsetof
 #define offsetof(cls, field)  ((POINTER_SIZE_INT)&(((cls*)4)->field)-4)
 
-const uint32 EmptyUint32=((uint32)-1);
-const uint32 UnknownId=EmptyUint32;
+const U_32 EmptyUint32=((U_32)-1);
+const U_32 UnknownId=EmptyUint32;
 
-const uint32 IRMaxExtendedOpnds=8;
-const uint32 IRMaxNativeOpnds=4;
-const uint32 IRMaxInstOpnds=512;
+const U_32 IRMaxExtendedOpnds=8;
+const U_32 IRMaxNativeOpnds=4;
+const U_32 IRMaxInstOpnds=512;
 
-const uint32 IRMaxOperandByteSize = 16;
+const U_32 IRMaxOperandByteSize = 16;
 
 
 //=========================================================================================================
-const uint32 IRNumRegKinds=5;
+const U_32 IRNumRegKinds=5;
 
-const uint32 IRMaxRegKinds=OpndKind_Reg + 1;
-const uint32 IRMaxRegNamesSameKind=16;
-const uint32 IRMaxRegNames=IRMaxRegNamesSameKind*IRMaxRegKinds;
+const U_32 IRMaxRegKinds=OpndKind_Reg + 1;
+const U_32 IRMaxRegNamesSameKind=16;
+const U_32 IRMaxRegNames=IRMaxRegNamesSameKind*IRMaxRegKinds;
 //=========================================================================================================
 enum MemOpndKind
 {
@@ -75,11 +75,11 @@ enum MemOpndSubOpndKind {
     MemOpndSubOpndKind_Displacement,
     MemOpndSubOpndKind_Count
 };
-uint32              countOnes(uint32 mask);
+U_32              countOnes(U_32 mask);
 
 //=========================================================================================================
 
-inline uint32       getByteSize(OpndSize size)
+inline U_32       getByteSize(OpndSize size)
 { return size <= OpndSize_64 ? size : size == OpndSize_128 ? 16 : size==OpndSize_80 ? 10 : 0; }
 
 ConditionMnemonic   reverseConditionMnemonic(ConditionMnemonic cm);

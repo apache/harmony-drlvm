@@ -90,7 +90,7 @@ public:
     }
 
     // Returns the number of nodes in the tree.
-    uint32 getNumNodes() const { return numNodes; }
+    U_32 getNumNodes() const { return numNodes; }
 
     // True if this is a post-dominator tree. 
     bool isPostDominator() const { return _isPostDominator; }
@@ -99,7 +99,7 @@ public:
     bool isValid() { 
         return traversalNum > flowgraph->getModificationTraversalNum(); 
     } 
-    uint32 getTraversalNum() { return traversalNum; }
+    U_32 getTraversalNum() { return traversalNum; }
 
     // True if node has dominator information.  Note, if the dominator tree
     // is not valid overall, it is up to the caller to ensure that an
@@ -110,11 +110,11 @@ public:
 
 private:
     DominatorTree(MemoryManager& mm, ControlFlowGraph* fg, StlVector<Node*>& nodes, 
-        StlVector<uint32>& idom, bool isPostDominator);
+        StlVector<U_32>& idom, bool isPostDominator);
  
     ControlFlowGraph*    flowgraph;
-    uint32               traversalNum;
-    uint32               numNodes;
+    U_32               traversalNum;
+    U_32               numNodes;
     bool                   _isPostDominator;
     StlVector<DominatorNode*> tree;
 };
@@ -130,7 +130,7 @@ public:
     DominatorTree* computeDominators(MemoryManager& mm, ControlFlowGraph* flowgraph, bool isPost=false, bool ignoreUnreach = false);
     DominatorTree* computePostdominators(MemoryManager& mm, ControlFlowGraph* flowgraph, bool ignoreUnreach) { return computeDominators(mm, flowgraph, true, ignoreUnreach); }
 private:
-    uint32 intersect(StlVector<uint32>& idom, uint32 num1, uint32 num2);
+    U_32 intersect(StlVector<U_32>& idom, U_32 num1, U_32 num2);
 };
 
 /**
@@ -143,7 +143,7 @@ class DomFrontier {
 public:
     DomFrontier(MemoryManager& mm, DominatorTree& d, ControlFlowGraph* fg);
     void   printDomFrontier(::std::ostream&, Node* n);
-    uint32 getNumNodes() {return numNodes;}
+    U_32 getNumNodes() {return numNodes;}
     List<Node>* getFrontiersOf(Node* n) {
         assert(n->getDfNum() < numNodes);
         computeDomFrontier(n);
@@ -152,11 +152,11 @@ public:
     DominatorTree& getDominator() {return dom;}
 private:
     void   computeDomFrontier(Node* n);
-    void   addDF(uint32 entry, Node* n);
+    void   addDF(U_32 entry, Node* n);
 
 
     List<Node>** DF;
-    uint32          numNodes;
+    U_32          numNodes;
     BitSet*         beenComputed;
     MemoryManager&  memManager;
     DominatorTree&  dom;

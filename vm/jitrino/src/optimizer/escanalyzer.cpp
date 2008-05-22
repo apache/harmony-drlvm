@@ -60,11 +60,11 @@ DEFINE_SESSION_ACTION(EscapeAnalysisPass, escape, "Escape Analysis")
 
 struct ComObjStat {
     ComObjStat()    :_n0(0), _n_ge(0), _n_ae(0), _n_ne(0), _n_lo(0) {};
-    uint32 _n0;
-    uint32 _n_ge;
-    uint32 _n_ae;
-    uint32 _n_ne;
-    uint32 _n_lo;
+    U_32 _n0;
+    U_32 _n_ge;
+    U_32 _n_ae;
+    U_32 _n_ne;
+    U_32 _n_lo;
 };
 static ComObjStat comObjStat;
 EscAnalyzer::CalleeMethodInfos* EscAnalyzer::calleeMethodInfos=NULL;
@@ -95,8 +95,8 @@ EscAnalyzer::EscAnalyzer(MemoryManager& mm, SessionAction* argSource, IRManager&
 : eaMemManager(mm), irManager(irm), mh(irm.getMethodDesc()), 
   compInterface(irm.getCompilationInterface()),os_sc(Log::out())
 {
-    maxMethodExamLevel = (uint32)argSource->getIntArg("max_level",maxMethodExamLevel_default);
-    allProps = (uint32)argSource->getIntArg("d_prop",0);
+    maxMethodExamLevel = (U_32)argSource->getIntArg("max_level",maxMethodExamLevel_default);
+    allProps = (U_32)argSource->getIntArg("d_prop",0);
     debug_method = argSource->getStringArg("d_method", NULL);
     method_ea_level = 0;  // determines level of method scan
     do_sync_removal = argSource->getBoolArg("do_sync_removal",true);
@@ -175,9 +175,9 @@ EscAnalyzer::doAnalysis() {
     const char* mn = mh.getName();
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     ControlFlowGraph& fg = irManager.getFlowGraph();
-    uint32 nodeNum = (uint32)nodes.size();
-    uint32 num2 = fg.getNodeCount();
-    uint32 num3 = fg.getMaxNodeId();
+    U_32 nodeNum = (U_32)nodes.size();
+    U_32 num2 = fg.getNodeCount();
+    U_32 num3 = fg.getMaxNodeId();
     Nodes::const_iterator niter;
 
     lastCnGNodeId = 0;    // initialization of private field
@@ -310,9 +310,9 @@ EscAnalyzer::instrExam(Node* node) {
         
         Type* type = NULL;
         CnGNode* cgnode = NULL;
-        uint32 ntype=0;
+        U_32 ntype=0;
         MethodPtrType* methType = NULL;
-        uint32 n = 0;
+        U_32 n = 0;
         bool addinst = false;
         Inst* method_inst = NULL;
         if (shortLog) {
@@ -461,7 +461,7 @@ EscAnalyzer::instrExam(Node* node) {
                 assert(methType!=NULL);
                 n=methType->getNumParams();
                 addinst=false;
-                for (uint32 i = 0; i < n; i++) {
+                for (U_32 i = 0; i < n; i++) {
                     Type* tt = methType->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
@@ -502,7 +502,7 @@ EscAnalyzer::instrExam(Node* node) {
                 
                 n=methType->getNumParams();
                 addinst=false;
-                for (uint32 i = 0; i < n; i++) {
+                for (U_32 i = 0; i < n; i++) {
                     Type* tt = methType->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
@@ -623,7 +623,7 @@ EscAnalyzer::instrExam(Node* node) {
 }  // instrExam(Node* node) 
 
 
-void EscAnalyzer::getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType) {
+void EscAnalyzer::getLdFieldAddrInfo(Inst* inst, Type*& type, U_32& nType) {
     type = NULL;
     nType = 0;
     if (inst->getOpcode() == Op_LdFieldAddr || inst->getOpcode() == Op_LdStaticAddr) {
@@ -645,7 +645,7 @@ void EscAnalyzer::getLdFieldAddrInfo(Inst* inst, Type*& type, uint32& nType) {
 
 void  EscAnalyzer::instrExam_processLdFieldAddr(Inst* inst) {
     Type* type = NULL;
-    uint32 nType = 0;
+    U_32 nType = 0;
     getLdFieldAddrInfo(inst, type, nType);
     if (type->isReference() || nType==NT_INSTFLD) {
         assert(findCnGNode_op(inst->getDst()->getId())==NULL);
@@ -662,7 +662,7 @@ void  EscAnalyzer::instrExam_processLdFieldAddr(Inst* inst) {
 void 
 EscAnalyzer::instrExam2_processLdFieldAddr(Inst* inst) {
     Type* type = NULL;
-    uint32 nType = 0;
+    U_32 nType = 0;
     getLdFieldAddrInfo(inst, type, nType);
 
     bool isref = type->isReference();
@@ -722,9 +722,9 @@ EscAnalyzer::instrExam2() {
         Type* type = NULL;
         CnGNode* cgnode = NULL;
         CnGNode* cgn_src = NULL;
-        uint32 ntype=0;
+        U_32 ntype=0;
         MethodPtrType* methType = NULL;
-        uint32 n = 0;
+        U_32 n = 0;
         Inst* method_inst = NULL;
         bool not_exam = false;
 
@@ -776,7 +776,7 @@ EscAnalyzer::instrExam2() {
                     }
                     if (type->isValue()) {
                         Inst* srcInst = inst->getSrc(0)->getInst();
-                        uint32 src_opcode = srcInst->getOpcode();
+                        U_32 src_opcode = srcInst->getOpcode();
                         if (src_opcode==Op_LdStaticAddr || isVMHelperCall(srcInst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE)) {
                             break;
                         }
@@ -827,7 +827,7 @@ EscAnalyzer::instrExam2() {
                     }
                     if (type->isValue()) {
                         Inst* srcInst = inst->getSrc(1)->getInst();
-                        uint32 src_opcode = srcInst->getOpcode();
+                        U_32 src_opcode = srcInst->getOpcode();
                         if (src_opcode==Op_LdStaticAddr  || isVMHelperCall(srcInst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE)) {
                             break;
                         }
@@ -845,7 +845,7 @@ EscAnalyzer::instrExam2() {
             case Op_DirectCall:      // call
                 methType = typeManager.getMethodPtrType(inst->asMethodInst()->getMethodDesc());
                 n = methType->getNumParams();
-                for (uint32 i = 0; i < n; i++) {
+                for (U_32 i = 0; i < n; i++) {
                     Type* tt = methType->getParamType(i);
                     if (!tt->isReference())  {
                         continue;
@@ -871,7 +871,7 @@ EscAnalyzer::instrExam2() {
                 }
                 assert(methType!=NULL);
                 n = methType->getNumParams();
-                for (uint32 i = 0; i < n; i++) {
+                for (U_32 i = 0; i < n; i++) {
                     Type* tt = methType->getParamType(i);
                     if (!tt->isReference()) {
                         continue;
@@ -899,10 +899,10 @@ EscAnalyzer::instrExam2() {
             case Op_Phi:             // phi
                 type = inst->getDst()->getType();
                 if (type->isObject()) {
-                    uint32 nsrc=inst->getNumSrcOperands();
+                    U_32 nsrc=inst->getNumSrcOperands();
                     cgnode = findCnGNode_op(inst->getDst()->getId());
                     assert(cgnode!=NULL);
-                    for (uint32 i=0; i<nsrc; i++) {
+                    for (U_32 i=0; i<nsrc; i++) {
                         Opnd* srcOpnd = inst->getSrc(i);
                         cgn_src=findCnGNode_op(srcOpnd->getId());
                         assert(cgn_src!=NULL);
@@ -971,7 +971,7 @@ EscAnalyzer::instrExam2() {
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
+EscAnalyzer::addCnGNode(Inst* inst, Type* type, U_32 ntype) {
     CnGNode* cgnode = new (eaMemManager) CnGNode; // new CG node
 
     cgnode->cngNodeId = ++lastCnGNodeId;
@@ -1021,11 +1021,11 @@ EscAnalyzer::addCnGNode(Inst* inst, Type* type, uint32 ntype) {
     }
     cngNodes->push_back(cgnode);
     return cgnode;
-}  // addCnGNode(Inst* inst, Type* type, uint32 ntype)
+}  // addCnGNode(Inst* inst, Type* type, U_32 ntype)
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode_op(Inst* inst, Type* type, uint32 ntype) {
+EscAnalyzer::addCnGNode_op(Inst* inst, Type* type, U_32 ntype) {
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
     Opnd* opnd = inst->getDst();
 
@@ -1036,11 +1036,11 @@ EscAnalyzer::addCnGNode_op(Inst* inst, Type* type, uint32 ntype) {
         Log::out() << std::endl;
     }
     return cgnode;
-}  // addCnGNode_op(Inst* inst, Type* type, uint32 ntype) 
+}  // addCnGNode_op(Inst* inst, Type* type, U_32 ntype) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode_mp(Inst* inst, MethodPtrType* mpt, uint32 ntype, uint32 narg) {
+EscAnalyzer::addCnGNode_mp(Inst* inst, MethodPtrType* mpt, U_32 ntype, U_32 narg) {
     Type* type = mpt->getParamType(narg);
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
 
@@ -1052,11 +1052,11 @@ EscAnalyzer::addCnGNode_mp(Inst* inst, MethodPtrType* mpt, uint32 ntype, uint32 
         Log::out() << std::endl;
     }
     return cgnode;
-}  // addCnGNode_mp(Inst* inst, MethodDesc* md, uint32 ntype, uint32 narg) 
+}  // addCnGNode_mp(Inst* inst, MethodDesc* md, U_32 ntype, U_32 narg) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode_ex(Inst* inst, uint32 ntype) {
+EscAnalyzer::addCnGNode_ex(Inst* inst, U_32 ntype) {
     Type* type = inst->getSrc(0)->getType();
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
 
@@ -1067,11 +1067,11 @@ EscAnalyzer::addCnGNode_ex(Inst* inst, uint32 ntype) {
         Log::out() << std::endl;
     }
     return cgnode;
-}  // addCnGNode_ex(Inst* inst, uint32 ntype) 
+}  // addCnGNode_ex(Inst* inst, U_32 ntype) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::addCnGNode_fl(Inst* inst, uint32 ntype) {
+EscAnalyzer::addCnGNode_fl(Inst* inst, U_32 ntype) {
     Type* type = inst->getDst()->getType();
     CnGNode* cgnode = addCnGNode(inst, type, ntype); // new CG node
 
@@ -1082,44 +1082,44 @@ EscAnalyzer::addCnGNode_fl(Inst* inst, uint32 ntype) {
         Log::out() << std::endl;
     }
     return cgnode;
-}  // addCnGNode_fl(Inst* inst, uint32 ntype) 
+}  // addCnGNode_fl(Inst* inst, U_32 ntype) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::findCnGNode_op(uint32 nId) {
+EscAnalyzer::findCnGNode_op(U_32 nId) {
     CnGNodes::iterator it;
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->opndId==nId && ((*it)->nodeType & (NT_OBJS|NT_LDVAL)))
             return (*it);
     }
     return(NULL);
-}  // findCnGNode_op(uint32 nId) 
+}  // findCnGNode_op(U_32 nId) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::findCnGNode_id(uint32 nId) {
+EscAnalyzer::findCnGNode_id(U_32 nId) {
     CnGNodes::iterator it;
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->cngNodeId==nId)
             return (*it);
     }
     return(NULL);
-}  // findCnGNode_id(uint32 nId) 
+}  // findCnGNode_id(U_32 nId) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::findCnGNode_in(uint32 nId) {
+EscAnalyzer::findCnGNode_in(U_32 nId) {
     CnGNodes::iterator it;
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->instrId==nId)
             return (*it);
     }
     return(NULL);
-}  // findCnGNode_in(uint32 nId) 
+}  // findCnGNode_in(U_32 nId) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::findCnGNode_mp(uint32 iId, uint32 aId) {
+EscAnalyzer::findCnGNode_mp(U_32 iId, U_32 aId) {
     CnGNodes::iterator it;
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->instrId==iId && (*it)->argNumber==aId &&
@@ -1127,11 +1127,11 @@ EscAnalyzer::findCnGNode_mp(uint32 iId, uint32 aId) {
             return (*it);
     }
     return(NULL);
-}  // findCnGNode_mp(uint32 iId, uint32 aId) 
+}  // findCnGNode_mp(U_32 iId, U_32 aId) 
 
 
 EscAnalyzer::CnGNode*
-EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
+EscAnalyzer::findCnGNode_fl(Inst* inst, U_32 ntype) {
     FieldDesc* fd1 = NULL;
     if (inst->asFieldAccessInst()==NULL) {// unresolved field access
         assert(inst->getOpcode() == Op_AddOffset || isVMHelperCall(inst, VM_RT_GET_STATIC_FIELD_ADDR_WITHRESOLVE));
@@ -1139,7 +1139,7 @@ EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
         fd1 = inst->asFieldAccessInst()->getFieldDesc();
     }
 
-    uint32 idr = 0; //object field used to reference this field
+    U_32 idr = 0; //object field used to reference this field
     if (ntype==NT_INSTFLD) {
         idr=inst->getSrc(0)->getId();
     }
@@ -1158,7 +1158,7 @@ EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
             }
             if ( (fd1!=NULL && fd1->getFieldHandle() == fd2->getFieldHandle()) || inst == inst2/*don't optimize*/ ) {
                 if (ntype==NT_INSTFLD) {
-                    uint32 idf = inst2->getSrc(0)->getId();
+                    U_32 idf = inst2->getSrc(0)->getId();
                     if (idr!=idf) {
                         continue;
                     }
@@ -1168,12 +1168,12 @@ EscAnalyzer::findCnGNode_fl(Inst* inst, uint32 ntype) {
         }
     }
     return(NULL);
-}  // findCnGNode_fl(Opnd* opnd, uint32 ntype) 
+}  // findCnGNode_fl(Opnd* opnd, U_32 ntype) 
 
 
 void
 EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto, 
-                                    uint32 etype, Inst* inst) {
+                                    U_32 etype, Inst* inst) {
     CnGEdges::iterator it;
     CnGRefs* el = NULL;
     CnGRef* ref;
@@ -1260,7 +1260,7 @@ EscAnalyzer::addEdge(CnGNode* cgnfrom, CnGNode* cgnto,
         Log::out() << "++++ addEdge: added edge" <<  std::endl;
     }
 
-}  // addEdge(CnGNode* cgnfrom, CnGNode* cgnto, uint32 etype, Inst* inst) 
+}  // addEdge(CnGNode* cgnfrom, CnGNode* cgnto, U_32 etype, Inst* inst) 
 
 
 void
@@ -1269,7 +1269,7 @@ EscAnalyzer::setCreatedObjectStates() {
     NodeMDs::iterator it1;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        uint32 nt = (*it)->nodeType;
+        U_32 nt = (*it)->nodeType;
         if (nt==NT_STFLD || nt==NT_CATCHVAL
             || (nt==NT_RETVAL && (*it)->nInst->getOpcode()==Op_IndirectMemoryCall)
             || (nt==NT_RETVAL && (*it)->nInst->asMethodInst()->getMethodDesc()->isNative())) {
@@ -1347,7 +1347,7 @@ EscAnalyzer::setCreatedObjectStates() {
         }
     }
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        uint32 nt = (*it)->nodeType;
+        U_32 nt = (*it)->nodeType;
         if ((nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) && (getEscState(*it)==ARG_ESCAPE)) {
             for (it1 = (*it)->nodeMDs->begin(); it1 != (*it)->nodeMDs->end();  it1++) {
                 CnGNode* n=findCnGNode_id(*it1);   // method argument node
@@ -1423,9 +1423,9 @@ EscAnalyzer::setCreatedObjectStates() {
                     }
                     break;
                 } else {  // to use info about scanned method
-                    uint32 narg = n->argNumber;
+                    U_32 narg = n->argNumber;
                     ParamInfos::iterator it2;
-                    uint32 state = 0;
+                    U_32 state = 0;
                     if (verboseLog) {
                         Log::out() << "--setSt cmi: method " 
                             << mtdInfo->methodIdent->parentName << "::"
@@ -1475,7 +1475,7 @@ EscAnalyzer::setCreatedObjectStates() {
         }
     }
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        uint32 nt = (*it)->nodeType;
+        U_32 nt = (*it)->nodeType;
         if ((nt==NT_RETVAL) && getEscState(*it)>GLOBAL_ESCAPE) {
             MethodDesc* mdesc = (*it)->nInst->asMethodInst()->getMethodDesc();
             if (((*it)->nInst->getOpcode())!=Op_DirectCall) { // only direct call may be here
@@ -1512,7 +1512,7 @@ EscAnalyzer::setCreatedObjectStates() {
     scannedSucNodes->clear();
     // check states of array elements' and fields' values
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        uint32 nt = (*it)->nodeType;
+        U_32 nt = (*it)->nodeType;
         if ((nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) && (getEscState(*it)!=GLOBAL_ESCAPE)) {
             if ((*it)->outEdges == NULL)
                 continue;
@@ -1536,7 +1536,7 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
     CnGRefs::iterator it1;
     CnGNode* next_node;
     ObjIds* scObjs = check_var_src ? scannedObjsRev : scannedObjs;
-    uint32 ni_opcode = cgn->nInst->getOpcode();
+    U_32 ni_opcode = cgn->nInst->getOpcode();
     bool needFix = isStateNeedGEFix(getFullState(cgn),cgn->nodeType);
 
     if (cgn->nodeType != NT_STFLD && cgn->nodeType != NT_THRVAL && cgn->nodeType != NT_EXITVAL 
@@ -1641,8 +1641,8 @@ EscAnalyzer::scanCnGNodeRefsGE(CnGNode* cgn, bool check_var_src) {
     }
     if (check_var_src) {
         if (ni_opcode == Op_LdVar || ni_opcode == Op_StVar || ni_opcode ==Op_Phi) {
-            uint32 nsrc=cgn->nInst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc=cgn->nInst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
                 needFix = isStateNeedGEFix(getFullState(next_node),next_node->nodeType);
                 if (!needFix) {
@@ -1675,8 +1675,8 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
     CnGRefs::iterator it1;
     CnGNode* next_node;
     ObjIds* scObjs = check_var_src ? scannedObjsRev : scannedObjs;
-    uint32 ni_opcode = cgn->nInst->getOpcode();
-    uint32 curMDNode_saved = 0;
+    U_32 ni_opcode = cgn->nInst->getOpcode();
+    U_32 curMDNode_saved = 0;
 
     if (curMDNode == 0) {
         assert(getEscState(cgn)!=ARG_ESCAPE);
@@ -1749,8 +1749,8 @@ EscAnalyzer::scanCnGNodeRefsAE(CnGNode* cgn, bool check_var_src) {
     }
     if (check_var_src) {
         if (ni_opcode == Op_LdVar || ni_opcode == Op_StVar || ni_opcode ==Op_Phi) {
-            uint32 nsrc=cgn->nInst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc=cgn->nInst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 next_node = findCnGNode_op(cgn->nInst->getSrc(i)->getId());
                 if (getEscState(next_node) <= ARG_ESCAPE)
                     continue;
@@ -2050,13 +2050,13 @@ EscAnalyzer::saveScannedMethodInfo() {
     mident->name=mname;
     mident->signature=msig;
     minfo->methodIdent=mident;
-    uint32 numpar = mdesc->getNumParams();
+    U_32 numpar = mdesc->getNumParams();
     minfo->numberOfArgs=numpar;
     ParamInfos* prminfos = new (globalMM) ParamInfos(globalMM);
     minfo->paramInfos=prminfos;
     minfo->retValueState=0;
     if (mdesc->getReturnType()->isReference()) {
-        uint32 escstate = 0;
+        U_32 escstate = 0;
         for (it = cngNodes->begin( ); it != cngNodes->end( ); it++) {
             if ((*it)->nodeType==NT_EXITVAL) {
                 if (isGlobalState(getFullState((*it)->outEdges->front()->cngNodeTo))) {
@@ -2099,10 +2099,10 @@ EscAnalyzer::saveScannedMethodInfo() {
 }  // saveScannedMethodInfo(MemoryManager& mm)
 
 
-uint32 
-EscAnalyzer::getMethodParamState(CalleeMethodInfo* mi, uint32 np) {
+U_32 
+EscAnalyzer::getMethodParamState(CalleeMethodInfo* mi, U_32 np) {
     ParamInfos::iterator it;
-    uint32 st = 0;
+    U_32 st = 0;
     if (mi==NULL)
         return 0; 
     for (it = mi->paramInfos->begin( ); it != mi->paramInfos->end( ); it++) {
@@ -2112,15 +2112,15 @@ EscAnalyzer::getMethodParamState(CalleeMethodInfo* mi, uint32 np) {
         }
     }
     return st;
-}  // getMethodParamState(CalleeMethodInfo* mi, uint32 np) 
+}  // getMethodParamState(CalleeMethodInfo* mi, U_32 np) 
 
 
 void
 EscAnalyzer::markNotEscInsts() {
     CnGNodes::iterator it;
     bool p2 = false;
-    StlMap<uint32, uint32> nonEscInsts(eaMemManager);
-    typedef ::std::pair <uint32,uint32> intPair;
+    StlMap<U_32, U_32> nonEscInsts(eaMemManager);
+    typedef ::std::pair <U_32,U_32> intPair;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->nodeType == NT_OBJECT && getEscState(*it) > GLOBAL_ESCAPE && getVirtualCall(*it) == 0 
@@ -2393,7 +2393,7 @@ EscAnalyzer::printCallMethodName(Inst* inst, ::std::ostream& os) {
 void
 EscAnalyzer::lObjectHistory(Inst* inst,std::string text,::std::ostream& os) {
     Inst* inst1;
-    uint32 nsrc=inst->getNumSrcOperands();
+    U_32 nsrc=inst->getNumSrcOperands();
 
     if (scannedInsts->size()!=0) {
         if (checkScannedInsts(inst->getId())) {
@@ -2418,7 +2418,7 @@ EscAnalyzer::lObjectHistory(Inst* inst,std::string text,::std::ostream& os) {
         return;
     }
     scannedInsts->push_back(inst->getId());
-    for (uint32 i=0; i<nsrc; i++) {
+    for (U_32 i=0; i<nsrc; i++) {
         inst1 = inst->getSrc(i)->getInst();
         if (!(Type::isTau(inst->getSrc(i)->getType()->tag)))
             lObjectHistory(inst1,text+" ",os);
@@ -2434,7 +2434,7 @@ EscAnalyzer::printCreatedObjectsInfo(::std::ostream& os) {
     irManager.getMethodDesc().printFullName(os); 
     os << std::endl;
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
-        uint32 nt = (*it)->nodeType;
+        U_32 nt = (*it)->nodeType;
         if (nt&(NT_OBJECT|NT_RETVAL) || nt==NT_LDOBJ) {
             printCnGNode(*it,os);
             ((Opnd*)(*it)->refObj)->printWithType(os);
@@ -2466,7 +2466,7 @@ EscAnalyzer::createdObjectInfo() {
     int n_ge = 0;
     int n_ae = 0;
     int n_ne = 0;
-    uint32 state = 0;
+    U_32 state = 0;
 
     for (it = cngNodes->begin( ); it != cngNodes->end( ); it++ ) {
         if ((*it)->nodeType == NT_OBJECT) {
@@ -2513,7 +2513,7 @@ EscAnalyzer::createdObjectInfo() {
 void
 EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
     Inst* inst1 = NULL;
-    uint32 nsrc=inst->getNumSrcOperands();
+    U_32 nsrc=inst->getNumSrcOperands();
 
     if (scannedObjs->size()!=0) {
         if (checkScannedObjs(inst->getId())) {
@@ -2582,7 +2582,7 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
     }
     scannedObjs->push_back(inst->getId());
     if (all) {
-        for (uint32 i=0; i<nsrc; i++) {
+        for (U_32 i=0; i<nsrc; i++) {
             inst1 = inst->getSrc(i)->getInst();
             printOriginObjects(inst1,true,text+" ");
         }
@@ -2594,13 +2594,13 @@ EscAnalyzer::printOriginObjects(Inst* inst, bool all, std::string text) {
                 printOriginObjects(inst1,false,text+" ");
                 break;
             case Op_TauStInd:        // stind
-                for (uint32 i=0; i<2; i++) {
+                for (U_32 i=0; i<2; i++) {
                     inst1 = inst->getSrc(i)->getInst();
                     printOriginObjects(inst1,false,text+" ");
                 }
                 break;
             default:
-                for (uint32 i=0; i<nsrc; i++) {
+                for (U_32 i=0; i<nsrc; i++) {
                     inst1 = inst->getSrc(i)->getInst();
                     printOriginObjects(inst1,false,text+" ");
                 }
@@ -2696,9 +2696,9 @@ EscAnalyzer::what_inst(Inst* inst,::std::ostream& os) {
         os << "        MethodInst" << std::endl;
         MethodDesc* md=inst->asMethodInst()->getMethodDesc();
         logMethod(md);
-        uint32 n=md->getNumParams();
+        U_32 n=md->getNumParams();
         os << "          Params " << n << std::endl;
-        for (uint32 i = 0; i < n; i++) {
+        for (U_32 i = 0; i < n; i++) {
             Type* tt = md->getParamType(i);
             os << "          << "<<i<<" >> " << tt->getName() <<" "<< tt->tag<< std::endl;
             os << "              isObject  " << tt->isObject();
@@ -2747,7 +2747,7 @@ void
 EscAnalyzer::debug_inst_info(Inst* inst,::std::ostream& os) {
     Opnd* dst;
     Opnd* src;
-    uint32 nsrc;
+    U_32 nsrc;
 
     os << "  =="; inst->print(os); os << std::endl;
     if (verboseLog) {
@@ -2769,7 +2769,7 @@ EscAnalyzer::debug_inst_info(Inst* inst,::std::ostream& os) {
             os << std::endl;
         if ( nsrc != 0 ) {
             os << "  sources" << std::endl;
-            for (uint32 i=0; i<nsrc; i++) {
+            for (U_32 i=0; i<nsrc; i++) {
                 src=inst->getSrc(i);
                 os << "  <<" <<i<<">> ";
                 debug_opnd_info(src, os);
@@ -2816,7 +2816,7 @@ EscAnalyzer::debug_opnd_info(Opnd* opnd,::std::ostream& os) {
 
 void 
 EscAnalyzer::addMonInst(Inst* inst) {
-    uint32 monOpndId = inst->getSrc(0)->getId();
+    U_32 monOpndId = inst->getSrc(0)->getId();
     MonUnit* monUnit = NULL;
     monUnit = findMonUnit(monOpndId);
     if (monUnit == NULL) {
@@ -2831,7 +2831,7 @@ EscAnalyzer::addMonInst(Inst* inst) {
 
 
 EscAnalyzer::MonUnit* 
-EscAnalyzer::findMonUnit(uint32 opndId) {
+EscAnalyzer::findMonUnit(U_32 opndId) {
     MonInstUnits::iterator it;
     assert(monitorInstUnits != NULL);
     for (it = monitorInstUnits->begin( ); it != monitorInstUnits->end( ); it++ ) {
@@ -2895,8 +2895,8 @@ EscAnalyzer::scanSyncInsts() {
     Insts* syncInsts;
     Insts* vcInsts;
     CnGNode* node;
-    uint32 checkedState = 0;
-    uint32 nState = 0;
+    U_32 checkedState = 0;
+    U_32 nState = 0;
     bool to_fix_ssa = false;
     BitSet fgnodes(eaMemManager,irManager.getFlowGraph().getMaxNodeId());
 
@@ -2975,7 +2975,7 @@ EscAnalyzer::scanSyncInsts() {
         }
         if (getVirtualCall(node)!=0) {
             if (checkedState > GLOBAL_ESCAPE && do_sync_removal_vc) {
-                uint32 bs_size = irManager.getFlowGraph().getMaxNodeId();
+                U_32 bs_size = irManager.getFlowGraph().getMaxNodeId();
                 if (fgnodes.getSetSize() < bs_size) {
                     fgnodes.resizeClear(bs_size);
                 } else {
@@ -3127,12 +3127,12 @@ EscAnalyzer::markLockedNodes2(Node* node, BitSet* bs, Opnd* moninstop) {
 } // markLockedNodes2(BitSet* bs, Insts* syncInsts)
 
 
-uint32 
-EscAnalyzer::checkState(Inst* inst,uint32 st) {
-    uint32 st1;
+U_32 
+EscAnalyzer::checkState(Inst* inst,U_32 st) {
+    U_32 st1;
     Inst* inst1;
     Opnd* opnd1;
-    uint32 nsrc=inst->getNumSrcOperands();
+    U_32 nsrc=inst->getNumSrcOperands();
 
     if (st <= GLOBAL_ESCAPE)
         return st;
@@ -3187,7 +3187,7 @@ EscAnalyzer::checkState(Inst* inst,uint32 st) {
     if (st <= GLOBAL_ESCAPE)
         return st;
     scannedObjs->push_back(inst->getId());
-    for (uint32 i=0; i<nsrc; i++) {
+    for (U_32 i=0; i<nsrc; i++) {
         opnd1 = inst->getSrc(i);
         if (opnd1->isVarOpnd()) {
             inst1 = opnd1->asVarOpnd()->getVarAccessInsts();
@@ -3202,7 +3202,7 @@ EscAnalyzer::checkState(Inst* inst,uint32 st) {
     }
     scannedObjs->pop_back();
     return st;
-} // checkState(Inst* inst,uint32 st) 
+} // checkState(Inst* inst,U_32 st) 
 
 
 void 
@@ -3310,7 +3310,7 @@ EscAnalyzer::fixMonitorInstsVCalls(MonUnit* mu, BitSet* bs) {
 
 
 void 
-EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk) {
+EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, U_32 chk) {
     Insts::iterator inst_it;
     OpndManager& _opndManager = irManager.getOpndManager();
     InstFactory& _instFactory = irManager.getInstFactory();
@@ -3373,7 +3373,7 @@ EscAnalyzer::insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk) {
     if (verboseLog) {
         Log::out() << "=-=-=-=- Finish w3" << std::endl;
     }
-} // insertFlagCheck(Insts* syncInsts, Opnd* muflag, uint32 chk)
+} // insertFlagCheck(Insts* syncInsts, Opnd* muflag, U_32 chk)
 
 
 void
@@ -3531,7 +3531,7 @@ EscAnalyzer::checkCallSyncMethod() {
         CnGNode* aanode = NULL;
         MethodPtrType* mpt = NULL;
         CalleeMethodInfo* mtdInfo = NULL;
-        uint32 callee_state = 0;
+        U_32 callee_state = 0;
 
         node = (*it);
         if (node->nodeType == NT_ACTARG && node->argNumber == 0) {
@@ -3639,7 +3639,7 @@ EscAnalyzer::insertSaveJitHelperCall(Inst* inst_before, SsaTmpOpnd* stVal) {
 
 
 SsaTmpOpnd* 
-EscAnalyzer::insertLdConst(uint32 value) {
+EscAnalyzer::insertLdConst(U_32 value) {
     TypeManager& _typeManager  = irManager.getTypeManager();
     Type* typeInt32 = _typeManager.getInt32Type();
     OpndManager& _opndManager = irManager.getOpndManager();
@@ -3661,7 +3661,7 @@ EscAnalyzer::insertLdConst(uint32 value) {
     if (value == 0)
         return i32_0;
     return i32_1;
-} // insertLdConst(uint32 value) 
+} // insertLdConst(U_32 value) 
 
 
 
@@ -3672,7 +3672,7 @@ EscAnalyzer::insertLdConst(uint32 value) {
 void
 EscAnalyzer::scanLocalObjects() {
     CnGNodes::iterator it;
-    uint32 lo_count=0;             // number of local objects
+    U_32 lo_count=0;             // number of local objects
     ObjIds* lnoids = NULL;         // list of new opnds to optimize
     ObjIds* lloids = NULL;         // list of load opnds to optimize
     ObjIds::iterator lo_it;
@@ -3799,8 +3799,8 @@ EscAnalyzer::scanLocalObjects() {
 void
 EscAnalyzer::scanEscapedObjects() {
     CnGNodes::iterator it;
-    uint32 vco_count=0;            // number of local objects
-    uint32 ob_ref_type=0;          // object ref type
+    U_32 vco_count=0;            // number of local objects
+    U_32 ob_ref_type=0;          // object ref type
     ObjIds* lnoids = NULL;         // list of CnG node Ids for new opnds to optimize
     ObjIds* lloids = NULL;         // list of CnG node Ids for load opnds to optimize
     ObjIds::iterator lo_it;
@@ -4137,14 +4137,14 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
                 }
                 continue;
             }
-            uint32 nsrc = phi->getNumSrcOperands();
+            U_32 nsrc = phi->getNumSrcOperands();
             if (nsrc > 2) {
                 if (verboseLog) {
                     os_sc << "  doEO 3" << std::endl;
                 }
                 continue;
             }
-            for (uint32 i=0; i<nsrc; i++) {
+            for (U_32 i=0; i<nsrc; i++) {
                 inst = phi->getSrc(i)->getInst();
                 if (verboseLog) {
                     os_sc << "  doEO phi "; inst->print(os_sc);
@@ -4247,7 +4247,7 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
         Inst* lobj_inst = NULL;           // load opnd inst for ldvar opnd
         VarOpnd* ob_var_opnd = _opndManager.createVarOpnd(nobj_inst->getDst()->getType(), false);
         SsaTmpOpnd* ob_init_opnd = _opndManager.createSsaTmpOpnd(ob_var_opnd->getType());
-        uint32 ob_id = onode->opndId;
+        U_32 ob_id = onode->opndId;
         Insts::iterator itvc;
         ScObjFlds::iterator ito;
         Node* node_no = nobj_inst->getNode();
@@ -4375,9 +4375,9 @@ EscAnalyzer::doEOScalarReplacement(ObjIds* loids) {
             if (phi->getOpcode() != Op_Phi) {
                 assert(0);
             }
-            uint32 nsrc = phi->getNumSrcOperands();
+            U_32 nsrc = phi->getNumSrcOperands();
 
-            for (uint32 i=0; i<nsrc; i++) {
+            for (U_32 i=0; i<nsrc; i++) {
                 inst = phi->getSrc(i)->getInst();
                 removeInst(inst);
             }
@@ -4466,7 +4466,7 @@ EscAnalyzer::collectStLdInsts(CnGNode* onode, ScObjFlds* scObjFlds) {
 
 
 void 
-EscAnalyzer::collectCallInsts(uint32 n, Insts* vc_insts, ObjIds* vcids) {
+EscAnalyzer::collectCallInsts(U_32 n, Insts* vc_insts, ObjIds* vcids) {
     CnGEdges::iterator ite;
     CnGRefs::iterator it2;
 
@@ -4476,7 +4476,7 @@ EscAnalyzer::collectCallInsts(uint32 n, Insts* vc_insts, ObjIds* vcids) {
         for (it2 = (*ite)->refList->begin( ); it2 != (*ite)->refList->end( ); it2++ ) {
             if ((*it2)->cngNodeTo->cngNodeId == n) {
                 Inst* ii=(*ite)->cngNodeFrom->nInst;
-                uint32 opc = ii->getOpcode();
+                U_32 opc = ii->getOpcode();
                 if (opc == Op_IndirectMemoryCall || opc == Op_DirectCall) {
                     if (!checkScanned(vcids,ii->getId())) {
                         vc_insts->push_back(ii);
@@ -4493,7 +4493,7 @@ void
 EscAnalyzer::scalarizeOFldUsage(ScObjFld* scfld) {
     Insts* sl_insts = scfld->ls_insts;
     VarOpnd* fl_var_opnd = scfld->fldVarOpnd;
-    uint32 nsrco = 0;
+    U_32 nsrco = 0;
     Inst* inst_ad;
     Inst* st_ld_var_inst;
     Inst* st_ld_inst;
@@ -4552,8 +4552,8 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
         Inst *headInst = (Inst*)node->getFirstInst();
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
-            uint32 nsrc = inst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc = inst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd()) { // check ssa operands
                     if (verboseLog) {
                         os_sc << "  not ssa opnd " << i << "  ";
@@ -4561,7 +4561,7 @@ EscAnalyzer::checkOpndUsage(ObjIds* lnoids, ObjIds* lloids, bool check_loc) {
                     }
                     continue;
                 }
-                uint32 opcode=inst->getOpcode();
+                U_32 opcode=inst->getOpcode();
                 if (checkScanned(lnoids,opnd->getId())) {
                     if (verboseLog) {
                         os_sc << " no "; FlowGraph::printLabel(os_sc,inst->getNode()); 
@@ -4635,8 +4635,8 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     Nodes::const_iterator niter;
     bool maydo = true;
-    uint32 tau_opnd_id = tau_inst->getDst()->getId();
-    uint32 sc_opnd_id = tau_inst->getSrc(0)->getId(); 
+    U_32 tau_opnd_id = tau_inst->getDst()->getId();
+    U_32 sc_opnd_id = tau_inst->getSrc(0)->getId(); 
     Inst* inst1;
 
     if (verboseLog) {
@@ -4653,12 +4653,12 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
                     inst->print(os_sc); os_sc << std::endl;
                 }
             }
-            uint32 nsrc = inst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc = inst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands
                     continue;
                 if (opnd->getId()==tau_opnd_id) {
-                    uint32 opcode=inst->getOpcode();
+                    U_32 opcode=inst->getOpcode();
                     if (verboseLog) {
                         os_sc << "      "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
@@ -4667,7 +4667,7 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
                         }
                     }
                     if (opcode == Op_IndirectMemoryCall || opcode == Op_DirectCall) {
-                        for (uint32 i1=0; i1<nsrc; i1++) {
+                        for (U_32 i1=0; i1<nsrc; i1++) {
                             if (inst->getSrc(i)->getId() == sc_opnd_id)
                                 break;
                             if (i1 == nsrc) {
@@ -4701,11 +4701,11 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
 
 
 bool 
-EscAnalyzer::checkOpndUsage(uint32 lobjid) {
+EscAnalyzer::checkOpndUsage(U_32 lobjid) {
     const Nodes& nodes = irManager.getFlowGraph().getNodes();
     Nodes::const_iterator niter;
     bool maydo = true;
-    uint32 n_used = 0;
+    U_32 n_used = 0;
 
     if (verboseLog) {
         os_sc << "  -------- Used in " << std::endl;
@@ -4721,13 +4721,13 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
                     inst->print(os_sc); os_sc << std::endl;
                 }
             }
-            uint32 nsrc = inst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc = inst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands
                     continue;
                 if (opnd->getId()==lobjid) {
                     n_used++;
-                    uint32 opcode=inst->getOpcode();
+                    U_32 opcode=inst->getOpcode();
                     if (verboseLog) {
                         os_sc << "    "; FlowGraph::printLabel(os_sc,inst->getNode()); 
                         os_sc << "  "; inst->print(os_sc); os_sc << std::endl; 
@@ -4748,24 +4748,24 @@ EscAnalyzer::checkOpndUsage(uint32 lobjid) {
         os_sc << "  -------- opnd used: " << n_used << "  maydo " << maydo << std::endl;
     }
     return maydo;
-} // checkOpndUsage(uint32 lobjid)
+} // checkOpndUsage(U_32 lobjid)
 
 
 EscAnalyzer::CnGNode* 
 EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
-    uint32 ob_ref_type=0;          // object ref type
-    uint32 ob_fld_count=0;         // number of object references to fields
-    uint32 ob_fin_fld_count=0;     // number of object references to final fields
-    uint32 ob_nfld_count=0;        // number of object references to not a field
-    uint32 ref_to_obj_count=0;     // number references to object
-    uint32 vcall_count=0;          // number of virtual calls
-    uint32 call_count=0;           // number of calls
-    uint32 ob_fld_stind_count=0;   // number of stores in object field
-    uint32 ob_fld_ldind_count=0;   // number of loads from object field
-    uint32 ob_fld_field_count=0;   // number of fields of object field
-    uint32 ob_fld_unkn_count=0;    // number of unknown references of object field
-    uint32 ob_fld_usage_count=0;   // number of object field usage
-    uint32 ob_stvar_count=0;       // number of object stvar
+    U_32 ob_ref_type=0;          // object ref type
+    U_32 ob_fld_count=0;         // number of object references to fields
+    U_32 ob_fin_fld_count=0;     // number of object references to final fields
+    U_32 ob_nfld_count=0;        // number of object references to not a field
+    U_32 ref_to_obj_count=0;     // number references to object
+    U_32 vcall_count=0;          // number of virtual calls
+    U_32 call_count=0;           // number of calls
+    U_32 ob_fld_stind_count=0;   // number of stores in object field
+    U_32 ob_fld_ldind_count=0;   // number of loads from object field
+    U_32 ob_fld_field_count=0;   // number of fields of object field
+    U_32 ob_fld_unkn_count=0;    // number of unknown references of object field
+    U_32 ob_fld_usage_count=0;   // number of object field usage
+    U_32 ob_stvar_count=0;       // number of object stvar
     bool storeId = false;
     CnGRefs::iterator it1;
     CnGRefs::iterator it2;
@@ -4773,7 +4773,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
     CnGNode* nf = NULL;
     CnGNode* vnode = NULL;
     CnGNode* rnode = scnode;
-    uint32 scnode_type = scnode->nodeType;
+    U_32 scnode_type = scnode->nodeType;
 
     ob_ref_type = scnode->nodeRefType;   // object ref type
     if (!check_loc && (ob_ref_type != NR_REF))
@@ -4867,7 +4867,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
     if (verboseLog) {
         os_sc << "  -------- end - Ref from node  " << std::endl;
     }
-    uint32 n=scnode->cngNodeId;
+    U_32 n=scnode->cngNodeId;
 
     if (verboseLog) {
         os_sc << "  -------- begin - Ref to node  " << scnode->cngNodeId << " - " 
@@ -4877,7 +4877,7 @@ EscAnalyzer::checkCnGtoScalarize(CnGNode* scnode, bool check_loc) {
         for (it2 = (*ite)->refList->begin( ); it2 != (*ite)->refList->end( ); it2++ ) {
             if ((*it2)->cngNodeTo->cngNodeId == n) {
                 Inst* ii=(*ite)->cngNodeFrom->nInst;
-                uint32 opc = ii->getOpcode();
+                U_32 opc = ii->getOpcode();
                 if (opc == Op_IndirectMemoryCall || opc == Op_DirectCall) {
                     if (opc == Op_IndirectMemoryCall)
                         vcall_count++;
@@ -5048,7 +5048,7 @@ EscAnalyzer::checkLocalPath(Inst* nob_inst) {
     double prob = 0;
     Node* node = nob_inst->getNode();
     Opnd* objOpnd = nob_inst->getDst();
-    uint32 objId = objOpnd ->getId();
+    U_32 objId = objOpnd ->getId();
 
     if (verboseLog) {
         os_sc << "  -------- Find local path for  "; FlowGraph::printLabel(os_sc,node); 
@@ -5076,7 +5076,7 @@ EscAnalyzer::checkLocalPath(Inst* nob_inst) {
 
 
 double 
-EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
+EscAnalyzer::checkNextNodes(Node* n, U_32 obId, double cprob) {
     Node* node = n;
     Inst *headInst = (Inst*)node->getFirstInst();
     Opnd* opnd;
@@ -5109,8 +5109,8 @@ EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
     }
     for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
         if (inst->getOpcode()==Op_IndirectMemoryCall || inst->getOpcode()==Op_DirectCall) {
-            uint32 nsrc = inst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc = inst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 opnd=inst->getSrc(i);
                 if (opnd->getId()==obId) {
                     if (verboseLog) {
@@ -5153,11 +5153,11 @@ EscAnalyzer::checkNextNodes(Node* n, uint32 obId, double cprob) {
         return r0;
     return r;
 
-} // checkNextNodes(Node* n, uint32 obId, double cprob))
+} // checkNextNodes(Node* n, U_32 obId, double cprob))
 
 
 void 
-EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* ob_var_opnd, uint32 oid) {
+EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* ob_var_opnd, U_32 oid) {
     Insts::iterator itvc;
     InstFactory& _instFactory = irManager.getInstFactory();
     ControlFlowGraph& fg = irManager.getFlowGraph();
@@ -5175,8 +5175,8 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
 
     for (itvc = vc_insts->begin( ); itvc != vc_insts->end( ); itvc++ ) {
         Inst* vc = *itvc;
-        uint32 i;
-        uint32 nsrc = vc->getNumSrcOperands();
+        U_32 i;
+        U_32 nsrc = vc->getNumSrcOperands();
 
         for (i=0; i<nsrc; i++) {
             Opnd* opnd=vc->getSrc(i);  
@@ -5204,14 +5204,14 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
         Inst* ldobj=_instFactory.makeLdVar(ob_opnd,ob_var_opnd);
         ldobj->insertBefore(vc);
         // reset call inst parameters
-        for (uint32 i1=0; i1<nsrc; i1++) {
+        for (U_32 i1=0; i1<nsrc; i1++) {
             if (vc->getSrc(i1)->getId()==oid) {
                 vc->setSrc(i1,ob_opnd );
             }
             if (Type::isTau(vc->getSrc(i1)->getType()->tag)) {
                 Inst* tau_inst = NULL;
                 Insts::iterator iit;
-                uint32 to_id = vc->getSrc(i1)->getId();
+                U_32 to_id = vc->getSrc(i1)->getId();
                 for (iit=checkInsts->begin(); iit!=checkInsts->end(); iit++) {
                     if ((*iit)->getDst()->isNull()) {
                         continue;
@@ -5221,7 +5221,7 @@ EscAnalyzer::restoreEOCreation(Insts* vc_insts, ScObjFlds* scObjFlds, VarOpnd* o
                     }
 
                     Inst* ti = *iit;
-                    uint32 ti_oc = ti->getOpcode();
+                    U_32 ti_oc = ti->getOpcode();
                     if (ti_oc == Op_TauCheckNull || ti_oc == Op_TauIsNonNull || ti_oc == Op_TauHasType) {
                         tau_inst = NULL;
                         SsaTmpOpnd* to = _opndManager.createSsaTmpOpnd(_typeManager.getTauType());
@@ -5419,14 +5419,14 @@ EscAnalyzer::removeInst(Inst* reminst) {
 } // removeInst(Inst* reminst)
 
 void 
-EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
+EscAnalyzer::fixMethodEndInsts(U_32 ob_id) {
     Insts::iterator itmei;
     InstFactory& _instFactory = irManager.getInstFactory();
     OpndManager& _opndManager = irManager.getOpndManager();
     for (itmei = methodEndInsts->begin( ); itmei != methodEndInsts->end( ); itmei++ ) {
         Inst* mei = *itmei;
-        uint32 i = 0;
-        uint32 nsrc = mei->getNumSrcOperands();
+        U_32 i = 0;
+        U_32 nsrc = mei->getNumSrcOperands();
 
         if (nsrc == 0)
             continue;
@@ -5450,7 +5450,7 @@ EscAnalyzer::fixMethodEndInsts(uint32 ob_id) {
             os_sc << "++++             " << std::endl;
         }
     }
-} // fixMethodEndInsts(uint32 ob_id)
+} // fixMethodEndInsts(U_32 ob_id)
 
 
 EscAnalyzer::CnGNode* 
@@ -5472,7 +5472,7 @@ EscAnalyzer::getLObj(CnGNode* vval) {
 bool
 EscAnalyzer::checkVVarSrcs(Inst* inst) {
     Inst* inst1;
-    uint32 nsrc=inst->getNumSrcOperands();
+    U_32 nsrc=inst->getNumSrcOperands();
     std::string text = " checkVVS  ";
     bool res = true;
 
@@ -5548,13 +5548,13 @@ EscAnalyzer::checkVVarSrcs(Inst* inst) {
             res = checkVVarSrcs(inst1);
             break;
         case Op_TauStInd:        // stind
-            for (uint32 i=0; i<2; i++) {
+            for (U_32 i=0; i<2; i++) {
                 inst1 = inst->getSrc(i)->getInst();
                 res = checkVVarSrcs(inst1);
             }
             break;
         default:
-            for (uint32 i=0; i<nsrc; i++) {
+            for (U_32 i=0; i<nsrc; i++) {
                 inst1 = inst->getSrc(i)->getInst();
                 bool res1 = checkVVarSrcs(inst1);
                 res = res && res1;
@@ -5606,7 +5606,7 @@ EscAnalyzer::checkObjFlds(ScObjFlds* nscObjFlds, ScObjFlds* lscObjFlds) {
 
 
 void 
-EscAnalyzer::fixCheckInsts(uint32 opId) {
+EscAnalyzer::fixCheckInsts(U_32 opId) {
     Insts::iterator iit;
     Edge* excedge;
 
@@ -5622,7 +5622,7 @@ EscAnalyzer::fixCheckInsts(uint32 opId) {
             os_sc << "  **  "; (*iit)->print(os_sc); os_sc << std::endl;
         }
         Inst* inst = (*iit);
-        uint32 opcode = inst->getOpcode();
+        U_32 opcode = inst->getOpcode();
         if (opcode == Op_Branch) {
             excedge = NULL;
             if (inst->getComparisonModifier()==Cmp_Zero) {
@@ -5653,7 +5653,7 @@ EscAnalyzer::fixCheckInsts(uint32 opId) {
             removeInst(inst);
         }
     }
-} // fixCheckInsts(uint32 opId)
+} // fixCheckInsts(U_32 opId)
 
 
 void 

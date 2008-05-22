@@ -479,7 +479,7 @@ FixupSyncEdgesWalker::applyToNode3(Node *node)
     }
 
     // must be high-priority catch node
-    uint32 order = catchLabelInst->getOrder();
+    U_32 order = catchLabelInst->getOrder();
     if (order != 0) {
         if (EXTRA_DEBUGGING && Log::isEnabled()) {
             Log::out() << "    case 3" << ::std::endl;
@@ -579,11 +579,11 @@ void FixupSyncEdgesWalker2::applyToCFGNode(Node *node)
 
 // synchronization inlining
 struct ObjectSynchronizationInfo {
-    uint32 threadIdReg;      // the register number that holds id of the current thread
-    uint32 syncHeaderOffset; // offset in bytes of the sync header from the start of the object   
-    uint32 syncHeaderWidth;  // width in bytes of the sync header
-    uint32 lockOwnerOffset;  // offset in bytes of the lock owner field from the start of the object
-    uint32 lockOwnerWidth;   // width in bytes of the lock owner field in the sync header
+    U_32 threadIdReg;      // the register number that holds id of the current thread
+    U_32 syncHeaderOffset; // offset in bytes of the sync header from the start of the object   
+    U_32 syncHeaderWidth;  // width in bytes of the sync header
+    U_32 lockOwnerOffset;  // offset in bytes of the lock owner field from the start of the object
+    U_32 lockOwnerWidth;   // width in bytes of the lock owner field in the sync header
     bool   jitClearsCcv;     // whether the JIT needs to clear ar.ccv
 };
 
@@ -660,7 +660,7 @@ void SyncOpt::runPass()
         }
     }
 
-    uint32 lockWidth = 2;
+    U_32 lockWidth = 2;
     
     ObjectSynchronizationInfo syncInfo;
     if (mayInlineObjectSynchronization(syncInfo)) 
@@ -778,8 +778,8 @@ private:
 public:
     Opnd *opnd;
     VarOpnd *oldValueVar;
-    uint32 id;
-    static uint32 counter;
+    U_32 id;
+    static U_32 counter;
 
     SyncClique() : UnionFind(), opnd(0), oldValueVar(0), id(++counter) {};
     SyncClique(Opnd *opnd0) : UnionFind(), opnd(opnd0), oldValueVar(0), id(++counter) {};
@@ -799,14 +799,14 @@ public:
     };
 };
 
-uint32 SyncClique::counter = 0;
+U_32 SyncClique::counter = 0;
 #define SYNC_STACK_TOP_DEPTH 20
 
 class SyncOptDfValue {
     enum State { Top, Normal, Bottom } state;
-    uint32 depth; 
+    U_32 depth; 
 public:
-    uint32 getDepth() { return depth; };
+    U_32 getDepth() { return depth; };
     SyncOptDfValue()
         : state(Top), depth(SYNC_STACK_TOP_DEPTH) { };
     SyncOptDfValue(int)
@@ -1004,7 +1004,7 @@ class BuildSyncCliquesWalker {
     MemoryManager &mem;
 
     StlVector<SyncClique *> *currentStack;
-    uint32 currentDepth;
+    U_32 currentDepth;
     SyncClique *bottomClique;
 
     StlMap<Inst *, SyncClique *> &monitorCliques;
@@ -1013,7 +1013,7 @@ class BuildSyncCliquesWalker {
     StlMap<Inst *, StlVectorSet<SyncClique *> *> &needRecCount;
 public:
     StlVector<SyncClique *> *getStack() { return currentStack; };
-    uint32 getDepth() { return currentDepth; };
+    U_32 getDepth() { return currentDepth; };
     BuildSyncCliquesWalker(MemoryManager &mm,
                            SyncClique *bottomClique0,
                            StlMap<Inst *, SyncClique *> &monitorCliques0,
@@ -1029,7 +1029,7 @@ public:
           needRecCount(needRecCount0)
     {};
     void startNode(StlVector<SyncClique *> *entryStack,
-                   uint32 entryDepth)
+                   U_32 entryDepth)
     {
         currentStack = entryStack;
         currentDepth = entryDepth;
@@ -1084,14 +1084,14 @@ public:
                 assert(currentStack);
                 if (use_IncRecCount) {
                     StlVectorSet<SyncClique *> *openSet = new (mem) StlVectorSet<SyncClique *>(mem);
-                    for (uint32 j=0; j < currentDepth; ++j) {
+                    for (U_32 j=0; j < currentDepth; ++j) {
                         openSet->insert((*currentStack)[j]);
                     }
                     needRecCount[i] = openSet;
                     // leaving a balanced area, cancel all monitors.
                     currentDepth = 0;
                 } else {
-                    for (uint32 i=0; i<currentDepth; ++i) {
+                    for (U_32 i=0; i<currentDepth; ++i) {
                         // invalidate all open monitors
                         if (Log::isEnabled()) {
                             Log::out() << " linking01 ";
@@ -1177,7 +1177,7 @@ public:
                 assert(currentStack);
                 // record cliques which depend on this opnd matching
                 StlVectorSet<SyncClique *> *openSet = new (mem) StlVectorSet<SyncClique *>(mem);
-                for (uint32 j=0; j < currentDepth; ++j) {
+                for (U_32 j=0; j < currentDepth; ++j) {
                     openSet->insert((*currentStack)[j]);
                 }
                 needRecCount[monitorExit] = openSet;
@@ -1258,7 +1258,7 @@ SyncOpt::getOldValueOpnd(SyncClique *clique)
 // The result is the total count of stack elements in entrySolution and exitSolution,
 //    which are also initialized here
 
-uint32 SyncOpt::findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, uint32 numNodes,
+U_32 SyncOpt::findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, U_32 numNodes,
                                          SyncOptDfValue *&entrySolution, SyncOptDfValue *&exitSolution)
 {
     SyncOptForwardInstance findBalancedExits(mm, optimistic, use_IncRecCount);
@@ -1267,9 +1267,9 @@ uint32 SyncOpt::findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, 
     solve<SyncOptDfValue>(&fg, findBalancedExits, true, // forwards
                           mm, 
                           entrySolution, exitSolution, true); // ignore exception edges
-    uint32 numCliques = 0;
+    U_32 numCliques = 0;
     {
-        for (uint32 i = 0; i<numNodes; i++) {
+        for (U_32 i = 0; i<numNodes; i++) {
             numCliques += entrySolution[i].getDepth();
             numCliques += exitSolution[i].getDepth();
         }
@@ -1277,15 +1277,15 @@ uint32 SyncOpt::findBalancedExits_Stage1(bool optimistic, bool use_IncRecCount, 
     return numCliques;
 }
 
-void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
-                         uint32 depth2, SyncClique *stack2,
+void SyncOpt::linkStacks(U_32 depth1, SyncClique *stack1,
+                         U_32 depth2, SyncClique *stack2,
                          SyncClique *bottomClique)
 {
     // link 
     //   stack1[depth1-1],..,stack1[0],bot,..
     //   stack2[depth2-1],..,stack2[0],bot,..
-    uint32 mindepth = ::std::min(depth1, depth2);
-    uint32 i = 0;
+    U_32 mindepth = ::std::min(depth1, depth2);
+    U_32 i = 0;
     for ( ; i < mindepth; ++i) {
         if (Log::isEnabled()) {
             Log::out() << " linking02 ";
@@ -1321,9 +1321,9 @@ void SyncOpt::linkStacks(uint32 depth1, SyncClique *stack1,
 // starting with cliques in inStack[0..depthIn-1], walk node with walker
 // and union result with outStack[0..depthOut-1].  stackspace is available for scratch.
 void SyncOpt::findBalancedExits_Stage2a(Node *node,
-                                        uint32 depthIn,
+                                        U_32 depthIn,
                                         SyncClique *inStack,
-                                        uint32 depthOut,
+                                        U_32 depthOut,
                                         SyncClique *outStack,
                                         BuildSyncCliquesWalker &walker,
                                         StlVector<SyncClique *> &stackspace, // scratch area
@@ -1331,7 +1331,7 @@ void SyncOpt::findBalancedExits_Stage2a(Node *node,
 {
     if (depthIn > 0) {
         assert(depthIn <= SYNC_STACK_TOP_DEPTH);
-        for (uint32 i=0; i<depthIn; i++) {
+        for (U_32 i=0; i<depthIn; i++) {
             stackspace[i] = &inStack[i];
         }
     }
@@ -1339,7 +1339,7 @@ void SyncOpt::findBalancedExits_Stage2a(Node *node,
     if (Log::isEnabled()) {
         Log::out() << "  Before walk, depthIn=" << (int) depthIn 
                    << ", stack = ";
-        for (uint32 i=0; i<depthIn; i++) {
+        for (U_32 i=0; i<depthIn; i++) {
             stackspace[i]->print(Log::out());
             Log::out() << " ";
         }
@@ -1351,7 +1351,7 @@ void SyncOpt::findBalancedExits_Stage2a(Node *node,
     WalkInstsInBlock<true, BuildSyncCliquesWalker>(node, walker); // in order
     
     assert(&walker.mem == &mm);
-    uint32 currentDepth = walker.getDepth();
+    U_32 currentDepth = walker.getDepth();
     StlVector<SyncClique *> *currentStack = walker.getStack();
     assert(currentStack);
     
@@ -1361,26 +1361,26 @@ void SyncOpt::findBalancedExits_Stage2a(Node *node,
                    << ", currentDepth=" 
                    << (int) currentDepth
                    << ", stack = ";
-        for (uint32 i=0; i<currentDepth; i++) {
+        for (U_32 i=0; i<currentDepth; i++) {
             (*currentStack)[i]->print(Log::out());
             Log::out() << " ";
         }
         Log::out() << ::std::endl;
     }
     
-    uint32 mindepth = ::std::min(currentDepth, depthOut);
+    U_32 mindepth = ::std::min(currentDepth, depthOut);
     if (Log::isEnabled()) {
         Log::out() << "  Linking05 with outstack of depth " 
                    << (int) depthOut
                    << ", outstack = ";
-        for (uint32 i=0; i<currentDepth; i++) {
+        for (U_32 i=0; i<currentDepth; i++) {
             outStack[i].print(Log::out());
             Log::out() << " ";
         }
         Log::out() << ::std::endl;
     }
     {
-        uint32 i = 0;
+        U_32 i = 0;
         for ( ; i < mindepth; ++i) {
             if (Log::isEnabled()) {
                 Log::out() << " linking06 ";
@@ -1439,8 +1439,8 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
         end = nodes.end();
     for (; iter != end; ++iter) {
         Node *node = *iter;
-        uint32 nodeId = node->getId();
-        uint32 depthIn = entrySolution[nodeId].getDepth();
+        U_32 nodeId = node->getId();
+        U_32 depthIn = entrySolution[nodeId].getDepth();
         if (Log::isEnabled()) {
             Log::out() << "Considering node " << (int) nodeId 
                        << " with depthIn=" << (int) depthIn
@@ -1455,7 +1455,7 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
         }
         // propagate node solution through node to exits
         
-        uint32 depthOut = exitSolution[nodeId].getDepth();
+        U_32 depthOut = exitSolution[nodeId].getDepth();
         assert(&walker.mem == &mm);
         findBalancedExits_Stage2a(node, 
                                   depthIn, entryCliques[nodeId],
@@ -1491,9 +1491,9 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
             }
             
             // link with successor inputs
-            uint32 targetId = target->getId();
+            U_32 targetId = target->getId();
             SyncClique *targetStack = entryCliques[targetId];
-            uint32 targetDepth = entrySolution[targetId].getDepth();
+            U_32 targetDepth = entrySolution[targetId].getDepth();
 
             if (Log::isEnabled()) {
                 Log::out() << "Linking09 output of node #" 
@@ -1510,10 +1510,10 @@ void SyncOpt::findBalancedExits_Stage2(bool optimistic, bool use_IncRecCount,
     // link any open monitor at the exit node with bottom
     {
         Node *exitNode = fg.getExitNode();
-        uint32 exitId = exitNode->getId();
-        uint32 depthIn = entrySolution[exitId].getDepth();
+        U_32 exitId = exitNode->getId();
+        U_32 depthIn = entrySolution[exitId].getDepth();
         SyncClique *exitStack = entryCliques[exitId];
-        for (uint32 i=0; i< depthIn; ++i) {
+        for (U_32 i=0; i< depthIn; ++i) {
             if (Log::isEnabled()) {
                 Log::out() << " for exit node: i="
                            << (int) i;
@@ -1729,13 +1729,13 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
             for ( ; newBadExitIter != newBadExitEnd; ++newBadExitIter) {
                 Inst *newBadExit = *newBadExitIter;
                 Node *node = newBadExit->getNode();
-                uint32 nodeId = node->getId();
-                uint32 nodeDepth = exitSolution[nodeId].getDepth();
+                U_32 nodeId = node->getId();
+                U_32 nodeDepth = exitSolution[nodeId].getDepth();
                 
                 Edge *e = (Edge *)node->getExceptionEdge();
                 Node *target = e->getTargetNode();
-                uint32 targetId = target->getId();
-                uint32 targetDepth = entrySolution[targetId].getDepth();
+                U_32 targetId = target->getId();
+                U_32 targetDepth = entrySolution[targetId].getDepth();
                 
                 SyncClique *nodeStack = exitCliques[nodeId];
                 SyncClique *targetStack = entryCliques[targetId];
@@ -1743,7 +1743,7 @@ void SyncOpt::findBalancedExits_Stage3(bool optimistic, bool use_IncRecCount,
                     if (targetDepth != nodeDepth) {
                         differs = true;
                     } else {
-                        for (uint32 i = 0; i < targetDepth; ++i) {
+                        for (U_32 i = 0; i < targetDepth; ++i) {
                             if (nodeStack[i].find() != targetStack[i].find()) {
                                 differs = true;
                                 break;
@@ -1786,9 +1786,9 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
     InstFactory &instFactory = irManager.getInstFactory();
 
     ControlFlowGraph &fg = irManager.getFlowGraph();
-    uint32 numNodes = fg.getMaxNodeId();
+    U_32 numNodes = fg.getMaxNodeId();
     SyncOptDfValue *entrySolution, *exitSolution;
-    uint32 numCliques = findBalancedExits_Stage1(optimistic, use_IncRecCount, numNodes,
+    U_32 numCliques = findBalancedExits_Stage1(optimistic, use_IncRecCount, numNodes,
                                                  entrySolution, exitSolution);
 
     if (Log::isEnabled()) {
@@ -1799,11 +1799,11 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
     SyncClique *cliquesHeap = new (mm) SyncClique[numCliques];
     SyncClique **entryCliques = new (mm) SyncClique *[numNodes];
     SyncClique **exitCliques = new (mm) SyncClique *[numNodes];
-    uint32 cliqueHeapIndex = 0;
+    U_32 cliqueHeapIndex = 0;
     {
-        for (uint32 i = 0; i<numNodes; i++) {
-            uint32 lin = entrySolution[i].getDepth();
-            uint32 lout = exitSolution[i].getDepth();
+        for (U_32 i = 0; i<numNodes; i++) {
+            U_32 lin = entrySolution[i].getDepth();
+            U_32 lout = exitSolution[i].getDepth();
 
             entryCliques[i] = &cliquesHeap[cliqueHeapIndex];
             cliqueHeapIndex += lin;
@@ -1812,14 +1812,14 @@ void SyncOpt::findBalancedExits(bool optimistic, bool use_IncRecCount)
 
             if (Log::isEnabled()) {
                 Log::out() << "  node " << (int) i << " has " << (int) lin << " cliques in: [ ";
-                for (uint32 j = 0; j<lin; ++j) { 
+                for (U_32 j = 0; j<lin; ++j) { 
                     entryCliques[i][j].print(Log::out());
                     Log::out() << " ";
                 }
                 Log::out() << "]" << ::std::endl;
                 
                 Log::out() << "  node " << (int) i << " has " << (int) lout << " cliques out: [ ";
-                for (uint32 jout = 0; jout<lout; ++jout) { 
+                for (U_32 jout = 0; jout<lout; ++jout) { 
                     exitCliques[i][jout].print(Log::out());
                     Log::out() << " ";
                 }

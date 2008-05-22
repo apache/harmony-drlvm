@@ -89,7 +89,7 @@ void* m2n_get_ip(M2nFrame* lm2nf)
 // 20040708 New function - needs proper implementation.
 void m2n_set_ip(M2nFrame* lm2nf, NativeCodePtr ip)
 {
-    lm2nf->eip = (uint32)ip;
+    lm2nf->eip = (U_32)ip;
 } 
 
 Method_Handle m2n_get_method(M2nFrame* m2nf)
@@ -146,7 +146,7 @@ M2nFrame* m2n_push_suspended_frame(VM_thread* thread, Registers* regs)
 }
 
 bool m2n_is_suspended_frame(M2nFrame * m2nf) {
-    return (uint32)m2nf->p_lm2nf == 1;
+    return (U_32)m2nf->p_lm2nf == 1;
 
 }
 
@@ -157,9 +157,9 @@ void * m2n_get_frame_base(M2nFrame * m2nf) {
 
 //***** Stub Interface
 
-uint32* m2n_get_args(M2nFrame* m2nf)
+U_32* m2n_get_args(M2nFrame* m2nf)
 {
-    return (uint32*)&m2nf->regs;
+    return (U_32*)&m2nf->regs;
 }
 
 unsigned m2n_ts_to_register_size()

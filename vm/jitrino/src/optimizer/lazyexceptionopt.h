@@ -66,7 +66,7 @@ private:
  * @return <code>true</code> if an information is added; 
  *         <code>false<code> if an exception object cannot be optimized.
  */
-    bool addOptCandidates(uint32 id, Inst* inst);
+    bool addOptCandidates(U_32 id, Inst* inst);
 
 /**
  * Checks if there is a side effect between throw_inst and init_inst instructions.
@@ -146,7 +146,7 @@ private:
  * @return <code>true</code> if a callee method argument may be null
  *         <code>false<code> if a callee method argument is not null
  */
-    bool mayBeNullArg(Inst* call_inst, uint32 arg_n);
+    bool mayBeNullArg(Inst* call_inst, U_32 arg_n);
 
 private:
     /// IR manager recieved by lazyexc optpass.
@@ -165,7 +165,7 @@ private:
     typedef StlList<Inst*> ThrowInsts; 
     /// Information about throwable object used in an optimized method.
     struct OptCandidate {
-        uint32 opndId;
+        U_32 opndId;
         Inst* objInst;
         Inst* initInst;
         ThrowInsts* throwInsts;

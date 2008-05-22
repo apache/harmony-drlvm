@@ -620,7 +620,7 @@ ENCODER_DECLARE_EXPORT char * jump(char * stream, char * target) {
     stream = mov(stream, rax_opnd, Imm_Opnd(size_64, (int64)target), size_64);    
     return jump(stream, rax_opnd, size_64);
 #else
-    int32 offset = target - stream;
+    I_32 offset = target - stream;
     // sub 2 bytes for the short version
     offset -= 2;
     if (fit8(offset)) {
@@ -710,7 +710,7 @@ ENCODER_DECLARE_EXPORT char * call(char * stream, const char * target)
     stream = mov(stream, rax_opnd, Imm_Opnd(size_64, (int64)target), size_64);
     return call(stream, rax_opnd, size_64);
 #else
-    int32 offset = target - stream;
+    I_32 offset = target - stream;
     offset -= 5; // sub 5 bytes for this instruction
     Imm_Opnd imm(size_32, offset);
     return call(stream, imm);

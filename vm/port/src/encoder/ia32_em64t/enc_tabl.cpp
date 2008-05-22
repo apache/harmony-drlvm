@@ -528,7 +528,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// double -> int32
+// double -> I_32
 BEGIN_MNEMONIC(CVTSD2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2D, _r},      {r32, xmm_m64}, D_U },
@@ -536,7 +536,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// double [truncated] -> int32
+// double [truncated] -> I_32
 BEGIN_MNEMONIC(CVTTSD2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2C, _r},      {r32, xmm_m64}, D_U },
@@ -551,7 +551,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// float -> int32
+// float -> I_32
 BEGIN_MNEMONIC(CVTSS2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2D, _r},         {r32, xmm_m32}, D_U},
@@ -559,7 +559,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// float [truncated] -> int32
+// float [truncated] -> I_32
 BEGIN_MNEMONIC(CVTTSS2SI, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2C, _r},         {r32, xmm_m32}, D_U},
@@ -567,7 +567,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// int32 -> double
+// I_32 -> double
 BEGIN_MNEMONIC(CVTSI2SD, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF2, 0x0F, 0x2A, _r},         {xmm64, r_m32}, D_U},
@@ -575,7 +575,7 @@ BEGIN_OPCODES()
 END_OPCODES()
 END_MNEMONIC()
 
-// int32 -> float
+// I_32 -> float
 BEGIN_MNEMONIC(CVTSI2SS, MF_NONE, D_U )
 BEGIN_OPCODES()
     {OpcodeInfo::all,     {0xF3, 0x0F, 0x2A, _r},         {xmm32, r_m32}, D_U},

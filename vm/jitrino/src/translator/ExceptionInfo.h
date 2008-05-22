@@ -28,11 +28,11 @@ class ExceptionInfo {
 public:
     virtual ~ExceptionInfo() {}
 
-    uint32  getId()            {return id;}
-    uint32  getBeginOffset(){return beginOffset;}
-    uint32  getEndOffset()    {return endOffset;}
-    void    setEndOffset(uint32 offset)    { endOffset = offset; }
-    bool    equals(uint32 begin,uint32 end) {
+    U_32  getId()            {return id;}
+    U_32  getBeginOffset(){return beginOffset;}
+    U_32  getEndOffset()    {return endOffset;}
+    void    setEndOffset(U_32 offset)    { endOffset = offset; }
+    bool    equals(U_32 begin,U_32 end) {
         return (begin == beginOffset && end == endOffset);
     }
     ExceptionInfo*  getNextExceptionInfoAtOffset() {return nextExceptionAtOffset;}
@@ -43,55 +43,55 @@ public:
     void setLabelInst(LabelInst *lab) { label = lab; }
     LabelInst *getLabelInst()         { return label; }
 protected:
-    ExceptionInfo(uint32 _id,
-                  uint32 _beginOffset,
-                  uint32 _endOffset) 
+    ExceptionInfo(U_32 _id,
+                  U_32 _beginOffset,
+                  U_32 _endOffset) 
     : id(_id), beginOffset(_beginOffset), endOffset(_endOffset),
       nextExceptionAtOffset(NULL), label(NULL)
     {}
 private:
-    uint32 id;
-    uint32 beginOffset;
-    uint32 endOffset;
+    U_32 id;
+    U_32 beginOffset;
+    U_32 endOffset;
     ExceptionInfo*    nextExceptionAtOffset;
     LabelInst* label;
 };
 
 class CatchHandler : public ExceptionInfo {
 public:
-    CatchHandler(uint32 id,
-                 uint32 beginOffset,
-                 uint32 endOffset,
+    CatchHandler(U_32 id,
+                 U_32 beginOffset,
+                 U_32 endOffset,
                  Type* excType) 
                  : ExceptionInfo(id, beginOffset, endOffset), 
                  exceptionType(excType), nextHandler(NULL), order(0) {}
     virtual ~CatchHandler() {}
 
     Type*          getExceptionType()              {return exceptionType;}
-    uint32         getExceptionOrder()             {return order;        }
+    U_32         getExceptionOrder()             {return order;        }
     CatchHandler*  getNextHandler()                {return nextHandler;  }
     void           setNextHandler(CatchHandler* n) {nextHandler=n;       }
-    void           setOrder(uint32 ord)            {order = ord;         }
+    void           setOrder(U_32 ord)            {order = ord;         }
     bool           isCatchHandler()                {return true;         }
 private:
     Type*          exceptionType;
     CatchHandler*  nextHandler;
-    uint32         order;
+    U_32         order;
 };
 
 class CatchBlock : public ExceptionInfo {
 public:
-    CatchBlock(uint32 id,
-               uint32 beginOffset,
-               uint32 endOffset,
-               uint32 exceptionIndex) 
+    CatchBlock(U_32 id,
+               U_32 beginOffset,
+               U_32 endOffset,
+               U_32 exceptionIndex) 
     : ExceptionInfo(id,beginOffset,endOffset), handlers(NULL), excTableIndex(exceptionIndex) {}
     virtual ~CatchBlock() {}
 
     bool isCatchBlock()                {return true;}
-    uint32 getExcTableIndex() { return excTableIndex; }
+    U_32 getExcTableIndex() { return excTableIndex; }
     void addHandler(CatchHandler* handler) {
-        uint32 order = 0;
+        U_32 order = 0;
         if (handlers == NULL) {
             handlers = handler;
         } else {
@@ -106,18 +106,18 @@ public:
         handler->setOrder(order);
 
     }
-    bool hasOffset(uint32 offset)
+    bool hasOffset(U_32 offset)
     {
         return (getBeginOffset() <= offset) && (offset < getEndOffset());
     }
-    bool offsetSplits(uint32 offset)
+    bool offsetSplits(U_32 offset)
     {
         return (getBeginOffset() < offset) && (offset + 1 < getEndOffset());
     }
     CatchHandler*    getHandlers()    {return handlers;}
 private:
     CatchHandler* handlers;
-    uint32 excTableIndex;
+    U_32 excTableIndex;
 };
 
 } //namespace Jitrino 

@@ -38,7 +38,7 @@ inline VTable *get_vector_vtable(Vector_Handle vector)
 
 
 
-inline int32 get_vector_length(Vector_Handle vector)
+inline I_32 get_vector_length(Vector_Handle vector)
 {
     VM_Vector *v = (VM_Vector *)vector;
     return v->get_length();
@@ -46,7 +46,7 @@ inline int32 get_vector_length(Vector_Handle vector)
 
 
 
-inline void set_vector_length(Vector_Handle vector, int32 length)
+inline void set_vector_length(Vector_Handle vector, I_32 length)
 {
     VM_Vector *v = (VM_Vector *)vector;
     v->set_length(length);
@@ -54,56 +54,56 @@ inline void set_vector_length(Vector_Handle vector, int32 length)
 
 
 
-inline int8 *get_vector_element_address_bool(Vector_Handle vector, int32 idx)
+inline int8 *get_vector_element_address_bool(Vector_Handle vector, I_32 idx)
 {
     return (int8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int8)));
 } //get_vector_element_address_bool
 
 
 
-inline int8 *get_vector_element_address_int8(Vector_Handle vector, int32 idx)
+inline int8 *get_vector_element_address_int8(Vector_Handle vector, I_32 idx)
 {
     return (int8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int8)));
 } //get_vector_element_address_int8
 
 
 
-inline int16 *get_vector_element_address_int16(Vector_Handle vector, int32 idx)
+inline int16 *get_vector_element_address_int16(Vector_Handle vector, I_32 idx)
 {
     return (int16 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int16)));
 } //get_vector_element_address_int16
 
 
 
-inline uint16 *get_vector_element_address_uint16(Vector_Handle vector, int32 idx)
+inline uint16 *get_vector_element_address_uint16(Vector_Handle vector, I_32 idx)
 {
     return (uint16 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(uint16)));
 } //get_vector_element_address_uint16
 
 
 
-inline int32 *get_vector_element_address_int32(Vector_Handle vector, int32 idx)
+inline I_32 *get_vector_element_address_int32(Vector_Handle vector, I_32 idx)
 {
-    return (int32 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int32)));
+    return (I_32 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(I_32)));
 } //get_vector_element_address_int32
 
 
 
-inline int64 *get_vector_element_address_int64(Vector_Handle vector, int32 idx)
+inline int64 *get_vector_element_address_int64(Vector_Handle vector, I_32 idx)
 {
     return (int64 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_8 + ((POINTER_SIZE_INT)idx * sizeof(int64)));
 } //get_vector_element_address_int64
 
 
 
-inline float *get_vector_element_address_f32(Vector_Handle vector, int32 idx)
+inline float *get_vector_element_address_f32(Vector_Handle vector, I_32 idx)
 {
     return (float *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(float)));
 } //get_vector_element_address_f32
 
 
 
-inline double *get_vector_element_address_f64(Vector_Handle vector, int32 idx)
+inline double *get_vector_element_address_f64(Vector_Handle vector, I_32 idx)
 {
     return (double *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_8 + ((POINTER_SIZE_INT)idx * sizeof(double)));
 } //get_vector_element_address_f64
@@ -112,7 +112,7 @@ inline double *get_vector_element_address_f64(Vector_Handle vector, int32 idx)
 
 // 20030321 Be careful with the result of this procedure: if references are compressed the result will be
 // the address of an element containing a COMPRESSED_REFERENCE, not a ManagedObject *.
-inline ManagedObject **get_vector_element_address_ref(Vector_Handle vector, int32 idx)
+inline ManagedObject **get_vector_element_address_ref(Vector_Handle vector, I_32 idx)
 {
     return (ManagedObject **)((POINTER_SIZE_INT)vector + 
                                       (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_REF + 
@@ -127,6 +127,6 @@ inline ManagedObject **get_vector_element_address_ref(Vector_Handle vector, int3
 
 enum ArrayCopyResult { ACR_Okay, ACR_NullPointer, ACR_TypeMismatch, ACR_BadIndices };
 
-ArrayCopyResult array_copy(ManagedObject* src, int32 src_off, ManagedObject* dst, int32 dst_off, int32 count);
+ArrayCopyResult array_copy(ManagedObject* src, I_32 src_off, ManagedObject* dst, I_32 dst_off, I_32 count);
 
 #endif //_VM_ARRAYS_H_

@@ -41,7 +41,7 @@ void allocator_object_write_barrier(Partial_Reveal_Object* p_object, Collector* 
     Partial_Reveal_Object* array = p_object;
     assert(!obj_is_primitive_array(array));
 
-    int32 array_length = vector_get_length((Vector_Handle) array);
+    I_32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
       p_slot = (REF *)vector_get_element_address_ref((Vector_Handle)array, i);
       if( read_slot(p_slot) != NULL && addr_belongs_to_nos(read_slot(p_slot))){
@@ -137,7 +137,7 @@ static void gc_object_write_barrier(Managed_Object_Handle p_object)
     Partial_Reveal_Object* array = (Partial_Reveal_Object*)p_object;
     assert(!obj_is_primitive_array(array));
     
-    int32 array_length = vector_get_length((Vector_Handle) array);
+    I_32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
       p_slot = (REF*)vector_get_element_address_ref((Vector_Handle) array, i);
       if( read_slot(p_slot) != NULL && addr_belongs_to_nos(read_slot(p_slot))){
@@ -175,7 +175,7 @@ static void write_barrier_rem_obj_snapshot(Managed_Object_Handle p_obj_holding_r
 
       Partial_Reveal_Object* obj_to_snapshot; 
       
-      int32 array_length = vector_get_length((Vector_Handle) array);
+      I_32 array_length = vector_get_length((Vector_Handle) array);
       for (int i = 0; i < array_length; i++) {
         p_obj_slot = (REF*)vector_get_element_address_ref((Vector_Handle) array, i);
         obj_to_snapshot = (Partial_Reveal_Object*)read_slot(p_obj_slot);

@@ -167,8 +167,8 @@ void Node::insertInst(CFGInst* prev, CFGInst* newInst) {
 }
 
 
-uint32 Node::getInstCount(bool ignoreLabels) const  {
-    uint32 count = 0;
+U_32 Node::getInstCount(bool ignoreLabels) const  {
+    U_32 count = 0;
     CFGInst* first = getFirstInst();
     while (ignoreLabels && first!=NULL && first->isLabel()) {
         first = first->next();
@@ -585,7 +585,7 @@ void ControlFlowGraph::mergeBlocks(Node* source, Node* target, bool keepFirst) {
 }
 
 void ControlFlowGraph::mergeAdjacentNodes(bool skipEntry, bool mergeByDispatch) {
-    for(uint32 idx = 0; idx < nodes.size(); idx++) {
+    for(U_32 idx = 0; idx < nodes.size(); idx++) {
         Node* node = nodes[idx];
         if (node->isBlockNode() && (!skipEntry || node!=entryNode)) { 
             Node* succ = node->getUnconditionalEdgeTarget();
@@ -884,7 +884,7 @@ public:
         if (!loopTree->isValid()) {
             loopTree->rebuild(false);
         }
-        uint32 nNodes = fg->getNodeCount();
+        U_32 nNodes = fg->getNodeCount();
         cyclicFreqs = new (mm) double[nNodes];
         std::fill(cyclicFreqs, cyclicFreqs + nNodes, 1);
     }

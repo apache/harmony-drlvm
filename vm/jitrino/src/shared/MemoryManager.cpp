@@ -69,7 +69,7 @@ static int  traceId = 0;
 static ::std::ostream& traceStream = ::std::cerr;
 #endif
 
-static const uint32 mm_default_next_arena_size = 4096-ARENA_HEADER_SIZE;
+static const U_32 mm_default_next_arena_size = 4096-ARENA_HEADER_SIZE;
 
 MemoryManager::MemoryManager(const char* name)
 {

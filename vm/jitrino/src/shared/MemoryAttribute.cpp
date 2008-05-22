@@ -85,8 +85,8 @@ bool MemoryAttribute::Context::maybeAliased(const MemoryAttribute::Context& mc) 
     //  two stack areas do not overlap
     //
     assert(size != 0 && mc.size != 0);
-    uint32 offset = id.stackOffset;
-    uint32 mcOffset = mc.id.stackOffset;
+    U_32 offset = id.stackOffset;
+    U_32 mcOffset = mc.id.stackOffset;
     return (offset == mcOffset) ||
            (offset > mcOffset && offset < mcOffset + mc.size) ||
            (offset < mcOffset && offset + size > mcOffset);
@@ -117,13 +117,13 @@ void MemoryAttribute::Context::unionWith(MemoryAttribute::Context& mc) {
 //
 //  Get 32-bit id
 //
-uint32 MemoryAttribute::Context::getId() const {
+U_32 MemoryAttribute::Context::getId() const {
     switch (getIdKind()) {
     case StackId: return id.stackOffset;
     case FieldId: return id.fieldDesc->getId(); 
     case MethodId: return id.methodDesc->getId();
     case CounterId: return id.counterId;
-    case NoId: return (uint32)id.all;
+    case NoId: return (U_32)id.all;
     default:
         assert(0);
     }

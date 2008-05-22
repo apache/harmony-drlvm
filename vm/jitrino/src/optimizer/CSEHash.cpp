@@ -28,9 +28,9 @@
 
 namespace Jitrino {
 
-uint32 HashTableImpl::numLookup = 0;
-uint32 HashTableImpl::numLookupEntry = 0;
-uint32 HashTableImpl::numFound = 0;
+U_32 HashTableImpl::numLookup = 0;
+U_32 HashTableImpl::numLookupEntry = 0;
+U_32 HashTableImpl::numFound = 0;
 
 Inst*    CSEHashTable::lookupKeyBase(CSEHashKey* key) {
     Inst* inst = (Inst*)hashTable.lookup(key);

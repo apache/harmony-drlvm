@@ -32,9 +32,9 @@ namespace IPF {
 #define VTABLEBASE    (opndManager->getVtableBase())
 #define VTABLEBASEIMM (opndManager->getVtableBaseImm())
 
-#define IMM32(o)   ((int32)(((Opnd *)(o))->getValue()))
+#define IMM32(o)   ((I_32)(((Opnd *)(o))->getValue()))
 #define IMM64(o)   ((int64)(((Opnd *)(o))->getValue()))
-#define IMM32U(o)  ((uint32)(((Opnd *)(o))->getValue()))
+#define IMM32U(o)  ((U_32)(((Opnd *)(o))->getValue()))
 #define IMM64U(o)  ((uint64)(((Opnd *)(o))->getValue()))
 
 // FP remainder internal helpers (temp solution to be optimized)
@@ -304,7 +304,7 @@ CG_OpndHandle *IpfInstCodeSelector::neg(NegOp::Types  opType,
     if (ipfConstantFolding && ((Opnd *)src_)->isImm()) {
         switch (opType) {
         case NegOp::I4: 
-            dst = opndManager->newImm((int32)0 - IMM32(src_)); break;
+            dst = opndManager->newImm((I_32)0 - IMM32(src_)); break;
         case NegOp::I:
         case NegOp::I8: 
             dst = opndManager->newImm(0 - IMM64(src_)); break;
@@ -610,7 +610,7 @@ CG_OpndHandle *IpfInstCodeSelector::shru(IntegerOp::Types opType,
     
     if (ipfConstantFolding && ((Opnd *)value)->isImm() && ((Opnd *)shiftAmount)->isImm()) {
         if (opType==IntegerOp::I4) {
-            return opndManager->newImm((uint64)((uint32)((int32)(((Opnd *)value)->getValue()))) >> ((Opnd *)shiftAmount)->getValue());
+            return opndManager->newImm((uint64)((U_32)((I_32)(((Opnd *)value)->getValue()))) >> ((Opnd *)shiftAmount)->getValue());
         } else {
             return opndManager->newImm((uint64)(((Opnd *)value)->getValue()) >> ((Opnd *)shiftAmount)->getValue());
         }
@@ -637,7 +637,7 @@ CG_OpndHandle *IpfInstCodeSelector::shru(IntegerOp::Types opType,
 
 CG_OpndHandle *IpfInstCodeSelector::shladd(IntegerOp::Types opType,
                                            CG_OpndHandle    *value_,
-                                           uint32           imm,
+                                           U_32           imm,
                                            CG_OpndHandle    *addto_) {
 
     IPF_LOG << "      shladd " << endl;
@@ -745,7 +745,7 @@ CG_OpndHandle *IpfInstCodeSelector::convToFp(ConvertToFpOp::Types opType,
 //----------------------------------------------------------------------------//
 // Load 32-bit integer constant
 
-CG_OpndHandle *IpfInstCodeSelector::ldc_i4(int32 val) {
+CG_OpndHandle *IpfInstCodeSelector::ldc_i4(I_32 val) {
 
     IPF_LOG << "      ldc_i4; val=" << val << endl;
     
@@ -791,7 +791,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldc_s(float val) {
 
     union {
         float  fr;
-        uint32 gr;
+        U_32 gr;
     } tmpVal;
     
     tmpVal.fr = val;
@@ -887,7 +887,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldnull(bool compressed) {
 //----------------------------------------------------------------------------//
 // Load variable
 
-CG_OpndHandle *IpfInstCodeSelector::ldVar(Type *dstType, uint32 varId) {
+CG_OpndHandle *IpfInstCodeSelector::ldVar(Type *dstType, U_32 varId) {
 
     IPF_LOG << "      ldVar; dstType=" << Type::tag2str(dstType->tag) << ", varId=" << varId << endl;
 
@@ -911,7 +911,7 @@ CG_OpndHandle *IpfInstCodeSelector::ldVar(Type *dstType, uint32 varId) {
 //----------------------------------------------------------------------------//
 // Store variable
 
-void IpfInstCodeSelector::stVar(CG_OpndHandle *_src, uint32 varId) {
+void IpfInstCodeSelector::stVar(CG_OpndHandle *_src, U_32 varId) {
 
     IPF_LOG << "      stVar" 
         << "; varId=" << varId
@@ -940,7 +940,7 @@ void IpfInstCodeSelector::stVar(CG_OpndHandle *_src, uint32 varId) {
 //----------------------------------------------------------------------------//
 // Define an argument
 
-CG_OpndHandle *IpfInstCodeSelector::defArg(uint32 inArgPosition, Type *type) {
+CG_OpndHandle *IpfInstCodeSelector::defArg(U_32 inArgPosition, Type *type) {
 
 
     OpndKind opndKind = toOpndKind(type->tag);
@@ -1200,7 +1200,7 @@ void IpfInstCodeSelector::bnzero(CompareZeroOp::Types opType,
 //  (p8) br.cond.sptk b1                            // branch to target
 //                                                  // if p8 is false - fall through
 
-void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
+void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, U_32 nTargets) {
 
     IPF_LOG << "      tableSwitch" << endl;
 
@@ -1257,7 +1257,7 @@ void IpfInstCodeSelector::tableSwitch(CG_OpndHandle *src, uint32 nTargets) {
 //----------------------------------------------------------------------------//
 // Direct call to the method
 
-CG_OpndHandle *IpfInstCodeSelector::call(uint32        numArgs, 
+CG_OpndHandle *IpfInstCodeSelector::call(U_32        numArgs, 
                                          CG_OpndHandle **args, 
                                          Type          *retType,
                                          MethodDesc    *desc) {
@@ -1268,7 +1268,7 @@ CG_OpndHandle *IpfInstCodeSelector::call(uint32        numArgs,
 //----------------------------------------------------------------------------//
 // Direct call to the method 
 
-CG_OpndHandle *IpfInstCodeSelector::tau_call(uint32        numArgs, 
+CG_OpndHandle *IpfInstCodeSelector::tau_call(U_32        numArgs, 
                                              CG_OpndHandle **args, 
                                              Type          *retType,
                                              MethodDesc    *desc,
@@ -1294,7 +1294,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_call(uint32        numArgs,
 //----------------------------------------------------------------------------//
 // Indirect call
 
-CG_OpndHandle *IpfInstCodeSelector::tau_calli(uint32        numArgs, 
+CG_OpndHandle *IpfInstCodeSelector::tau_calli(U_32        numArgs, 
                                               CG_OpndHandle **args, 
                                               Type          *retType, 
                                               CG_OpndHandle *methodPtr,
@@ -1428,8 +1428,8 @@ void IpfInstCodeSelector::throwException(ObjectType* excType)
 // Throw linking exception
 
 void IpfInstCodeSelector::throwLinkingException(Class_Handle encClass,
-                                                uint32       cp_ndx,
-                                                uint32       opcode)
+                                                U_32       cp_ndx,
+                                                U_32       opcode)
 {
 
     IPF_LOG << "      throwLinkingException" << endl;
@@ -1724,7 +1724,7 @@ CG_OpndHandle *IpfInstCodeSelector::tau_ldInd(Type          *dstType,
 // Load string 
 
 CG_OpndHandle *IpfInstCodeSelector::ldString(MethodDesc *enclosingMethod,
-                                             uint32     stringToken,
+                                             U_32     stringToken,
                                              bool       uncompress) {
 
     IPF_LOG << "      ldString" << endl;
@@ -1976,14 +1976,14 @@ CG_OpndHandle *IpfInstCodeSelector::newArray(ArrayType     *arrayType,
 // Create multi-dimensional new array
 
 CG_OpndHandle *IpfInstCodeSelector::newMultiArray(ArrayType      *arrayType, 
-                                                   uint32        numDims, 
+                                                   U_32        numDims, 
                                                    CG_OpndHandle **dims) {
 
     Opnd *helperArgs[2 + numDims];
     
     helperArgs[0] = opndManager->newImm((uint64)arrayType->getRuntimeIdentifier());
     helperArgs[1] = opndManager->newImm(numDims);
-    for (uint32 i = 0; i < numDims; i++) {
+    for (U_32 i = 0; i < numDims; i++) {
         helperArgs[i + 2] = (Opnd *)dims[numDims - 1 - i];
     }
 
@@ -2162,7 +2162,7 @@ void IpfInstCodeSelector::balancedMonitorExit(CG_OpndHandle *obj,
 //----------------------------------------------------------------------------//
 // Create direct call to the method 
 
-void IpfInstCodeSelector::directCall(uint32    numArgs, 
+void IpfInstCodeSelector::directCall(U_32    numArgs, 
                                      Opnd      **args, 
                                      RegOpnd   *retOpnd,
                                      Opnd      *methodAddress,
@@ -2184,7 +2184,7 @@ void IpfInstCodeSelector::directCall(uint32    numArgs,
 //----------------------------------------------------------------------------//
 // Create indirect call to the method 
 
-void IpfInstCodeSelector::indirectCall(uint32    numArgs, 
+void IpfInstCodeSelector::indirectCall(U_32    numArgs, 
                                        Opnd      **args, 
                                        RegOpnd   *retOpnd,
                                        RegOpnd   *methodPtr,
@@ -2208,16 +2208,16 @@ void IpfInstCodeSelector::indirectCall(uint32    numArgs,
 //----------------------------------------------------------------------------//
 // Move out args in regs and stack positions according with IPF software convention
 
-void IpfInstCodeSelector::makeCallArgs(uint32 numArgs, Opnd **args, Inst *callInst, RegOpnd *pred) {
+void IpfInstCodeSelector::makeCallArgs(U_32 numArgs, Opnd **args, Inst *callInst, RegOpnd *pred) {
     
     int16 numFpOutArgs = 0;
-    for(uint32 argPosition=0; argPosition<numArgs; argPosition++) {
+    for(U_32 argPosition=0; argPosition<numArgs; argPosition++) {
         
         Opnd     *opnd    = args[argPosition];
         OpndKind opndKind = OPND_INVALID;
         DataKind dataKind = DATA_INVALID;
         InstCode instCode = INST_INVALID;
-        int32    location = LOCATION_INVALID;
+        I_32    location = LOCATION_INVALID;
         bool     isFp     = opnd->isFloating();
 
         if (opnd->isReg() == true) {                                  // opnd is register
@@ -2705,7 +2705,7 @@ void IpfInstCodeSelector::saturatingConv4(RegOpnd *dst, CG_OpndHandle *src_) {
     
     union {
         float  fr;
-        uint32 gr;
+        U_32 gr;
     } fval;
     union {
         double fr;
@@ -2952,7 +2952,7 @@ void IpfInstCodeSelector::divDouble(RegOpnd *dst, CG_OpndHandle *src1, CG_OpndHa
 
 CG_OpndHandle *IpfInstCodeSelector::ldRef(Type *dstType,
                                           MethodDesc* enclosingMethod,
-                                          uint32 refToken,
+                                          U_32 refToken,
                                           bool uncompress) 
 {
     assert(dstType->isSystemString() || dstType->isSystemClass());

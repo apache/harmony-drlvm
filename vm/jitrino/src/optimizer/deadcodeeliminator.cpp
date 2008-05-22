@@ -144,7 +144,7 @@ getBitWidth(Type::Tag tag)
 // returns the number of bits of the given opnd_num which is used,
 // given that dst_bits of the dst are used
 static uint8
-usesBitsOfOpnd(uint8 dst_bits, Inst* inst, uint32 opnd_num) {
+usesBitsOfOpnd(uint8 dst_bits, Inst* inst, U_32 opnd_num) {
     uint8 opwidth = getBitWidth(inst->getType());
     Opnd *opnd = inst->getSrc(opnd_num);
     uint8 opndwidth = getBitWidth(opnd->getType()->tag);
@@ -173,7 +173,7 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, uint32 opnd_num) {
             case 0:
                 {
                     Opnd *shiftAmount = inst->getSrc(1);
-                    int32 shiftby;
+                    I_32 shiftby;
                     bool isconst = 
                         ConstantFolder::isConstant(shiftAmount->getInst(), 
                                                    shiftby);
@@ -202,7 +202,7 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, uint32 opnd_num) {
             case 0:
                 {
                     Opnd *shiftAmount = inst->getSrc(1);
-                    int32 shiftby;
+                    I_32 shiftby;
                     bool isconst 
                         = ConstantFolder::isConstant(shiftAmount->getInst(), 
                                                      shiftby);
@@ -302,8 +302,8 @@ DeadCodeEliminator::findDefiningTemp(Opnd* var) {
     } else if(inst->getOpcode() == Op_Phi) {
 
         Opnd* tmp = NULL;
-        uint32 n = inst->getNumSrcOperands();
-        for(uint32 j=0; j < n; ++j) {
+        U_32 n = inst->getNumSrcOperands();
+        for(U_32 j=0; j < n; ++j) {
             Opnd* src = inst->getSrc(j);
             Inst* srcInst = src->getInst();
             assert(srcInst->getNode());
@@ -363,8 +363,8 @@ DeadCodeEliminator::copyPropagate(Opnd* opnd) {
 
 void
 DeadCodeEliminator::copyPropagate(Inst* inst) {
-    uint32 numSrcs = inst->getNumSrcOperands();
-    for (uint32 i=0; i<numSrcs; i++) {
+    U_32 numSrcs = inst->getNumSrcOperands();
+    for (U_32 i=0; i<numSrcs; i++) {
         Opnd* opnd = inst->getSrc(i);
         Opnd* propagated = copyPropagate(opnd);
         if (opnd != propagated) {
@@ -386,8 +386,8 @@ markLiveInst1(Inst* inst,
               InstDeque& workSet,
               BitSet& usefulInstSet,
               BitSet& usefulVarSet,
-              uint32 minInstId,
-              uint32 maxInstId) {
+              U_32 minInstId,
+              U_32 maxInstId) {
     //
     // add instruction's sources to the work list
     //
@@ -403,7 +403,7 @@ markLiveInst1(Inst* inst,
         Log::out() << ::std::endl;
     }
 
-    for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+    for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
         Opnd* src = inst->getSrc(i);
         // only follow ssa use-def links
         SsaOpnd* srcSsaOpnd = src->asSsaOpnd();
@@ -416,7 +416,7 @@ markLiveInst1(Inst* inst,
 
             assert(def->getNode());
             uint8 opndWidth = 255;
-            uint32 defId = def->getId();
+            U_32 defId = def->getId();
 
             if (usefulInstSet.setBit(defId-minInstId, true)) {
                 // was already marked as live, check old width.
@@ -472,12 +472,12 @@ DeadCodeEliminator::sweepInst1(Node* node,
                                Inst* inst,
                                BitSet& usefulInstSet,
                                BitSet& usefulVarSet,
-                               uint32 minInstId,
-                               uint32 maxInstId,
+                               U_32 minInstId,
+                               U_32 maxInstId,
                                bool canRemoveStvars) {
     assert(inst);
     assert(inst->getNode());
-    uint32 instId = inst->getId();
+    U_32 instId = inst->getId();
     if (inst->isMethodMarker()) {
         // don't remove a method marker, but remove opcode if it is dead
         if (inst->getNumSrcOperands() > 0) {
@@ -486,7 +486,7 @@ DeadCodeEliminator::sweepInst1(Node* node,
                 Inst *srcInst = opnd->getInst();
                 assert(srcInst);
                 assert(srcInst->getNode());
-                uint32 srcId = srcInst->getId();
+                U_32 srcId = srcInst->getId();
                 // instructions are only added during analysis for
                 // live instructions, so if it's not in the map, 
                 // assume it is live
@@ -554,14 +554,14 @@ markLiveInst(Inst* inst,
              BitSet& usefulInstSet,
              BitSet& usefulVarSet,
              uint8 *usedInstWidth,
-             uint32 minInstId,
-             uint32 maxInstId) {
+             U_32 minInstId,
+             U_32 maxInstId) {
     //
     // add instruction's sources to the work list
     //
     assert(inst);
     assert(inst->getNode());
-    uint32 instId = inst->getId();
+    U_32 instId = inst->getId();
     assert(usedInstWidth);
     assert((instId >= minInstId) && (instId < maxInstId));
     uint8 dstWidth = usedInstWidth[instId-minInstId];
@@ -573,7 +573,7 @@ markLiveInst(Inst* inst,
         Log::out() << ::std::endl;
     }
 
-    for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+    for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
         Opnd* src = inst->getSrc(i);
         // only follow ssa use-def links
         SsaOpnd* srcSsaOpnd = src->asSsaOpnd();
@@ -587,7 +587,7 @@ markLiveInst(Inst* inst,
             uint8 opndWidth = usesBitsOfOpnd(dstWidth, inst, i);
             assert(def);
             assert(def->getNode());
-            uint32 defId = def->getId();
+            U_32 defId = def->getId();
 
             if (!((minInstId <= defId) && (defId < maxInstId))) {
                 // this instruction is out of the region, skip it.
@@ -654,13 +654,13 @@ DeadCodeEliminator::sweepInst(Node* node,
                               BitSet& usefulInstSet,
                               BitSet& usefulVarSet,
                               uint8 *usedInstWidth,
-                              uint32 minInstId,
-                              uint32 maxInstId,
+                              U_32 minInstId,
+                              U_32 maxInstId,
                               bool canRemoveStvars) {
     assert(usedInstWidth);
     assert(inst);
     assert(inst->getNode());
-    uint32 instId = inst->getId();
+    U_32 instId = inst->getId();
     if (inst->isMethodMarker()) {
         // don't remove a method marker, but remove opcode if it is dead
         if (inst->getNumSrcOperands() > 0) {
@@ -669,7 +669,7 @@ DeadCodeEliminator::sweepInst(Node* node,
                 Inst *srcInst = opnd->getInst();
                 assert(srcInst);
                 assert(srcInst->getNode());
-                uint32 srcId = srcInst->getId();
+                U_32 srcId = srcInst->getId();
                 // instructions are only added during analysis for
                 // live instructions, so if it's not in the map, 
                 // assume it is live
@@ -798,7 +798,7 @@ DeadCodeEliminator::eliminateUnreachableCode() {
         return false;
 
     // Clear the set of unreachable definitions.
-    StlHashSet<uint32> unreachableDefSet(memManager);
+    StlHashSet<U_32> unreachableDefSet(memManager);
 
     StlVector<Node*>::iterator niter;
     for(niter = unreachableNodes.begin(); niter != unreachableNodes.end(); ++niter) {
@@ -837,9 +837,9 @@ DeadCodeEliminator::eliminateUnreachableCode() {
                 SsaVarOpnd* dst = inst->getDst()->asSsaVarOpnd();
                 assert(dst!=NULL);
 #endif
-                uint32 numSrc = inst->getNumSrcOperands();
-                uint32 numKill = 0;
-                for(uint32 i = 0; i < numSrc; ++i) {
+                U_32 numSrc = inst->getNumSrcOperands();
+                U_32 numKill = 0;
+                for(U_32 i = 0; i < numSrc; ++i) {
                     SsaVarOpnd* src = inst->getSrc(i)->asSsaVarOpnd();
                     assert(src != NULL);
                     if(unreachableDefSet.find(src->getId()) != unreachableDefSet.end()) {
@@ -874,10 +874,10 @@ void
 DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     // user should call eliminateUnreachableCode() first
 
-    uint32 minInstId = irManager.getMinimumInstId();
-    uint32 maxInstId = irManager.getInstFactory().getNumInsts();
-    uint32 numInsts = maxInstId - minInstId;
-    uint32 numOpnds = irManager.getOpndManager().getNumVarOpnds();
+    U_32 minInstId = irManager.getMinimumInstId();
+    U_32 maxInstId = irManager.getInstFactory().getNumInsts();
+    U_32 numInsts = maxInstId - minInstId;
+    U_32 numOpnds = irManager.getOpndManager().getNumVarOpnds();
     MemoryManager memManager("DeadCodeEliminator::eliminateDeadCode");
     InstDeque workSet(memManager);
     Nodes nodes(memManager);
@@ -914,7 +914,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
 
                     assert(inst);
                     assert(inst->getNode());
-                    uint32 instId = inst->getId();
+                    U_32 instId = inst->getId();
                     usefulInstSet.setBit(instId-minInstId, true);
                     if (usedInstWidth) {
                         uint8 usedWidth = getBitWidth(inst->getType());
@@ -947,7 +947,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
 
                     assert(inst);
                     assert(inst->getNode());
-                    uint32 instId = inst->getId();
+                    U_32 instId = inst->getId();
                     usefulInstSet.setBit(instId-minInstId, true);
                 }
             }

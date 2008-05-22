@@ -41,7 +41,7 @@ jsize JNICALL GetArrayLength(JNIEnv * UNREF jni_env,
     ObjectHandle h = (ObjectHandle)array;
 
     tmn_suspend_disable();   //-----------------v
-    uint32 length = get_vector_length((Vector_Handle)h->object);
+    U_32 length = get_vector_length((Vector_Handle)h->object);
     tmn_suspend_enable();    //---------------------------------^
 
     return length;

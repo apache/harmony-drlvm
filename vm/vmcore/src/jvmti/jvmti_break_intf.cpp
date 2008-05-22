@@ -552,8 +552,8 @@ static char *gen_push(char *code_addr, POINTER_SIZE_INT value)
 #ifdef _IA32_
     return push(code_addr, Imm_Opnd(size_32, value));
 #elif defined _EM64T_
-    int32 high = (int32)((uint32)(value >> 32));
-    int32 low = (int32)((uint32)value);
+    I_32 high = (I_32)((U_32)(value >> 32));
+    I_32 low = (I_32)((U_32)value);
     code_addr = alu(code_addr, sub_opc, rsp_opnd, Imm_Opnd(size_8, 8));
     code_addr = mov(code_addr, M_Base_Opnd(rsp_reg, 4), Imm_Opnd(size_32, high), size_32);
     return mov(code_addr, M_Base_Opnd(rsp_reg, 0), Imm_Opnd(size_32, low), size_32);
@@ -1408,13 +1408,13 @@ void jvmti_set_pending_breakpoints(Method *method)
     jlocation *locations = (jlocation *)STD_MALLOC(sizeof(jlocation) *
         method->get_pending_breakpoints());
     assert(locations);
-    uint32 location_count = 0;
+    U_32 location_count = 0;
 
     do
     {
         // It is necessary to set breakpoints only once for each
         // location, so we need to filter out duplicate breakpoints
-        for (uint32 iii = 0; iii < location_count; iii++)
+        for (U_32 iii = 0; iii < location_count; iii++)
             if (bp->location == locations[iii])
                 continue;
 

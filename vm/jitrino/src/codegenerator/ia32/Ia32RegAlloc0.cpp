@@ -51,8 +51,8 @@ struct RegAlloc0Action : public Action
 
 struct RegAlloc0 : public SessionAction
 {
-    uint32 getNeedInfo () const     {return 0;}
-    uint32 getSideEffects () const  {return 0;}
+    U_32 getNeedInfo () const     {return 0;}
+    U_32 getSideEffects () const  {return 0;}
 
     void runImpl();
 };

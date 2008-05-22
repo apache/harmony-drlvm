@@ -84,7 +84,7 @@ namespace Ia32 {
 
         POINTER_SIZE_INT getUint32Size() const;
         void write(POINTER_SIZE_INT* image) const;
-        uint32 getNumOpnds() const {return (uint32)gcOpnds.size();}
+        U_32 getNumOpnds() const {return (U_32)gcOpnds.size();}
         static POINTER_SIZE_INT getIP(const POINTER_SIZE_INT* image);
 
         void enumerate(GCInterface* gcInterface, const JitFrameContext* c, const StackInfo& stackInfo) const;
@@ -104,15 +104,15 @@ namespace Ia32 {
 
     class GCSafePointOpnd {
         friend class GCSafePoint;
-        static const uint32 OBJ_MASK  = 0x1;
-        static const uint32 REG_MASK  = 0x2;
+        static const U_32 OBJ_MASK  = 0x1;
+        static const U_32 REG_MASK  = 0x2;
 #ifdef _EM64T_
-        static const uint32 COMPRESSED_MASK  = 0x4;
+        static const U_32 COMPRESSED_MASK  = 0x4;
 #endif
 
 #ifdef GCMAP_TRACK_IDS
         // flags + val + mptrOffset + firstId
-        static const uint32 IMAGE_SIZE_UINT32 = 4; //do not use sizeof due to the potential struct layout problems
+        static const U_32 IMAGE_SIZE_UINT32 = 4; //do not use sizeof due to the potential struct layout problems
 #else 
         // flags + val + mptrOffset 
         static const POINTER_SIZE_INT IMAGE_SIZE_UINT32 = 3;
@@ -121,10 +121,10 @@ namespace Ia32 {
     public:
         
 #ifdef _EM64T_
-        GCSafePointOpnd(bool isObject, bool isOnRegister, int32 _val, int32 _mptrOffset, bool isCompressed=false) : val(_val), mptrOffset(_mptrOffset) {
+        GCSafePointOpnd(bool isObject, bool isOnRegister, I_32 _val, I_32 _mptrOffset, bool isCompressed=false) : val(_val), mptrOffset(_mptrOffset) {
             flags = flags | (isCompressed ? COMPRESSED_MASK: 0);
 #else
-        GCSafePointOpnd(bool isObject, bool isOnRegister, int32 _val, int32 _mptrOffset) : val(_val), mptrOffset(_mptrOffset) {
+        GCSafePointOpnd(bool isObject, bool isOnRegister, I_32 _val, I_32 _mptrOffset) : val(_val), mptrOffset(_mptrOffset) {
 #endif
             flags = isObject ? OBJ_MASK : 0;
             flags = flags | (isOnRegister ? REG_MASK: 0);
@@ -143,37 +143,37 @@ namespace Ia32 {
         bool isCompressed() const { return (flags & COMPRESSED_MASK)!=0;}
 #endif      
         RegName getRegName() const { assert(isOnRegister()); return RegName(val);}
-        int32 getDistFromInstESP() const { assert(isOnStack()); return val;}
+        I_32 getDistFromInstESP() const { assert(isOnStack()); return val;}
 
-        int32 getMPtrOffset() const {return mptrOffset;}
+        I_32 getMPtrOffset() const {return mptrOffset;}
         void getMPtrOffset(int newOffset) {mptrOffset = newOffset;}
 
 #ifdef GCMAP_TRACK_IDS
-        uint32 firstId;
+        U_32 firstId;
 #endif
 
     private:
-        GCSafePointOpnd(uint32 _flags, int32 _val, int32 _mptrOffset) : flags(_flags), val(_val), mptrOffset(_mptrOffset) {}
+        GCSafePointOpnd(U_32 _flags, I_32 _val, I_32 _mptrOffset) : flags(_flags), val(_val), mptrOffset(_mptrOffset) {}
 
         //first bit is location, second is type
-        uint32 flags;        
+        U_32 flags;        
         //opnd placement ->Register or offset
-        int32 val; 
-        int32 mptrOffset;
+        I_32 val; 
+        I_32 mptrOffset;
     };
 
 
     class GCMapCreator : public SessionAction {
         void runImpl();
-        uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo;}
-        uint32 getSideEffects() {return Log::isEnabled();}
+        U_32 getNeedInfo()const{ return NeedInfo_LivenessInfo;}
+        U_32 getSideEffects() {return Log::isEnabled();}
         bool isIRDumpEnabled(){ return true;}
     };        
 
     class InfoBlockWriter : public SessionAction {
         void runImpl();
-        uint32 getNeedInfo()const{ return 0; }
-        uint32 getSideEffects()const{ return 0; }
+        U_32 getNeedInfo()const{ return 0; }
+        U_32 getSideEffects()const{ return 0; }
         bool isIRDumpEnabled(){ return false; }
     };
 

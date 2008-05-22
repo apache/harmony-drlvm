@@ -34,10 +34,10 @@ namespace Jitrino {
 template <typename inttype, int width> inline int popcount(inttype x);
 template <>
 inline
-int popcount<int32, 32> (int32 x)
+int popcount<I_32, 32> (I_32 x)
 {
 #ifdef _USE_ITANIUM_INTRINSICS_
-    uint32 y = x; // avoid sign extension
+    U_32 y = x; // avoid sign extension
     __m64 z = _m_from_int(int(y));
     __m64 r = __m64_popcnt(z);
     return _m_to_int(r);
@@ -156,7 +156,7 @@ inttype leftmost1(inttype x);
 
 template <>
 inline
-int32 leftmost1<int32>(int32 x)
+I_32 leftmost1<I_32>(I_32 x)
 {
     if (x == 1) return 1;
     if (x == 0) return 0;
@@ -194,14 +194,14 @@ int nlz(inttype x);
 
 template <>
 inline
-int nlz<int32, 32>(int32 x)
+int nlz<I_32, 32>(I_32 x)
 {
     x = x | (x >> 1);
     x = x | (x >> 2);
     x = x | (x >> 4);
     x = x | (x >> 8);
     x = x | (x >> 16);
-    return popcount<int32, 32>(~x);
+    return popcount<I_32, 32>(~x);
 }
 
 template <>
@@ -271,7 +271,7 @@ inline uinttype isqrt_iter(uinttype n, uinttype approx)
 template <typename uinttype> inline uinttype isqrt(uinttype n);
 
 template <> inline uint64 isqrt(uint64 n) { return isqrt_iter(n, (uint64) 65536); }
-template <> inline uint32 isqrt(uint32 n) { return isqrt_iter(n, (uint32) 256); }
+template <> inline U_32 isqrt(U_32 n) { return isqrt_iter(n, (U_32) 256); }
 template <> inline uint16 isqrt(uint16 n) { return isqrt_iter(n, (uint16) 16); }
 template <> inline uint8 isqrt(uint8 n) { return isqrt_iter(n, (uint8) 4); }
 

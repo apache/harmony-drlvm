@@ -45,16 +45,16 @@ class EarlyPropagation : public SessionAction {
 
     struct OpndInfo
     {
-        uint32 defCount;
+        U_32 defCount;
         Inst * sourceInst;
-        uint32 sourceOpndId;
-        uint32 sourceOpndDefCountAtCopy;
+        U_32 sourceOpndId;
+        U_32 sourceOpndDefCountAtCopy;
         OpndInfo()
             :defCount(0), sourceInst(NULL), sourceOpndId(EmptyUint32), sourceOpndDefCountAtCopy(0){}
     };
     
     void runImpl();
-    uint32 getNeedInfo()const{ return 0; }
+    U_32 getNeedInfo()const{ return 0; }
 };
 
 static ActionFactory<EarlyPropagation> _early_prop("early_prop");
@@ -71,7 +71,7 @@ static bool isTypeConversionAllowed(Opnd* fromOpnd, Opnd* toOpnd) {
 void EarlyPropagation::runImpl()
 { 
         irManager->updateLoopInfo();
-        uint32 opndCount=irManager->getOpndCount();
+        U_32 opndCount=irManager->getOpndCount();
 
         MemoryManager mm("early_prop");
         OpndInfo * opndInfos = new(mm) OpndInfo[opndCount];
@@ -89,7 +89,7 @@ void EarlyPropagation::runImpl()
             Node * loopHeader = lt->getLoopHeader(node, false);
             if (currentLoopHeader != loopHeader){
                 currentLoopHeader = loopHeader;
-                for (uint32 i = 0; i < opndCount; ++i)
+                for (U_32 i = 0; i < opndCount; ++i)
                     if (opndInfos[i].sourceOpndId != EmptyUint32)
                         opndInfos[i].defCount++;
             }
@@ -99,11 +99,11 @@ void EarlyPropagation::runImpl()
                 Inst::Opnds opnds(inst, Inst::OpndRole_All);
                 for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it)){
                     Opnd * opnd=inst->getOpnd(it);
-                    uint32 roles=inst->getOpndRoles(it);
-                    uint32 opndId = opnd->getId();
+                    U_32 roles=inst->getOpndRoles(it);
+                    U_32 opndId = opnd->getId();
                     OpndInfo& opndInfo = opndInfos[opndId];
 
-                    uint32 mask = 0;
+                    U_32 mask = 0;
 
                     if (roles & Inst::OpndRole_Def){
                         ++opndInfo.defCount;
@@ -150,7 +150,7 @@ void EarlyPropagation::runImpl()
                 if (isCopy){ // CopyPseudoInst or mov
                     Opnd * defOpnd = inst->getOpnd(0);
                     Opnd * srcOpnd = inst->getOpnd(1);
-                    uint32 defOpndId = defOpnd->getId();
+                    U_32 defOpndId = defOpnd->getId();
                     OpndInfo * opndInfo = opndInfos + defOpndId;
                     bool instHandled=false;
                     bool typeConvOk = isTypeConversionAllowed(srcOpnd, defOpnd);
@@ -175,7 +175,7 @@ void EarlyPropagation::runImpl()
             Opnd ** replacements = new(mm) Opnd* [opndCount];
             memset(replacements, 0, sizeof(Opnd*) * opndCount);
             bool hasReplacements = false;
-            for (uint32 i = 0; i < opndCount; ++i){
+            for (U_32 i = 0; i < opndCount; ++i){
                 if (opndInfos[i].sourceOpndId != EmptyUint32){
                     Inst * inst = opndInfos[i].sourceInst;
                     if (inst !=NULL){

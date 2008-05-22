@@ -93,7 +93,7 @@ SplitSSAPass::_run(IRManager& irm) {
 class RenameStack : public SparseScopedMap<Opnd *, SsaVarOpnd *> {
 public:
     typedef SparseScopedMap<Opnd *, SsaVarOpnd *> BaseMap;
-    RenameStack(MemoryManager& mm, uint32 n, const OptimizerFlags& optimizerFlags)
+    RenameStack(MemoryManager& mm, U_32 n, const OptimizerFlags& optimizerFlags)
         : BaseMap(n, mm,
                   optimizerFlags.hash_init_factor,
                   optimizerFlags.hash_resize_factor,
@@ -159,8 +159,8 @@ void SSABuilder::findDefSites(DefSites& allDefSites) {
 void SSABuilder::addPhiSrc(PhiInst* i, 
                            SsaVarOpnd* src) {
     assert(i->isPhi());
-    uint32 numOpnds = i->getNumSrcOperands();
-    for (uint32 j = 0; j < numOpnds; j++) {
+    U_32 numOpnds = i->getNumSrcOperands();
+    for (U_32 j = 0; j < numOpnds; j++) {
         // no duplicate SSA opnd
         if (i->getSrc(j) == src) 
             return;
@@ -173,13 +173,13 @@ class SsaRenameWalker {
     MemoryManager &localMemManager;
     SSABuilder *ssaBuilder;
     RenameStack *rs;
-    uint32 n;
+    U_32 n;
     const StlVectorSet<VarOpnd *> *whatVars;
     const OptimizerFlags& optimizerFlags;
 public:
     SsaRenameWalker(SSABuilder *builder0,
                     MemoryManager &localMM,
-                    uint32 num, const OptimizerFlags& _optimizerFlags)
+                    U_32 num, const OptimizerFlags& _optimizerFlags)
         : localMemManager(localMM),
           ssaBuilder(builder0),
           rs(0),
@@ -225,8 +225,8 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
     for (Inst* i = head->getNextInst(); i != NULL; i = i->getNextInst()) {
         if (!i->isPhi()) {
             // replace src with ssa opnd
-            uint32 nSrcs = i->getNumSrcOperands();
-            for (uint32 j = 0; j < nSrcs; j++) {
+            U_32 nSrcs = i->getNumSrcOperands();
+            for (U_32 j = 0; j < nSrcs; j++) {
                 Opnd *srcj = i->getSrc(j);
                 VarOpnd *srcjVar = (srcj->isSsaVarOpnd()
                                     ? srcj->asSsaVarOpnd()->getVar()
@@ -326,7 +326,7 @@ void SSABuilder::renameNode(RenameStack *renameStack, DominatorNode* dt,
 #ifdef DEBUG_SSA
                 if (Log::isEnabled()) {
                     cout << "redge";
-//                    cout << (int32)j;
+//                    cout << (I_32)j;
                     cout << " with ssa "; ssa->print(cout); cout << ::std::endl;
                 }
 #endif
@@ -410,7 +410,7 @@ bool SSABuilder::convertSSA(MethodDesc&    methodDesc) {
     // rename
     SsaRenameWalker renameWalker(this, ssaMemManager,
                                  optimizerFlags.hash_node_var_factor *
-                                 (uint32) fg->getNodes().size(), optimizerFlags);
+                                 (U_32) fg->getNodes().size(), optimizerFlags);
 
     DomTreeWalk<true, // pre-order
         SsaRenameWalker>(frontier.getDominator(), renameWalker, ssaMemManager);  
@@ -522,8 +522,8 @@ void SSABuilder::clearPhiSrcs2(Node *node,
                 continue;
         }
         bool changed=false;
-        uint32 numSrcs = inst->getNumSrcOperands();
-        for (uint32 i=0; i<numSrcs; ++i) {
+        U_32 numSrcs = inst->getNumSrcOperands();
+        for (U_32 i=0; i<numSrcs; ++i) {
             Opnd *thisOpnd = inst->getSrc(i);
 
             if (!(removedVars && removedVars->has(thisOpnd))) {
@@ -651,7 +651,7 @@ bool SSABuilder::checkForTrivialPhis(Node *node,
         PhiInst *phiInst = phi->asPhiInst();
         assert(phiInst);
 #endif
-        uint32 nSrcs = phi->getNumSrcOperands();
+        U_32 nSrcs = phi->getNumSrcOperands();
         if (nSrcs <= 1) {
             // phi must be trivial
 #ifdef DEBUG_SSA
@@ -727,7 +727,7 @@ void SSABuilder::checkForTrivialPhis2(Node *node,
         PhiInst *phiInst = phi->asPhiInst();
         assert(phiInst);
 #endif
-        uint32 nSrcs = phi->getNumSrcOperands();
+        U_32 nSrcs = phi->getNumSrcOperands();
         if (nSrcs <= 1) {
             // phi must be trivial
 #ifdef DEBUG_SSA
@@ -797,7 +797,7 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
         // do renaming to propagate vars to Phis which had vars removed
         SsaRenameWalker renameWalker(this, localMM,
                                      optimizerFlags.hash_node_var_factor *
-                                     (uint32) fg->getNodes().size(), optimizerFlags);
+                                     (U_32) fg->getNodes().size(), optimizerFlags);
 
         // oldChangedVarsSet will be the set for looking up Vars to consider
         StlVectorSet<VarOpnd *> oldChangedVarsSet(localMM);
@@ -863,7 +863,7 @@ bool SSABuilder::fixupSSA(MethodDesc& methodDesc, bool useBetter) {
         
         SsaRenameWalker renameWalker(this, localMM,
                                      optimizerFlags.hash_node_var_factor *
-                                     (int32) fg->getNodes().size(), optimizerFlags);
+                                     (I_32) fg->getNodes().size(), optimizerFlags);
         DomTreeWalk<true, // pre-order
             SsaRenameWalker>(frontier.getDominator(), renameWalker,
                              localMM);
@@ -951,8 +951,8 @@ public:
     };
 
     void applyToInst(Inst *inst) {
-        uint32 numSrcs = inst->getNumSrcOperands();
-        for (uint32 i=0; i<numSrcs; ++i) {
+        U_32 numSrcs = inst->getNumSrcOperands();
+        for (U_32 i=0; i<numSrcs; ++i) {
             Opnd *thisOpnd = inst->getSrc(i);
             recordOpnd(thisOpnd);
         }
@@ -1008,8 +1008,8 @@ public:
                 }
             }
         }
-        uint32 numSrcs = inst->getNumSrcOperands();
-        for (uint32 i=0; i<numSrcs; ++i) {
+        U_32 numSrcs = inst->getNumSrcOperands();
+        for (U_32 i=0; i<numSrcs; ++i) {
             Opnd *thisOpnd = inst->getSrc(i);
             VarOpnd *varOpnd = needToDeSsaOpnd(thisOpnd);
             if (varOpnd) {
@@ -1102,7 +1102,7 @@ void SSABuilder::deconvertSSA(ControlFlowGraph* fg,OpndManager& opndManager) {
             if (inst->isPhi()) {
                 inst->unlink();
             } else {
-                for (uint32 i = 0; i < inst->getNumSrcOperands(); i++) {
+                for (U_32 i = 0; i < inst->getNumSrcOperands(); i++) {
                     Opnd *opnd = inst->getSrc(i);
                     if (opnd->isSsaVarOpnd()) {
                         SsaVarOpnd *ssa = (SsaVarOpnd *)opnd;
@@ -1138,7 +1138,7 @@ struct SsaVarClique : private UnionFind {
 // rename vars to make un-overlapping live ranges of a variable into
 // different variables.
 void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
-    uint32 numSsaOpnds = opndManager.getNumSsaOpnds();
+    U_32 numSsaOpnds = opndManager.getNumSsaOpnds();
     MemoryManager localMM("SSABuilder::splitSsaWebs::memManager");
     SsaVarClique *cliques = new (localMM) SsaVarClique[numSsaOpnds];
     
@@ -1153,11 +1153,11 @@ void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
                 // do something
                 VarOpnd *var0 = 0;
                 SsaVarClique *clique = 0;
-                for (uint32 i = 0; i < inst->getNumSrcOperands(); i++) {
+                for (U_32 i = 0; i < inst->getNumSrcOperands(); i++) {
                     Opnd *opnd = inst->getSrc(i);
                     if (opnd->isSsaVarOpnd()) {
                         SsaVarOpnd *ssa = (SsaVarOpnd *)opnd;
-                        uint32 id = ssa->getId();
+                        U_32 id = ssa->getId();
                         if (var0) {
                             assert(ssa->getVar()==var0);
                             cliques[id].link(clique);
@@ -1171,7 +1171,7 @@ void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
                 if (dst->isSsaVarOpnd()) {
                     SsaVarOpnd *ssa = (SsaVarOpnd *)dst;
                     ssa->getVar();
-                    uint32 id = ssa->getId();
+                    U_32 id = ssa->getId();
                     if (var0) {
                         assert(ssa->getVar()==var0);
                         cliques[id].link(clique);
@@ -1184,9 +1184,9 @@ void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
             inst = nextInst;
         }
     }
-    uint32 numvars = opndManager.getNumVarOpnds();
+    U_32 numvars = opndManager.getNumVarOpnds();
     bool *used = new (localMM) bool[numvars];
-    for (uint32 i=0; i<numvars; i++) {
+    for (U_32 i=0; i<numvars; i++) {
         used[i] = false;
     }
 
@@ -1196,17 +1196,17 @@ void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
         for (Inst *inst = headInst->getNextInst(); inst != NULL; ) {
             Inst *nextInst = inst->getNextInst();
 
-            for (uint32 i = 0; i < inst->getNumSrcOperands(); i++) {
+            for (U_32 i = 0; i < inst->getNumSrcOperands(); i++) {
                 Opnd *opnd = inst->getSrc(i);
                 if (opnd->isSsaVarOpnd()) {
                     SsaVarOpnd *ssa = (SsaVarOpnd *)opnd;
                     VarOpnd *var = ssa->getVar();
-                    uint32 id=ssa->getId();
+                    U_32 id=ssa->getId();
                     SsaVarClique *clique = &cliques[id];
                     clique = clique->getRoot();
                     VarOpnd *cvar = clique->var;
                     if (cvar == 0) {
-                        uint32 varId = var->getId();
+                        U_32 varId = var->getId();
                         if (used[varId]) {
                             cvar = opndManager.createVarOpnd(var->getType(),
                                                              var->isPinned());
@@ -1225,13 +1225,13 @@ void SSABuilder::splitSsaWebs(ControlFlowGraph* fg,OpndManager& opndManager) {
             if (dst->isSsaVarOpnd()) {
                 SsaVarOpnd *ssa = (SsaVarOpnd *)dst;
                 VarOpnd *var = ssa->getVar();
-                uint32 id=ssa->getId();
+                U_32 id=ssa->getId();
 
                 SsaVarClique *clique = &cliques[id];
                 clique = clique->getRoot();
                 VarOpnd *cvar = clique->var;
                 if (cvar == 0) {
-                    uint32 varId = var->getId();
+                    U_32 varId = var->getId();
                     if (used[varId]) {
                         cvar = opndManager.createVarOpnd(var->getType(),
                                                          var->isPinned());

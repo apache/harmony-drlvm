@@ -132,18 +132,18 @@ FastArrayFillPass::_run(IRManager& irManager)
     /* Code pattern:
 
     label .node1
-    arraylen  arrayRef ((tau1,tau3)) -) arrayBound:int32
+    arraylen  arrayRef ((tau1,tau3)) -) arrayBound:I_32
     chkub 0 .lt. arrayBound -) tau2:tau
     GOTO .node2
 
     label .node2
     ldbase    arrayRef -) arrayBase:ref:char
     stind.unc:chr constValue ((tau1,tau2,tau3)) -) [arrayBase]
-    stvar     startIndex -) index:int32
+    stvar     startIndex -) index:I_32
     GOTO .loopNode1
 
     label .loopNode1
-    ldvar     index -) tmpIndex:int32
+    ldvar     index -) tmpIndex:I_32
     if cge.i4  tmpIndex, fillBound goto .loopExit
     GOTO .node2
 
@@ -154,8 +154,8 @@ FastArrayFillPass::_run(IRManager& irManager)
     label .loopNode3
     addindex  arrayBase, tmpIndex -) address:ref:char
     stind.unc:chr constValue ((tau1,tau2,tau3)) -) [address]
-    add   tmpIndex, addOp -) inc:int32
-    stvar     inc -) index:int32
+    add   tmpIndex, addOp -) inc:I_32
+    stvar     inc -) index:I_32
     GOTO .node1
     
     */
@@ -283,7 +283,7 @@ FastArrayFillPass::_run(IRManager& irManager)
 #ifdef _EM64T_
         int64 val = (int64)((ConstInst*)constValue->getInst())->getValue().i8;
 #else
-        int32 val = (int32)((ConstInst*)constValue->getInst())->getValue().i4;
+        I_32 val = (I_32)((ConstInst*)constValue->getInst())->getValue().i4;
 #endif
         switch (((Type*)arrayRef->getType()->asArrayType()->getElementType())->tag) {
             case Type::Int8:

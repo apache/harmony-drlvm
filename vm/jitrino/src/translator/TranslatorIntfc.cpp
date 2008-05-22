@@ -135,7 +135,7 @@ void TranslatorAction::readFlags() {
 }
 
 
-OpndStack::OpndStack(MemoryManager& memManager,uint32 slots) 
+OpndStack::OpndStack(MemoryManager& memManager,U_32 slots) 
     : maxSlots(slots) 
 {
     opnds = new (memManager) Opnd*[maxSlots];
@@ -149,29 +149,29 @@ enum {
     StackOpndAlive = 0x10,  // to get rid of phi nodes in the translator
     StackOpndSaved = 0x20   // to get rid of phi nodes in the translator
 };
-static bool isNonNull(uint32 flags)   {
+static bool isNonNull(U_32 flags)   {
     return (flags & IsNonNull) != 0; 
 }
-static bool isExactType(uint32 flags) {
+static bool isExactType(U_32 flags) {
     return (flags & IsExactType) != 0; 
 }
-static uint32 setNonNull(uint32 flags,bool val) { 
+static U_32 setNonNull(U_32 flags,bool val) { 
     return (val ? (flags | IsNonNull) : (flags & ~IsNonNull));
 }
-static uint32 setExactType(uint32 flags,bool val){ 
+static U_32 setExactType(U_32 flags,bool val){ 
     return (val ? (flags | IsExactType) : (flags & ~IsExactType));
 }
-static bool isStackOpndAlive(uint32 flags) {
+static bool isStackOpndAlive(U_32 flags) {
     return (flags & StackOpndAlive) != 0;
 }
-static bool isStackOpndSaved(uint32 flags) {
+static bool isStackOpndSaved(U_32 flags) {
     return (flags & StackOpndSaved) != 0;
 }
-static uint32 setStackOpndAlive(uint32 flags,bool val) {
+static U_32 setStackOpndAlive(U_32 flags,bool val) {
     return (val ? (flags | StackOpndAlive) : (flags & ~StackOpndAlive));
 }
 
-static uint32 setStackOpndSaved(uint32 flags,bool val) {
+static U_32 setStackOpndSaved(U_32 flags,bool val) {
     return (val ? (flags | StackOpndSaved) : (flags & ~StackOpndSaved));
 }
 
@@ -217,7 +217,7 @@ setNonNullOpnd(Opnd* opnd,bool val) {
         //
         // use the properties in Opnd
         //
-        uint32 props = opnd->getProperties();
+        U_32 props = opnd->getProperties();
         opnd->setProperties(setNonNull(props,val));
         return;
     }
@@ -229,7 +229,7 @@ setExactTypeOpnd(Opnd* opnd,bool val) {
         //
         // use the properties in Opnd
         //
-        uint32 props = opnd->getProperties();
+        U_32 props = opnd->getProperties();
         opnd->setProperties(setExactType(props,val));
         return;
     }
@@ -240,7 +240,7 @@ setStackOpndAliveOpnd(Opnd* opnd,bool val) {
     //
     // use the properties in Opnd
     //
-    uint32 props = opnd->getProperties();
+    U_32 props = opnd->getProperties();
     opnd->setProperties(setStackOpndAlive(props,val));
     return;
 }
@@ -250,7 +250,7 @@ setStackOpndSavedOpnd(Opnd* opnd,bool val) {
     //
     // use the properties in Opnd
     //
-    uint32 props = opnd->getProperties();
+    U_32 props = opnd->getProperties();
     opnd->setProperties(setStackOpndSaved(props,val));
     return;
 }

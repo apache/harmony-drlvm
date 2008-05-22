@@ -138,10 +138,10 @@ public:
         //  This might be useful if tags become non sequential, e.g., bit positions
         //  so that we can encode multiple tag usage for managed pointers in CLI.
         //
-        static uint32  getNumTagIds() {return NumTags;}
-        static uint32  getTagId(Tag tag) {return tag;}
-        uint32         getTagId() const {return getTagId(tag);}
-        static Tag     mapIdToTag(uint32 _id) {return (Tag)_id;}
+        static U_32  getNumTagIds() {return NumTags;}
+        static U_32  getTagId(Tag tag) {return tag;}
+        U_32         getTagId() const {return getTagId(tag);}
+        static Tag     mapIdToTag(U_32 _id) {return (Tag)_id;}
         //
         //  Checks if memory context is exact
         //
@@ -184,7 +184,7 @@ public:
         //
         //  Get various ids
         //
-        uint32 getStackOffset() const {
+        U_32 getStackOffset() const {
             assert(getIdKind() == StackId);
             return id.stackOffset;
         }
@@ -196,7 +196,7 @@ public:
             assert(getIdKind() == MethodId);
             return id.methodDesc;
         }
-        uint32     getProfileCounterId() const {
+        U_32     getProfileCounterId() const {
             assert(getIdKind() == CounterId);
             return id.counterId;
         }
@@ -222,7 +222,7 @@ public:
             bool         maybeTypeAliased;
         };
     private:
-        Context(Tag t, uint32 _size = 0)
+        Context(Tag t, U_32 _size = 0)
             : tag(t), size((uint8)_size) {
             id.all = UnknownMemoryContextId;
             assert(_size <= 0xff);
@@ -240,17 +240,17 @@ public:
             return info[tag].idKind;
         }
         bool    hasUnknownId() const {return id.all == UnknownMemoryContextId;}
-        uint32  getId() const;
+        U_32  getId() const;
     void    printId(::std::ostream& os) const;
         //
         // Fields
         //
         Tag      tag : 8;
         union IdUnion {
-            uint32       stackOffset;
+            U_32       stackOffset;
             FieldDesc *  fieldDesc;
             MethodDesc * methodDesc;
-            uint32       counterId;
+            U_32       counterId;
             uint64       all;
         } id;
         uint8    size; // size of accessed memory in bytes; used for stack locations
@@ -318,7 +318,7 @@ public:
     //
     // Get memory context for accessing stack memory of given size at given offset
     //
-    MemoryAttribute::Context getStackContext(uint32 offset, uint32 size) {
+    MemoryAttribute::Context getStackContext(U_32 offset, U_32 size) {
         assert(size <= 0xff);
         MemoryAttribute::Context c(MemoryAttribute::Context::StackLocation,
                                    (uint8)size);
@@ -330,7 +330,7 @@ public:
     //  This is IPF specific as incoming arguments are in the previous frame
     //  and their stack offset is not known till the final register allocation.
     //
-    MemoryAttribute::Context getStackIncomingArgContext(uint32 offset) {
+    MemoryAttribute::Context getStackIncomingArgContext(U_32 offset) {
         MemoryAttribute::Context c(MemoryAttribute::Context::StackIncomingArg);
         c.id.stackOffset = offset;
         return c;
@@ -356,7 +356,7 @@ public:
     MemoryAttribute::Context getJitConstantContext() {
         return MemoryAttribute::Context(MemoryAttribute::Context::JitConstant);
     }
-    MemoryAttribute::Context getProfileCounterContext(uint32 counterId) {
+    MemoryAttribute::Context getProfileCounterContext(U_32 counterId) {
         MemoryAttribute::Context c(MemoryAttribute::Context::ProfileCounter);
         c.id.counterId = counterId;
         return c;
@@ -365,8 +365,8 @@ public:
     //  Returns a memory context at (offset, size) from the given context
     //
     MemoryAttribute::Context findContextAtOffset(MemoryAttribute::Context& mc,
-                                                 uint32                    _offset,
-                                                 uint32                    _size) {
+                                                 U_32                    _offset,
+                                                 U_32                    _size) {
         MemoryAttribute::Context context(mc);
         if (context.tag == MemoryAttribute::Context::StackLocation ||
             context.tag == MemoryAttribute::Context::StackIncomingArg) {

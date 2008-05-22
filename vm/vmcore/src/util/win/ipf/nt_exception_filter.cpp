@@ -74,7 +74,7 @@ void nt_to_vm_context(PCONTEXT pcontext, Registers* regs)
     regs->gr[ 30]   = (uint64)(pcontext->IntT21);
     regs->gr[ 31]   = (uint64)(pcontext->IntT22);
 
-    uint32 gr_cursor = 32;
+    U_32 gr_cursor = 32;
     uint64 *bsp_cursor = regs->bsp;
 
     while (gr_cursor<128) {

@@ -114,13 +114,13 @@ void LilCguLabelAddresses::apply_patch(LilCguLabelAddress * label_adress, LilCgu
         *(int8*)patch->addr = (int8)diff;
         break;
     case LPT_Rel32:
-        diff = (int64)((char *)label_adress->addr - (char *)((int32 *)patch->addr + 1));
-        assert(diff == (int64)(int32)diff);
-        *(int32*)patch->addr = (int32)diff;
+        diff = (int64)((char *)label_adress->addr - (char *)((I_32 *)patch->addr + 1));
+        assert(diff == (int64)(I_32)diff);
+        *(I_32*)patch->addr = (I_32)diff;
         break;
     case LPT_Abs32:
         assert((POINTER_SIZE_INT)label_adress->addr <= 0xFFFFffff);
-        *(int32*)patch->addr = (int32)(POINTER_SIZE_INT)label_adress->addr;
+        *(I_32*)patch->addr = (I_32)(POINTER_SIZE_INT)label_adress->addr;
         break;
     default:
         DIE(("Unknown patch typ"));

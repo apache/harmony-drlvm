@@ -83,10 +83,10 @@ JIT_get_root_set_for_thread_dump(JIT_Handle             jit,
  * @param prt - corresponding inline info
  * @param offset - offset in native code relative to code block start
  */
-JITEXPORT uint32 
+JITEXPORT U_32 
 JIT_get_inline_depth(JIT_Handle jit, 
                      InlineInfoPtr   ptr, 
-                     uint32          offset);
+                     U_32          offset);
 
 /**
 * Returns specified inlined method (null if not found).
@@ -102,8 +102,8 @@ JIT_get_inline_depth(JIT_Handle jit,
 JITEXPORT Method_Handle
 JIT_get_inlined_method(JIT_Handle jit, 
                        InlineInfoPtr ptr, 
-                       uint32 offset,
-                       uint32 inline_depth);
+                       U_32 offset,
+                       U_32 inline_depth);
 
 /**
 * Returns bytecode offset at specified inlined method for the native code (zero if unknown).
@@ -119,8 +119,8 @@ JIT_get_inlined_method(JIT_Handle jit,
 JITEXPORT uint16
 JIT_get_inlined_bc(JIT_Handle jit, 
                    InlineInfoPtr ptr, 
-                   uint32 offset, 
-                   uint32 inline_depth);
+                   U_32 offset, 
+                   U_32 inline_depth);
 
 JITEXPORT void
 JIT_fix_handler_context(JIT_Handle         jit,

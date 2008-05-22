@@ -86,11 +86,11 @@ public:
     bool isDOL() const {return type == DEF_OUT_OF_LOOP;} 
     bool isUndefined() const {return type == UNDEF;} 
 
-    uint32 getConst() const {
+    U_32 getConst() const {
         assert(getType() == LD_CONST);
         return val;
     }
-    void setConst(uint32 v) {
+    void setConst(U_32 v) {
         assert(getType() == LD_CONST);
         val = v;
     }
@@ -243,7 +243,7 @@ private:
     void replaceOperands(Type* type, Inst* newDef, SsaOpnd* iv,
              SsaOpnd* rc, Opcode opcode, Operation op);
     void findLeadingOpnd(Inst* newDef, SsaOpnd* opnd);
-    void replaceOperand(uint32 num, Inst* newDef, SsaOpnd* o,
+    void replaceOperand(U_32 num, Inst* newDef, SsaOpnd* o,
             Opnd* lead, Node* leadBlock, Type* type,
             Opcode opcode, SsaOpnd* rc, Operation op);
     Inst *findInsertionPlace(SsaOpnd* opnd2, SsaOpnd* opnd1);

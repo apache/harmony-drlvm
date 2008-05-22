@@ -205,7 +205,7 @@ protected:
     void writeStackMapFrame_Same(Address offset);
     void writeStackMapFrame_Cut(Address offset, int attr_delta, int workmap_delta);
     void writeStackMapFrame_Append(Address offset, int attr_delta, int workmap_delta);
-    void writeStackMapElements(Address start, uint32 cnt);
+    void writeStackMapElements(Address start, U_32 cnt);
 
     void writeByte(uint16 byte) {
         assert(byte < 256);
@@ -444,8 +444,8 @@ protected:
     void* unparsedPairs;
 
 
-    uint32 attrLen;
-    uint32 attrSz;
+    U_32 attrLen;
+    U_32 attrSz;
 };
 
 

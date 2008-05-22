@@ -65,16 +65,16 @@ public:
     void close();
 
     /** print everything supposed to be printed to the current output */
-    virtual void print(uint32 indent=0);
+    virtual void print(U_32 indent=0);
     
-    virtual void printHeader(uint32 indent=0);
-    virtual void printEnd(uint32 indent=0);
-    virtual void printBody(uint32 indent=0);
+    virtual void printHeader(U_32 indent=0);
+    virtual void printEnd(U_32 indent=0);
+    virtual void printBody(U_32 indent=0);
 
     /** Prints indent tabs */
-    virtual void printIndent(uint32 indent)
+    virtual void printIndent(U_32 indent)
         { while (indent--) getStream()<<'\t';  }
-    static void printIndent(::std::ostream& os, uint32 indent)
+    static void printIndent(::std::ostream& os, U_32 indent)
         { Printer p; p.setStream(os); p.printIndent(indent); }
 
     /** returns the current output desitnation */
@@ -113,23 +113,23 @@ public:
     static void printRegName(::std::ostream& os, const RegName regName)
     { OpcodeDescriptionPrinter p; p.setStream(os); p.printRegName(regName); }
 
-    virtual void printOpndRoles(uint32 roles);
-    static void printOpndRoles(::std::ostream& os, uint32 roles)
+    virtual void printOpndRoles(U_32 roles);
+    static void printOpndRoles(::std::ostream& os, U_32 roles)
     { OpcodeDescriptionPrinter p; p.setStream(os); p.printOpndRoles(roles); }
 
     virtual void printOpndRolesDescription(const Encoder::OpndRolesDescription * ord);
     static void printOpndRolesDescription(::std::ostream& os, Encoder::OpndRolesDescription * ord)
     { OpcodeDescriptionPrinter p; p.setStream(os); p.printOpndRolesDescription(ord); }
 
-    virtual void printOpcodeDescription(const Encoder::OpcodeDescription * od, uint32 indent=0);
-    static void printOpcodeDescription(::std::ostream& os, Encoder::OpcodeDescription * od, uint32 indent=0)
+    virtual void printOpcodeDescription(const Encoder::OpcodeDescription * od, U_32 indent=0);
+    static void printOpcodeDescription(::std::ostream& os, Encoder::OpcodeDescription * od, U_32 indent=0)
     { OpcodeDescriptionPrinter p; p.setStream(os); p.printOpcodeDescription(od, indent); }
 
-    virtual void printOpcodeGroup(const Encoder::OpcodeGroup* og, uint32 indent=0);
-    static void printOpcodeGroup(::std::ostream& os, Encoder::OpcodeGroup* og, uint32 indent=0)
+    virtual void printOpcodeGroup(const Encoder::OpcodeGroup* og, U_32 indent=0);
+    static void printOpcodeGroup(::std::ostream& os, Encoder::OpcodeGroup* og, U_32 indent=0)
     { OpcodeDescriptionPrinter p; p.setStream(os); p.printOpcodeGroup(og, indent); }
 
-    virtual void print(uint32 indent=0);
+    virtual void print(U_32 indent=0);
 };
 
 //========================================================================================
@@ -151,23 +151,23 @@ public:
     };
 
     IRPrinter(const IRManager * irm=0, const char * _title=0)
-        :OpcodeDescriptionPrinter(irm, _title), instFilter((uint32)Inst::Kind_Inst), 
-        opndFlavor((uint32)OpndFlavor_All), opndRolesFilter((uint32)(Inst::OpndRole_InstLevel|Inst::OpndRole_Use|Inst::OpndRole_Def))
+        :OpcodeDescriptionPrinter(irm, _title), instFilter((U_32)Inst::Kind_Inst), 
+        opndFlavor((U_32)OpndFlavor_All), opndRolesFilter((U_32)(Inst::OpndRole_InstLevel|Inst::OpndRole_Use|Inst::OpndRole_Def))
     {}
 
-    IRPrinter & setInstFilter(uint32 kinds){ instFilter=kinds; return *this; }
-    IRPrinter & setOpndFlavor(uint32 f){ opndFlavor=f; return *this; }
-    IRPrinter & setOpndRolesFilter(uint32 orf){ opndRolesFilter=orf; return *this; }
+    IRPrinter & setInstFilter(U_32 kinds){ instFilter=kinds; return *this; }
+    IRPrinter & setOpndFlavor(U_32 f){ opndFlavor=f; return *this; }
+    IRPrinter & setOpndRolesFilter(U_32 orf){ opndRolesFilter=orf; return *this; }
 
     virtual void printNodeName(const Node * node);
     static void printNodeName(::std::ostream& os, const Node * node)
     { IRPrinter p; p.setStream(os); p.printNodeName(node); }
 
-    virtual void printNodeHeader(const Node * node, uint32 indent=0);
-    virtual void printNodeInstList(const Node* bb, uint32 indent=0);
+    virtual void printNodeHeader(const Node * node, U_32 indent=0);
+    virtual void printNodeInstList(const Node* bb, U_32 indent=0);
 
-    virtual void printNode(const Node * node, uint32 indent=0);
-    static void printNode(::std::ostream& os, const Node * node, uint32 indent=0)
+    virtual void printNode(const Node * node, U_32 indent=0);
+    static void printNode(::std::ostream& os, const Node * node, U_32 indent=0)
     { IRPrinter p; p.setStream(os); p.printNode(node, indent); }
 
     virtual void printEdge(const Edge * edge);
@@ -176,27 +176,27 @@ public:
 
     virtual void printInst(const Inst * inst);
     static void printInst(::std::ostream& os, const Inst * inst, 
-        uint32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Use|Inst::OpndRole_Def,
-        uint32 opndFlavor=OpndFlavor_Default
+        U_32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Use|Inst::OpndRole_Def,
+        U_32 opndFlavor=OpndFlavor_Default
     )
     { IRPrinter p; p.setStream(os); p.setOpndRolesFilter(opndRolesFilter); p.setOpndFlavor(opndFlavor); p.printInst(inst); }
 
-    virtual uint32 printInstOpnds(const Inst * inst, uint32 opndRolesFilter);
+    virtual U_32 printInstOpnds(const Inst * inst, U_32 opndRolesFilter);
 
-    virtual void printOpndRoles(uint32 roles);
-    static void printOpndRoles(::std::ostream& os, uint32 roles)
+    virtual void printOpndRoles(U_32 roles);
+    static void printOpndRoles(::std::ostream& os, U_32 roles)
     { IRPrinter p; p.setStream(os); p.printOpndRoles(roles); }
 
     void printOpndName(const Opnd * opnd);
     static void printOpndName(::std::ostream& os, const Opnd * opnd)
     { IRPrinter p; p.setStream(os); p.printOpndName(opnd); }
 
-    virtual uint32 getOpndNameLength(Opnd * opnd);
+    virtual U_32 getOpndNameLength(Opnd * opnd);
 
-    virtual void printOpnd(const Inst * inst, uint32 idx, bool isLiveBefore=false, bool isLiveAfter=false);
+    virtual void printOpnd(const Inst * inst, U_32 idx, bool isLiveBefore=false, bool isLiveAfter=false);
 
-    virtual void printOpnd(const Opnd * opnd, uint32 roles=0, bool isLiveBefore=false, bool isLiveAfter=false);
-    static void printOpnd(::std::ostream& os, const Opnd * opnd, uint32 of=OpndFlavor_Default)
+    virtual void printOpnd(const Opnd * opnd, U_32 roles=0, bool isLiveBefore=false, bool isLiveAfter=false);
+    static void printOpnd(::std::ostream& os, const Opnd * opnd, U_32 of=OpndFlavor_Default)
     { IRPrinter p; p.setStream(os); p.setOpndFlavor(of); p.printOpnd(opnd); }
 
     virtual void printRuntimeInfo(const Opnd::RuntimeInfo * ri);
@@ -207,17 +207,17 @@ public:
     static void printType(::std::ostream& os, const Type * type)
     { IRPrinter p; p.setStream(os); p.printType(type); }
 
-    virtual void printCFG(uint32 indent=0);
+    virtual void printCFG(U_32 indent=0);
 
-    virtual void printBody(uint32 indent=0);
-    virtual void print(uint32 indent=0);
+    virtual void printBody(U_32 indent=0);
+    virtual void print(U_32 indent=0);
 
     static const char * getPseudoInstPrintName(Inst::Kind k);
 
 protected:
-    uint32      instFilter;
-    uint32      opndFlavor;
-    uint32      opndRolesFilter;
+    U_32      instFilter;
+    U_32      opndFlavor;
+    U_32      opndRolesFilter;
 };
 
 inline ::std::ostream& operator << (::std::ostream& os, Opnd * opnd){ IRPrinter::printOpnd(os, opnd); return os; }
@@ -231,8 +231,8 @@ public:
     IROpndPrinter(const IRManager * irm=0, const char * _title=0)
         :IRPrinter(irm, _title){}
 
-    void printBody(uint32 indent=0);
-    void printHeader(uint32 indent=0);
+    void printBody(U_32 indent=0);
+    void printHeader(U_32 indent=0);
 };
 
 //========================================================================================
@@ -243,7 +243,7 @@ class IRLivenessPrinter: public IRPrinter
 public:
     IRLivenessPrinter(const IRManager * irm=0, const char * _title=0)
         :IRPrinter(irm, _title){}
-    void printNode(const Node * node, uint32 indent=0);
+    void printNode(const Node * node, U_32 indent=0);
 
     virtual void printLiveSet(const BitSet * ls);
     static void printLiveSet(::std::ostream& os, const IRManager& irm, const BitSet * ls)
@@ -259,7 +259,7 @@ public:
     IRInstConstraintPrinter(const IRManager * irm=0, const char * _title=0)
         :IRPrinter(irm, _title){}
 
-    virtual void printOpnd(const Inst * inst, uint32 opndIdx, bool isLiveBefore=false, bool isLiveAfter=false);
+    virtual void printOpnd(const Inst * inst, U_32 opndIdx, bool isLiveBefore=false, bool isLiveAfter=false);
 };
 
 //========================================================================================
@@ -283,12 +283,12 @@ public:
     virtual void printTraversalOrder(CGNode::OrderType orderType);
     virtual void printLiveness();
 
-    virtual void printCFG(uint32 indent=0);
+    virtual void printCFG(U_32 indent=0);
 
-    virtual void printHeader(uint32 indent=0);
-    virtual void printEnd(uint32 indent=0);
-    virtual void printBody(uint32 indent=0);
-    virtual void print(uint32 indent=0);
+    virtual void printHeader(U_32 indent=0);
+    virtual void printEnd(U_32 indent=0);
+    virtual void printBody(U_32 indent=0);
+    virtual void print(U_32 indent=0);
     
 };
 
@@ -307,7 +307,7 @@ public:
 
     virtual void printNode(const Node * node);
 
-    virtual void printBody(uint32 indent=0);
+    virtual void printBody(U_32 indent=0);
 
 private:
     void printLivenessForInst(const StlVector<Opnd*> opnds, const BitSet * ls0, const BitSet * ls1);
@@ -321,31 +321,31 @@ private:
 //========================================================================================
 void dumpIR(
             const IRManager * irManager,
-            uint32 stageId,
+            U_32 stageId,
             const char * readablePrefix,
             const char * readableStageName,
             const char * stageTagName,
             const char * subKind1, 
             const char * subKind2=0,
-            uint32 instFilter=Inst::Kind_Inst, 
-            uint32 opndFlavor=IRPrinter::OpndFlavor_All,
-            uint32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Implicit|Inst::OpndRole_Use|Inst::OpndRole_Def
+            U_32 instFilter=Inst::Kind_Inst, 
+            U_32 opndFlavor=IRPrinter::OpndFlavor_All,
+            U_32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Implicit|Inst::OpndRole_Use|Inst::OpndRole_Def
             );
 
 void printDot(
             const IRManager * irManager,
-            uint32 stageId,
+            U_32 stageId,
             const char * readablePrefix,
             const char * readableStageName,
             const char * stageTagName,
             const char * subKind1, 
             const char * subKind2=0,
-            uint32 instFilter=Inst::Kind_Inst, 
-            uint32 opndFlavor=IRPrinter::OpndFlavor_All,
-            uint32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Implicit|Inst::OpndRole_Use|Inst::OpndRole_Def
+            U_32 instFilter=Inst::Kind_Inst, 
+            U_32 opndFlavor=IRPrinter::OpndFlavor_All,
+            U_32 opndRolesFilter=Inst::OpndRole_Explicit|Inst::OpndRole_Auxilary|Inst::OpndRole_Implicit|Inst::OpndRole_Use|Inst::OpndRole_Def
             );
 
-void printRuntimeArgs(::std::ostream& os, uint32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context);
+void printRuntimeArgs(::std::ostream& os, U_32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context);
 void printRuntimeOpnd(::std::ostream& os, TypeManager & tm, Type::Tag typeTag, const void * p);
 void printRuntimeObjectOpnd(::std::ostream& os, TypeManager & tm, const void * p);
 void printRuntimeObjectContent(::std::ostream& os, TypeManager & tm, Type * type, const void * p);

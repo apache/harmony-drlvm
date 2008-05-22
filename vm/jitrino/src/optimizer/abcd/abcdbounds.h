@@ -131,7 +131,7 @@ class ConstBound {
                 Const_IsNull} flag;
 public:
     ConstBound() : the_const(0), flag(Const_IsNull) {};
-    ConstBound(int32 c) : the_const(c), flag(Const_IsConst) {};
+    ConstBound(I_32 c) : the_const(c), flag(Const_IsConst) {};
     ConstBound(int64 c) : the_const(c), flag(Const_IsConst) {};
     ConstBound(bool positive) : the_const(0), 
                                 flag(positive ? Const_PlusInfinity
@@ -143,7 +143,7 @@ public:
     bool isPlusInfinity() const { return (flag == Const_PlusInfinity); };
     bool isMinusInfinity() const { return (flag == Const_MinusInfinity); };
     int64 getInt64() const { return the_const; };
-    int32 getInt32() const { return (int32)the_const; };
+    I_32 getInt32() const { return (I_32)the_const; };
     bool operator ==(const ConstBound &other) const {
         if (flag == other.flag) {
             if (flag == Const_IsConst) {
@@ -485,7 +485,7 @@ extern void printPiCondition(const PiCondition *, ::std::ostream &);
 class PiBoundIter {
     bool isLb;
     Inst *instr;  // set to 0 when invalid
-    uint32 idx;
+    U_32 idx;
     PiBound current;
     MemoryManager &mm;
     AbcdReasons *why;

@@ -213,7 +213,7 @@ typedef struct HyThread {
      *    2. hythread_exception_safe_point()
      *          - removes safe point callback request for current thread
      */
-    uint32 request;
+    U_32 request;
 
     /**
      * Field indicating that thread can safely be suspended.
@@ -267,7 +267,7 @@ typedef struct HyThread {
      * After increment/decrement of suspend_count, request field
      * should be incremented/decremented too.
      */
-    uint32 suspend_count;
+    U_32 suspend_count;
 
     /**
      * Function to be executed at safepoint upon thread resume.
@@ -353,7 +353,7 @@ typedef struct HyThread {
     /**
      * Flag of interruption
      */
-    uint32 interrupted;
+    U_32 interrupted;
 
 // Monitors
 

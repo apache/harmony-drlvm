@@ -71,7 +71,7 @@ struct st_jit_uwinfo
     bool is_first; // For setting is_ip_past
 };
 
-static uint32 cci_get_inlined_depth(CodeChunkInfo* cci, uint32 offset)
+static U_32 cci_get_inlined_depth(CodeChunkInfo* cci, U_32 offset)
 {
     ASSERT_NO_INTERPRETER
 
@@ -81,16 +81,16 @@ static uint32 cci_get_inlined_depth(CodeChunkInfo* cci, uint32 offset)
     return cci->get_jit()->get_inline_depth(cci->get_inline_info(), offset);
 }
 
-static Method* get_jit_method(CodeChunkInfo* cci, void* ip, uint32 index, bool is_first)
+static Method* get_jit_method(CodeChunkInfo* cci, void* ip, U_32 index, bool is_first)
 {
     Method* method = cci->get_method();
 
     if (index == 0)
         return method;
 
-    uint32 offset = (uint32)((POINTER_SIZE_INT)ip -
+    U_32 offset = (U_32)((POINTER_SIZE_INT)ip -
         (POINTER_SIZE_INT)cci->get_code_block_addr());
-    uint32 inlined_depth = cci_get_inlined_depth(cci, offset);
+    U_32 inlined_depth = cci_get_inlined_depth(cci, offset);
     bool is_ip_past = !is_first; // || (index != inlined_depth);
 
     if (index > inlined_depth)
@@ -243,9 +243,9 @@ static int unwind_compiled_frame(Registers *regs, port_stack_frame_info *sfi)
     }
 
     // New cci
-    uint32 offset = (uint32)((POINTER_SIZE_INT)cur_ip -
+    U_32 offset = (U_32)((POINTER_SIZE_INT)cur_ip -
                         (POINTER_SIZE_INT)cci->get_code_block_addr());
-    uint32 inlined_depth = cci_get_inlined_depth(cci, offset);
+    U_32 inlined_depth = cci_get_inlined_depth(cci, offset);
 
     uwinfo->cci = cci;
     uwinfo->inline_index = (int)inlined_depth;

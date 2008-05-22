@@ -123,8 +123,8 @@ class ConstraintsResolver : public SessionAction {
     /** runImpl is required override, calls ConstraintsResolverImpl.runImpl */
     void runImpl();
     /** This transformer requires up-to-date liveness info */
-    uint32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
-    uint32 getSideEffects()const{ return 0; }
+    U_32 getNeedInfo()const{ return NeedInfo_LivenessInfo; }
+    U_32 getSideEffects()const{ return 0; }
 
 };
 
@@ -238,11 +238,11 @@ void ConstraintsResolverImpl::run()
     liveAtDispatchBlockEntry.resizeClear(originalOpndCount);
 
     opndReplaceWorkset.resize(originalOpndCount);
-    for (uint32 i=0; i<originalOpndCount; i++)
+    for (U_32 i=0; i<originalOpndCount; i++)
         opndReplaceWorkset[i]=NULL;
 
     opndUsage.resize(originalOpndCount);
-    for (uint32 i=0; i<originalOpndCount; i++)
+    for (U_32 i=0; i<originalOpndCount; i++)
         opndUsage[i]=0;
 
 
@@ -282,8 +282,8 @@ void ConstraintsResolverImpl::createBasicBlockArray()
         Node* node = *it;
         if (node->isBlockNode()){
             double bbecv = getBasicBlockPriority(node);
-            uint32 ibb=0;
-            for (uint32 nbb=(uint32)basicBlocks.size(); ibb<nbb; ++ibb){
+            U_32 ibb=0;
+            for (U_32 nbb=(U_32)basicBlocks.size(); ibb<nbb; ++ibb){
                 if (bbecv > getBasicBlockPriority(basicBlocks[ibb]))
                     break;
             }
@@ -310,7 +310,7 @@ void ConstraintsResolverImpl::calculateStartupOpndConstraints()
 // Reset calculated constraints to null constraints
     irManager.resetOpndConstraints();
 // For all operands in the CFG
-    for (uint32 i=0; i<originalOpndCount; i++){ 
+    for (U_32 i=0; i<originalOpndCount; i++){ 
         Opnd * opnd=irManager.getOpnd(i);
 
         Constraint c=opnd->getConstraint(Opnd::ConstraintKind_Initial);
@@ -339,9 +339,9 @@ bool ConstraintsResolverImpl::constraintIsWorse(Constraint cnew, Constraint cold
 {
     if (cnew.isNull())
         return true;
-    uint32 newMask = cnew.getMask(), oldMask = cold.getMask();
+    U_32 newMask = cnew.getMask(), oldMask = cold.getMask();
     if ((newMask & oldMask) != oldMask){
-        uint32 newMaskCount = countOnes(newMask);
+        U_32 newMaskCount = countOnes(newMask);
         return 
             (newMaskCount == 0 && normedBBExecCount < splitThresholdForNoRegs) ||
             (newMaskCount <= 1 && normedBBExecCount < splitThresholdFor1Reg) ||
@@ -547,7 +547,7 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
 
     // if we come to bb entry with some replacement for an operand and the operand is live at the entry
     // insert copying from the original operand to the replacement operand
-    uint32 execCount = (uint32)bb->getExecCount();
+    U_32 execCount = (U_32)bb->getExecCount();
     BitSet * ls = irManager.getLiveAtEntry(bb);
     BitSet::IterB ib(*ls);
     for (int i = ib.getNext(); i != -1; i = ib.getNext()){
@@ -570,7 +570,7 @@ void ConstraintsResolverImpl::resolveConstraints(Node * bb)
 void ConstraintsResolverImpl::resolveConstraints()
 {   
     // for all basic blocks in the array
-    for (uint32 ibb=0, nbb=(uint32)basicBlocks.size(); ibb<nbb; ++ibb){
+    for (U_32 ibb=0, nbb=(U_32)basicBlocks.size(); ibb<nbb; ++ibb){
         resolveConstraints(basicBlocks[ibb]);
     }
 }   

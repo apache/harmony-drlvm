@@ -204,15 +204,15 @@ class ConstOpndLoopInfo : public InvariantOpndLoopInfo {
 public:    
     virtual bool isConstant() const { return true; }
 
-    int32 getValue() const { return value; }
+    I_32 getValue() const { return value; }
 
 protected:
-    ConstOpndLoopInfo(InductionDetector* id, SsaOpnd* opnd, int32 val):
+    ConstOpndLoopInfo(InductionDetector* id, SsaOpnd* opnd, I_32 val):
         InvariantOpndLoopInfo(id, opnd), value(val) {}
     virtual ~ConstOpndLoopInfo() {}
 
 private:
-    int32 value;
+    I_32 value;
 };
 
 // TODO: Should be able to detect linear induction.
@@ -239,7 +239,7 @@ public:
         return new (memoryManager) InvariantOpndLoopInfo(this, opnd); 
     }
     
-    ConstOpndLoopInfo* createConstOpnd(SsaOpnd* opnd, int32 val) {
+    ConstOpndLoopInfo* createConstOpnd(SsaOpnd* opnd, I_32 val) {
         return new (memoryManager) ConstOpndLoopInfo(this, opnd, val);
     }
 

@@ -46,7 +46,7 @@ public:
      * @param[in] addrLocationMap - native addresses to bytecode locations
      *       correspondence table
      */
-    void add(Method* method, uint32 codeSize, void* codeAddr, uint32 mapLength, 
+    void add(Method* method, U_32 codeSize, void* codeAddr, U_32 mapLength, 
             AddrLocation* addrLocationMap);
 
     /**
@@ -63,9 +63,9 @@ private:
     struct Entry
     {
         Method* method;
-        uint32 codeSize;
+        U_32 codeSize;
         void* codeAddr;
-        uint32 mapLength;
+        U_32 mapLength;
         AddrLocation* addrLocationMap;
     };
 

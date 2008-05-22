@@ -45,19 +45,19 @@ namespace Ia32 {
  *  For example:
  *  
  *  Original code piece:
- *      I29: t50.:int32 (ID:v15(EFLGS):uint32) =AND .t28:int32,t49(1):int32 
- *      I30: (AD:v1:int32) =CopyPseudoInst (AU:t48:int32) 
- *      I31: (AD:v2:int32) =CopyPseudoInst (AU:t25:int32) 
+ *      I29: t50.:I_32 (ID:v15(EFLGS):U_32) =AND .t28:I_32,t49(1):I_32 
+ *      I30: (AD:v1:I_32) =CopyPseudoInst (AU:t48:I_32) 
+ *      I31: (AD:v2:I_32) =CopyPseudoInst (AU:t25:I_32) 
  *      I32: (AD:v3:int8[]) =CopyPseudoInst (AU:t38:int8[]) 
- *      I33: (ID:v15(EFLGS):uint32) =CMP .t50:int32,t51(0):int32 
- *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):uint32) 
+ *      I33: (ID:v15(EFLGS):U_32) =CMP .t50:I_32,t51(0):I_32 
+ *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):U_32) 
  *
  *  After optimization:
- *      I29: t50:int32 (ID:v15(EFLGS):uint32) =AND .t28:int32,t49(1):int32 
- *      I30: (AD:v1:int32) =CopyPseudoInst (AU:t48:int32) 
- *      I31: (AD:v2:int32) =CopyPseudoInst (AU:t25:int32) 
+ *      I29: t50:I_32 (ID:v15(EFLGS):U_32) =AND .t28:I_32,t49(1):I_32 
+ *      I30: (AD:v1:I_32) =CopyPseudoInst (AU:t48:I_32) 
+ *      I31: (AD:v2:I_32) =CopyPseudoInst (AU:t25:I_32) 
  *      I32: (AD:v3:int8[]) =CopyPseudoInst (AU:t38:int8[]) 
- *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):uint32) 
+ *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):U_32) 
  *
  *  The implementation of this transformer is located in Ia32RCE.cpp
  *
@@ -120,7 +120,7 @@ RCE::runImpl()
                             continue;
                         }
                         cmpInst = inst;
-                        uint32 defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+                        U_32 defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
                         if(inst->getOpnd(defCount+1)->isPlacedIn(OpndKind_Imm)) {
                             //try to change conditional instruction to make combination available to optimize
                             cmpOp = inst->getOpnd(defCount);
@@ -219,7 +219,7 @@ bool RCE::isSuitableToRemove(Inst * inst, Inst * condInst, Inst * cmpInst, Opnd 
      *  compared with zero by cmpInst
      *  Required: Native form of insts
      */
-    uint32 cmpOpCount = cmpInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_UseDef);
+    U_32 cmpOpCount = cmpInst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_UseDef);
     if ((cmpOp == inst->getOpnd(0)) && cmpInst->getOpnd(cmpOpCount -1)->isPlacedIn(OpndKind_Imm) && (cmpInst->getOpnd(cmpOpCount -1)->getImmValue() == 0)) {
             return true;
     }

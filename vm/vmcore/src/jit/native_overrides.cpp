@@ -178,7 +178,7 @@ LilCodeStub* nso_get_class(LilCodeStub* cs, Method_Handle)
 
 LilCodeStub* nso_array_copy(LilCodeStub* cs, Method_Handle)
 {
-    ArrayCopyResult (*p_array_copy)(ManagedObject* src, int32 src_off, ManagedObject* dst, int32 dst_off, int32 count);
+    ArrayCopyResult (*p_array_copy)(ManagedObject* src, I_32 src_off, ManagedObject* dst, I_32 dst_off, I_32 count);
     p_array_copy = array_copy;
     cs = lil_parse_onto_end(cs,
         "in2out platform:g4;"

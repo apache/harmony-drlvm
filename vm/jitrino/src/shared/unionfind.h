@@ -31,7 +31,7 @@ private:
     UnionFind &operator=(const UnionFind &other) { assert(0); return *this; };
 public:
     UnionFind *parent;
-    uint32 rank;
+    U_32 rank;
     UnionFind() : parent(0), rank(1) { parent = this; };
     void link(UnionFind *other) {
         assert(other);

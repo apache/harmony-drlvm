@@ -144,7 +144,7 @@ APR_DECLARE(apr_status_t) port_user_timezone(char** tzname,
 		}
 		if (!found) {
 			/* At least try to obtain GMT offset for local time */
-			int32 bias = 0;
+			I_32 bias = 0;
 			DWORD size = sizeof(bias);
 			rv = RegQueryValueEx(hkey, "ActiveTimeBias", NULL, NULL, 
 				(LPBYTE)&bias, &size);

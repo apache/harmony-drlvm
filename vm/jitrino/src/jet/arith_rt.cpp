@@ -270,7 +270,7 @@ double  __stdcall rt_h_i32_2_dbl(int i)     { return (double)i; };
 // i64 ->
 // Workaround for bug in gcc 4.1.x. It doesn't clear upper half of the long
 // register when it returns value from rt_h_i64_2_i32
-int     __stdcall rt_h_i64_2_i32(int64 i)   { return (int32)(i & 0xffffffff); };
+int     __stdcall rt_h_i64_2_i32(int64 i)   { return (I_32)(i & 0xffffffff); };
 float   __stdcall rt_h_i64_2_flt(int64 i)   { return (float)i; };
 double  __stdcall rt_h_i64_2_dbl(int64 i)   { return (double)i; };
 // flt ->
@@ -280,7 +280,7 @@ int     __stdcall rt_h_flt_2_i32(float i)
         return 0;
     }
     return i<(double)INT_MIN ? 
-                    INT_MIN : (i>=(double)INT_MAX ? INT_MAX : (int32)i);
+                    INT_MIN : (i>=(double)INT_MAX ? INT_MAX : (I_32)i);
 }
 
 jlong   __stdcall rt_h_flt_2_i64(float i)

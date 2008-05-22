@@ -62,15 +62,15 @@ LateDepthReassociationPass::_run(IRManager& irm) {
     pass.runPass(true, true);
 }
 
-inline uint32 computePriority(uint32 op_cost, uint32 priority0) {
+inline U_32 computePriority(U_32 op_cost, U_32 priority0) {
     if (priority0 == 0) return 0;
     else return op_cost + priority0;
 }
-inline uint32 computePriority(uint32 op_cost, uint32 priority0, uint32 priority1) {
+inline U_32 computePriority(U_32 op_cost, U_32 priority0, U_32 priority1) {
     if (priority0 == 0) return 0;
     else return op_cost + ::std::max(priority0, priority1);
 }
-inline uint32 computePriority(uint32 op_cost, uint32 priority0, uint32 priority1, uint32 priority2) {
+inline U_32 computePriority(U_32 op_cost, U_32 priority0, U_32 priority1, U_32 priority2) {
     if ((priority0 == 0) && (priority1 == 0) && (priority2 == 0)) return 0;
     else return op_cost + ::std::max(::std::max(priority0, priority1), priority2);
 }
@@ -100,11 +100,11 @@ Reassociate::~Reassociate()
 }
 
 
-uint32 Reassociate::getPriority(Opnd *opnd)
+U_32 Reassociate::getPriority(Opnd *opnd)
 {
     if (priority.has(opnd)) return priority[opnd];
     Inst *inst = opnd->getInst();
-    uint32 opriority = 0;
+    U_32 opriority = 0;
     Operation operation = inst->getOperation();
     Opcode opc = operation.getOpcode();
     switch (opc) {
@@ -159,24 +159,24 @@ uint32 Reassociate::getPriority(Opnd *opnd)
     break;
     default:
     if (operation.isMovable()) {
-        uint32 numOpnds = inst->getNumSrcOperands();
+        U_32 numOpnds = inst->getNumSrcOperands();
         opriority = 0;
 
-        for (uint32 i = 0; i<numOpnds; i++) {
+        for (U_32 i = 0; i<numOpnds; i++) {
                 Opnd *opndi = inst->getSrc(i);
-                uint32 argpriority = getPriority(opndi);
+                U_32 argpriority = getPriority(opndi);
                 opriority = ::std::max(opriority, argpriority);
         }
         opriority = computePriority(costOfMisc, opriority);
     } else {
         Inst *previ = inst->getPrevInst();
-        uint32 ipriority = 1;
+        U_32 ipriority = 1;
         while (!previ->isLabel()) {
         ++ipriority;
         previ = previ->getPrevInst();
         }
         Node *block = previ->asLabelInst()->getNode();
-        uint32 bpriority = cfgRpoNum[block];
+        U_32 bpriority = cfgRpoNum[block];
         opriority = ((bpriority * priorityFactorOfBlock)
                          + ipriority)*priorityFactorOfPosition;
     }
@@ -235,7 +235,7 @@ void Reassociate::runPass(bool minimizeDepth, bool isLate)
     StlVector<Node *>::reverse_iterator 
     riter = postOrderNodes.rbegin(),
     rend = postOrderNodes.rend();
-    uint32 i = 0;
+    U_32 i = 0;
     while (riter != rend) {
     Node *node = *riter;
     if (Log::isEnabled()) {
@@ -447,11 +447,11 @@ Reassociate::simplifyReassociatedAdd(Type *type,
         Opnd *opnd1 = owd1.opnd;
         Opnd *newOpnd = 0;
         bool newNegated = 0;
-        uint32 priority0 = owd0.priority;
-        uint32 priority1 = owd1.priority;
+        U_32 priority0 = owd0.priority;
+        U_32 priority1 = owd1.priority;
         const char *debug_op = "";
         bool debug_swapped = false;
-        uint32 newPriority = 0;
+        U_32 newPriority = 0;
         if (owd0.negate != owd1.negate) {
             if (owd0.negate) {
                 newOpnd = theSimp->genSub(type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
@@ -560,10 +560,10 @@ Reassociate::simplifyReassociatedMul(Type *type,
         OpndWithPriority owd0 = opnds[0]; 
         OpndWithPriority owd1 = opnds[1];
         Opnd *opnd0 = owd0.opnd;
-        uint32 priority0 = owd0.priority;
+        U_32 priority0 = owd0.priority;
         bool neg0 = owd0.negate;
         Opnd *opnd1 = owd1.opnd;
-        uint32 priority1 = owd1.priority;
+        U_32 priority1 = owd1.priority;
         bool neg1 = owd1.negate;
 
         if ((opnd0 == opnd1) && (opndsize > 3)
@@ -574,7 +574,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
             OpndWithPriority owd2 = opnds[2]; 
             OpndWithPriority owd3 = opnds[3];
             Opnd *opnd2 = owd2.opnd;
-            uint32 priority2 = owd2.priority;
+            U_32 priority2 = owd2.priority;
 
             Opnd *newOpnd0 = theSimp->genMul(type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                              opnd0, opnd2)->getDst();
@@ -583,9 +583,9 @@ Reassociate::simplifyReassociatedMul(Type *type,
             opnds.pop_front();
             opnds.pop_front();
             opnds.pop_front();
-            uint32 priorityNew0 = computePriority(costOfMul, priority0,
+            U_32 priorityNew0 = computePriority(costOfMul, priority0,
                                                   priority2);
-            uint32 priorityNew1 = computePriority(costOfMul, 
+            U_32 priorityNew1 = computePriority(costOfMul, 
                                                   priorityNew0,
                                                   priorityNew0);
             OpndWithPriority newelt(newOpnd1, priorityNew1, 
@@ -604,7 +604,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
             
             opnds[0] = newelt;
             opndsize -= 3;
-            uint32 i = 1;
+            U_32 i = 1;
             while (i < opndsize) {
                 if (opnds[i].priority < priorityNew1) {
                     opnds[i-1] = opnds[i];
@@ -618,7 +618,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
             Opnd *newOpnd = theSimp->genMul(type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                             opnd0, opnd1)->getDst();
             opnds.pop_front();
-            uint32 priority = computePriority(costOfMul, priority0, priority1);
+            U_32 priority = computePriority(costOfMul, priority0, priority1);
             OpndWithPriority newelt(newOpnd, priority, neg0 ^ neg1);
             
             if (Log::isEnabled()) {
@@ -633,7 +633,7 @@ Reassociate::simplifyReassociatedMul(Type *type,
             
             opnds[0] = newelt;
             opndsize -= 1;
-            uint32 i = 1;
+            U_32 i = 1;
             while (i < opndsize) {
                 if (opnds[i].priority < priority) {
                     opnds[i-1] = opnds[i];
@@ -718,11 +718,11 @@ Reassociate::simplifyReassociatedAddOffset(Type *type,
         Opnd *opnd1 = owd1.opnd;
         Opnd *newOpnd = 0;
         bool newNegated = 0;
-        uint32 priority0 = owd0.priority;
-        uint32 priority1 = owd1.priority;
+        U_32 priority0 = owd0.priority;
+        U_32 priority1 = owd1.priority;
         const char *debug_op = "";
         bool debug_swapped = false;
-        uint32 newPriority = 0;
+        U_32 newPriority = 0;
         if (owd0.negate != owd1.negate) {
             if (owd0.negate) {
                 newOpnd = theSimp->genSub(type, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),

@@ -160,13 +160,13 @@ typedef struct EM_ProfileAccessInterface {
  * @return The counter's limit for entry threshold for a given
  *         profile collector.
  */
-    uint32 (*eb_profiler_get_entry_threshold)(PC_Handle pch);
+    U_32 (*eb_profiler_get_entry_threshold)(PC_Handle pch);
 
 /** 
  * @return The counter's limit for backedge threshold for a given
  *         profile collector.
  */
-    uint32 (*eb_profiler_get_backedge_threshold)(PC_Handle pch);
+    U_32 (*eb_profiler_get_backedge_threshold)(PC_Handle pch);
 
 
 
@@ -187,23 +187,23 @@ typedef struct EM_ProfileAccessInterface {
      *
      * @return A handle to access method profile data.
      */
-    Method_Profile_Handle (*edge_profiler_create_profile) (PC_Handle ph, Method_Handle mh, uint32 numEdgeCounters, uint32* counterKeys, uint32 checkSum);
+    Method_Profile_Handle (*edge_profiler_create_profile) (PC_Handle ph, Method_Handle mh, U_32 numEdgeCounters, U_32* counterKeys, U_32 checkSum);
 
 
     /** 
      * Return number of edge counters in profile.
      */
-    uint32 (*edge_profiler_get_num_counters)(Method_Profile_Handle mph);
+    U_32 (*edge_profiler_get_num_counters)(Method_Profile_Handle mph);
 
     /** 
      * Return profile checksum.
      */
-    uint32 (*edge_profiler_get_checksum)(Method_Profile_Handle mph);
+    U_32 (*edge_profiler_get_checksum)(Method_Profile_Handle mph);
 
     /** 
      * Return the address of counter associated with key.
      */
-    void* (*edge_profiler_get_counter_addr)(Method_Profile_Handle mph, uint32 key);
+    void* (*edge_profiler_get_counter_addr)(Method_Profile_Handle mph, U_32 key);
 
     /** 
      * Return the address of entry counter.
@@ -213,13 +213,13 @@ typedef struct EM_ProfileAccessInterface {
     /** 
      * Return the entry threshold for profile collector.
      */
-    uint32 (*edge_profiler_get_entry_threshold)(PC_Handle pch);
+    U_32 (*edge_profiler_get_entry_threshold)(PC_Handle pch);
     
     /** 
      * Return the edge threshold for profile collector.
      */
 
-    uint32 (*edge_profiler_get_backedge_threshold)(PC_Handle pch);
+    U_32 (*edge_profiler_get_backedge_threshold)(PC_Handle pch);
     
     // Value profiler interface
 
@@ -235,17 +235,17 @@ typedef struct EM_ProfileAccessInterface {
      *                           each instruction. The key must be used to access to
      *                           instruction value
      */
-    Method_Profile_Handle (*value_profiler_create_profile) (PC_Handle pch, Method_Handle mh, uint32 numKeys, uint32* keys);
+    Method_Profile_Handle (*value_profiler_create_profile) (PC_Handle pch, Method_Handle mh, U_32 numKeys, U_32* keys);
     
     /** 
      * Update frequency or insert the new value of given instruction.
      */
-    void (*value_profiler_add_value)(Method_Profile_Handle mph, uint32 instructionKey, POINTER_SIZE_INT valueToAdd);
+    void (*value_profiler_add_value)(Method_Profile_Handle mph, U_32 instructionKey, POINTER_SIZE_INT valueToAdd);
     
     /** 
      * @return The maximum value(by frequency) of give instruction.
      */
-    POINTER_SIZE_INT (*value_profiler_get_top_value) (Method_Profile_Handle mph, uint32 instructionKey);
+    POINTER_SIZE_INT (*value_profiler_get_top_value) (Method_Profile_Handle mph, U_32 instructionKey);
 
     void (*value_profiler_dump_values) (Method_Profile_Handle mph, std::ostream& os);
 

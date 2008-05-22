@@ -149,7 +149,7 @@ namespace Jet {
  * number of registers is much bigger than on IA-32 and each register is
  * 8 bytes wide - so the spill area is long. As result, the length of 
  * the fixed-size area does not fit into +/-127. This makes generated code 
- * to use addressing with 32 bit displacements [rbp+int32] which make code 
+ * to use addressing with 32 bit displacements [rbp+I_32] which make code 
  * bigger. If we point base pointer (in the method's prolog) not to the 
  * beginning of the frame but, say, into the middle between 
  * locals and stack, then we'll be able to address most of them with 8bit 

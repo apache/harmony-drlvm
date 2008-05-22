@@ -360,7 +360,7 @@ public:
                 assert(ip<len); 
                 int val = data[ip]; ip += 1;
                 Opnd *op = (width32 
-                            ? simp->genLdConstant((int32)(val))->getDst()
+                            ? simp->genLdConstant((I_32)(val))->getDst()
                             : simp->genLdConstant((int64)(val))->getDst());
                 thestack[sp] = op;
                 sp += 1;
@@ -382,7 +382,7 @@ public:
                 assert(ip<len);
                 int val = data[ip]; ip += 1;
                 assert(val <= SMALL_SHIFT_MAXBITS);
-                Opnd *op = simp->genLdConstant((int32)(val))->getDst();
+                Opnd *op = simp->genLdConstant((I_32)(val))->getDst();
                 thestack[sp-2] = simp->genShladd(type, thestack[sp-2], op, thestack[sp-1])->getDst(); 
                 sp -=1; } break;
             case MulOp::neg: assert(sp >= 1); 
@@ -392,7 +392,7 @@ public:
                 assert(sp >= 1); 
                 assert(ip<len);
                 int val = data[ip]; ip += 1;
-                Opnd *op = simp->genLdConstant((int32)(val))->getDst();
+                Opnd *op = simp->genLdConstant((I_32)(val))->getDst();
                 thestack[sp-1] = simp->genShl(type, ShiftMask_None,
                                               thestack[sp-1], op)->getDst();
             } break;
@@ -1005,11 +1005,11 @@ void planMulLookup(MulMethod &m, inttype d, int depth) {
 
 #else // !STANDALONE_TEST
 Opnd *
-Simplifier::planMul32(int32 multiplier, Opnd *opnd)
+Simplifier::planMul32(I_32 multiplier, Opnd *opnd)
 {
     const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     MulMethod method(!optimizerFlags.ia32_code_gen);
-    planMul<int32, 32>(method, multiplier, 1);
+    planMul<I_32, 32>(method, multiplier, 1);
     if (Log::isEnabled()) {
         Log::out() << "in multiply(" << (int) multiplier << ", ";
         opnd->print(Log::out());

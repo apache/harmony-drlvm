@@ -57,7 +57,7 @@
  * Various Numeric Types
  */
 
-// Boolean, uint8, int8, uint16, int16, uint32, int32, uint64, int64,
+// Boolean, uint8, int8, uint16, int16, uint64, int64,
 // POINTER_SIZE_INT
 
 // We can't use bool in non-C++ code
@@ -85,12 +85,10 @@ typedef unsigned Boolean;
 #ifdef PLATFORM_POSIX
 typedef unsigned char uint8;
 typedef unsigned short uint16;
-typedef unsigned int uint32;
 typedef unsigned long long uint64;
 
 typedef   signed char  int8;
 typedef   signed short int16;
-typedef   signed int  int32; 
 typedef   signed long long int64;
 
 #else //!PLATFORM_POSIX
@@ -99,28 +97,17 @@ typedef   signed long long int64;
 // these give Insure++ problems:
 typedef unsigned __int8  uint8;
 typedef unsigned __int16 uint16;
-typedef unsigned __int32 uint32;
 typedef   signed __int8  int8;
 typedef   signed __int16 int16;
 #else
 // so use these definitions instead with Insure++:
 typedef unsigned char uint8;
 typedef unsigned short uint16;
-typedef unsigned int uint32;
 typedef   signed char int8;
 typedef   signed short int16;
 #endif
 typedef unsigned __int64 uint64;
 typedef   signed __int64 int64;
-#if (_MSC_VER != 1100 || !defined _WINSOCK2API_)
-#ifndef __INSURE__
-// this gives Insure++ problems:
-typedef   signed __int32 int32;
-#else
-// so use this definition instead with Insure++:
-typedef signed int int32;
-#endif // __INSURE__
-#endif
 
 #endif //!PLATFORM_POSIX
 
@@ -147,8 +134,8 @@ typedef signed int int32;
 #endif
 #define W_PI_FMT "016"PI_FMT"x"
 #else
-#define POINTER_SIZE_INT uint32
-#define POINTER_SIZE_SINT int32
+#define POINTER_SIZE_INT U_32
+#define POINTER_SIZE_SINT I_32
 #define PI_FMT ""
 #define W_PI_FMT "08"PI_FMT"x"
 #endif // POINTER64
@@ -204,7 +191,7 @@ struct Registers {
     uint64 r10;
     uint64 r11;
 
-    uint32 eflags;
+    U_32 eflags;
 
 #ifdef __cplusplus
     void  reset_ip() { rip = 0; }
@@ -218,23 +205,23 @@ struct Registers {
 #else // ! _EM64T_
 
 struct Registers {
-    uint32 eax;
-    uint32 ebx;
-    uint32 ecx;
-    uint32 edx;
-    uint32 edi;
-    uint32 esi;
-    uint32 ebp;
-    uint32 esp;
-    uint32 eip;
-    uint32 eflags;
+    U_32 eax;
+    U_32 ebx;
+    U_32 ecx;
+    U_32 edx;
+    U_32 edi;
+    U_32 esi;
+    U_32 ebp;
+    U_32 esp;
+    U_32 eip;
+    U_32 eflags;
 
 #ifdef __cplusplus
     void  reset_ip() { eip = 0; }
     void* get_ip() { return (void*)eip; }
-    void  set_ip(void* src_ip) { eip = (uint32)src_ip; }
+    void  set_ip(void* src_ip) { eip = (U_32)src_ip; }
     void* get_sp() { return (void*)esp; }
-    void  set_sp(void* src_sp) { esp = (uint32)src_sp; }
+    void  set_sp(void* src_sp) { esp = (U_32)src_sp; }
 #endif
 }; //Registers
 

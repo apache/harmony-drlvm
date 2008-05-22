@@ -236,8 +236,8 @@ PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint
 
 PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const void * comp) {
 #if defined(_IA32_)
-    uint32 Exchange = (uint32)value;
-    uint32 Comperand = (uint32)comp;
+    U_32 Exchange = (U_32)value;
+    U_32 Comperand = (U_32)comp;
     __asm__ __volatile__(
         "lock cmpxchgl %1, (%2)"
         :"=a"(Comperand)

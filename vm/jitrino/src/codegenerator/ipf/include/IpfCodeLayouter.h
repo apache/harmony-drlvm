@@ -57,7 +57,7 @@ protected:
     void          pushBack(Chain*, Node*);
     void          pushFront(Chain*, Node*);
     void          layoutNodes();
-    uint32        calculateChainWeight(Chain*);
+    U_32        calculateChainWeight(Chain*);
 
     // set branch targets
     void          setBranchTargets();

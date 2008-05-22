@@ -67,7 +67,7 @@ void* RuntimeInterface::getAddressOfThis(MethodDesc * methodDesc, const JitFrame
     return (void *)(context->rsp + stackInfo.getStackDepth() + (int)stackInfo.getOffsetOfThis());
 #else
     stackInfo.read(methodDesc, *context->p_eip, isFirst);
-    assert(isFirst || (uint32)context->p_eip+4 == context->esp);
+    assert(isFirst || (U_32)context->p_eip+4 == context->esp);
     //assert(stackInfo.getStackDepth()==0 || !isFirst);
     return (void *)(context->esp + stackInfo.getStackDepth() + stackInfo.getOffsetOfThis());
 #endif
@@ -98,7 +98,7 @@ bool RuntimeInterface::getBcLocationForNative(MethodDesc* method, POINTER_SIZE_I
 
     POINTER_SIZE_INT nativeOffset = (POINTER_SIZE_INT)native_pc - (POINTER_SIZE_INT)method->getCodeBlockAddress(0);
     assert(nativeOffset<=1024*1024*1024);//extra check: we do not generate such a large methods..
-    uint16 bcOffset = BcMap::get_bc_offset_for_native_offset((uint32)nativeOffset, infoBlock + stackInfoSize + gcMapSize);
+    uint16 bcOffset = BcMap::get_bc_offset_for_native_offset((U_32)nativeOffset, infoBlock + stackInfoSize + gcMapSize);
     if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) {
         *bc_pc = bcOffset;
         return true;
@@ -115,7 +115,7 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
     POINTER_SIZE_INT stackInfoSize = stackInfo.readByteSize(infoBlock);
     POINTER_SIZE_INT gcMapSize = GCMap::readByteSize(infoBlock + stackInfoSize);
 
-    uint32 nativeOffset = BcMap::get_native_offset_for_bc_offset(bc_pc, infoBlock + stackInfoSize + gcMapSize);
+    U_32 nativeOffset = BcMap::get_native_offset_for_bc_offset(bc_pc, infoBlock + stackInfoSize + gcMapSize);
     if (nativeOffset!= MAX_UINT32) {
         *native_pc =  (POINTER_SIZE_INT)(method->getCodeBlockAddress(0) + nativeOffset);
         return true;
@@ -126,19 +126,19 @@ bool RuntimeInterface::getNativeLocationForBc(MethodDesc* method, uint16 bc_pc, 
     return false;
 }
 
-uint32  RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, uint32 offset) {
+U_32  RuntimeInterface::getInlineDepth(InlineInfoPtr ptr, U_32 offset) {
     const InlineInfoMap::Entry* e = InlineInfoMap::getEntryWithMaxDepth(ptr, offset);
     // real instructions are recorded at an extra nested level to enclosing method
     // but we need to count method marker entries only
     return e == NULL ? 0 : e->getInlineDepth() - 1;
 }
 
-Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
+Method_Handle   RuntimeInterface::getInlinedMethod(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth) {
     const InlineInfoMap::Entry* e = InlineInfoMap::getEntry(ptr, offset, inline_depth);
     return e == NULL  ? 0 : e->method;
 }
 
-uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) {
+uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth) {
     const InlineInfoMap::Entry* e = InlineInfoMap::getEntryWithMaxDepth(ptr, offset);
     assert(inline_depth);
 
@@ -149,7 +149,7 @@ uint16 RuntimeInterface::getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 i
     // In both cases needed bcOffset is stored in child entry
     const InlineInfoMap::Entry* childCallee = e;
     while (e) {
-        uint32 depth = e->getInlineDepth();
+        U_32 depth = e->getInlineDepth();
         if (depth == inline_depth)
         {
             return childCallee->bcOffset;

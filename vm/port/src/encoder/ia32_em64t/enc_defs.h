@@ -443,21 +443,21 @@ Mnemonic_CMPSD,                         // Compare Two Doublewords at DS:ESI and
 //
 // double -> float
 Mnemonic_CVTSD2SS,                      // Convert Scalar Double-Precision Floating-Point Value to Scalar Single-Precision Floating-Point Value
-// double -> int32
+// double -> I_32
 Mnemonic_CVTSD2SI,                      // Convert Scalar Double-Precision Floating-Point Value to Doubleword Integer
-// double [truncated] -> int32
+// double [truncated] -> I_32
 Mnemonic_CVTTSD2SI,                     // Convert with Truncation Scalar Double-Precision Floating-Point Value to Signed Doubleword Integer
 //
 // float -> double
 Mnemonic_CVTSS2SD,                      // Convert Scalar Single-Precision Floating-Point Value to Scalar Double-Precision Floating-Point Value
-// float -> int32
+// float -> I_32
 Mnemonic_CVTSS2SI,                      // Convert Scalar Single-Precision Floating-Point Value to Doubleword Integer
-// float [truncated] -> int32
+// float [truncated] -> I_32
 Mnemonic_CVTTSS2SI,                     // Convert with Truncation Scalar Single-Precision Floating-Point Value to Doubleword Integer
 //
-// int32 -> double
+// I_32 -> double
 Mnemonic_CVTSI2SD,                      // Convert Doubleword Integer to Scalar Double-Precision Floating-Point Value
-// int32 -> float
+// I_32 -> float
 Mnemonic_CVTSI2SS,                      // Convert Doubleword Integer to Scalar Single-Precision Floating-Point Value
 
 Mnemonic_COMISD,                        // Compare Scalar Ordered Double-Precision Floating-Point Values and Set EFLAGS

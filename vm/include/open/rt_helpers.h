@@ -546,11 +546,11 @@ enum VM_RT_SUPPORT {
  * @param The parameters are the following:
  *        arg\ Object reference for the source array. Must be non-null and refer to an array 
  *             of 16 bit chars
- *        arg\ int32 containing the starting index of the source array to copy
+ *        arg\ I_32 containing the starting index of the source array to copy
  *        arg\ Object reference for the destination array. Must be non-null and refer to an array 
  *             of 16 bit chars.
- *        arg\ int32 containing the starting index of the destination array to copy into.
- *        arg\ int32 containing the number of 16 bit chars to copy.
+ *        arg\ I_32 containing the starting index of the destination array to copy into.
+ *        arg\ I_32 containing the number of 16 bit chars to copy.
  *
  * @return None.
  * 

@@ -113,7 +113,7 @@ jobject object_clone(JNIEnv *jenv, jobject jobj)
     if((vt->class_properties & CL_PROP_ARRAY_MASK) != 0)
     {
         // clone an array
-        int32 length = get_vector_length((Vector_Handle) h->object);
+        I_32 length = get_vector_length((Vector_Handle) h->object);
         size = vt->clss->calculate_array_size(length);
         assert(size > 0);
         result = (ManagedObject*)

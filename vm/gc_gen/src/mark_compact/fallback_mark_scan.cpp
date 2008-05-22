@@ -70,7 +70,7 @@ static void scan_object(Collector* collector, REF *p_ref)
     Partial_Reveal_Object* array = p_obj;
     assert(!obj_is_primitive_array(array));
     
-    int32 array_length = vector_get_length((Vector_Handle) array);
+    I_32 array_length = vector_get_length((Vector_Handle) array);
     for (int i = 0; i < array_length; i++) {
       REF *p_ref = (REF*)vector_get_element_address_ref((Vector_Handle) array, i);
       scan_slot(collector, p_ref);

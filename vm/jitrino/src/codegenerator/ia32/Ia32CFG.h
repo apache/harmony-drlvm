@@ -54,8 +54,8 @@ namespace Ia32{
         exception handlers, the handler with the highest priority handles it.
         The smaller the priority number the hight is the priority.  
         */
-        uint32  getPriority()const {return priority;}
-        void    setPriority(uint32 p) {priority = p;}
+        U_32  getPriority()const {return priority;}
+        void    setPriority(U_32 p) {priority = p;}
 
         //---------------------------------------------------------------------------------------------
     protected: 
@@ -71,7 +71,7 @@ namespace Ia32{
         exception handlers, the handler with the highest priority handles it.
         The smaller the priority number the hight is the priority.
         */
-        uint32      priority;
+        U_32      priority;
 
         //---------------------------------------------------------------------------------------------
     };
@@ -92,9 +92,9 @@ namespace Ia32{
         };
 
         /** Returns the persistent id of the node (HIR CFG node id resulting to this node) */
-        uint32              getPersistentId()const {return persistentId; }
+        U_32              getPersistentId()const {return persistentId; }
         /** Sets the persistent id of the node (HIR CFG node id resulting to this node) */
-        void                setPersistentId(uint32 persId) { persistentId = persId; }
+        void                setPersistentId(U_32 persId) { persistentId = persId; }
 
         IRManager &         getIRManager() { return irm; }
         
@@ -111,7 +111,7 @@ namespace Ia32{
 
         IRManager&      irm;
         BitSet*         liveAtEntry;
-        uint32         persistentId;
+        U_32         persistentId;
        
         friend class IRManager;
        
@@ -135,13 +135,13 @@ namespace Ia32{
         void            setLayoutSucc(BasicBlock *bb) {assert(bb!=this); layoutSucc = bb;}
 
         /** sets the offset of native code for this basic block */
-        void            setCodeOffset(uint32 offset) {codeOffset = offset;}
+        void            setCodeOffset(U_32 offset) {codeOffset = offset;}
         /** returns the offset of native code for this basic block */
-        uint32          getCodeOffset()const    {   return codeOffset;  }
+        U_32          getCodeOffset()const    {   return codeOffset;  }
         /** sets the size of native code for this basic block */
-        void            setCodeSize(uint32 size) {codeSize = size;}
+        void            setCodeSize(U_32 size) {codeSize = size;}
         /** returns the size of native code for this basic block */
-        uint32          getCodeSize()const  {   return codeSize;    }
+        U_32          getCodeSize()const  {   return codeSize;    }
         
         /** returns the pointer to the native code for this basic block */
         void*           getCodeStartAddr() const;
@@ -155,8 +155,8 @@ namespace Ia32{
         
     protected:
         BasicBlock *    layoutSucc; 
-        uint32          codeOffset;
-        uint32          codeSize;
+        U_32          codeOffset;
+        U_32          codeSize;
         void*           codeAddr;
     };
 

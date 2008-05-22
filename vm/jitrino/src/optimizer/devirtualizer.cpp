@@ -68,7 +68,7 @@ Devirtualizer::Devirtualizer(IRManager& irm, SessionAction* sa)
 }
 
 bool
-Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, Opnd*& tauNullChecked, Opnd *&tauTypesChecked, uint32 &argOffset, bool &isIntfCall)
+Devirtualizer::isGuardableVirtualCall(Inst* inst, MethodInst*& methodInst, Opnd*& base, Opnd*& tauNullChecked, Opnd *&tauTypesChecked, U_32 &argOffset, bool &isIntfCall)
 {
     //
     // Returns true if this call site may be considered for guarded devirtualization
@@ -186,7 +186,7 @@ Devirtualizer::guardCallsInRegion(IRManager& regionIRM, DominatorTree* dtree) {
 
 
 void
-Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* objectType, Opnd *tauNullChecked, Opnd *tauTypesChecked, uint32 argOffset) {
+Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call, MethodDesc* methodDesc, ObjectType* objectType, Opnd *tauNullChecked, Opnd *tauTypesChecked, U_32 argOffset) {
     ControlFlowGraph &regionFG = regionIRM.getFlowGraph();
     assert(!methodDesc->isStatic());
     assert(call == node->getLastInst());
@@ -233,9 +233,9 @@ Devirtualizer::genGuardedDirectCall(IRManager &regionIRM, Node* node, Inst* call
     // Create direct call instruction
     //
     Opnd* dst = call->getDst(); 
-    uint32 numArgs = call->getNumSrcOperands()-argOffset;
-    uint32 i = 0;
-    uint32 j = argOffset; // skip taus
+    U_32 numArgs = call->getNumSrcOperands()-argOffset;
+    U_32 i = 0;
+    U_32 j = argOffset; // skip taus
     Opnd** args = new (regionIRM.getMemoryManager()) Opnd*[numArgs];
     for(; i < numArgs; ++i, ++j)
         args[i] = call->getSrc(j); // skip taus
@@ -418,7 +418,7 @@ Devirtualizer::getTopProfiledCalleeType(IRManager& regionIRM, MethodDesc *origMe
     uint16 bcOffset = call->getBCOffset();
     assert(bcOffset != 0);
     assert(bcOffset != ILLEGAL_BC_MAPPING_VALUE);
-    Log::out() << "Call instruction bcOffset = " << (int32)bcOffset << std::endl;
+    Log::out() << "Call instruction bcOffset = " << (I_32)bcOffset << std::endl;
 
     // Get profiled vtable value
     POINTER_SIZE_INT vtHandle = mp->getTopValue(bcOffset);
@@ -445,7 +445,7 @@ Devirtualizer::guardCallsInBlock(IRManager& regionIRM, Node* node) {
         Opnd* base = 0;
         Opnd* tauNullChecked = 0;
         Opnd* tauTypesChecked = 0;
-        uint32 argOffset = 0;
+        U_32 argOffset = 0;
         bool isIntfCall = false;
         if(isGuardableVirtualCall(last, methodInst, base, tauNullChecked, tauTypesChecked, argOffset, isIntfCall)) {
             assert(methodInst && base && tauNullChecked && tauTypesChecked && argOffset);

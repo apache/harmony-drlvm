@@ -52,7 +52,7 @@ void Printer::close()
     logs.close();
 }
 //_____________________________________________________________________________________________
-void Printer::print(uint32 indent)
+void Printer::print(U_32 indent)
 {
     printHeader(indent);
     printBody(indent);
@@ -60,7 +60,7 @@ void Printer::print(uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void Printer::printHeader(uint32 indent)
+void Printer::printHeader(U_32 indent)
 {
     assert(irManager!=NULL);
     ::std::ostream& os = getStream();
@@ -72,7 +72,7 @@ void Printer::printHeader(uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void Printer::printEnd(uint32 indent)
+void Printer::printEnd(U_32 indent)
 {
     ::std::ostream& os = getStream();
     os << ::std::endl;
@@ -80,7 +80,7 @@ void Printer::printEnd(uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void Printer::printBody(uint32 indent)
+void Printer::printBody(U_32 indent)
 {
     ::std::ostream& os = getStream();
     os << "Printer::printBody is stub implementation"<< ::std::endl;
@@ -91,19 +91,19 @@ void Printer::printBody(uint32 indent)
 // class IRPrinter
 //========================================================================================
 //_____________________________________________________________________________________________
-void IRPrinter::print(uint32 indent)
+void IRPrinter::print(U_32 indent)
 {
     Printer::print();
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printBody(uint32 indent)
+void IRPrinter::printBody(U_32 indent)
 {
     printCFG(indent);
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printCFG(uint32 indent)
+void IRPrinter::printCFG(U_32 indent)
 {
     assert(irManager!=NULL);
     std::ostream& os = getStream();
@@ -146,7 +146,7 @@ void IRPrinter::printNodeName(const Node * node)
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printNodeHeader(const Node * node, uint32 indent)
+void IRPrinter::printNodeHeader(const Node * node, U_32 indent)
 {
     std::ostream& os = getStream();
     printIndent(indent);
@@ -227,12 +227,12 @@ void IRPrinter::printNodeHeader(const Node * node, uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printNodeInstList(const Node* bb, uint32 indent)
+void IRPrinter::printNodeInstList(const Node* bb, U_32 indent)
 {
     ::std::ostream& os = getStream();
     for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
         Inst::Kind kind=inst->getKind();
-        if ((kind & instFilter)==(uint32)kind){
+        if ((kind & instFilter)==(U_32)kind){
             printIndent(indent+1); 
             if (irManager->getCodeStartAddr()!=NULL){
                 os<<(void*)inst->getCodeStartAddr()<<' ';
@@ -244,7 +244,7 @@ void IRPrinter::printNodeInstList(const Node* bb, uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printNode(const Node * node, uint32 indent)
+void IRPrinter::printNode(const Node * node, U_32 indent)
 {
     std::ostream& os = getStream();
     printNodeHeader(node, indent);
@@ -280,12 +280,12 @@ const char * IRPrinter::getPseudoInstPrintName(Inst::Kind k)
 }
 
 //_____________________________________________________________________________________________
-uint32 IRPrinter::printInstOpnds(const Inst * inst, uint32 orf)
+U_32 IRPrinter::printInstOpnds(const Inst * inst, U_32 orf)
 {
     ::std::ostream& os = getStream();
     if (!(orf&Inst::OpndRole_ForIterator))
         return 0;
-    uint32 printedOpnds=0;
+    U_32 printedOpnds=0;
     bool explicitOnly=(orf&Inst::OpndRole_ForIterator)==Inst::OpndRole_Explicit;
 
     Inst::Opnds opnds(inst, orf);
@@ -308,7 +308,7 @@ void IRPrinter::printInst(const Inst * inst)
     os<<"I"<<inst->getId()<<": ";
 
     if (opndRolesFilter & Inst::OpndRole_Def){
-        uint32 printedOpndsTotal=0, printedOpnds=0;
+        U_32 printedOpndsTotal=0, printedOpnds=0;
         if (inst->getForm()==Inst::Form_Extended)
             printedOpnds=printInstOpnds(inst, (Inst::OpndRole_Def|Inst::OpndRole_Explicit)&opndRolesFilter);
         if (printedOpnds){ os<<" "; printedOpndsTotal+=printedOpnds; }
@@ -348,7 +348,7 @@ void IRPrinter::printInst(const Inst * inst)
     }
 
     os<<" ";
-    uint32 printedOpndsTotal=0, printedOpnds=0;
+    U_32 printedOpndsTotal=0, printedOpnds=0;
     printedOpnds=printInstOpnds(inst, ((inst->getForm()==Inst::Form_Extended?Inst::OpndRole_Use:Inst::OpndRole_UseDef)|Inst::OpndRole_Explicit)&opndRolesFilter);
     if (printedOpnds){ os<<" "; printedOpndsTotal+=printedOpnds; }
     printedOpnds=printInstOpnds(inst, (Inst::OpndRole_Use|Inst::OpndRole_Auxilary)&opndRolesFilter);
@@ -369,12 +369,12 @@ void IRPrinter::printInst(const Inst * inst)
     if (inst->hasKind(Inst::Kind_GCInfoPseudoInst)) {
         const GCInfoPseudoInst* gcInst = (GCInfoPseudoInst*)inst;
         Opnd * const * uses = gcInst->getOpnds();
-        const StlVector<int32>& offsets = gcInst->offsets;
+        const StlVector<I_32>& offsets = gcInst->offsets;
         os<<"[phase:"<<gcInst->desc<<"]";
         os<<"(";
         assert(!offsets.empty());
-        for (uint32 i = 0, n = (uint32)offsets.size(); i<n; i++) {
-                int32 offset = offsets[i];
+        for (U_32 i = 0, n = (U_32)offsets.size(); i<n; i++) {
+                I_32 offset = offsets[i];
                 Opnd* opnd = uses[i];
                 if (i>0) {
                     os<<",";
@@ -387,7 +387,7 @@ void IRPrinter::printInst(const Inst * inst)
 
 
 //_________________________________________________________________________________________________
-void IRPrinter::printOpndRoles(uint32 roles)
+void IRPrinter::printOpndRoles(U_32 roles)
 {
     ::std::ostream& os=getStream();
     if (roles&Inst::OpndRole_Explicit)          os<<"E"; 
@@ -411,15 +411,15 @@ void IRPrinter::printOpndName(const Opnd * opnd)
 }
 
 //_________________________________________________________________________________________________
-uint32 IRPrinter::getOpndNameLength(Opnd * opnd)
+U_32 IRPrinter::getOpndNameLength(Opnd * opnd)
 {
-    uint32 id=opnd->getFirstId();
-    uint32 idLength=id<10?1:id<100?2:id<1000?3:id<10000?4:5;
+    U_32 id=opnd->getFirstId();
+    U_32 idLength=id<10?1:id<100?2:id<1000?3:id<10000?4:5;
     return 1+idLength;
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printOpnd(const Inst * inst, uint32 idx, bool isLiveBefore, bool isLiveAfter)
+void IRPrinter::printOpnd(const Inst * inst, U_32 idx, bool isLiveBefore, bool isLiveAfter)
 {
     printOpnd(inst->getOpnd(idx), inst->getOpndRoles(idx), isLiveBefore, isLiveAfter);
 }
@@ -533,13 +533,13 @@ void IRPrinter::printRuntimeInfo(const Opnd::RuntimeInfo * info)
         default:
             assert(0);
     }
-    uint32 additionalOffset=info->getAdditionalOffset();
+    U_32 additionalOffset=info->getAdditionalOffset();
     if (additionalOffset>0)
         os<<"+"<<additionalOffset;
 }
 
 //_____________________________________________________________________________________________
-void IRPrinter::printOpnd(const Opnd * opnd, uint32 roles, bool isLiveBefore, bool isLiveAfter)
+void IRPrinter::printOpnd(const Opnd * opnd, U_32 roles, bool isLiveBefore, bool isLiveAfter)
 {
     ::std::ostream& os = getStream();
 
@@ -555,10 +555,10 @@ void IRPrinter::printOpnd(const Opnd * opnd, uint32 roles, bool isLiveBefore, bo
                 os<<"(";printRegName(opnd->getSegReg());os<<":";
             }
             os<<"[";
-            uint32 oldOpndFlavor=opndFlavor;
+            U_32 oldOpndFlavor=opndFlavor;
             opndFlavor&=~OpndFlavor_Type;
             bool append=false;
-            for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++){
+            for (U_32 i=0; i<MemOpndSubOpndKind_Count; i++){
                 Opnd * subOpnd=opnd->getMemOpndSubOpnd((MemOpndSubOpndKind)i);
                 if (subOpnd){
                     if (append){
@@ -605,7 +605,7 @@ void IRPrinter::printType(const Type * type)
 // class IRLivenessPrinter
 //========================================================================================
 //_____________________________________________________________________________________________
-void IRLivenessPrinter::printNode(const Node * node, uint32 indent)
+void IRLivenessPrinter::printNode(const Node * node, U_32 indent)
 {
     assert(irManager!=NULL);
     ::std::ostream& os = getStream();
@@ -632,7 +632,7 @@ void IRLivenessPrinter::printLiveSet(const BitSet * ls)
         os<<"Null";
         return;
     }
-    for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++){
+    for (U_32 i=0, n=irManager->getOpndCount(); i<n; i++){
         Opnd * opnd=irManager->getOpnd(i);
         if (ls->getBit(opnd->getId())){
             printOpndName(opnd); os<<"("<<opnd->getId()<<")"<<" ";
@@ -644,11 +644,11 @@ void IRLivenessPrinter::printLiveSet(const BitSet * ls)
 // class IROpndPrinter
 //========================================================================================
 //_____________________________________________________________________________________________
-void IROpndPrinter::printBody(uint32 indent)
+void IROpndPrinter::printBody(U_32 indent)
 {
     assert(irManager!=NULL);
     ::std::ostream& os = getStream();
-    for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++){
+    for (U_32 i=0, n=irManager->getOpndCount(); i<n; i++){
         printIndent(indent);
         Opnd * opnd=irManager->getOpnd(i);
         printOpnd(opnd);
@@ -672,7 +672,7 @@ void IROpndPrinter::printBody(uint32 indent)
 }
 
 //_____________________________________________________________________________________________
-void IROpndPrinter::printHeader(uint32 indent)
+void IROpndPrinter::printHeader(U_32 indent)
 {
     assert(irManager!=NULL);
     ::std::ostream& os = getStream();
@@ -689,7 +689,7 @@ void IROpndPrinter::printHeader(uint32 indent)
 //========================================================================================
 
 //_____________________________________________________________________________________________
-void IRInstConstraintPrinter::printOpnd(const Inst * inst, uint32 idx, bool isLiveBefore, bool isLiveAfter)
+void IRInstConstraintPrinter::printOpnd(const Inst * inst, U_32 idx, bool isLiveBefore, bool isLiveAfter)
 {
     ::std::ostream& os = getStream();
     Opnd * opnd=inst->getOpnd(idx);
@@ -714,7 +714,7 @@ void OpcodeDescriptionPrinter::printConstraint(Constraint c)
     }
     os<<getOpndSizeString(c.getSize())<<":";
     bool written=false;
-    uint32 kind=c.getKind();
+    U_32 kind=c.getKind();
     if (kind & OpndKind_Imm){
         if (written) os<<"|";
         os << "Imm";
@@ -732,8 +732,8 @@ void OpcodeDescriptionPrinter::printConstraint(Constraint c)
         os <<"{";
         {
             bool written=false;
-            uint32 mask=c.getMask();
-            for (uint32 i=1, idx=0; i; i<<=1, idx++){
+            U_32 mask=c.getMask();
+            for (U_32 i=1, idx=0; i; i<<=1, idx++){
                 if (mask&i){
                     const char * regName=getRegNameString(getRegName((OpndKind)(kind&OpndKind_Reg), c.getSize(), idx));
                     if (regName!=NULL){
@@ -757,7 +757,7 @@ void OpcodeDescriptionPrinter::printRegName(const RegName regName)
 }
 
 //_________________________________________________________________________________________________
-void OpcodeDescriptionPrinter::printOpndRoles(uint32 roles)
+void OpcodeDescriptionPrinter::printOpndRoles(U_32 roles)
 {
     ::std::ostream& os=getStream();
     if (roles&Inst::OpndRole_Def)   os<<"D";
@@ -768,8 +768,8 @@ void OpcodeDescriptionPrinter::printOpndRoles(uint32 roles)
 void OpcodeDescriptionPrinter::printOpndRolesDescription(const Encoder::OpndRolesDescription * ord)
 {
     ::std::ostream& os=getStream();
-    os<<"count: "<<(uint32)ord->count<<" (D:"<<ord->defCount<<",U:"<<ord->useCount<<"); roles: "; 
-    for (uint32 i=0; i<ord->count; i++){
+    os<<"count: "<<(U_32)ord->count<<" (D:"<<ord->defCount<<",U:"<<ord->useCount<<"); roles: "; 
+    for (U_32 i=0; i<ord->count; i++){
         if (i>0)
             os<<',';
         printOpndRoles(Encoder::getOpndRoles(*ord, i));
@@ -777,19 +777,19 @@ void OpcodeDescriptionPrinter::printOpndRolesDescription(const Encoder::OpndRole
 }
 
 //_________________________________________________________________________________________________
-void OpcodeDescriptionPrinter::printOpcodeDescription(const Encoder::OpcodeDescription * od, uint32 indent)
+void OpcodeDescriptionPrinter::printOpcodeDescription(const Encoder::OpcodeDescription * od, U_32 indent)
 {
     assert( false );
 }
 
 //_________________________________________________________________________________________________
-void OpcodeDescriptionPrinter::printOpcodeGroup(const Encoder::OpcodeGroup* ogd, uint32 indent)
+void OpcodeDescriptionPrinter::printOpcodeGroup(const Encoder::OpcodeGroup* ogd, U_32 indent)
 {
     assert( false );
 }
 
 //_________________________________________________________________________________________________
-void OpcodeDescriptionPrinter::print(uint32 indent)
+void OpcodeDescriptionPrinter::print(U_32 indent)
 {
     assert( false );
 }
@@ -831,7 +831,7 @@ void IRDotPrinter::printNode(const Node * node)
         out << "\\l|\\" << std::endl;
         for (Inst * inst = (Inst*)node->getFirstInst(); inst != NULL; inst = inst->getNextInst()) {
             Inst::Kind kind=inst->getKind();
-            if ((kind & instFilter)==(uint32)kind){
+            if ((kind & instFilter)==(U_32)kind){
                 printInst(inst);
                 uint16 bcOffset = inst->getBCOffset();
                 if (bcOffset != ILLEGAL_BC_MAPPING_VALUE) out<<" bcOff: "<< bcOffset << " ";
@@ -906,7 +906,7 @@ void IRDotPrinter::printLayoutEdge(const BasicBlock * from, const BasicBlock * t
 }
 
 //_________________________________________________________________________________________________
-void IRDotPrinter::printHeader(uint32 indent)
+void IRDotPrinter::printHeader(U_32 indent)
 {
     assert(irManager!=NULL);
     getStream() << "digraph dotgraph {" << ::std::endl
@@ -928,7 +928,7 @@ void IRDotPrinter::printHeader(uint32 indent)
 }
 
 //_________________________________________________________________________________________________
-void IRDotPrinter::printEnd(uint32 indent)
+void IRDotPrinter::printEnd(U_32 indent)
 {
     getStream() << "}" << ::std::endl;
 }
@@ -947,7 +947,7 @@ void IRDotPrinter::printLiveness()
         out<<"liveness_"; printNodeName(node); 
         out << " [label=\""; printNodeName(node); out<<":";
         if (ls){
-            for (uint32 i = 0; i < ls->getSetSize(); i++) {
+            for (U_32 i = 0; i < ls->getSetSize(); i++) {
                 if (ls->getBit(i))
                     out << " " << i;
             }
@@ -1035,7 +1035,7 @@ void IRDotPrinter::printTraversalOrder(CGNode::OrderType orderType)
 }
 
 //_________________________________________________________________________________________________
-void IRDotPrinter::printBody(uint32 indent)
+void IRDotPrinter::printBody(U_32 indent)
 {
     assert(irManager!=NULL);
 
@@ -1049,7 +1049,7 @@ void IRDotPrinter::printBody(uint32 indent)
 }
 
 //_________________________________________________________________________________________________
-void IRDotPrinter::printCFG(uint32 indent)
+void IRDotPrinter::printCFG(U_32 indent)
 {
     assert(irManager!=NULL);
     const Nodes& nodes = irManager->getFlowGraph()->getNodes();
@@ -1082,7 +1082,7 @@ void IRDotPrinter::printCFG(uint32 indent)
 }
 
 //_________________________________________________________________________________________________
-void IRDotPrinter::print(uint32 indent)
+void IRDotPrinter::print(U_32 indent)
 {
     IRPrinter::print();
 }
@@ -1094,7 +1094,7 @@ void IRDotPrinter::print(uint32 indent)
 //========================================================================================
 
 //_________________________________________________________________________________________________
-void IRLivenessDotPrinter::printBody(uint32 indent)
+void IRLivenessDotPrinter::printBody(U_32 indent)
 {
     assert(irManager!=NULL);
     setOpndFlavor(OpndFlavor_Location);
@@ -1105,8 +1105,8 @@ void IRLivenessDotPrinter::printBody(uint32 indent)
 char * IRLivenessDotPrinter::getRegString(char * str, Constraint c, StlVector<Opnd *> opnds)
 {
     char * retStr=NULL;
-    uint32 si=0;
-    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
+    U_32 si=0;
+    for (U_32 i=0, n=(U_32)opnds.size(); i<n; i++){
         Opnd * o=opnds[i];
         if (o->isPlacedIn(c)){
             retStr=str;
@@ -1114,7 +1114,7 @@ char * IRLivenessDotPrinter::getRegString(char * str, Constraint c, StlVector<Op
             str[si++]=(char)('0'+getRegIndex(r));
         }else
             str[si++]='_';
-        for (uint32 j=0, l=getOpndNameLength(o)-1; j<l; j++) 
+        for (U_32 j=0, l=getOpndNameLength(o)-1; j<l; j++) 
             str[si++]='_';
     }
     str[si++]=0;
@@ -1156,7 +1156,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
         if (irManager->hasLivenessInfo()){
 
             StlVector<BitSet *> liveSets(mm);
-            StlVector<uint32> regUsages(mm);
+            StlVector<U_32> regUsages(mm);
             BitSet * lsAll=new (mm) BitSet(mm, irManager->getOpndCount());
 
             BitSet * lsCurrent=new (mm) BitSet(mm, irManager->getOpndCount());
@@ -1166,7 +1166,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
             ls->copyFrom(*lsCurrent);
             liveSets.push_back(ls);
 
-            uint32 regUsage=0, regUsageAll=0;
+            U_32 regUsage=0, regUsageAll=0;
             irManager->getRegUsageAtExit(node, OpndKind_GPReg, regUsage);
             regUsageAll|=regUsage;
             regUsages.push_back(regUsage);
@@ -1200,7 +1200,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
 
             StlVector<Opnd *> opndsAll(mm);
 
-            for (uint32 i=0, n=irManager->getOpndCount(); i<n; i++){
+            for (U_32 i=0, n=irManager->getOpndCount(); i<n; i++){
                 Opnd * opnd=irManager->getOpnd(i);
                 if (lsAll->getBit(opnd->getId())) {
                     opndsAll.push_back(opnd);
@@ -1214,8 +1214,8 @@ void IRLivenessDotPrinter::printNode(const Node * node)
 
             out<<"Operand Ids:\\l\\"<<::std::endl;
 
-            uint32 regKindCount=0;
-            for (uint32 i=0; i<IRMaxRegKinds; i++){
+            U_32 regKindCount=0;
+            for (U_32 i=0; i<IRMaxRegKinds; i++){
                 if (regStrings[i]!=NULL){
                     regKindCount++;
                     out<<getOpndKindString((OpndKind)i) << "\\l\\" << ::std::endl;
@@ -1227,17 +1227,17 @@ void IRLivenessDotPrinter::printNode(const Node * node)
             }
 
             out << "|\\" << std::endl;
-            for (uint32 i=0, n=(uint32)opndsAll.size(); i<n; i++){
+            for (U_32 i=0, n=(U_32)opndsAll.size(); i<n; i++){
                 out<<opndsAll[i]->getFirstId()<<'_';
             }
             out << "\\l\\" << std::endl;
 
-            for (uint32 i=0; i<IRMaxRegKinds; i++){
+            for (U_32 i=0; i<IRMaxRegKinds; i++){
                 if (regStrings[i]!=NULL)
                     out << regStrings[i] << "\\l\\" << ::std::endl;
             }
 
-            uint32 idx=(uint32)liveSets.size()-1;
+            U_32 idx=(U_32)liveSets.size()-1;
 
             for (Inst * inst = (Inst*)bb->getFirstInst(); inst != NULL; inst = inst->getNextInst(), idx--) {
                 printLivenessForInst(opndsAll, liveSets[idx], liveSets[idx-1]); // output at entry
@@ -1248,12 +1248,12 @@ void IRLivenessDotPrinter::printNode(const Node * node)
                 out << "|\\" << ::std::endl;
 
                 out << "01234567" << "\\l\\" << std::endl;
-                for (uint32 i=1; i<regKindCount; i++)
+                for (U_32 i=1; i<regKindCount; i++)
                     out << "\\l\\" << std::endl;
 
-                for (int32 i=(int32)regUsages.size()-1; i>=0; i--) {
-                    uint32 regUsage=regUsages[i];
-                    for (uint32 m=1; m!=0x100; m<<=1)
+                for (I_32 i=(I_32)regUsages.size()-1; i>=0; i--) {
+                    U_32 regUsage=regUsages[i];
+                    for (U_32 m=1; m!=0x100; m<<=1)
                         out << (m&regUsage?'.':'_');
                     out << "\\l\\" << std::endl;
                 }
@@ -1283,7 +1283,7 @@ void IRLivenessDotPrinter::printNode(const Node * node)
 void IRLivenessDotPrinter::printLivenessForInst(const StlVector<Opnd*> opnds, const BitSet * ls0, const BitSet * ls1)
 {
     ::std::ostream& out=getStream();
-    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
+    for (U_32 i=0, n=(U_32)opnds.size(); i<n; i++){
         Opnd * opnd=opnds[i];
         bool isLiveBefore=ls0!=NULL && ls0->getBit(opnd->getId());
         bool isLiveAfter=ls1!=NULL && ls1->getBit(opnd->getId());
@@ -1295,7 +1295,7 @@ void IRLivenessDotPrinter::printLivenessForInst(const StlVector<Opnd*> opnds, co
             out<<'\'';
         else
             out<<'_';
-        for (uint32 j=0, l=getOpndNameLength(opnd)-1; j<l; j++) 
+        for (U_32 j=0, l=getOpndNameLength(opnd)-1; j<l; j++) 
             out<<'_';
     }
 }
@@ -1305,15 +1305,15 @@ void IRLivenessDotPrinter::printLivenessForInst(const StlVector<Opnd*> opnds, co
 //_________________________________________________________________________________________________
 void dumpIR(
             const IRManager * irManager,
-            uint32 stageId,
+            U_32 stageId,
             const char * readablePrefix,
             const char * readableStageName,
             const char * stageTagName,
             const char * subKind1, 
             const char * subKind2,
-            uint32 instFilter, 
-            uint32 opndFlavor,
-            uint32 opndRolesFilter
+            U_32 instFilter, 
+            U_32 opndFlavor,
+            U_32 opndRolesFilter
             )
 {
     std::ostream& out = Log::log(LogStream::IRDUMP).out();
@@ -1357,15 +1357,15 @@ void dumpIR(
 //_________________________________________________________________________________________________
 void printDot(
             const IRManager * irManager,
-            uint32 stageId,
+            U_32 stageId,
             const char * readablePrefix,
             const char * readableStageName,
             const char * stageTagName,
             const char * subKind1, 
             const char * subKind2,
-            uint32 instFilter, 
-            uint32 opndFlavor,
-            uint32 opndRolesFilter
+            U_32 instFilter, 
+            U_32 opndFlavor,
+            U_32 opndRolesFilter
             )
 {
     char title[128];
@@ -1403,23 +1403,23 @@ void printDot(
 }
 
 //_________________________________________________________________________________________________
-void printRuntimeArgs(::std::ostream& os, uint32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context)
+void printRuntimeArgs(::std::ostream& os, U_32 opndCount, CallingConvention::OpndInfo * infos, JitFrameContext * context)
 {
     MemoryManager mm("printRuntimeOpndInternalHelper");
     TypeManager tm(mm); tm.init();
     os<<opndCount<<" args: ";
-    for (uint32 i=0; i<opndCount; i++){
+    for (U_32 i=0; i<opndCount; i++){
         CallingConvention::OpndInfo & info=infos[i];
-        uint32 cb=0;
-        uint8 arg[4*sizeof(uint32)]; 
-        for (uint32 j=0; j<info.slotCount; j++){
+        U_32 cb=0;
+        uint8 arg[4*sizeof(U_32)]; 
+        for (U_32 j=0; j<info.slotCount; j++){
             if (!info.isReg){
 #ifdef _EM64T_
                 *(POINTER_SIZE_INT*)(arg+cb)=((POINTER_SIZE_INT*)context->rsp)[info.slots[j]];
 #else
-                *(uint32*)(arg+cb)=((uint32*)context->esp)[info.slots[j]];
+                *(U_32*)(arg+cb)=((U_32*)context->esp)[info.slots[j]];
 #endif
-                cb+=sizeof(uint32);
+                cb+=sizeof(U_32);
             }else{
                 assert(info.isReg);
                 //assert(0);                    
@@ -1459,10 +1459,10 @@ void printRuntimeOpnd(::std::ostream& os, TypeManager & tm, Type::Tag typeTag, c
                 os<<*(uint16*)p<<*(char*)p;
                 break;
             case Type::Int32:
-                os<<*(int32*)p;
+                os<<*(I_32*)p;
                 break;
             case Type::UInt32:
-                os<<*(uint32*)p;
+                os<<*(U_32*)p;
                 break;
             case Type::Int64:   
                 os<<*(int64*)p;
@@ -1527,11 +1527,11 @@ void printRuntimeObjectOpnd(::std::ostream& os, TypeManager & tm, const void * p
 void printRuntimeObjectContent_Array(::std::ostream& os, TypeManager & tm, Type * type, const void * p)
 {
     ArrayType * arrayType=(ArrayType *)type;
-    uint32 lengthOffset=arrayType->getArrayLengthOffset();
-    uint32 length=*(uint32*)(((uint8*)p)+lengthOffset);
+    U_32 lengthOffset=arrayType->getArrayLengthOffset();
+    U_32 length=*(U_32*)(((uint8*)p)+lengthOffset);
     os<<"{"<<length<<" elems: ";
     if (length>0){
-        uint32 elemOffset=arrayType->getArrayElemOffset();
+        U_32 elemOffset=arrayType->getArrayElemOffset();
         printRuntimeOpnd(os, tm, arrayType->getElementType()->tag, (const void*)(((uint8*)p)+elemOffset));
         if (length>1)
             os<<", ...";
@@ -1546,16 +1546,16 @@ void printRuntimeObjectContent_String(::std::ostream& os, TypeManager & tm, Type
     os<<"\"...\"";
     return;
 #else
-    uint32 stringLengthOffset=8;
-    uint32 stringOffsetOffset=12;
-    uint32 stringBufferOffset=16;
-    uint32 bufferLengthOffset=8;
-    uint32 bufferElemsOffset=12;
+    U_32 stringLengthOffset=8;
+    U_32 stringOffsetOffset=12;
+    U_32 stringBufferOffset=16;
+    U_32 bufferLengthOffset=8;
+    U_32 bufferElemsOffset=12;
     
     uint8 * string=(uint8*)p;
 
-    uint32  stringLength=*(uint32*)(string+stringLengthOffset);
-    uint32  stringOffset=*(uint32*)(string+stringOffsetOffset);
+    U_32  stringLength=*(U_32*)(string+stringLengthOffset);
+    U_32  stringOffset=*(U_32*)(string+stringOffsetOffset);
     uint8 * buffer=*(uint8**)(string+stringBufferOffset);
 
     if (buffer==NULL){
@@ -1566,7 +1566,7 @@ void printRuntimeObjectContent_String(::std::ostream& os, TypeManager & tm, Type
         return;
     }
 
-    uint32 bufferLength=*(uint32*)(buffer+bufferLengthOffset);
+    U_32 bufferLength=*(U_32*)(buffer+bufferLengthOffset);
 
     uint16 * bufferElems=(uint16*)(buffer+bufferElemsOffset);
 
@@ -1576,7 +1576,7 @@ void printRuntimeObjectContent_String(::std::ostream& os, TypeManager & tm, Type
     }
 
     os<<"\"";
-    for (uint32 i=stringOffset, n=stringOffset+stringLength; i<n; i++)
+    for (U_32 i=stringOffset, n=stringOffset+stringLength; i<n; i++)
         os<<(char)bufferElems[i];
     os<<"\"";
 #endif

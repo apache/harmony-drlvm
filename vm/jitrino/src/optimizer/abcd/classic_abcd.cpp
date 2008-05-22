@@ -53,7 +53,7 @@ class IOpndProxy : public IOpnd
 public:
     IOpndProxy(Opnd* opnd);
 
-    IOpndProxy(int32 c, uint32 id);
+    IOpndProxy(I_32 c, U_32 id);
 
     virtual void printName(std::ostream& os) const
     {
@@ -66,17 +66,17 @@ public:
 
     Opnd* getOrg() const { assert(_opnd); return _opnd; }
 
-    static uint32 getProxyIdByOpnd(Opnd* opnd);
+    static U_32 getProxyIdByOpnd(Opnd* opnd);
 private:
     Opnd* _opnd;
 
     /* ids of PiOpnd, SsaOpnd, VarOpnd may alias their IDs,
      * encoding all in one ID with unaliasing
      */
-    static const uint32 min_var_opnd = 0;
-    static const uint32 min_ssa_opnd = MAX_UINT32 / 4;
-    static const uint32 min_pi_opnd = (min_ssa_opnd) * 2;
-    static const uint32 min_const_opnd = (min_ssa_opnd) * 3;
+    static const U_32 min_var_opnd = 0;
+    static const U_32 min_ssa_opnd = MAX_UINT32 / 4;
+    static const U_32 min_pi_opnd = (min_ssa_opnd) * 2;
+    static const U_32 min_const_opnd = (min_ssa_opnd) * 3;
 };
 //------------------------------------------------------------------------------
 
@@ -88,7 +88,7 @@ void printIOpnd(IOpnd* opnd)
 }
 
 bool inInt32(int64 c) {
-    return (int64)(int32)c == c;
+    return (int64)(I_32)c == c;
 }
 
 bool inInt32Type(Type t) {
@@ -115,7 +115,7 @@ IOpndProxy::IOpndProxy(Opnd* opnd) :
             return;
         }
         if ( inInt32(value) ) {
-            setConstant((int32)value);
+            setConstant((I_32)value);
         }else{
             setUnconstrained(true);
         }
@@ -123,7 +123,7 @@ IOpndProxy::IOpndProxy(Opnd* opnd) :
 }
 //------------------------------------------------------------------------------
 
-IOpndProxy::IOpndProxy(int32 c, uint32 id) : 
+IOpndProxy::IOpndProxy(I_32 c, U_32 id) : 
     IOpnd(0, false /* is_phi */, true /* is_constant */),
     _opnd(NULL)
 {
@@ -131,9 +131,9 @@ IOpndProxy::IOpndProxy(int32 c, uint32 id) :
     setConstant(c);
 }
 
-uint32 IOpndProxy::getProxyIdByOpnd(Opnd* opnd)
+U_32 IOpndProxy::getProxyIdByOpnd(Opnd* opnd)
 {
-    uint32 id = opnd->getId();
+    U_32 id = opnd->getId();
     if ( opnd->isVarOpnd() ) {
         id += min_var_opnd;
     }else if ( opnd->isPiOpnd() ) { 
@@ -183,7 +183,7 @@ private:
     IOpndProxy* addOldOrCreateOpnd(Opnd* opnd);
 
     InequalityGraph* _igraph;
-    uint32 _const_id_counter;
+    U_32 _const_id_counter;
 
     // operands are mapped to their renaming Pi instructions during the walk
     // (applyToInst), and then this mapping is used to create edges between
@@ -224,7 +224,7 @@ IOpndProxy* BuildInequalityGraphWalker::findProxy(Opnd* opnd)
 void BuildInequalityGraphWalker::addAllSrcOpndsForPhi(Inst* inst)
 {
     assert(inst->getOpcode() == Op_Phi);
-    for (uint32 j = 0; j < inst->getNumSrcOperands(); j++) {
+    for (U_32 j = 0; j < inst->getNumSrcOperands(); j++) {
         IOpndProxy* proxy_src = addOldOrCreateOpnd(inst->getSrc(j));
         addDistance(findProxy(inst->getDst()), proxy_src, 0, false /*negate*/);
     }
@@ -401,7 +401,7 @@ bool BuildInequalityGraphWalker::addDistance
     assert(dst && src);
     // This prevention to put some edges is *not* an optimization of any kind.
     // Operands can be marked unconstrained by various reasons, for example:
-    // because the constant value does not fit into int32 (which is critical for
+    // because the constant value does not fit into I_32 (which is critical for
     // array access)
     if ( !src->isUnconstrained() ) {
         if ( !inInt32(constant) ) {
@@ -410,7 +410,7 @@ bool BuildInequalityGraphWalker::addDistance
         if ( negate ) {
             constant = (-1) * constant;
         }
-        _igraph->addEdge(src->getID(), dst->getID(), (int32)constant);
+        _igraph->addEdge(src->getID(), dst->getID(), (I_32)constant);
         return true;
     }
     return false;
@@ -424,7 +424,7 @@ void BuildInequalityGraphWalker::addDistanceSingleProblem
     if ( from->isUnconstrained() || !inInt32(c) ) {
         return;
     }
-    _igraph->addEdgeSingleState(from->getID(), to->getID(), (int32)c, lower_problem);
+    _igraph->addEdgeSingleState(from->getID(), to->getID(), (I_32)c, lower_problem);
 }
 //------------------------------------------------------------------------------
 
@@ -468,7 +468,7 @@ void BuildInequalityGraphWalker::addPiEdgesSingleProblem
     } else if ( non_inf_bound.isConst() ) {
         MemoryManager& mm = _igraph->getMemoryManager();
         IOpndProxy* c_opnd = new (mm) 
-            IOpndProxy((int32)non_inf_bound.getConst(), _const_id_counter++);
+            IOpndProxy((I_32)non_inf_bound.getConst(), _const_id_counter++);
         _igraph->addOpnd(c_opnd);
         addDistanceSingleProblem(dst /* to */, c_opnd, 0, lower_problem);
     }
@@ -524,8 +524,8 @@ void ClassicAbcd::updateOrInitValue
     if ( map.count(inst) == 0 ) {
         map[inst] = type;
     }else{
-        int32 new_rtype = (int32)map[inst];
-        new_rtype |= (int32)type;
+        I_32 new_rtype = (I_32)map[inst];
+        new_rtype |= (I_32)type;
         map[inst] = (RedundancyType)new_rtype;
     }
 }
@@ -630,7 +630,7 @@ void ClassicAbcd::runPass()
 
     insertPi.removePi();
 
-    uint32 checks_eliminated = 0;
+    U_32 checks_eliminated = 0;
 
     for(InstRedundancyMap::const_iterator i = _redundantChecks.begin();
         i != _redundantChecks.end(); ++i) {

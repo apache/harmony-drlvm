@@ -83,34 +83,34 @@ public:
     // and returns True if branch can be folded away.
     bool canFoldBranch(Type::Tag, ComparisonModifier, Opnd* src1, Opnd* src2,bool& isTaken);
     bool canFoldBranch(Type::Tag, ComparisonModifier, Opnd* src, bool& isTaken);
-    bool simplifySwitch(uint32 numLabels, LabelInst* label[], LabelInst* defaultLabel, Opnd* src);
+    bool simplifySwitch(U_32 numLabels, LabelInst* label[], LabelInst* defaultLabel, Opnd* src);
 
     Opnd* simplifyTauVirtualCall(MethodDesc* methodDesc,
                                  Type* returnType,
                                  Opnd* tauNullCheckedFirstArg,
                                  Opnd* tauTypesChecked,
-                                 uint32 numArgs,
+                                 U_32 numArgs,
                                  Opnd* args[]);
 
     Inst* simplifyIndirectCallInst(Opnd* funPtr,
                                    Type* returnType,
                                    Opnd* tauNullCheckedFirstArg,
                                    Opnd* tauTypesChecked,
-                                   uint32 numArgs,
+                                   U_32 numArgs,
                                    Opnd** args);
 
     Inst* simplifyIndirectMemoryCallInst(Opnd* funPtr,
                                          Type* returnType,
                                          Opnd* tauNullCheckedFirstArg,
                                          Opnd* tauTypesChecked,
-                                         uint32 numArgs,
+                                         U_32 numArgs,
                                          Opnd** args);
 
     Inst* simplifyJitHelperCall(JitHelperCallInst* inst);
 
     // loads
     Opnd* simplifyLdRef(Modifier mod, Type *dstType, 
-                        uint32 token,
+                        U_32 token,
                         MethodDesc* enclosingMethod);
     Opnd* simplifyTauLdInd(Modifier mod, Type *dstType, 
                            Type::Tag type,
@@ -226,10 +226,10 @@ protected:
                                 Type* returnType,
                                 Opnd* tauNullCheckedFirstArg,
                                 Opnd* tauTypesChecked,
-                                uint32 numArgs,
+                                U_32 numArgs,
                                 Opnd* args[]) = 0;
     // load, store & move
-    virtual Inst* genLdConstant(int32 val) = 0;
+    virtual Inst* genLdConstant(I_32 val) = 0;
     virtual Inst* genLdConstant(int64 val) = 0;
     virtual Inst* genLdConstant(float val) = 0;
     virtual Inst* genLdConstant(double val) = 0;
@@ -237,7 +237,7 @@ protected:
     virtual Inst* genTauLdInd(Modifier mod, Type *dstType, Type::Tag type, Opnd *ptr, 
                               Opnd *tauNonNullBase, Opnd *tauAddressInRange) = 0;
     virtual Inst* genLdRef(Modifier mod, Type *dstType,
-                           uint32 token, MethodDesc *enclosingMethod) = 0;
+                           U_32 token, MethodDesc *enclosingMethod) = 0;
     virtual Inst* genLdFunAddrSlot(MethodDesc*) = 0;
     virtual Inst* genGetVTableAddr(ObjectType* type) = 0;
     // compressed references
@@ -264,10 +264,10 @@ protected:
     virtual void genThrowSystemException(CompilationInterface::SystemExceptionId) = 0;
 
     virtual void  foldBranch(BranchInst* branchInst, bool isTaken) = 0;
-    virtual void  foldSwitch(SwitchInst* switchInst, uint32 index) = 0;
+    virtual void  foldSwitch(SwitchInst* switchInst, U_32 index) = 0;
     virtual void  eliminateCheck(Inst* checkInst, bool alwaysThrows) = 0;
 
-    Opnd *planMul32(int32 multiplier, Opnd *opnd);
+    Opnd *planMul32(I_32 multiplier, Opnd *opnd);
     Opnd *planMul64(int64 multiplier, Opnd *opnd);
 public:
     //-------------------------------------------------------------------------
@@ -1051,7 +1051,7 @@ private:
                               Opnd* &newSrc1, Opnd* &newSrc2);
 
     friend struct OpndDepthCompare;
-    uint32 getDepth(Opnd *src);
+    U_32 getDepth(Opnd *src);
 
 protected:
     bool            isLate;
@@ -1075,7 +1075,7 @@ public:
     SimplifierWithInstFactory(IRManager&,bool latePass=false,
                   Reassociate *reassociate0=0);
     virtual Inst* optimizeInst(Inst* inst);
-    uint32 simplifyControlFlowGraph();
+    U_32 simplifyControlFlowGraph();
 protected:
     void insertInst(Inst* inst);
     void insertInstInHeader(Inst* inst);
@@ -1121,10 +1121,10 @@ protected:
                                 Type* returnType,
                                 Opnd* tauNullCheckedFirstArg,
                                 Opnd* typesChecked,
-                                uint32 numArgs,
+                                U_32 numArgs,
                                 Opnd* args[]);
 
-    virtual Inst* genLdConstant(int32 val);
+    virtual Inst* genLdConstant(I_32 val);
     virtual Inst* genLdConstant(int64 val);
     virtual Inst* genLdConstant(float val);
     virtual Inst* genLdConstant(double val);
@@ -1133,7 +1133,7 @@ protected:
     virtual Inst* genTauLdInd(Modifier mod, Type *dstType, Type::Tag type, Opnd *ptr,
                               Opnd *tauNonNullBase, Opnd *tauAddressInRange);
     virtual Inst* genLdRef(Modifier mod, Type *dstType,
-                           uint32 token, MethodDesc *enclosingMethod);
+                           U_32 token, MethodDesc *enclosingMethod);
 
     virtual Inst* genLdFunAddrSlot(MethodDesc*);
     virtual Inst* genGetVTableAddr(ObjectType* type);
@@ -1160,7 +1160,7 @@ protected:
     virtual void genThrowSystemException(CompilationInterface::SystemExceptionId);
 
     virtual void  foldBranch(BranchInst* br, bool isTaken);
-    virtual void  foldSwitch(SwitchInst* switchInst, uint32 index);
+    virtual void  foldSwitch(SwitchInst* switchInst, U_32 index);
     virtual void  eliminateCheck(Inst* checkInst, bool alwaysThrows);
 private:
     Inst*           nextInst;

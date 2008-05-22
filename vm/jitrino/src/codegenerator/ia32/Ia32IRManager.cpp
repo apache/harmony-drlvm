@@ -46,11 +46,11 @@ static void appendToInstList(Inst *& head, Inst * listToAppend) {
 }
 
 //_________________________________________________________________________________________________
-const char * newString(MemoryManager& mm, const char * str, uint32 length)
+const char * newString(MemoryManager& mm, const char * str, U_32 length)
 {
     assert(str!=NULL);
     if (length==EmptyUint32)
-        length=(uint32)strlen(str);
+        length=(U_32)strlen(str);
     char * psz=new(mm) char[length+1];
     strncpy(psz, str, length);
     psz[length]=0;
@@ -68,7 +68,7 @@ IRManager::IRManager(MemoryManager& memManager, TypeManager& tm, MethodDesc& md,
         refsCompressed(VMInterface::areReferencesCompressed())
 
 {  
-    for (uint32 i=0; i<lengthof(regOpnds); i++) regOpnds[i]=NULL;
+    for (U_32 i=0; i<lengthof(regOpnds); i++) regOpnds[i]=NULL;
     fg = new (memManager) ControlFlowGraph(memManager, this);
     fg->setEntryNode(fg->createBlockNode());
     fg->setLoopTree(new (memManager) LoopTree(memManager, fg));
@@ -82,7 +82,7 @@ void IRManager::addOpnd(Opnd * opnd)
 { 
     assert(opnd->id>=opnds.size());
     opnds.push_back(opnd);
-    opnd->id=(uint32)opnds.size()-1;
+    opnd->id=(U_32)opnds.size()-1;
 }
 
 //_____________________________________________________________________________________________
@@ -138,7 +138,7 @@ ConstantAreaItem *  IRManager::newConstantAreaItem(double d)
 }
 
 //_____________________________________________________________________________________________
-ConstantAreaItem *  IRManager::newSwitchTableConstantAreaItem(uint32 numTargets)
+ConstantAreaItem *  IRManager::newSwitchTableConstantAreaItem(U_32 numTargets)
 {
     return new(memoryManager) ConstantAreaItem(
         ConstantAreaItem::Kind_SwitchTableConstantAreaItem, sizeof(BasicBlock*)*numTargets, 
@@ -152,13 +152,13 @@ ConstantAreaItem *  IRManager::newInternalStringConstantAreaItem(const char * st
     if (str==NULL)
         str="";
     return new(memoryManager) ConstantAreaItem(
-        ConstantAreaItem::Kind_InternalStringConstantAreaItem, (uint32)strlen(str)+1, 
+        ConstantAreaItem::Kind_InternalStringConstantAreaItem, (U_32)strlen(str)+1, 
         (void*)newInternalString(str)
     );
 }
 
 //_____________________________________________________________________________________________
-ConstantAreaItem * IRManager::newBinaryConstantAreaItem(uint32 size, const void * pv)
+ConstantAreaItem * IRManager::newBinaryConstantAreaItem(U_32 size, const void * pv)
 {
     return new(memoryManager) ConstantAreaItem(ConstantAreaItem::Kind_BinaryConstantAreaItem, size, pv);
 }
@@ -197,14 +197,14 @@ Opnd * IRManager::newInternalStringConstantImmOpnd(const char * str)
 }
 
 //_____________________________________________________________________________________________
-Opnd * IRManager::newBinaryConstantImmOpnd(uint32 size, const void * pv)
+Opnd * IRManager::newBinaryConstantImmOpnd(U_32 size, const void * pv)
 {
     ConstantAreaItem * item=newBinaryConstantAreaItem(size, pv);
     return newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getIntPtrType()), Opnd::RuntimeInfo::Kind_ConstantAreaItem, item);
 }
 
 //_____________________________________________________________________________________________
-SwitchInst * IRManager::newSwitchInst(uint32 numTargets, Opnd * index)
+SwitchInst * IRManager::newSwitchInst(U_32 numTargets, Opnd * index)
 {
     assert(numTargets>0);
     assert(index!=NULL);
@@ -256,7 +256,7 @@ Opnd * IRManager::newMemOpnd(Type * type, Opnd * base, Opnd * index, Opnd * scal
 }
 
 //_____________________________________________________________________________________________
-Opnd * IRManager::newMemOpnd(Type * type, MemOpndKind k, Opnd * base, int32 displacement, RegName segReg)
+Opnd * IRManager::newMemOpnd(Type * type, MemOpndKind k, Opnd * base, I_32 displacement, RegName segReg)
 {
     return newMemOpnd(type, k, base, 0, 0, newImmOpnd(typeManager.getInt32Type(), displacement), segReg);
 }
@@ -290,7 +290,7 @@ Opnd * IRManager::newMemOpndAutoKind(Type * type, MemOpndKind k, Opnd * opnd0, O
 //_____________________________________________________________________________________________
 void IRManager::initInitialConstraints()
 {
-    for (uint32 i=0; i<lengthof(initialConstraints); i++)
+    for (U_32 i=0; i<lengthof(initialConstraints); i++)
         initialConstraints[i] = createInitialConstraint((Type::Tag)i);
 }
 
@@ -311,9 +311,9 @@ Constraint IRManager::createInitialConstraint(Type::Tag t)const
 Inst * IRManager::newInst(Mnemonic mnemonic, Opnd * opnd0, Opnd * opnd1, Opnd * opnd2)
 {
     Inst * inst = new(memoryManager, 4) Inst(mnemonic, instId++, Inst::Form_Native);
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
-    uint32 * roles = inst->getOpndRoles();
+    U_32 * roles = inst->getOpndRoles();
     if (opnd0!=NULL){ opnds[i] = opnd0; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd1!=NULL){ opnds[i] = opnd1; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd2!=NULL){ opnds[i] = opnd2; roles[i] = Inst::OpndRole_Explicit; i++;
@@ -330,9 +330,9 @@ Inst * IRManager::newInst(Mnemonic mnemonic,
     )
 {
     Inst * inst = new(memoryManager, 8) Inst(mnemonic, instId++, Inst::Form_Native);
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
-    uint32 * roles = inst->getOpndRoles();
+    U_32 * roles = inst->getOpndRoles();
     if (opnd0!=NULL){ opnds[i] = opnd0; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd1!=NULL){ opnds[i] = opnd1; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd2!=NULL){ opnds[i] = opnd2; roles[i] = Inst::OpndRole_Explicit; i++;
@@ -348,12 +348,12 @@ Inst * IRManager::newInst(Mnemonic mnemonic,
 }
 
 //_____________________________________________________________________________________________
-Inst * IRManager::newInstEx(Mnemonic mnemonic, uint32 defCount, Opnd * opnd0, Opnd * opnd1, Opnd * opnd2)
+Inst * IRManager::newInstEx(Mnemonic mnemonic, U_32 defCount, Opnd * opnd0, Opnd * opnd1, Opnd * opnd2)
 {
     Inst * inst = new(memoryManager, 4) Inst(mnemonic, instId++, Inst::Form_Extended);
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
-    uint32 * roles = inst->getOpndRoles();
+    U_32 * roles = inst->getOpndRoles();
     if (opnd0!=NULL){ 
         opnds[i] = opnd0; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd1!=NULL){ 
@@ -368,15 +368,15 @@ Inst * IRManager::newInstEx(Mnemonic mnemonic, uint32 defCount, Opnd * opnd0, Op
 }
 
 //_____________________________________________________________________________________________
-Inst * IRManager::newInstEx(Mnemonic mnemonic, uint32 defCount, 
+Inst * IRManager::newInstEx(Mnemonic mnemonic, U_32 defCount, 
         Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3, 
         Opnd * opnd4, Opnd * opnd5, Opnd * opnd6, Opnd * opnd7
     )
 {
     Inst * inst = new(memoryManager, 8) Inst(mnemonic, instId++, Inst::Form_Extended);
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
-    uint32 * roles = inst->getOpndRoles();
+    U_32 * roles = inst->getOpndRoles();
     if (opnd0!=NULL){ 
         opnds[i] = opnd0; roles[i] = Inst::OpndRole_Explicit; i++;
     if (opnd1!=NULL){ 
@@ -401,13 +401,13 @@ Inst * IRManager::newInstEx(Mnemonic mnemonic, uint32 defCount,
 }
 
 //_________________________________________________________________________________________________
-Inst * IRManager::newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
+Inst * IRManager::newI8PseudoInst(Mnemonic mnemonic, U_32 defCount,
             Opnd * opnd0, Opnd * opnd1, Opnd * opnd2, Opnd * opnd3
         )
 {
     Inst * inst=new  (memoryManager, 4) Inst(mnemonic, instId++, Inst::Form_Extended);
     inst->kind = Inst::Kind_I8PseudoInst;
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
     assert(opnd0->getType()->isInteger() ||opnd0->getType()->isPtr());
     if (opnd0!=NULL){       opnds[i] = opnd0; i++;
@@ -425,7 +425,7 @@ Inst * IRManager::newI8PseudoInst(Mnemonic mnemonic, uint32 defCount,
 SystemExceptionCheckPseudoInst * IRManager::newSystemExceptionCheckPseudoInst(CompilationInterface::SystemExceptionId exceptionId, Opnd * opnd0, Opnd * opnd1, bool checksThisForInlinedMethod)
 {
     SystemExceptionCheckPseudoInst * inst=new  (memoryManager, 8) SystemExceptionCheckPseudoInst(exceptionId, instId++, checksThisForInlinedMethod);
-    uint32 i=0;
+    U_32 i=0;
     Opnd ** opnds = inst->getOpnds();
     if (opnd0!=NULL){ opnds[i++] = opnd0; 
     if (opnd1!=NULL){ opnds[i++] = opnd1;
@@ -490,11 +490,11 @@ EntryPointPseudoInst * IRManager::newEntryPointPseudoInst(const CallingConventio
 
 //_________________________________________________________________________________________________
 CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * cc, 
-        uint32 argCount, Opnd ** args, Opnd * retOpnd)
+        U_32 argCount, Opnd ** args, Opnd * retOpnd)
 {
     CallInst * callInst=new(memoryManager, (argCount + (retOpnd ? 1 : 0)) * 2 + 1) CallInst(this, instId++, cc, targetOpnd->getRuntimeInfo());
     CallingConventionClient & ccc = callInst->callingConventionClient;
-    uint32 i=0;
+    U_32 i=0;
     if (retOpnd!=NULL){
         ccc.pushInfo(Inst::OpndRole_Def, retOpnd->getType()->tag);
         callInst->insertOpnd(i++, retOpnd, Inst::OpndRole_Auxilary|Inst::OpndRole_Def);
@@ -503,7 +503,7 @@ CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * c
     callInst->insertOpnd(i++, targetOpnd, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
 
     if (argCount>0){
-        for (uint32 j=0; j<argCount; j++){
+        for (U_32 j=0; j<argCount; j++){
             ccc.pushInfo(Inst::OpndRole_Use, args[j]->getType()->tag);
             callInst->insertOpnd(i++, args[j], Inst::OpndRole_Auxilary|Inst::OpndRole_Use);
         }
@@ -515,7 +515,7 @@ CallInst * IRManager::newCallInst(Opnd * targetOpnd, const CallingConvention * c
 
 //_________________________________________________________________________________________________
 CallInst * IRManager::newRuntimeHelperCallInst(VM_RT_SUPPORT helperId, 
-    uint32 numArgs, Opnd ** args, Opnd * retOpnd)
+    U_32 numArgs, Opnd ** args, Opnd * retOpnd)
 {
     Inst * instList = NULL;
     Opnd * target=newImmOpnd(typeManager.getInt32Type(), Opnd::RuntimeInfo::Kind_HelperAddress, (void*)helperId);
@@ -525,7 +525,7 @@ CallInst * IRManager::newRuntimeHelperCallInst(VM_RT_SUPPORT helperId,
 }
 
 //_________________________________________________________________________________________________
-CallInst * IRManager::newInternalRuntimeHelperCallInst(const char * internalHelperID, uint32 numArgs, Opnd ** args, Opnd * retOpnd)
+CallInst * IRManager::newInternalRuntimeHelperCallInst(const char * internalHelperID, U_32 numArgs, Opnd ** args, Opnd * retOpnd)
 {
     const InternalHelperInfo * info=getInternalHelperInfo(internalHelperID);
     assert(info!=NULL);
@@ -598,7 +598,7 @@ void IRManager::applyCallingConventions()
                     retInst->callingConventionClient.layoutAuxilaryOpnds(Inst::OpndRole_Use, OpndKind_Null);
 
                     if (retInst->getCallingConventionClient().getCallingConvention()->calleeRestoresStack()){
-                        uint32 stackDepth=getEntryPointInst()->getArgStackDepth();
+                        U_32 stackDepth=getEntryPointInst()->getArgStackDepth();
                         retInst->getOpnd(0)->assignImmValue(stackDepth);
                     }
                 }
@@ -627,15 +627,15 @@ GCInfoPseudoInst* IRManager::newGCInfoPseudoInst(const StlVector<Opnd*>& basesAn
         assert(opnd->getType()->isObject() || opnd->getType()->isManagedPtr());
     }
 #endif
-    GCInfoPseudoInst* inst = new(memoryManager, (uint32)basesAndMptrs.size()) GCInfoPseudoInst(this, instId++);
+    GCInfoPseudoInst* inst = new(memoryManager, (U_32)basesAndMptrs.size()) GCInfoPseudoInst(this, instId++);
     Opnd ** opnds = inst->getOpnds();
     Constraint * constraints = inst->getConstraints();
-    for (uint32 i = 0, n = (uint32)basesAndMptrs.size(); i < n; i++){
+    for (U_32 i = 0, n = (U_32)basesAndMptrs.size(); i < n; i++){
         Opnd * opnd = basesAndMptrs[i];
         opnds[i] = opnd;
         constraints[i] = Constraint(OpndKind_Any, opnd->getSize());
     }
-    inst->opndCount = (uint32)basesAndMptrs.size();
+    inst->opndCount = (U_32)basesAndMptrs.size();
     inst->assignOpcodeGroup(this);
     return inst;
 }
@@ -678,7 +678,7 @@ CMPXCHG8BPseudoInst * IRManager::newCMPXCHG8BPseudoInst(Opnd* mem, Opnd* edx, Op
 Inst * IRManager::newCopyPseudoInst(Mnemonic mn, Opnd * opnd0, Opnd * opnd1)
 { 
     assert(mn==Mnemonic_MOV||mn==Mnemonic_PUSH||mn==Mnemonic_POP);
-    uint32 allOpndCnt = opnd0->getType()->isInt8() ? 4 : 2;
+    U_32 allOpndCnt = opnd0->getType()->isInt8() ? 4 : 2;
     Inst * inst=new  (memoryManager, allOpndCnt) Inst(mn, instId++, Inst::Form_Extended);
     inst->kind = Inst::Kind_CopyPseudoInst;
     assert(opnd0!=NULL);
@@ -702,7 +702,7 @@ Inst * IRManager::newCopyPseudoInst(Mnemonic mn, Opnd * opnd0, Opnd * opnd1)
 }
 
 //_________________________________________________________________________________________________
-AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 offset)
+AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 offset)
 {
     assert(sourceOpnd->isPlacedIn(OpndKind_Memory));
     assert(!targetOpnd->hasAssignedPhysicalLocation());
@@ -715,13 +715,13 @@ AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, Opnd * source
     OpndSize targetSize=getTypeSize(targetType);
 
 #ifdef _DEBUG
-    uint32 sourceByteSize=getByteSize(sourceSize);
-    uint32 targetByteSize=getByteSize(targetSize);
+    U_32 sourceByteSize=getByteSize(sourceSize);
+    U_32 targetByteSize=getByteSize(targetSize);
     assert(getByteSize(sourceSize)>0 && getByteSize(targetSize)>0);
     assert(offset+targetByteSize<=sourceByteSize);
 #endif
 
-    uint32 allocOpndNum = sourceOpnd->getType()->isInt8() ? 3 : 2;
+    U_32 allocOpndNum = sourceOpnd->getType()->isInt8() ? 3 : 2;
     AliasPseudoInst * inst=new  (memoryManager, allocOpndNum) AliasPseudoInst(instId++);
 
     inst->getOpnds()[0] = targetOpnd;
@@ -745,15 +745,15 @@ AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, Opnd * source
 }
 
 //_________________________________________________________________________________________________
-AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, uint32 sourceOpndCount, Opnd ** sourceOpnds)
+AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, U_32 sourceOpndCount, Opnd ** sourceOpnds)
 {
     assert(targetOpnd->isPlacedIn(OpndKind_Memory));
 
     Type * targetType=targetOpnd->getType();
     OpndSize targetSize=getTypeSize(targetType);
     assert(getByteSize(targetSize)>0);
-    uint32 allocOpnNum = 0;
-    for (uint32 i=0; i<sourceOpndCount; i++) allocOpnNum += getByteSize(getTypeSize(sourceOpnds[i]->getType()));
+    U_32 allocOpnNum = 0;
+    for (U_32 i=0; i<sourceOpndCount; i++) allocOpnNum += getByteSize(getTypeSize(sourceOpnds[i]->getType()));
 
     allocOpnNum += getByteSize(getTypeSize(targetOpnd->getType()));
     AliasPseudoInst * inst=new  (memoryManager, allocOpnNum) AliasPseudoInst(instId++);
@@ -765,8 +765,8 @@ AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, uint32 source
     opndConstraints[0] = Constraint(OpndKind_Mem, targetSize);
 
 
-    uint32 offset=0;
-    for (uint32 i=0; i<sourceOpndCount; i++){
+    U_32 offset=0;
+    for (U_32 i=0; i<sourceOpndCount; i++){
         assert(!sourceOpnds[i]->hasAssignedPhysicalLocation() || 
             (sourceOpnds[i]->isPlacedIn(OpndKind_Memory) && 
             sourceOpnds[i]->getMemOpndKind() == targetOpnd->getMemOpndKind())
@@ -774,7 +774,7 @@ AliasPseudoInst * IRManager::newAliasPseudoInst(Opnd * targetOpnd, uint32 source
         assert(sourceOpnds[i]->canBePlacedIn(OpndKind_Memory));
         Type * sourceType=sourceOpnds[i]->getType();
         OpndSize sourceSize=getTypeSize(sourceType);
-        uint32 sourceByteSize=getByteSize(sourceSize);
+        U_32 sourceByteSize=getByteSize(sourceSize);
         assert(sourceByteSize>0);
         assert(offset+sourceByteSize<=getByteSize(targetSize));
 
@@ -798,11 +798,11 @@ void IRManager::layoutAliasPseudoInstOpnds(AliasPseudoInst * inst)
     Opnd * const * opnds = inst->getOpnds();
     Opnd * defOpnd=opnds[0];
     Opnd * const * useOpnds = opnds + 1; 
-    uint32 useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
+    U_32 useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
     assert(useCount > 0);
     if (inst->offset==EmptyUint32){
-        uint32 offset=0;
-        for (uint32 i=0; i<useCount; i++){
+        U_32 offset=0;
+        for (U_32 i=0; i<useCount; i++){
             Opnd * innerOpnd=useOpnds[i];
             assignInnerMemOpnd(defOpnd, innerOpnd, offset);
             offset+=getByteSize(innerOpnd->getSize());
@@ -812,7 +812,7 @@ void IRManager::layoutAliasPseudoInstOpnds(AliasPseudoInst * inst)
 }
 
 //_________________________________________________________________________________________________
-void IRManager::addAliasRelation(AliasRelation * relations, Opnd * outerOpnd, Opnd * innerOpnd, uint32 offset)
+void IRManager::addAliasRelation(AliasRelation * relations, Opnd * outerOpnd, Opnd * innerOpnd, U_32 offset)
 {
     if (outerOpnd==innerOpnd){
         assert(offset==0);
@@ -833,12 +833,12 @@ void IRManager::addAliasRelation(AliasRelation * relations, Opnd * outerOpnd, Op
 #ifdef _DEBUG
     Type * outerType=outerOpnd->getType();
     OpndSize outerSize=getTypeSize(outerType);
-    uint32 outerByteSize=getByteSize(outerSize);
+    U_32 outerByteSize=getByteSize(outerSize);
     assert(offset<outerByteSize);
 
     Type * innerType=innerOpnd->getType();
     OpndSize innerSize=getTypeSize(innerType);
-    uint32 innerByteSize=getByteSize(innerSize);
+    U_32 innerByteSize=getByteSize(innerSize);
     assert(outerByteSize>0 && innerByteSize>0);
     assert(offset+innerByteSize<=outerByteSize);
 #endif
@@ -859,13 +859,13 @@ void IRManager::getAliasRelations(AliasRelation * relations)
                 if (inst->hasKind(Inst::Kind_AliasPseudoInst)){
                     AliasPseudoInst * aliasInst=(AliasPseudoInst *)inst;
                     Opnd * const * opnds = inst->getOpnds();
-                    uint32 useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
+                    U_32 useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
                     assert(inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def) == 1 && useCount > 0);
                     Opnd * defOpnd=opnds[0];
                     Opnd * const * useOpnds = opnds + 1; 
                     if (aliasInst->offset==EmptyUint32){
-                        uint32 offset=0;
-                        for (uint32 i=0; i<useCount; i++){
+                        U_32 offset=0;
+                        for (U_32 i=0; i<useCount; i++){
                             Opnd * innerOpnd=useOpnds[i];
                             addAliasRelation(relations, defOpnd, innerOpnd, offset);
                             offset+=getByteSize(innerOpnd->getSize());
@@ -883,10 +883,10 @@ void IRManager::getAliasRelations(AliasRelation * relations)
 void IRManager::layoutAliasOpnds() 
 {
     MemoryManager mm("layoutAliasOpnds");
-    uint32 opndCount=getOpndCount();
+    U_32 opndCount=getOpndCount();
     AliasRelation * relations=new  (memoryManager) AliasRelation[opndCount];
     getAliasRelations(relations);
-    for (uint32 i=0; i<opndCount; i++){
+    for (U_32 i=0; i<opndCount; i++){
         if (relations[i].outerOpnd!=NULL){
             Opnd * innerOpnd=getOpnd(i);
             assert(innerOpnd->isPlacedIn(OpndKind_Mem));
@@ -897,14 +897,14 @@ void IRManager::layoutAliasOpnds()
                 innerOpnd->setMemOpndSubOpnd(MemOpndSubOpndKind_Displacement, innerDispOpnd);
             }
             Opnd * outerDispOpnd=relations[i].outerOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement);
-            uint32 outerDispValue=(uint32)(outerDispOpnd!=NULL?outerDispOpnd->getImmValue():0);
+            U_32 outerDispValue=(U_32)(outerDispOpnd!=NULL?outerDispOpnd->getImmValue():0);
             innerDispOpnd->assignImmValue(outerDispValue+relations[i].offset);
         }
     }
 }
 
 //_________________________________________________________________________________________________
-uint32 IRManager::assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnd, uint32 offset)
+U_32 IRManager::assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnd, U_32 offset)
 {
     assert(outerOpnd->isPlacedIn(OpndKind_Memory));
 
@@ -918,7 +918,7 @@ uint32 IRManager::assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnd, uint32 o
     Opnd * outerScale=outerOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale);
 
     OpndSize innerSize = innerOpnd->getSize();
-    uint32 innerByteSize = getByteSize(innerSize);
+    U_32 innerByteSize = getByteSize(innerSize);
         
     Opnd * innerDisp=newImmOpnd(outerDisp!=NULL?outerDisp->getType():typeManager.getInt32Type(), outerDispValue+offset);
     if (outerDispRI){
@@ -938,19 +938,19 @@ uint32 IRManager::assignInnerMemOpnd(Opnd * outerOpnd, Opnd* innerOpnd, uint32 o
 }
 
 //_________________________________________________________________________________________________
-void IRManager::assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, uint32 innerOpndCount)
+void IRManager::assignInnerMemOpnds(Opnd * outerOpnd, Opnd** innerOpnds, U_32 innerOpndCount)
 {
 #ifdef _DEBUG
-    uint32 outerByteSize = getByteSize(outerOpnd->getSize());
+    U_32 outerByteSize = getByteSize(outerOpnd->getSize());
 #endif
-    for (uint32 i=0, offset=0; i<innerOpndCount; i++){
+    for (U_32 i=0, offset=0; i<innerOpndCount; i++){
         offset+=assignInnerMemOpnd(outerOpnd, innerOpnds[i], offset);
         assert(offset<=outerByteSize);
     }
 }
 
 //_________________________________________________________________________________________________
-uint32 getLayoutOpndAlignment(Opnd * opnd)
+U_32 getLayoutOpndAlignment(Opnd * opnd)
 {
     OpndSize size=opnd->getSize();
     if (size==OpndSize_80 || size==OpndSize_128)
@@ -964,7 +964,7 @@ uint32 getLayoutOpndAlignment(Opnd * opnd)
 
 //_________________________________________________________________________________________________
 
-Inst * IRManager::newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1, uint32 gpRegUsageMask, uint32 flagsRegUsageMask)
+Inst * IRManager::newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1, U_32 gpRegUsageMask, U_32 flagsRegUsageMask)
 {
     if (mn==Mnemonic_MOV)
         return newCopySequence(opnd0, opnd1, gpRegUsageMask, flagsRegUsageMask);
@@ -978,16 +978,16 @@ Inst * IRManager::newCopySequence(Mnemonic mn, Opnd * opnd0, Opnd * opnd1, uint3
 
 //_________________________________________________________________________________________________
 
-Inst * IRManager::newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32 regUsageMask, bool checkSource)
+Inst * IRManager::newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 regUsageMask, bool checkSource)
 {
     Inst * instList=NULL;
     RegName tmpRegName=RegName_Null, unusedTmpRegName=RegName_Null;
     bool registerSetNotLocked = !isRegisterSetLocked(OpndKind_GPReg);
 
 #ifdef _EM64T_
-    for (uint32 reg = RegName_RAX; reg<=RegName_R15/*(uint32)(targetOpnd->getSize()<OpndSize_64?RegName_RBX:RegName_RDI)*/; reg++) {
+    for (U_32 reg = RegName_RAX; reg<=RegName_R15/*(U_32)(targetOpnd->getSize()<OpndSize_64?RegName_RBX:RegName_RDI)*/; reg++) {
 #else
-    for (uint32 reg = RegName_EAX; reg<=(uint32)(targetOpnd->getSize()<OpndSize_32?RegName_EBX:RegName_EDI); reg++) {
+    for (U_32 reg = RegName_EAX; reg<=(U_32)(targetOpnd->getSize()<OpndSize_32?RegName_EBX:RegName_EDI); reg++) {
 #endif
         RegName regName = (RegName) reg;
         if (regName == STACK_REG)
@@ -1037,7 +1037,7 @@ Inst * IRManager::newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, uint32
 
 //_________________________________________________________________________________________________
 
-Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32 regUsageMask, uint32 flagsRegUsageMask)
+Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 regUsageMask, U_32 flagsRegUsageMask)
 
 { 
     Opnd * targetOpnd=(Opnd*)targetBOpnd, * sourceOpnd=(Opnd*)sourceBOpnd;
@@ -1050,7 +1050,7 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
     }
 
     OpndSize sourceSize=sourceConstraint.getSize();
-    uint32 sourceByteSize=getByteSize(sourceSize);
+    U_32 sourceByteSize=getByteSize(sourceSize);
     OpndKind targetKind=(OpndKind)targetConstraint.getKind();
     OpndKind sourceKind=(OpndKind)sourceConstraint.getKind();
 
@@ -1111,17 +1111,17 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
         if (sourceKind==OpndKind_Mem && targetKind==OpndKind_Mem){
             Inst * instList=NULL;
 #ifndef _EM64T_
-            uint32 targetByteSize=getByteSize(targetSize);
+            U_32 targetByteSize=getByteSize(targetSize);
             if (sourceByteSize<=4){
                 instList=newMemMovSequence(targetOpnd, sourceOpnd, regUsageMask);
             }else{
                 Opnd * targetOpnds[IRMaxOperandByteSize/4]; // limitation because we are currently don't support large memory operands
-                uint32 targetOpndCount = 0;
-                for (uint32 cb=0; cb<sourceByteSize && cb<targetByteSize; cb+=4)
+                U_32 targetOpndCount = 0;
+                for (U_32 cb=0; cb<sourceByteSize && cb<targetByteSize; cb+=4)
                     targetOpnds[targetOpndCount++] = newOpnd(typeManager.getInt32Type());
                 AliasPseudoInst * targetAliasInst=newAliasPseudoInst(targetOpnd, targetOpndCount, targetOpnds);
                 layoutAliasPseudoInstOpnds(targetAliasInst);
-                for (uint32 cb=0, targetOpndSlotIndex=0; cb<sourceByteSize && cb<targetByteSize; cb+=4, targetOpndSlotIndex++){  
+                for (U_32 cb=0, targetOpndSlotIndex=0; cb<sourceByteSize && cb<targetByteSize; cb+=4, targetOpndSlotIndex++){  
                     Opnd * sourceOpndSlot=newOpnd(typeManager.getInt32Type());
                     appendToInstList(instList, newAliasPseudoInst(sourceOpndSlot, sourceOpnd, cb));
                     Opnd * targetOpndSlot=targetOpnds[targetOpndSlotIndex];
@@ -1193,7 +1193,7 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, uint32
 
 //_________________________________________________________________________________________________
 
-Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMask)
+Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, U_32 regUsageMask)
 {
     assert(opnd!=NULL);
 
@@ -1254,8 +1254,8 @@ Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, uint32 regUsageMa
         }
     }
 #else
-    uint32 cb=getByteSize(size);
-    uint32 slotSize=4; 
+    U_32 cb=getByteSize(size);
+    U_32 slotSize=4; 
     cb=(cb+slotSize-1)&~(slotSize-1);
     Opnd * sizeOpnd=newImmOpnd(typeManager.getInt32Type(), cb);
     if (mn==Mnemonic_PUSH){
@@ -1295,7 +1295,7 @@ const CallingConvention * IRManager::getCallingConvention(MethodDesc * methodDes
 }
 
 //_________________________________________________________________________________________________
-Opnd * IRManager::defArg(Type * type, uint32 position)
+Opnd * IRManager::defArg(Type * type, U_32 position)
 {
     assert(NULL != entryPointInst);
     Opnd * opnd=newOpnd(type);
@@ -1308,7 +1308,7 @@ Opnd * IRManager::defArg(Type * type, uint32 position)
 Opnd * IRManager::getRegOpnd(RegName regName)
 {
     assert(getRegSize(regName)==Constraint::getDefaultSize(getRegKind(regName))); // are we going to change this?
-    uint32 idx=( (getRegKind(regName) & 0x1f) << 4 ) | ( getRegIndex(regName)&0xf );
+    U_32 idx=( (getRegKind(regName) & 0x1f) << 4 ) | ( getRegIndex(regName)&0xf );
     if (!regOpnds[idx]){
 #ifdef _EM64T_
         Type * t = (getRegSize(regName) == OpndSize_64 ? typeManager.getUInt64Type() : typeManager.getUInt32Type());
@@ -1321,15 +1321,15 @@ Opnd * IRManager::getRegOpnd(RegName regName)
 }
 void IRManager::calculateTotalRegUsage(OpndKind regKind) {
     assert(regKind == OpndKind_GPReg);
-    uint32 opndCount=getOpndCount();
-    for (uint32 i=0; i<opndCount; i++){
+    U_32 opndCount=getOpndCount();
+    for (U_32 i=0; i<opndCount; i++){
         Opnd * opnd=getOpnd(i);
         if (opnd->isPlacedIn(regKind))
             gpTotalRegUsage |= getRegMask(opnd->getRegName());
     }
 }
 //_________________________________________________________________________________________________
-uint32 IRManager::getTotalRegUsage(OpndKind regKind)const {
+U_32 IRManager::getTotalRegUsage(OpndKind regKind)const {
     return gpTotalRegUsage;
 }
 //_________________________________________________________________________________________________
@@ -1338,7 +1338,7 @@ bool IRManager::isPreallocatedRegOpnd(Opnd * opnd)
     RegName regName=opnd->getRegName();
     if (regName==RegName_Null || getRegSize(regName)!=Constraint::getDefaultSize(getRegKind(regName)))
         return false;
-    uint32 idx=( (getRegKind(regName) & 0x1f) << 4 ) | ( getRegIndex(regName)&0xf );
+    U_32 idx=( (getRegKind(regName) & 0x1f) << 4 ) | ( getRegIndex(regName)&0xf );
     return regOpnds[idx]==opnd;
 }
 
@@ -1426,7 +1426,7 @@ OpndSize IRManager::getTypeSize(Type::Tag tag)
 //_____________________________________________________________________________________________
 void IRManager::indexInsts() {
     const Nodes& postOrder = fg->getNodesPostOrder();
-    uint32 idx=0;
+    U_32 idx=0;
     for (Nodes::const_reverse_iterator it = postOrder.rbegin(), end = postOrder.rend(); it!=end; ++it) {
         Node* node = *it;
         if (node->isBlockNode()){
@@ -1438,10 +1438,10 @@ void IRManager::indexInsts() {
 }
 
 //_____________________________________________________________________________________________
-uint32 IRManager::calculateOpndStatistics(bool reindex)
+U_32 IRManager::calculateOpndStatistics(bool reindex)
 {
     POpnd * arr=&opnds.front();
-    for (uint32 i=0, n=(uint32)opnds.size(); i<n; i++){
+    for (U_32 i=0, n=(U_32)opnds.size(); i<n; i++){
         Opnd * opnd=arr[i];
         if (opnd==NULL) {
             continue;
@@ -1454,18 +1454,18 @@ uint32 IRManager::calculateOpndStatistics(bool reindex)
         }
     }
 
-    uint32 index=0;
-    uint32 instIdx=0;
+    U_32 index=0;
+    U_32 instIdx=0;
     const Nodes& nodes = fg->getNodesPostOrder();
     for (Nodes::const_reverse_iterator  it = nodes.rbegin(), end = nodes.rend(); it!=end; ++it) {
         Node* node = *it;
         if (!node->isBlockNode()) {
             continue;
         }
-        int32 execCount=1;//(int32)node->getExecCount()*100;
+        I_32 execCount=1;//(I_32)node->getExecCount()*100;
         for (Inst * inst=(Inst*)node->getFirstInst(); inst!=NULL; inst=inst->getNextInst()){
             inst->index=instIdx++;
-            for (uint32 i=0, n=inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_UseDef); i<n; i++){
+            for (U_32 i=0, n=inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_UseDef); i<n; i++){
                 Opnd * opnd=inst->getOpnd(i);
                 opnd->addRefCount(index, execCount);
                 if ((inst->getOpndRoles(i)&Inst::OpndRole_Def)!=0){
@@ -1475,7 +1475,7 @@ uint32 IRManager::calculateOpndStatistics(bool reindex)
         }
     }
 
-    for (uint32 i=0; i<IRMaxRegNames; i++){ // update predefined regOpnds to prevent losing them from the ID space
+    for (U_32 i=0; i<IRMaxRegNames; i++){ // update predefined regOpnds to prevent losing them from the ID space
         if (regOpnds[i]!=NULL) {
             regOpnds[i]->addRefCount(index, 1);
         }
@@ -1491,12 +1491,12 @@ void IRManager::packOpnds()
 
     _hasLivenessInfo=false;
 
-    uint32 maxIndex=calculateOpndStatistics(true);
+    U_32 maxIndex=calculateOpndStatistics(true);
 
-    uint32 opndsBefore=(uint32)opnds.size();
+    U_32 opndsBefore=(U_32)opnds.size();
     opnds.resize(opnds.size()+maxIndex);
     POpnd * arr=&opnds.front();
-    for (uint32 i=0; i<opndsBefore; i++){
+    for (U_32 i=0; i<opndsBefore; i++){
         Opnd * opnd=arr[i];
         if (opnd->id!=EmptyUint32)
             arr[opndsBefore+opnd->id]=opnd;
@@ -1507,9 +1507,9 @@ void IRManager::packOpnds()
 }
 
 //_____________________________________________________________________________________________
-void IRManager::fixLivenessInfo( uint32 * map )
+void IRManager::fixLivenessInfo( U_32 * map )
 {
-    uint32 opndCount = getOpndCount();
+    U_32 opndCount = getOpndCount();
     const Nodes& nodes = fg->getNodes();
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         CGNode* node = (CGNode*)*it;
@@ -1527,7 +1527,7 @@ void IRManager::calculateLivenessInfo()
     _hasLivenessInfo=false;
     LoopTree* lt = fg->getLoopTree();
     lt->rebuild(false);
-    const uint32 opndCount = getOpndCount();    
+    const U_32 opndCount = getOpndCount();    
 
     const Nodes& nodes = fg->getNodesPostOrder();
     //clean all prev. liveness info
@@ -1535,15 +1535,15 @@ void IRManager::calculateLivenessInfo()
         CGNode* node = (CGNode*)*it;
         node->getLiveAtEntry()->resizeClear(opndCount);
     }
-    uint32 loopDepth = lt->getMaxLoopDepth();
-    uint32 nIterations = loopDepth + 1;
+    U_32 loopDepth = lt->getMaxLoopDepth();
+    U_32 nIterations = loopDepth + 1;
 #ifdef _DEBUG
     nIterations++; //one more extra iteration to prove that nothing changed
 #endif 
     BitSet tmpLs(memoryManager, opndCount);
     bool changed = true;
     Node* exitNode = fg->getExitNode();
-    for (uint32 iteration=0; iteration < nIterations; iteration++) {
+    for (U_32 iteration=0; iteration < nIterations; iteration++) {
         changed = false;
         for (Nodes::const_iterator it = nodes.begin(),end = nodes.end();it!=end; ++it) {
             CGNode* node = (CGNode*)*it;
@@ -1567,7 +1567,7 @@ void IRManager::calculateLivenessInfo()
             }
             bool processNode = true;
             if (iteration > 0) {
-                uint32 depth = lt->getLoopDepth(node);
+                U_32 depth = lt->getLoopDepth(node);
                 processNode = iteration <= depth;
 #ifdef _DEBUG
                 processNode = processNode || iteration == nIterations-1; //last iteration will check all blocks
@@ -1607,7 +1607,7 @@ void IRManager::getLiveAtExit(const Node * node, BitSet & ls) const
 {
     assert(ls.getSetSize()<=getOpndCount());
     const Edges& edges=node->getOutEdges();
-    uint32 i=0;
+    U_32 i=0;
     for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite, ++i) {
         Edge* edge = *ite;
         CGNode * succ=(CGNode*)edge->getTargetNode();
@@ -1624,21 +1624,21 @@ void IRManager::getLiveAtExit(const Node * node, BitSet & ls) const
 void IRManager::updateLiveness(const Inst * inst, BitSet & ls) const 
 {
     const Opnd * const * opnds = inst->getOpnds();
-    uint32 opndCount = inst->getOpndCount();
+    U_32 opndCount = inst->getOpndCount();
 
-    for (uint32 i = 0; i < opndCount; i++){
+    for (U_32 i = 0; i < opndCount; i++){
         const Opnd * opnd = opnds[i];
-        uint32 id = opnd->getId();
+        U_32 id = opnd->getId();
         if (inst->isLiveRangeEnd(i))
             ls.setBit(id, false);
         else if (inst->isLiveRangeStart(i))
             ls.setBit(id, true);
     }
-    for (uint32 i = 0; i < opndCount; i++){
+    for (U_32 i = 0; i < opndCount; i++){
         const Opnd * opnd = opnds[i];
         if (opnd->getMemOpndKind() != MemOpndKind_Null){
             const Opnd * const * subOpnds = opnd->getMemOpndSubOpnds();
-            for (uint32 j = 0; j < MemOpndSubOpndKind_Count; j++){
+            for (U_32 j = 0; j < MemOpndSubOpndKind_Count; j++){
                 const Opnd * subOpnd = subOpnds[j];
                 if (subOpnd != NULL && subOpnd->isSubjectForLivenessAnalysis())
                     ls.setBit(subOpnd->getId(), true);
@@ -1649,10 +1649,10 @@ void IRManager::updateLiveness(const Inst * inst, BitSet & ls) const
 }
 
 //_____________________________________________________________________________________________
-uint32 IRManager::getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const
+U_32 IRManager::getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const
 {
     assert(ls->getSetSize()<=getOpndCount());
-    uint32 mask=0;
+    U_32 mask=0;
     BitSet::IterB ib(*ls);
     for (int i = ib.getNext(); i != -1; i = ib.getNext()){
         Opnd * opnd=getOpnd(i);
@@ -1664,7 +1664,7 @@ uint32 IRManager::getRegUsageFromLiveSet(BitSet * ls, OpndKind regKind)const
 
 
 //_____________________________________________________________________________________________
-void IRManager::getRegUsageAtExit(const Node * node, OpndKind regKind, uint32 & mask)const
+void IRManager::getRegUsageAtExit(const Node * node, OpndKind regKind, U_32 & mask)const
 {
     assert(node->isBlockNode());
     const Edges& edges=node->getOutEdges();
@@ -1676,13 +1676,13 @@ void IRManager::getRegUsageAtExit(const Node * node, OpndKind regKind, uint32 & 
 }
 
 //_____________________________________________________________________________________________
-void IRManager::updateRegUsage(const Inst * inst, OpndKind regKind, uint32 & mask)const
+void IRManager::updateRegUsage(const Inst * inst, OpndKind regKind, U_32 & mask)const
 {
     Inst::Opnds opnds(inst, Inst::OpndRole_All);
     for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it)){
         Opnd * opnd=inst->getOpnd(it);
         if (opnd->isPlacedIn(regKind)){
-            uint32 m=getRegMask(opnd->getRegName());
+            U_32 m=getRegMask(opnd->getRegName());
             if (inst->isLiveRangeEnd(it))
                 mask &= ~m;
             else if (inst->isLiveRangeStart(it))
@@ -1694,7 +1694,7 @@ void IRManager::updateRegUsage(const Inst * inst, OpndKind regKind, uint32 & mas
 //_____________________________________________________________________________________________
 void IRManager::resetOpndConstraints()
 {
-    for (uint32 i=0, n=getOpndCount(); i<n; i++){
+    for (U_32 i=0, n=getOpndCount(); i<n; i++){
         Opnd * opnd=getOpnd(i);
         opnd->setCalculatedConstraint(opnd->getConstraint(Opnd::ConstraintKind_Initial));
     }
@@ -1737,7 +1737,7 @@ void IRManager::finalizeCallSites()
                     }
 
                     // Put inputs on the stack.
-                    for (uint32 i = 0, n = (uint32)stackOpndInfos.size(); i < n; i++) {
+                    for (U_32 i = 0, n = (U_32)stackOpndInfos.size(); i < n; i++) {
                         Opnd* opnd = opnds[stackOpndInfos[i].opndIndex];
                         Inst * pushInst = newCopyPseudoInst(Mnemonic_PUSH, opnd);
                         pushInst->insertBefore(instToPrepend);
@@ -1773,23 +1773,23 @@ void IRManager::finalizeCallSites()
 }
 
 //_____________________________________________________________________________________________
-uint32 IRManager::calculateStackDepth()
+U_32 IRManager::calculateStackDepth()
 {
     MemoryManager mm("calculateStackDepth");
-    StlVector<int32> stackDepths(mm, fg->getNodeCount(), -1);
-    int32 maxMethodStackDepth = -1;    
+    StlVector<I_32> stackDepths(mm, fg->getNodeCount(), -1);
+    I_32 maxMethodStackDepth = -1;    
     
     const Nodes& nodes = fg->getNodesPostOrder();
     //iterating in topological (reverse postorder) order
     for (Nodes::const_reverse_iterator itn = nodes.rbegin(), endn = nodes.rend(); itn!=endn; ++itn) {
         Node* node = *itn;
         if (node->isBlockNode() || (node->isDispatchNode() && node!=fg->getUnwindNode())) {
-            int32 stackDepth=-1;
+            I_32 stackDepth=-1;
             const Edges& edges=node->getInEdges();
             for (Edges::const_iterator ite = edges.begin(), ende = edges.end(); ite!=ende; ++ite) {
                 Edge* edge = *ite;
                 Node * pred=edge->getSourceNode();
-                int32 predStackDepth=stackDepths[pred->getDfNum()];
+                I_32 predStackDepth=stackDepths[pred->getDfNum()];
                 if (predStackDepth>=0){
                     assert(stackDepth==-1 || stackDepth==predStackDepth);
                     stackDepth=predStackDepth;
@@ -1807,9 +1807,9 @@ uint32 IRManager::calculateStackDepth()
                     Inst::Opnds::iterator it = opnds.begin();
                     if (it != opnds.end() && inst->getOpnd(it)->isPlacedIn(STACK_REG)) {
                         if (inst->getMnemonic()==Mnemonic_ADD)
-                            stackDepth -= (int32)inst->getOpnd(opnds.next(it))->getImmValue();
+                            stackDepth -= (I_32)inst->getOpnd(opnds.next(it))->getImmValue();
                         else if (inst->getMnemonic()==Mnemonic_SUB)
-                            stackDepth += (int32)inst->getOpnd(opnds.next(it))->getImmValue();
+                            stackDepth += (I_32)inst->getOpnd(opnds.next(it))->getImmValue();
                         else
                             assert(0);
                     }else{
@@ -1833,7 +1833,7 @@ uint32 IRManager::calculateStackDepth()
         }
     }
     assert(maxMethodStackDepth>=0);
-    return (uint32)maxMethodStackDepth;
+    return (U_32)maxMethodStackDepth;
 }
 
 //_____________________________________________________________________________________________
@@ -1853,7 +1853,7 @@ bool IRManager::isOnlyPrologSuccessor(Node * bb) {
     }
 }
 //_____________________________________________________________________________________________
-void IRManager::expandSystemExceptions(uint32 reservedForFlags)
+void IRManager::expandSystemExceptions(U_32 reservedForFlags)
 {
     calculateOpndStatistics();
     StlMap<Opnd *, POINTER_SIZE_INT> checkOpnds(getMemoryManager());
@@ -1922,7 +1922,7 @@ void IRManager::expandSystemExceptions(uint32 reservedForFlags)
                             zero = (int64)(POINTER_SIZE_INT)VMInterface::getHeapBase();
                         }
                         Opnd* zeroOpnd = NULL;
-                        if((POINTER_SIZE_INT)zero == (uint32)zero) { // heap base fits into 32 bits
+                        if((POINTER_SIZE_INT)zero == (U_32)zero) { // heap base fits into 32 bits
                             zeroOpnd = newImmOpnd(opnd->getType(), zero);
                         } else { // zero can not be an immediate at comparison
                             Opnd* zeroImm = newImmOpnd(typeManager.getIntPtrType(), zero);
@@ -2047,7 +2047,7 @@ void IRManager::eliminateSameOpndMoves()
 //_____________________________________________________________________________________________
 void IRManager::resolveRuntimeInfo()
 {
-    for (uint32 i=0, n=getOpndCount(); i<n; i++){
+    for (U_32 i=0, n=getOpndCount(); i<n; i++){
         Opnd * opnd=getOpnd(i);
         resolveRuntimeInfo(opnd);
     }
@@ -2097,7 +2097,7 @@ void IRManager::resolveRuntimeInfo(Opnd* opnd) const {
             /** The value of the operand is the address where the interned version of the string is stored*/
             {
             MethodDesc*  mDesc = (MethodDesc*)info->getValue(0);
-            uint32 token = (uint32)(POINTER_SIZE_INT)info->getValue(1);
+            U_32 token = (U_32)(POINTER_SIZE_INT)info->getValue(1);
             value = (POINTER_SIZE_INT) compilationInterface.getStringInternAddr(mDesc,token);
             }break;
         case Opnd::RuntimeInfo::Kind_StaticFieldAddress:
@@ -2208,11 +2208,11 @@ bool IRManager::verifyOpnds() const
     typedef StlVector<Inst*> InstList;      // to register all instruction referenced an operand
     typedef StlVector<InstList*> OpndList;  // one entry for each operand, instruction register or 0
 
-    const uint32 opnd_count = getOpndCount();
+    const U_32 opnd_count = getOpndCount();
     OpndList opnd_list(getMemoryManager(), opnd_count); // fixed size
 
 //  Watch only MemOpndKind_Heap operands - all others are simply ignored.
-    for (uint32 i = 0; i != opnd_count; ++i) {
+    for (U_32 i = 0; i != opnd_count; ++i) {
         InstList* ilp = 0; 
         if (getOpnd(i)->getMemOpndKind() == MemOpndKind_Heap)
             ilp = new (getMemoryManager()) InstList(getMemoryManager());
@@ -2238,7 +2238,7 @@ bool IRManager::verifyOpnds() const
         }
     }
 
-    for (uint32 i = 0; i != opnd_count; ++i) {
+    for (U_32 i = 0; i != opnd_count; ++i) {
         InstList* ilp = opnd_list.at(i);
         if (ilp != 0 && ilp->size() > 1) {
         //  Error found
@@ -2287,11 +2287,11 @@ bool IRManager::verifyLiveness()
 bool IRManager::verifyHeapAddressTypes()
 {
     bool failed=false;
-    for (uint32 i=0, n=getOpndCount(); i<n; i++){
+    for (U_32 i=0, n=getOpndCount(); i<n; i++){
         Opnd * opnd = getOpnd(i);
         if (opnd->isPlacedIn(OpndKind_Mem) && opnd->getMemOpndKind()==MemOpndKind_Heap){
             Opnd * properTypeSubOpnd=NULL;
-            for (uint32 j=0; j<MemOpndSubOpndKind_Count; j++){
+            for (U_32 j=0; j<MemOpndSubOpndKind_Count; j++){
                 Opnd * subOpnd=opnd->getMemOpndSubOpnd((MemOpndSubOpndKind)j);
                 if (subOpnd!=NULL){
                     Type * type=subOpnd->getType();
@@ -2389,7 +2389,7 @@ void SessionAction::run()
     if (isLogEnabled(LogStream::IRDUMP)) 
         Log::printStageBegin(log(LogStream::IRDUMP).out(), stageId, "IA32", getName(), getTagName());
 
-    uint32 needInfo=getNeedInfo();
+    U_32 needInfo=getNeedInfo();
     if (needInfo & NeedInfo_LivenessInfo)
         irManager->updateLivenessInfo();
     if (needInfo & NeedInfo_LoopInfo)
@@ -2397,7 +2397,7 @@ void SessionAction::run()
 
     runImpl();
 
-    uint32 sideEffects=getSideEffects();
+    U_32 sideEffects=getSideEffects();
     if (sideEffects & SideEffect_InvalidatesLivenessInfo)
         irManager->invalidateLivenessInfo();
     if (sideEffects & SideEffect_InvalidatesLoopInfo)
@@ -2413,14 +2413,14 @@ void SessionAction::run()
 }
 
 
-uint32 SessionAction::getSideEffects()const
+U_32 SessionAction::getSideEffects()const
 {
-    return ~(uint32)0;
+    return ~(U_32)0;
 }
 
-uint32 SessionAction::getNeedInfo()const
+U_32 SessionAction::getNeedInfo()const
 {
-    return ~(uint32)0;
+    return ~(U_32)0;
 }
 
 bool SessionAction::verify(bool force)

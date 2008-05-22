@@ -34,7 +34,7 @@ class StateTable;
 
 class VariableIncarnation : private Dlink {
 public:
-    VariableIncarnation(uint32 offset, Type*);
+    VariableIncarnation(U_32 offset, Type*);
     void setMultipleDefs();
     Type* getDeclaredType();
     void setDeclaredType(Type*);
@@ -61,7 +61,7 @@ protected:
     void createVarOpnd(IRBuilder*);
 private:
     friend class SlotVar;
-    int32   definingOffset;  // offset where the def was found, -1 if multiple defs
+    I_32   definingOffset;  // offset where the def was found, -1 if multiple defs
     Type*   declaredType;
     Opnd*   opnd;
 };
@@ -82,14 +82,14 @@ public:
     }
     // Add var incarnations from SlotVar to the list.
     // Return true if var incarnation has been added.
-    bool addVarIncarnations(SlotVar* var, MemoryManager& mm, uint32 linkOffset);
+    bool addVarIncarnations(SlotVar* var, MemoryManager& mm, U_32 linkOffset);
     VariableIncarnation* getVarIncarnation() {return var;}
     void mergeVarIncarnations(TypeManager* tm);
-    uint32 getLinkOffset() {return linkOffset;}
+    U_32 getLinkOffset() {return linkOffset;}
     void print(::std::ostream& out);
 private:
     VariableIncarnation* var;
-    uint32 linkOffset;
+    U_32 linkOffset;
 };
 
 
@@ -115,12 +115,12 @@ public:
 
     struct SlotInfo {
         Type *type;
-        uint32 varNumber;
+        U_32 varNumber;
         uint16 slotFlags;
         SlotVar *vars;
-        uint32 jsrLabelOffset;
+        U_32 jsrLabelOffset;
         SlotInfo() : type(NULL), varNumber(0), slotFlags(0), vars(NULL), jsrLabelOffset(0){}
-        void setVarNumber(uint32 n) { varNumber = n;slotFlags |= VarNumberIsSet; }
+        void setVarNumber(U_32 n) { varNumber = n;slotFlags |= VarNumberIsSet; }
     };
 
     // Push type to modelled operand stack
@@ -130,7 +130,7 @@ public:
     SlotInfo& top();
 
     // remove all slots containing returnAddress for RET instruction with jsrNexOffset == offset
-    void cleanFinallyInfo(uint32 offset);
+    void cleanFinallyInfo(U_32 offset);
 
     /* flags */
     enum {
@@ -193,13 +193,13 @@ public:
                      CompilationInterface& ci,
                      Opnd** actualArgs);    // NULL for non-inlined methods
 
-    bool    isLabel(uint32 offset)            { return labels->getBit(offset); }
-    bool    isSubroutineEntry(uint32 offset)  { return subroutines->getBit(offset); }
+    bool    isLabel(U_32 offset)            { return labels->getBit(offset); }
+    bool    isSubroutineEntry(U_32 offset)  { return subroutines->getBit(offset); }
     bool    getHasJsrLabels()                 { return hasJsrLabels;}
-    uint32  getNumLabels()                    { return numLabels;}
-    uint32  getNumVars()                      { return numVars;}
-    uint32  getLabelId(uint32 offset);
-    void    print_loc_vars(uint32 offset, uint32 index);
+    U_32  getNumLabels()                    { return numLabels;}
+    U_32  getNumVars()                      { return numVars;}
+    U_32  getLabelId(U_32 offset);
+    void    print_loc_vars(U_32 offset, U_32 index);
     //
     // exception info
     //
@@ -216,10 +216,10 @@ public:
     ///////////////////////////////////////////////////////////////////////////
 
     // called before each byte code to indicate the next byte code's offset
-    void offset(uint32 offset);
+    void offset(U_32 offset);
 
     // called after each byte code offset is worked out
-    void offset_done(uint32 offset) {}
+    void offset_done(U_32 offset) {}
 
     // called when an error occurs during the byte codes parsing
     void parseError();
@@ -233,8 +233,8 @@ public:
     void parseDone();
 
     // Variable information
-    VariableIncarnation* getVarInc(uint32 offset, uint32 index);
-    VariableIncarnation* getOrCreateVarInc(uint32 offset, uint32 index, Type* type);
+    VariableIncarnation* getVarInc(U_32 offset, U_32 index);
+    VariableIncarnation* getOrCreateVarInc(U_32 offset, U_32 index, Type* type);
     void                 createMultipleDefVarOpnds(IRBuilder*);
 
     //
@@ -245,7 +245,7 @@ public:
     void                    popAndCheck(Type *type);
     void                    popAndCheck(JavaVarType type);
     void                    pushType(StateInfo::SlotInfo& slot);
-    void                    pushType(Type *type, uint32 varNumber);
+    void                    pushType(Type *type, U_32 varNumber);
     void                    pushType(Type *type);
     bool isCategory2(StateInfo::SlotInfo& slot) { return slot.type == int64Type || slot.type == doubleType; }
 
@@ -256,7 +256,7 @@ public:
     // cut and paste from Java_Translator.cpp
     // field, method, and type resolution
     //
-    const char*             methodSignatureString(uint32 cpIndex);
+    const char*             methodSignatureString(U_32 cpIndex);
     StateInfo*              getStateInfo()  { return &stateInfo; }
     StateTable*             getStateTable() { return stateTable; }
 
@@ -299,10 +299,10 @@ public:
     // helper functions
     //
     void genReturn    (Type *type);
-    void genLoad      (Type *type, uint32 index);
-    void genTypeLoad  (uint32 index);
-    void genStore     (Type *type, uint32 index, uint32 offset);
-    void genTypeStore (uint32 index, uint32 offset);
+    void genLoad      (Type *type, U_32 index);
+    void genTypeLoad  (U_32 index);
+    void genStore     (Type *type, U_32 index, U_32 offset);
+    void genTypeStore (U_32 index, U_32 offset);
     void genArrayLoad (Type *type);
     void genTypeArrayLoad();
     void genArrayStore(Type *type);
@@ -314,22 +314,22 @@ public:
     void genCompare   (Type *type);
     void invoke       (MethodDesc *mdesc);
     void pseudoInvoke (const char* mdesc);
-    static uint32  getNumArgsBySignature(const char* methodSig);
+    static U_32  getNumArgsBySignature(const char* methodSig);
     static Type*   getRetTypeBySignature(CompilationInterface& ci, Class_Handle enclClass, const char* methodSig);
-    static Type*   getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, uint32& len);
+    static Type*   getTypeByDescriptorString(CompilationInterface& ci, Class_Handle enclClass, const char* descriptorString, U_32& len);
 
     // remaining instructions
 
     void nop();
     void aconst_null();
-    void iconst(int32 val);
+    void iconst(I_32 val);
     void lconst(int64 val);
     void fconst(float val);
     void dconst(double val);
     void bipush(int8 val);
     void sipush(int16 val);
-    void ldc(uint32 constPoolIndex);
-    void ldc2(uint32 constPoolIndex);
+    void ldc(U_32 constPoolIndex);
+    void ldc2(U_32 constPoolIndex);
     void iload(uint16 varIndex) ;
     void lload(uint16 varIndex) ;
     void fload(uint16 varIndex) ;
@@ -343,11 +343,11 @@ public:
     void baload() ;
     void caload() ;
     void saload() ;
-    void istore(uint16 varIndex, uint32 off) ;
-    void lstore(uint16 varIndex, uint32 off) ;
-    void fstore(uint16 varIndex, uint32 off) ;
-    void dstore(uint16 varIndex, uint32 off) ;
-    void astore(uint16 varIndex, uint32 off) ;
+    void istore(uint16 varIndex, U_32 off) ;
+    void lstore(uint16 varIndex, U_32 off) ;
+    void fstore(uint16 varIndex, U_32 off) ;
+    void dstore(uint16 varIndex, U_32 off) ;
+    void astore(uint16 varIndex, U_32 off) ;
     void iastore() ;
     void lastore() ;
     void fastore() ;
@@ -401,7 +401,7 @@ public:
     void lor() ;
     void ixor() ;
     void lxor() ;
-    void iinc(uint16 varIndex,int32 amount) ;
+    void iinc(uint16 varIndex,I_32 amount) ;
     void i2l() ;
     void i2f() ;
     void i2d() ;
@@ -422,56 +422,56 @@ public:
     void fcmpg() ;
     void dcmpl() ;
     void dcmpg() ;
-    void ifeq(uint32 targetOffset,uint32 nextOffset);
-    void ifne(uint32 targetOffset,uint32 nextOffset);
-    void iflt(uint32 targetOffset,uint32 nextOffset);
-    void ifge(uint32 targetOffset,uint32 nextOffset);
-    void ifgt(uint32 targetOffset,uint32 nextOffset);
-    void ifle(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpeq(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpne(uint32 targetOffset,uint32 nextOffset);
-    void if_icmplt(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpge(uint32 targetOffset,uint32 nextOffset);
-    void if_icmpgt(uint32 targetOffset,uint32 nextOffset);
-    void if_icmple(uint32 targetOffset,uint32 nextOffset);
-    void if_acmpeq(uint32 targetOffset,uint32 nextOffset);
-    void if_acmpne(uint32 targetOffset,uint32 nextOffset);
-    void goto_(uint32 targetOffset,uint32 nextOffset);
-    void jsr(uint32 offset, uint32 nextOffset);
+    void ifeq(U_32 targetOffset,U_32 nextOffset);
+    void ifne(U_32 targetOffset,U_32 nextOffset);
+    void iflt(U_32 targetOffset,U_32 nextOffset);
+    void ifge(U_32 targetOffset,U_32 nextOffset);
+    void ifgt(U_32 targetOffset,U_32 nextOffset);
+    void ifle(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpeq(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpne(U_32 targetOffset,U_32 nextOffset);
+    void if_icmplt(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpge(U_32 targetOffset,U_32 nextOffset);
+    void if_icmpgt(U_32 targetOffset,U_32 nextOffset);
+    void if_icmple(U_32 targetOffset,U_32 nextOffset);
+    void if_acmpeq(U_32 targetOffset,U_32 nextOffset);
+    void if_acmpne(U_32 targetOffset,U_32 nextOffset);
+    void goto_(U_32 targetOffset,U_32 nextOffset);
+    void jsr(U_32 offset, U_32 nextOffset);
     void ret(uint16 varIndex, const uint8* byteCodes);
     void tableswitch(JavaSwitchTargetsIter*);
     void lookupswitch(JavaLookupSwitchTargetsIter*);
     void incrementReturn();
-    void ireturn(uint32 off);
-    void lreturn(uint32 off);
-    void freturn(uint32 off);
-    void dreturn(uint32 off);
-    void areturn(uint32 off);
-    void return_(uint32 off);
-    void getstatic(uint32 constPoolIndex) ;
-    void putstatic(uint32 constPoolIndex) ;
-    void getfield(uint32 constPoolIndex) ;
-    void putfield(uint32 constPoolIndex) ;
-    void invokevirtual(uint32 constPoolIndex) ;
-    void invokespecial(uint32 constPoolIndex) ;
-    void invokestatic(uint32 constPoolIndex) ;
-    void invokeinterface(uint32 constPoolIndex,uint32 count) ;
-    void new_(uint32 constPoolIndex) ;
+    void ireturn(U_32 off);
+    void lreturn(U_32 off);
+    void freturn(U_32 off);
+    void dreturn(U_32 off);
+    void areturn(U_32 off);
+    void return_(U_32 off);
+    void getstatic(U_32 constPoolIndex) ;
+    void putstatic(U_32 constPoolIndex) ;
+    void getfield(U_32 constPoolIndex) ;
+    void putfield(U_32 constPoolIndex) ;
+    void invokevirtual(U_32 constPoolIndex) ;
+    void invokespecial(U_32 constPoolIndex) ;
+    void invokestatic(U_32 constPoolIndex) ;
+    void invokeinterface(U_32 constPoolIndex,U_32 count) ;
+    void new_(U_32 constPoolIndex) ;
     void newarray(uint8 type) ;
-    void anewarray(uint32 constPoolIndex) ;
+    void anewarray(U_32 constPoolIndex) ;
     void arraylength() ;
     void athrow() ;
-    void checkcast(uint32 constPoolIndex) ;
-    int  instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off) ;
+    void checkcast(U_32 constPoolIndex) ;
+    int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off) ;
     void monitorenter() ;
     void monitorexit() ;
-    void multianewarray(uint32 constPoolIndex,uint8 dimensions) ;
-    void ifnull(uint32 targetOffset,uint32 nextOffset);
-    void ifnonnull(uint32 targetOffset,uint32 nextOffset);
-    void pushCatchLabel(uint32 offset) {
+    void multianewarray(U_32 constPoolIndex,uint8 dimensions) ;
+    void ifnull(U_32 targetOffset,U_32 nextOffset);
+    void ifnonnull(U_32 targetOffset,U_32 nextOffset);
+    void pushCatchLabel(U_32 offset) {
         labelStack->push((uint8*)methodDesc.getByteCodes()+offset);
     }
-    void pushRestart(uint32 offset) {
+    void pushRestart(U_32 offset) {
         labelStack->push((uint8*)methodDesc.getByteCodes()+offset);
     }
 private:
@@ -479,9 +479,9 @@ private:
     friend struct CatchOffsetVisitor;
     friend class JavaByteCodeTranslator;
 
-    typedef StlMultiMap<uint32, uint32> JsrEntryToJsrNextMap;
+    typedef StlMultiMap<U_32, U_32> JsrEntryToJsrNextMap;
     typedef std::pair<JsrEntryToJsrNextMap::const_iterator, JsrEntryToJsrNextMap::const_iterator> JsrEntriesMapCIterRange;
-    typedef StlMap<uint32, uint32> RetToSubEntryMap;
+    typedef StlMap<U_32, U_32> RetToSubEntryMap;
 
     // compilation environment
     MemoryManager&    memManager;
@@ -493,17 +493,17 @@ private:
     StateInfo       stateInfo;
     StateTable*     stateTable;
     // information about variables
-    StlHashMap<uint32,VariableIncarnation*> localVars;
+    StlHashMap<U_32,VariableIncarnation*> localVars;
     // basic label info
     bool            nextIsLabel;
     BitSet*         labels;
     BitSet*         subroutines;
-    uint32*         labelOffsets;    // array containing offsets of labels
-    uint32          numLabels;
-    uint32          numVars; 
+    U_32*         labelOffsets;    // array containing offsets of labels
+    U_32          numLabels;
+    U_32          numVars; 
     bool            isFallThruLabel;
     // exception info
-    uint32          numCatchHandlers;
+    U_32          numCatchHandlers;
     // Java JSR
     bool            hasJsrLabels;
     //
@@ -523,13 +523,13 @@ private:
     unsigned       problemTypeToken;
 
     // private helper methods
-    void setLabel(uint32 offset);
-    void setSubroutineEntry(uint32 offset) { subroutines->setBit(offset,true); }
-    void checkTargetForRestart(uint32 target);
-    void propagateStateInfo(uint32 offset, bool isFallthru);
-    void setJsrLabel(uint32 offset);
+    void setLabel(U_32 offset);
+    void setSubroutineEntry(U_32 offset) { subroutines->setBit(offset,true); }
+    void checkTargetForRestart(U_32 target);
+    void propagateStateInfo(U_32 offset, bool isFallthru);
+    void setJsrLabel(U_32 offset);
     void setStackVars();
-    void propagateLocalVarToHandlers(uint32 varIndex);
+    void propagateLocalVarToHandlers(U_32 varIndex);
     RetToSubEntryMap* getRetToSubEntryMapPtr() { return &retToSubEntryMap; }
 };
 
@@ -541,17 +541,17 @@ public:
     virtual ~StateTable() {
     }
 
-    StateTable(MemoryManager& mm,TypeManager& tm, JavaLabelPrepass& jlp, uint32 numstack, uint32 numvars) :
+    StateTable(MemoryManager& mm,TypeManager& tm, JavaLabelPrepass& jlp, U_32 numstack, U_32 numvars) :
                memManager(mm), typeManager(tm), prepass(jlp),
                hashtable(mm), maxDepth(numvars + numstack), numVars(numvars)
                {
-                    assert(sizeof(POINTER_SIZE_INT)>=sizeof(uint32));
-                    assert(sizeof(uint32*)>=sizeof(uint32));
+                    assert(sizeof(POINTER_SIZE_INT)>=sizeof(U_32));
+                    assert(sizeof(U_32*)>=sizeof(U_32));
                }
-    StateInfo *getStateInfo(uint32 offset) {
+    StateInfo *getStateInfo(U_32 offset) {
         return hashtable[offset];
     }
-    StateInfo *createStateInfo(uint32 offset, unsigned stackDepth = MAX_UINT32) {
+    StateInfo *createStateInfo(U_32 offset, unsigned stackDepth = MAX_UINT32) {
         StateInfo *state = hashtable[offset];
         if (state == NULL) {
             state = new (memManager) StateInfo();
@@ -569,13 +569,13 @@ public:
     }
 
     void copySlotInfo(StateInfo::SlotInfo& to, StateInfo::SlotInfo& from);
-    void mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
-    void rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, uint32 offset, bool isVar);
-    void setStackInfo(StateInfo *inState, uint32 offset, bool includeVars, bool includeStack);
-    void setStateInfo(StateInfo *inState, uint32 offset, bool isFallThru, bool varsOnly = false);
-    void setStateInfoFromFinally(StateInfo *inState, uint32 offset);
+    void mergeSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, U_32 offset, bool isVar);
+    void rewriteSlots(StateInfo::SlotInfo* inSlot, StateInfo::SlotInfo* slot, U_32 offset, bool isVar);
+    void setStackInfo(StateInfo *inState, U_32 offset, bool includeVars, bool includeStack);
+    void setStateInfo(StateInfo *inState, U_32 offset, bool isFallThru, bool varsOnly = false);
+    void setStateInfoFromFinally(StateInfo *inState, U_32 offset);
 
-    void restoreStateInfo(StateInfo *stateInfo, uint32 offset) {
+    void restoreStateInfo(StateInfo *stateInfo, U_32 offset) {
         if(Log::isEnabled()) {
             Log::out() << "INIT_STATE_FOR_BLOCK " <<(int)offset << " depth " << stateInfo->stackDepth << ::std::endl;
             printState(stateInfo);
@@ -614,18 +614,18 @@ public:
         }
     }
 protected:
-    virtual bool keyEquals(uint32 *key1,uint32 *key2) const {
+    virtual bool keyEquals(U_32 *key1,U_32 *key2) const {
         return key1 == key2;
     }
-    virtual uint32 getKeyHashCode(uint32 *key) const {
+    virtual U_32 getKeyHashCode(U_32 *key) const {
         // return hash of address bits
-        return ((uint32)(POINTER_SIZE_INT)key);
+        return ((U_32)(POINTER_SIZE_INT)key);
     }
 private:
     MemoryManager& memManager;
     TypeManager& typeManager;
     JavaLabelPrepass& prepass;
-    StlHashMap<uint32, StateInfo*> hashtable;
+    StlHashMap<U_32, StateInfo*> hashtable;
     unsigned maxDepth;
     unsigned numVars;
 };

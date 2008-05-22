@@ -75,7 +75,7 @@ GlobalOpndAnalyzer::markGlobals() {
     // Now walk instructions in postorder, marking sources that have not been
     // visited as global.
     //
-    uint32 numInsts = irManager.getInstFactory().getNumInsts();
+    U_32 numInsts = irManager.getInstFactory().getNumInsts();
     MemoryManager memManager("GlobalOpndAnalyzer::doAnalysis()");
     BitSet markedInstSet(memManager,numInsts);
     Nodes::iterator niter;
@@ -86,7 +86,7 @@ GlobalOpndAnalyzer::markGlobals() {
             // mark as visited
             markedInstSet.setBit(inst->getId(),true);
             // check sources to see if any span globally
-            for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+            for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
                 Opnd* src = inst->getSrc(i);
                 //
                 // we care only about srcs that are temporary
@@ -122,10 +122,10 @@ GlobalOpndAnalyzer::doAnalysis() {
 //  Information about a global operand
 //
 struct AdvancedGlobalOpndAnalyzer::OpndInfo {
-    OpndInfo(uint32 h, uint32 ts) : header(h), timeStamp(ts), isGlobal(false) {
+    OpndInfo(U_32 h, U_32 ts) : header(h), timeStamp(ts), isGlobal(false) {
     }
-    uint32    header;       // dfNum of a header where node is used.
-    uint32    timeStamp;
+    U_32    header;       // dfNum of a header where node is used.
+    U_32    timeStamp;
     bool      isGlobal;
 };
 
@@ -134,14 +134,14 @@ struct AdvancedGlobalOpndAnalyzer::OpndInfo {
 //
 class AdvancedGlobalOpndAnalyzer::OpndTable : public HashTable<Opnd,OpndInfo> {
 public:
-    OpndTable(MemoryManager& mm, uint32 size) : 
+    OpndTable(MemoryManager& mm, U_32 size) : 
         HashTable<Opnd,OpndInfo>(mm,size), memManager(mm), lastHeaderTimeStamp(0) {
     }
     void clear() {
         lastHeaderTimeStamp = 0;
         removeAll();
     }
-    void recordUse(Opnd * use, uint32 loopHeader, uint32 timeStamp) {
+    void recordUse(Opnd * use, U_32 loopHeader, U_32 timeStamp) {
         OpndInfo * info = lookup(use);
         if (info == NULL)
             insertOpnd(use, loopHeader, timeStamp);
@@ -153,7 +153,7 @@ public:
                 info->isGlobal = true;
         }
     }
-    void recordDef(Opnd * def, uint32 loopHeader, uint32 timeStamp) {
+    void recordDef(Opnd * def, U_32 loopHeader, U_32 timeStamp) {
         OpndInfo * info = lookup(def);
         //
         //  Operand may be not in the table if it's definition is inside
@@ -177,21 +177,21 @@ public:
                 info->isGlobal = true;
         }
     }
-    void recordLoopHeader(uint32 timeStamp) {
+    void recordLoopHeader(U_32 timeStamp) {
         lastHeaderTimeStamp = timeStamp;
     }
 private:
     virtual bool keyEquals(Opnd* key1,Opnd* key2) const {
         return key1 == key2;
     }
-    virtual uint32 getKeyHashCode(Opnd* key) const {
+    virtual U_32 getKeyHashCode(Opnd* key) const {
         return key->getId();
     }
-    void insertOpnd(Opnd * opnd, uint32  header, uint32 timeStamp) {
+    void insertOpnd(Opnd * opnd, U_32  header, U_32 timeStamp) {
         insert(opnd, new(memManager) OpndInfo(header,timeStamp));
     }
     MemoryManager& memManager;
-    uint32  lastHeaderTimeStamp;
+    U_32  lastHeaderTimeStamp;
 };
     
 void
@@ -243,7 +243,7 @@ void
 AdvancedGlobalOpndAnalyzer::unmarkFalseGlobals() {
     MemoryManager localMemManager("RefinedGlobalOpndAnalyzer::doAnalysis.localMemManager");
     opndTable = new (localMemManager) OpndTable(localMemManager, 16);
-    uint32 timeStamp = 0;
+    U_32 timeStamp = 0;
     //
     //  Walk nodes in postorder
     //
@@ -255,7 +255,7 @@ AdvancedGlobalOpndAnalyzer::unmarkFalseGlobals() {
         //  Figure out the current loop header
         //
         Node* header = loopInfo.getLoopHeader(node, false);
-        uint32 currHeader = header != NULL ? header->getDfNum() : (uint32)-1;
+        U_32 currHeader = header != NULL ? header->getDfNum() : (U_32)-1;
         
         //
         //  Walk instructions in reverse order
@@ -264,7 +264,7 @@ AdvancedGlobalOpndAnalyzer::unmarkFalseGlobals() {
             //
             // Analyze sources 
             //
-            for (uint32 i=0; i<inst->getNumSrcOperands(); i++) {
+            for (U_32 i=0; i<inst->getNumSrcOperands(); i++) {
                 Opnd* src = inst->getSrc(i);
                 //
                 // We care only about global tmps

@@ -32,10 +32,10 @@ namespace Ia32 {
 class GCPointsBaseLiveRangeFixer: public SessionAction {
 public:
     void runImpl();
-    uint32 getSideEffects() const {return sideEffect;}
-    uint32 getNeedInfo()const{ return 0;}
+    U_32 getSideEffects() const {return sideEffect;}
+    U_32 getNeedInfo()const{ return 0;}
 private:
-    uint32 sideEffect;    
+    U_32 sideEffect;    
 };
 
 class GCSafePointsInfo;
@@ -90,7 +90,7 @@ public:
 };
 
 typedef StlVector<MPtrPair> GCSafePointPairs;
-typedef StlMap<uint32, GCSafePointPairs*> GCSafePointPairsMap;
+typedef StlMap<U_32, GCSafePointPairs*> GCSafePointPairsMap;
 
 class GCSafePointsInfo {
 
@@ -116,7 +116,7 @@ public:
     static bool graphHasSafePoints(const IRManager& irm);
     static bool blockHasSafePoints(const Node* b);
     /** if pairs!=NULL counts only gcpoints with non-empty pairs*/
-    static uint32 getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap = NULL);
+    static U_32 getNumSafePointsInBlock(const Node* b, const GCSafePointPairsMap* pairsMap = NULL);
     static MPtrPair* findPairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr);
    static bool isManaged(Opnd* op) { return op->getType()->isObject() || op->getType()->isManagedPtr();}
 
@@ -151,9 +151,9 @@ private:
     void removePairByMPtrOpnd(GCSafePointPairs& pairs, const Opnd* mptr) const;
     void runLivenessFilter(Inst* inst, GCSafePointPairs& res) const;
     Opnd* getBaseAccordingMode(Opnd* opnd) const;
-    void  updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMptr, Opnd* fromOpnd, int32 offset, bool fromOpndIsBase);
+    void  updateMptrInfoInPairs(GCSafePointPairs& res, Opnd* newMptr, Opnd* fromOpnd, I_32 offset, bool fromOpndIsBase);
     //returns offset if offsetOpnd is immediate ir MPTR_OFFSET_UNKNOWN if not */
-    int32 getOffsetFromImmediate(Opnd* offsetOpnd) const;
+    I_32 getOffsetFromImmediate(Opnd* offsetOpnd) const;
 
     MemoryManager&  mm;
     IRManager&      irm;
@@ -167,8 +167,8 @@ private:
     bool allowMerging;
 
     /** stat fields */
-    uint32 opndsAdded; 
-    uint32 instsAdded;
+    U_32 opndsAdded; 
+    U_32 instsAdded;
     Mode   mode;
 
 };

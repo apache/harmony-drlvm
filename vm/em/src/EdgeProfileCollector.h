@@ -36,31 +36,31 @@ typedef std::vector<EdgeMethodProfile*> EdgeProfiles;
 class EdgeProfileCollector : public ProfileCollector, public TbsEMClient {
 public:
     EdgeProfileCollector(EM_PC_Interface* em, const std::string& name, JIT_Handle genJit,
-                                           uint32 _initialTimeout, uint32 _timeout, 
-                                           uint32 _eThreshold, uint32 _bThreshold);
+                                           U_32 _initialTimeout, U_32 _timeout, 
+                                           U_32 _eThreshold, U_32 _bThreshold);
     virtual ~EdgeProfileCollector();
 
     virtual TbsEMClient* getTbsEmClient() const {return (TbsEMClient*)this;}
 
-    virtual uint32 getInitialTimeout() const {return initialTimeout;}
-    virtual uint32 getTimeout() const {return timeout;}
+    virtual U_32 getInitialTimeout() const {return initialTimeout;}
+    virtual U_32 getTimeout() const {return timeout;}
     virtual void onTimeout();
     virtual void classloaderUnloadingCallback(Class_Loader_Handle h);
 
     MethodProfile* getMethodProfile(Method_Handle mh) const ;
-    EdgeMethodProfile* createProfile(Method_Handle mh, uint32 numCounters, uint32* counterKeys, uint32 checkSum);
+    EdgeMethodProfile* createProfile(Method_Handle mh, U_32 numCounters, U_32* counterKeys, U_32 checkSum);
 
-    uint32 getEntryThreshold() const {return eThreshold;}
-    uint32 getBackedgeThreshold() const {return bThreshold;}
+    U_32 getEntryThreshold() const {return eThreshold;}
+    U_32 getBackedgeThreshold() const {return bThreshold;}
 
 
 private:
     void cleanUnloadedProfiles();
 
-    uint32 initialTimeout;
-    uint32 timeout;
-    uint32 eThreshold;
-    uint32 bThreshold;
+    U_32 initialTimeout;
+    U_32 timeout;
+    U_32 eThreshold;
+    U_32 bThreshold;
     bool   loggingEnabled;
     std::string catName;
    
@@ -76,7 +76,7 @@ private:
 
 class EdgeMethodProfile : public MethodProfile {
 private:
-    typedef std::vector<uint32> EdgeMap;
+    typedef std::vector<U_32> EdgeMap;
 public:
     EdgeMethodProfile(EdgeProfileCollector* pc, Method_Handle mh) 
         : MethodProfile(pc, mh), entryCounter(0),
@@ -85,25 +85,25 @@ public:
     void dump( const char* banner );
     void setHotMethod() { _isHot = true; }
     bool isHot() const  { return _isHot; }
-    uint32* getCounter( uint32 key ) const;
+    U_32* getCounter( U_32 key ) const;
 
-    uint32 entryCounter;   // point to the method entry counter
-    std::vector<uint32> counters;
+    U_32 entryCounter;   // point to the method entry counter
+    std::vector<U_32> counters;
     EdgeMap cntMap;        // map to a counter, given a key
 
-    uint32  checkSum;       // checksum provided by instrumentation
+    U_32  checkSum;       // checksum provided by instrumentation
 
 private:
     bool    _isHot;
 };
 
 
-Method_Profile_Handle edge_profiler_create_profile(PC_Handle ph, Method_Handle mh, uint32 numCounters, uint32* counterKeys, uint32 checkSum);
-uint32  edge_profiler_get_num_counters(Method_Profile_Handle mph);
-uint32  edge_profiler_get_checksum(Method_Profile_Handle mph);
+Method_Profile_Handle edge_profiler_create_profile(PC_Handle ph, Method_Handle mh, U_32 numCounters, U_32* counterKeys, U_32 checkSum);
+U_32  edge_profiler_get_num_counters(Method_Profile_Handle mph);
+U_32  edge_profiler_get_checksum(Method_Profile_Handle mph);
 void* edge_profiler_get_entry_counter_addr(Method_Profile_Handle mph);
-void* edge_profiler_get_counter_addr(Method_Profile_Handle mph, uint32 key);
-uint32  edge_profiler_get_entry_threshold(PC_Handle pch);
-uint32  edge_profiler_get_backedge_threshold(PC_Handle pch);
+void* edge_profiler_get_counter_addr(Method_Profile_Handle mph, U_32 key);
+U_32  edge_profiler_get_entry_threshold(PC_Handle pch);
+U_32  edge_profiler_get_backedge_threshold(PC_Handle pch);
 
 #endif

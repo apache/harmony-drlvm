@@ -62,7 +62,7 @@ private:
     
     RegOpnd*      newStorage(DataKind, uint16);
     void          setRegUsage(RegOpnd*, bool);
-    int32         calculateLocRegSize();
+    I_32         calculateLocRegSize();
     void          printRegMasks();
 
     MemoryManager &mm;

@@ -1075,7 +1075,7 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             
             // b3: var = 1
             Opnd* one = opndManager.createSsaTmpOpnd(dst->getType());
-            b3->appendInst(instFactory.makeLdConst(one, (int32) 1));
+            b3->appendInst(instFactory.makeLdConst(one, (I_32) 1));
             fg.addEdge(b3, succ);
             
             VarOpnd* dstVar = opndManager.createVarOpnd(dst->getType(), false);
@@ -1178,12 +1178,12 @@ CodeLowerer::caseTauInstanceOf(TypeInst* inst)
             
             // b3: var = 1
             Opnd* one = opndManager.createSsaTmpOpnd(dst->getType());
-            b3->appendInst(instFactory.makeLdConst(one, (int32) 1));
+            b3->appendInst(instFactory.makeLdConst(one, (I_32) 1));
             fg.addEdge(b3, succ);
             
             // b4: var = 0
             Opnd* zero = opndManager.createSsaTmpOpnd(dst->getType());
-            b4->appendInst(instFactory.makeLdConst(zero, (int32) 0));
+            b4->appendInst(instFactory.makeLdConst(zero, (I_32) 0));
             fg.addEdge(b4, succ);
             
             VarOpnd* dstVar = opndManager.createVarOpnd(dst->getType(), false);

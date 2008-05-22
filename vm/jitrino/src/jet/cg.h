@@ -108,14 +108,14 @@ inline unsigned count_slots(unsigned num, const jtype * args)
  */
 struct ProfileCounterInfo  {
    //This field contains composite info on counter size (first byte) and offset (last 3 bytes)
-   uint32 offsetInfo;
+   U_32 offsetInfo;
    //Link to the basic block to calculate counter's offset after code layout
     BBInfo* bb;
     ProfileCounterInfo() : offsetInfo(0), bb(NULL){}
 
-    static uint32 getInstSize(uint32 offsetInfo) { return offsetInfo >> 24;}
-    static uint32 getInstOffset(uint32 offsetInfo) { return offsetInfo & 0x00FFFFFF;}
-    static uint32 createOffsetInfo(uint32 instSize, uint32 instOffset) {
+    static U_32 getInstSize(U_32 offsetInfo) { return offsetInfo >> 24;}
+    static U_32 getInstOffset(U_32 offsetInfo) { return offsetInfo & 0x00FFFFFF;}
+    static U_32 createOffsetInfo(U_32 instSize, U_32 instOffset) {
         assert(instSize<0xFF && instOffset<0xFFFFFF); 
         return (instSize<<24) | (instOffset);
     }

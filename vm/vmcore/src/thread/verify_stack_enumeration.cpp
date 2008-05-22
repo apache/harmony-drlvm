@@ -75,8 +75,8 @@ static void add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinne
 }
 
 
-typedef void (*add_compressed_root_set_entry_func)(uint32 *ref, Boolean is_pinned);
-static void add_compressed_root_set_entry(uint32 *ref, Boolean is_pinned)
+typedef void (*add_compressed_root_set_entry_func)(U_32 *ref, Boolean is_pinned);
+static void add_compressed_root_set_entry(U_32 *ref, Boolean is_pinned)
 {
     TRACE("compressed root " << *ref << " at " << ref << ", not verified");
 }

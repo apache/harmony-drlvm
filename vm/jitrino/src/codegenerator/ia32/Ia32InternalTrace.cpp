@@ -49,7 +49,7 @@ static inline void m_assert(bool cond)  {
 
 static MemoryManager mm("printRuntimeOpndInternalHelper");
 static TypeManager *tm = NULL;
-void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, CallingConvention::OpndInfo * argInfos)
+void __stdcall methodEntry(const char * methodName, U_32 argInfoCount, CallingConvention::OpndInfo * argInfos)
 {
 
     JitFrameContext context;
@@ -67,18 +67,18 @@ void __stdcall methodEntry(const char * methodName, uint32 argInfoCount, Calling
     if (tm == NULL) {
         tm = new (mm) TypeManager(mm); tm->init();
     }
-    for (uint32 i=0; i<argInfoCount; i++){
+    for (U_32 i=0; i<argInfoCount; i++){
         CallingConvention::OpndInfo & info=argInfos[i];
-        uint32 cb=0;
-        uint8 arg[4*sizeof(uint32)]; 
-        for (uint32 j=0; j<info.slotCount; j++){
+        U_32 cb=0;
+        uint8 arg[4*sizeof(U_32)]; 
+        for (U_32 j=0; j<info.slotCount; j++){
             if (!info.isReg){
 #ifdef _EM64T_
                 *(POINTER_SIZE_INT*)(arg+cb)=((POINTER_SIZE_INT*)context.rsp)[info.slots[j]];
 #else
-                *(uint32*)(arg+cb)=((uint32*)context.esp)[info.slots[j]];
+                *(U_32*)(arg+cb)=((U_32*)context.esp)[info.slots[j]];
 #endif
-                cb+=sizeof(uint32);
+                cb+=sizeof(U_32);
             }else{
                 m_assert(info.isReg);
                 m_assert(0);                    
@@ -136,7 +136,7 @@ void InternalTrace::runImpl()
         EntryPointPseudoInst * entryPointPseudoInst = (EntryPointPseudoInst *)inst;
         entryPointPseudoInst->getCallingConventionClient().finalizeInfos(Inst::OpndRole_Def, CallingConvention::ArgKind_InArg);
         const StlVector<CallingConvention::OpndInfo> & infos=((const EntryPointPseudoInst *)entryPointPseudoInst)->getCallingConventionClient().getInfos(Inst::OpndRole_Def);
-        Opnd * argInfoOpnd=irManager->newBinaryConstantImmOpnd((uint32)infos.size()*sizeof(CallingConvention::OpndInfo), &infos.front());
+        Opnd * argInfoOpnd=irManager->newBinaryConstantImmOpnd((U_32)infos.size()*sizeof(CallingConvention::OpndInfo), &infos.front());
         Opnd * args[3]={ methodNameOpnd, 
             irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), infos.size()), 
             argInfoOpnd,

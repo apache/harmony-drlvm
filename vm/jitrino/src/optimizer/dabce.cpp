@@ -640,7 +640,7 @@ Node* DynamicABCE::getClonedLoop() {
         Log::out() << "Duplicating original loop...\n";
     }
     
-    uint32 maxNodeId = flowGraph.getMaxNodeId();
+    U_32 maxNodeId = flowGraph.getMaxNodeId();
     StlBitVector nodesInLoop(memoryManager, maxNodeId);
     const Nodes& loopNodes = optimizedLoop->getNodesInLoop();
     

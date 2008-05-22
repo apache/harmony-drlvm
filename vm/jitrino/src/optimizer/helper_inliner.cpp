@@ -35,7 +35,7 @@ public:
     HelperConfig(VM_RT_SUPPORT id) : helperId(id), doInlining(true), hotnessPercentToInline(0) {}
     VM_RT_SUPPORT helperId;
     bool          doInlining;
-    uint32        hotnessPercentToInline;
+    U_32        hotnessPercentToInline;
 };    
 
 struct HelperInlinerFlags {
@@ -90,7 +90,7 @@ void HelperInlinerAction::registerHelper(Opcode opcode, VM_RT_SUPPORT helperId) 
 class HelperInliner {
 public:
     HelperInliner(HelperInlinerSession* _sessionAction, MemoryManager& tmpMM, CompilationContext* _cc, Inst* _inst, 
-        uint32 _hotness, MethodDesc* _helperMethod, VM_RT_SUPPORT _helperId)  
+        U_32 _hotness, MethodDesc* _helperMethod, VM_RT_SUPPORT _helperId)  
         : flags(((HelperInlinerAction*)_sessionAction->getAction())->getFlags()), localMM(tmpMM), 
         cc(_cc), inst(_inst), session(_sessionAction), method(_helperMethod),  helperId(_helperId)
     {
@@ -106,7 +106,7 @@ public:
 
     void run();
 
-    uint32 hotness;
+    U_32 hotness;
 
     static MethodDesc* findHelperMethod(CompilationInterface* ci, VM_RT_SUPPORT helperId);
 
@@ -154,7 +154,7 @@ void HelperInlinerSession::_run(IRManager& irm) {
     //finding all helper calls
     ControlFlowGraph& fg = irm.getFlowGraph();
     double entryExecCount = fg.hasEdgeProfile() ? fg.getEntryNode()->getExecCount(): 1;
-    uint32 maxNodeCount = irm.getOptimizerFlags().hir_node_threshold;
+    U_32 maxNodeCount = irm.getOptimizerFlags().hir_node_threshold;
     StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare> *helperInlineCandidates = 
         new (tmpMM) StlPriorityQueue<HelperInliner*, StlVector<HelperInliner*>, HelperInlinerCompare>(tmpMM);
 
@@ -166,7 +166,7 @@ void HelperInlinerSession::_run(IRManager& irm) {
         Node* node = *it;
         double execCount = node->getExecCount();
         assert (execCount >= 0);
-        uint32 nodePercent = fg.hasEdgeProfile() ? (uint32)(execCount*100/entryExecCount) : 0;
+        U_32 nodePercent = fg.hasEdgeProfile() ? (U_32)(execCount*100/entryExecCount) : 0;
         if (node->isBlockNode()) {
             for (Inst* inst = (Inst*)node->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
                 Opcode opcode = inst->getOpcode();
@@ -209,13 +209,13 @@ void HelperInliner::run()  {
     assert(method);
 
     //Convert all inst params into helper params
-    uint32 numHelperArgs = method->getNumParams();
-    uint32 numInstArgs = inst->getNumSrcOperands();
+    U_32 numHelperArgs = method->getNumParams();
+    U_32 numInstArgs = inst->getNumSrcOperands();
     Opnd** helperArgs = new (irm->getMemoryManager()) Opnd*[numHelperArgs];
 #ifdef _DEBUG
     std::fill(helperArgs, helperArgs + numHelperArgs, (Opnd*)NULL);
 #endif
-    uint32 currentHelperArg = 0;
+    U_32 currentHelperArg = 0;
     if (inst->isType()) {
         Type* type = inst->asTypeInst()->getTypeInfo();
         assert(type->isNamedType());
@@ -227,11 +227,11 @@ void HelperInliner::run()  {
     } else if (inst->isToken()) {
         TokenInst* tokenInst = inst->asTokenInst();
         MethodDesc* methDesc = tokenInst->getEnclosingMethod();
-        uint32 cpIndex = tokenInst->getToken();
+        U_32 cpIndex = tokenInst->getToken();
         Opnd* classHandleOpnd = opndManager->createSsaTmpOpnd(typeManager->getUnmanagedPtrType(typeManager->getIntPtrType()));
         Opnd* cpIndexOpnd = opndManager->createSsaTmpOpnd(typeManager->getUInt32Type());
         Inst* ldMethDesc = instFactory->makeLdConst(classHandleOpnd, (POINTER_SIZE_SINT)methDesc->getParentHandle());
-        Inst* ldCpIndex = instFactory->makeLdConst(cpIndexOpnd, (int32)cpIndex);
+        Inst* ldCpIndex = instFactory->makeLdConst(cpIndexOpnd, (I_32)cpIndex);
         
         ldMethDesc->insertBefore(inst);
         helperArgs[currentHelperArg] = classHandleOpnd;
@@ -242,7 +242,7 @@ void HelperInliner::run()  {
         currentHelperArg++;                
     }
     
-    for (uint32 i = 0; i < numInstArgs; i++) {
+    for (U_32 i = 0; i < numInstArgs; i++) {
         Opnd* instArg = inst->getSrc(i);
         if (instArg->getType()->tag == Type::Tau) {
             continue;

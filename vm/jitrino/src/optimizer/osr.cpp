@@ -54,7 +54,7 @@ namespace Jitrino {
 
 DEFINE_SESSION_ACTION(OSRPass, osr, "Operator Strength Reduction")
 
-static uint32 signof(int v){ return (v == 0) ? 0 : (v < 0 ? -1 : 1);}
+static U_32 signof(int v){ return (v == 0) ? 0 : (v < 0 ? -1 : 1);}
 
 
 /* The code below is based on loop_unroll processOpnd function. However it
@@ -158,9 +158,9 @@ OSROpndInfo OSRInductionDetector::processOpnd(LoopTree* tree,
             }
         } else if ((info1.isCounter() && info2.isLDConst())
                    || (info2.isCounter() && info1.isLDConst())) {
-            uint32 increment = info1.isCounter() ?
+            U_32 increment = info1.isCounter() ?
                 info1.getIncrement() : info2.getIncrement();
-            uint32 diff = info1.isLDConst()? info1.getConst() : info2.getConst();
+            U_32 diff = info1.isLDConst()? info1.getConst() : info2.getConst();
             bool monotonousFlag = increment == 0 || diff == 0
                 || (opcode == Op_Add && signof(diff) == signof(increment))
                 || (opcode == Op_Sub && signof(diff) != signof(increment));
@@ -446,7 +446,7 @@ void OSR::findLeadingOpnd(Inst* newDef, SsaOpnd* opnd){
     }
 }
 
-void OSR::replaceOperand(uint32 num, Inst* inst, SsaOpnd* opnd,
+void OSR::replaceOperand(U_32 num, Inst* inst, SsaOpnd* opnd,
                          Opnd* iv_lead, Node* iv_lead_node,
                          Type* type, Opcode opcode, SsaOpnd* rc,
                          Operation op){
@@ -484,10 +484,10 @@ void OSR::replaceOperands(Type* type, Inst* inst, SsaOpnd* iv,
         Log::out() << std::endl;
     }
 
-    uint32 numOpnds = inst->getNumSrcOperands();
+    U_32 numOpnds = inst->getNumSrcOperands();
     SsaOpnd* iv_lead = getLeadingOperand(iv);
     Node* iv_lead_node = iv_lead->getInst()->getNode();
-    for (uint32 num = 0; num < numOpnds; num++) {
+    for (U_32 num = 0; num < numOpnds; num++) {
         SsaOpnd* opnd = inst->getSrc(num)->asSsaOpnd();
         replaceOperand(num, inst, opnd, iv_lead, iv_lead_node, type,
                        opcode, rc, op);
@@ -555,9 +555,9 @@ Inst* OSR::createNewVarInst(SsaOpnd* old, Type* type,
         return instFactory.makeStVar(newSsaVar,
                                      old_inst->getSrc(0)->asSsaOpnd());
     } else {
-        uint32 num = old_inst->getNumSrcOperands();
+        U_32 num = old_inst->getNumSrcOperands();
         Opnd** newOpnds = new(mm) Opnd* [num];
-        for (uint32 i = 0; i < num; i++) {
+        for (U_32 i = 0; i < num; i++) {
             newOpnds[i] = old_inst->getSrc(i)->asSsaOpnd();
         }
         return (PhiInst*)instFactory.makePhi(newSsaVar, num, newOpnds);
@@ -786,7 +786,7 @@ void OSR::replaceLinearFuncTest(StlVector < Node* >&postOrderNodes){
 void OSR::performLFTR(Inst* inst){
     Opcode opcode = inst->getOpcode();
     if (opcode == Op_Cmp || opcode == Op_Branch) {
-        uint32 num = inst->getNumSrcOperands();
+        U_32 num = inst->getNumSrcOperands();
         if (2 == num) {
             iv = 0;
             rc = 0;

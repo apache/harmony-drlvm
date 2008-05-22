@@ -129,8 +129,8 @@ public:
         DeadCodeEliminator::copyPropagate(inst);
         // then, if we are using constant propagation based on branches, try it
         if (constantTable) {
-            uint32 numSrcs = inst->getNumSrcOperands();
-            for (uint32 i=0; i<numSrcs; ++i) {
+            U_32 numSrcs = inst->getNumSrcOperands();
+            for (U_32 i=0; i<numSrcs; ++i) {
                 Opnd *thisOpnd = inst->getSrc(i);
                 Opnd *foundOpnd = constantTable->lookup(thisOpnd);
                 if (foundOpnd) {
@@ -1025,7 +1025,7 @@ private:
         //  (tauAnd, ldvar)
         // so if first operand is a tau, don't skip any
 
-        uint32 numSrcs = inst->getNumSrcOperands();
+        U_32 numSrcs = inst->getNumSrcOperands();
         if (numSrcs > 0) {
             if (inst->getSrc(0)->getType()->tag != Type::Tau) {
                 while ((numSrcs > 0) && (inst->getSrc(numSrcs-1)->getType()->tag == Type::Tau)) {
@@ -1051,7 +1051,7 @@ private:
     }
     CSEHashKey getKey(FieldAccessInst *inst) {
         FieldDesc* fieldDesc = inst->getFieldDesc();
-        uint32 numSrcs = inst->getNumSrcOperands();
+        U_32 numSrcs = inst->getNumSrcOperands();
         if (numSrcs > 0) {
             if (inst->getSrc(0)->getType()->tag != Type::Tau) {
                 while ((numSrcs > 0) && (inst->getSrc(numSrcs-1)->getType()->tag == Type::Tau)) {
@@ -1072,7 +1072,7 @@ private:
     }
     CSEHashKey getKey(TypeInst* inst) {
         Type* typeInfo = inst->getTypeInfo();
-        uint32 numSrcs = inst->getNumSrcOperands();
+        U_32 numSrcs = inst->getNumSrcOperands();
         if (numSrcs > 0) {
             if (inst->getSrc(0)->getType()->tag != Type::Tau) {
                 while ((numSrcs > 0) && (inst->getSrc(numSrcs-1)->getType()->tag == Type::Tau)) {
@@ -1097,8 +1097,8 @@ private:
     }
     CSEHashKey getKey(ConstInst* inst) {
         return getKey(inst->getOperation(),
-                      (uint32)inst->getValue().dword1,
-                      (uint32)inst->getValue().dword2);
+                      (U_32)inst->getValue().dword1,
+                      (U_32)inst->getValue().dword2);
     }
     CSEHashKey getKey(TokenInst* inst) {
         return getKey(inst->getOperation(),
@@ -1107,7 +1107,7 @@ private:
     }
     CSEHashKey getKey(MethodInst* inst) {
         MethodDesc* methodDesc = inst->getMethodDesc();
-        uint32 numSrcs = inst->getNumSrcOperands();
+        U_32 numSrcs = inst->getNumSrcOperands();
         if (numSrcs > 0) {
             if (inst->getSrc(0)->getType()->tag != Type::Tau) {
                 while ((numSrcs > 0) && (inst->getSrc(numSrcs-1)->getType()->tag == Type::Tau)) {
@@ -1144,13 +1144,13 @@ private:
     CSEHashKey getKey(Operation operation) {
         return CSEHashKey(operation.encodeForHashing());
     }
-    CSEHashKey getKey(Operation operation, uint32 srcid1) {
+    CSEHashKey getKey(Operation operation, U_32 srcid1) {
         return CSEHashKey(operation.encodeForHashing(), srcid1);
     }
-    CSEHashKey getKey(Operation operation, uint32 srcid1, uint32 srcid2) {
+    CSEHashKey getKey(Operation operation, U_32 srcid1, U_32 srcid2) {
         return CSEHashKey(operation.encodeForHashing(), srcid1, srcid2);
     }
-    CSEHashKey getKey(Operation operation, uint32 srcid1, uint32 srcid2, uint32 srcid3) {
+    CSEHashKey getKey(Operation operation, U_32 srcid1, U_32 srcid2, U_32 srcid3) {
         return CSEHashKey(operation.encodeForHashing(), srcid1, srcid2, srcid3);
     }
 
@@ -1361,7 +1361,7 @@ private:
                                   ComparisonModifier mod,
                                   Type::Tag comparisonType,
                                   bool isTrueEdge,
-                                  uint32 numSrcOperands,
+                                  U_32 numSrcOperands,
                                   Opnd *src0,
                                   Opnd *src1);
     void addInfoFromPEI(Inst *pei, bool isExceptionEdge);
@@ -1779,8 +1779,8 @@ bool InstValueNumberer::allowsConstantPropagation(ComparisonModifier mod, Type::
                 Inst *zeroInst = lookupInst(0, getKey(Operation(Op_LdConstant, 
                                                                 comparisonType, 
                                                                 Modifier()),
-                                                      (uint32) 0,
-                                                      (uint32) 0));
+                                                      (U_32) 0,
+                                                      (U_32) 0));
                 if (zeroInst) {
                     *opnd = src0;
                     *constOpnd = zeroInst->getDst();
@@ -1959,7 +1959,7 @@ void InstValueNumberer::addInfoFromBranch(Node* targetNode, BranchInst *branchi,
         Log::out() << ::std::endl;
     }
 
-    uint32 numSrcs = branchi->getNumSrcOperands();
+    U_32 numSrcs = branchi->getNumSrcOperands();
     addInfoFromBranchCompare(targetNode, 
                              branchi->getComparisonModifier(),
                              branchi->getType(),
@@ -1974,8 +1974,8 @@ void InstValueNumberer::recordHasTypeTau(Opnd *opnd,
                                          Inst *tauHasTypeInst)
 {
     // make checks available
-    uint32 typeId = type->getId();
-    uint32 opndId = opnd->getId();
+    U_32 typeId = type->getId();
+    U_32 opndId = opnd->getId();
 
     CSEHashKey key1 = getKey(Operation(Op_TauCheckCast, Type::SystemObject,
                                        Modifier(Exception_Sometimes)),
@@ -1994,7 +1994,7 @@ void InstValueNumberer::recordHasTypeTau(Opnd *opnd,
         ObjectType *objType = (ObjectType *)type;
         ObjectType *superClass = objType->getSuperType();
         while (superClass) {
-            uint32 superClassId = superClass->getId();
+            U_32 superClassId = superClass->getId();
             CSEHashKey key1 = getKey(Operation(Op_TauCheckCast, Type::SystemObject,
                                                Modifier(Exception_Sometimes)),
                                      opndId, superClassId);
@@ -2015,7 +2015,7 @@ void InstValueNumberer::addInfoFromBranchCompare(Node* targetNode,
                                                  ComparisonModifier mod,
                                                  Type::Tag comparisonType,
                                                  bool isTrueEdge,
-                                                 uint32 numSrcOperands,
+                                                 U_32 numSrcOperands,
                                                  Opnd *src0,
                                                  Opnd *src1)
 {
@@ -2424,8 +2424,8 @@ public:
             // this must happen even for exception code, to
             // make sure that GCMed def is made visible to
             // exception code
-            uint32 numSrcs = inst->getNumSrcOperands();
-            for (uint32 i=0; i < numSrcs; ++i) {
+            U_32 numSrcs = inst->getNumSrcOperands();
+            for (U_32 i=0; i < numSrcs; ++i) {
                 Opnd *opnd = inst->getSrc(i);
                 SsaOpnd *ssaOpnd = opnd->asSsaOpnd();
                 if (ssaOpnd) {
@@ -2508,9 +2508,9 @@ public:
                 Opnd* srcOpnd = NULL;
                 if (optimizedOpcode == Op_TauUnsafe && instOpcode == Op_Cmp){ 
                     // optimizedInst is tauUnsafe so srcOpnd for copying must be 'false'
-                    copy = irManager.getInstFactory().makeLdConst(dstOpnd,(int32)0);
+                    copy = irManager.getInstFactory().makeLdConst(dstOpnd,(I_32)0);
                 } else  if (optimizedOpcode == Op_TauEdge && dstOpnd->getType()->isNumeric()) {
-                    copy = irManager.getInstFactory().makeLdConst(dstOpnd,(int32)1);
+                    copy = irManager.getInstFactory().makeLdConst(dstOpnd,(I_32)1);
                 } else {
                     srcOpnd = optimizedInst->getDst();
                     //

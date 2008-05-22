@@ -51,23 +51,23 @@ inline double _chgsign(double d) {
 
 // use templates here to decrease code to write for float2int below.
 template <typename tointtype> tointtype minint(tointtype);
-template < > inline int32 minint<int32>(int32) { return 0x80000000; }
+template < > inline I_32 minint<I_32>(I_32) { return 0x80000000; }
 template < > inline int64 minint<int64>(int64) { 
     return __INT64_C(0x8000000000000000); 
 }
 template <typename tointtype> tointtype maxint(tointtype);
-template < > inline int32 maxint<int32>(int32) { return 0x7fffffff; }
+template < > inline I_32 maxint<I_32>(I_32) { return 0x7fffffff; }
 template < > inline int64 maxint<int64>(int64) { 
     return __INT64_C(0x7fffffffffffffff); 
 }
 template <typename tointtype> tointtype maxuint(tointtype);
-template < > inline uint32 maxuint<uint32>(uint32) { return 0xffffffff; }
+template < > inline U_32 maxuint<U_32>(U_32) { return 0xffffffff; }
 template < > inline uint64 maxuint<uint64>(uint64) { 
     return __UINT64_C(0xffffffffffffffff); 
 }
 // get around VC++ problem with uint64->float conversions:
 template <typename tointtype> double maxuintasfloat(tointtype);
-template < > inline double maxuintasfloat<uint32>(uint32) { 
+template < > inline double maxuintasfloat<U_32>(U_32) { 
     return 4294967295.0;
 }
 template < > inline double maxuintasfloat<uint64>(uint64) { 
@@ -203,7 +203,7 @@ ConstantFolder::isConstantAllOnes(Opnd* opnd) {
     ConstInst::ConstValue value = inst->getValue();
     switch (inst->getType()) {
     case Type::Int32:
-        return value.i4 == (int32) -1;
+        return value.i4 == (I_32) -1;
     case Type::Int64:
         return value.i8 == (int64) -1;
     default:
@@ -212,7 +212,7 @@ ConstantFolder::isConstantAllOnes(Opnd* opnd) {
 }
 
 bool
-ConstantFolder::isConstant(Inst* inst, int32& value) {
+ConstantFolder::isConstant(Inst* inst, I_32& value) {
     ConstInst* constInst = inst->asConstInst();
     if (constInst == NULL || constInst->getType() != Type::Int32)
         return false;
@@ -247,7 +247,7 @@ ConstantFolder::hasConstant(Inst* inst) {
 // Utilities for constant folding
 //-----------------------------------------------------------------------------
 bool
-ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, int32& result, bool is_signed) {
+ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, I_32& result, bool is_signed) {
     switch (opc) {
     case Op_Add:    result = c1 + c2; return true;
     case Op_Sub:    result = c1 - c2; return true;
@@ -259,7 +259,7 @@ ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, int32& result, bool is_signe
         if (is_signed) {
             result = c1 * c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, (CAST(uint8, c1)*CAST(uint8, c2)))); return true;
+            result = CAST(I_32, CAST(U_32, (CAST(uint8, c1)*CAST(uint8, c2)))); return true;
         }
     // for div and rem, be careful c2 not be 0
     // also, need to handle signed/unsigned based on SignedModifier
@@ -268,16 +268,16 @@ ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, int32& result, bool is_signe
         if (is_signed) {
             result = c1 / c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint8, c1) / CAST(uint8, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(uint8, c1) / CAST(uint8, c2))); return true;
         }
     case Op_TauRem:
         if (c2 == (int8)0) return false;
         if (is_signed) {
             result = c1 % c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint8, c1) % CAST(uint8, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(uint8, c1) % CAST(uint8, c2))); return true;
         }
-    case Op_MulHi:  result = (int32)(int8)((((int16)c1) * ((int16)c2)) >> 8);
+    case Op_MulHi:  result = (I_32)(int8)((((int16)c1) * ((int16)c2)) >> 8);
         return true;
     case Op_Min:
         result = ::std::min(c1,c2); return true;
@@ -288,7 +288,7 @@ ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, int32& result, bool is_signe
     }
 }
 bool
-ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, int32& result, bool is_signed) {
+ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, I_32& result, bool is_signed) {
     switch (opc) {
     case Op_Add:    result = c1 + c2; return true;
     case Op_Sub:    result = c1 - c2; return true;
@@ -300,7 +300,7 @@ ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, int32& result, bool is_si
         if (is_signed) {
             result = c1 * c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint16, c1) * CAST(uint16, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(uint16, c1) * CAST(uint16, c2))); return true;
         }
     // for div and rem, be careful c2 not be 0
     // also, need to handle signed/unsigned based on SignedModifier
@@ -309,16 +309,16 @@ ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, int32& result, bool is_si
         if (is_signed) {
             result = c1 / c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint16, c1) / CAST(uint16, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(uint16, c1) / CAST(uint16, c2))); return true;
         }
     case Op_TauRem:
         if (c2 == (int16)0) return false;
         if (is_signed) {
             result = c1 % c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint16, c1) % CAST(uint16, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(uint16, c1) % CAST(uint16, c2))); return true;
         }
-    case Op_MulHi:  result = (int32)((int16)(((int32)c1) * ((int32)c2)) >> 16);
+    case Op_MulHi:  result = (I_32)((int16)(((I_32)c1) * ((I_32)c2)) >> 16);
         return true;
     case Op_Min:
         result = ::std::min(c1,c2); return true;
@@ -330,7 +330,7 @@ ConstantFolder::fold16(Opcode opc, int16 c1, int16 c2, int32& result, bool is_si
 }
 
 bool
-ConstantFolder::fold32(Opcode opc, int32 c1, int32 c2, int32& result, bool is_signed) {
+ConstantFolder::fold32(Opcode opc, I_32 c1, I_32 c2, I_32& result, bool is_signed) {
     switch (opc) {
     case Op_Add:    result = c1 + c2; return true;
     case Op_Sub:    result = c1 - c2; return true;
@@ -342,39 +342,39 @@ ConstantFolder::fold32(Opcode opc, int32 c1, int32 c2, int32& result, bool is_si
         if (is_signed) {
             result = c1 * c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint32, c1) * CAST(uint32, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(U_32, c1) * CAST(U_32, c2))); return true;
         }
     // for div and rem, be careful c2 not be 0
     // also, need to handle signed/unsigned based on SignedModifier
     case Op_TauDiv:    
-        if (c2 == (int32)0) return false;
+        if (c2 == (I_32)0) return false;
         if (is_signed) {
-            if ((c1 == (int32)0x80000000) && (c2 == -1)) {
+            if ((c1 == (I_32)0x80000000) && (c2 == -1)) {
                 result = c1; 
                 return true;
             }
 
             result = c1 / c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint32, c1 / CAST(uint32, c2)))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(U_32, c1 / CAST(U_32, c2)))); return true;
         }
     case Op_TauRem:
-        if (c2 == (int32)0) return false;
+        if (c2 == (I_32)0) return false;
         if (is_signed) {
-            if ((c1 == (int32)0x80000000) && (c2 == -1)) {
+            if ((c1 == (I_32)0x80000000) && (c2 == -1)) {
                 result = 0; 
                 return true;
             }
 
             result = c1 % c2; return true;
         } else {
-            result = CAST(int32, CAST(uint32, CAST(uint32, c1) % CAST(uint32, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(U_32, c1) % CAST(U_32, c2))); return true;
         }
     case Op_MulHi:
         {
             int64 res = ((int64)c1) * ((int64)c2);
-            int64 res2 = (int64)((int32)(res >> 32));
-            result = (int32) res2;
+            int64 res2 = (int64)((I_32)(res >> 32));
+            result = (I_32) res2;
             return true;
         }
     case Op_Min:
@@ -434,7 +434,7 @@ ConstantFolder::fold64(Opcode opc, int64 c1, int64 c2, int64& result, bool is_si
             if (is_signed) {
                 result = mulhs<int64, uint64, 32>(c1, c2);
             } else {
-                result = mulhu<uint64, uint32, 32>(CAST(uint64, c1),
+                result = mulhu<uint64, U_32, 32>(CAST(uint64, c1),
                                                    CAST(uint64, c2));
             }
             return true;
@@ -481,7 +481,7 @@ ConstantFolder::foldDouble(Opcode opc, double c1, double c2, double& result) {
 }
 
 bool
-ConstantFolder::fold8(Opcode opc, int8 c, int32& result) {
+ConstantFolder::fold8(Opcode opc, int8 c, I_32& result) {
     switch (opc) {
     case Op_Not:    result = ~c; return true;
     case Op_Neg:    result = -c; return true;
@@ -492,7 +492,7 @@ ConstantFolder::fold8(Opcode opc, int8 c, int32& result) {
 }
 
 bool
-ConstantFolder::fold16(Opcode opc, int16 c, int32& result) {
+ConstantFolder::fold16(Opcode opc, int16 c, I_32& result) {
     switch (opc) {
     case Op_Not:    result = ~c; return true;
     case Op_Neg:    result = -c; return true;
@@ -503,7 +503,7 @@ ConstantFolder::fold16(Opcode opc, int16 c, int32& result) {
 }
 
 bool
-ConstantFolder::fold32(Opcode opc, int32 c, int32& result) {
+ConstantFolder::fold32(Opcode opc, I_32 c, I_32& result) {
     switch (opc) {
     case Op_Not:    result = ~c; return true;
     case Op_Neg:    result = -c; return true;
@@ -560,21 +560,21 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
                 if (ovfm && (src.i4 < 0)) return false;
                 return true;
             } else if (Type::isIntegerOf8Signed(fromType)) {
-                res.i4 = CAST(int32, src.i8);
+                res.i4 = CAST(I_32, src.i8);
                 if (ovfm && (src.i8 != CAST(int64, res.i4))) return false;
                 return true;
             } else if (Type::isIntegerOf8Unsigned(fromType)) {
-                res.i4 = CAST(int32, CAST(uint64, src.i8));
+                res.i4 = CAST(I_32, CAST(uint64, src.i8));
                 if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, res.i4))) return false;
                 return true;
             }
             assert(0);
         } else if (fromType == Type::Single) {
-            res.i4 = float2int<int32, float>(src.s); 
+            res.i4 = float2int<I_32, float>(src.s); 
             if (ovfm && (src.s != CAST(float, res.i4))) return false;
             return true;
         } else if (fromType == Type::Double) {
-            res.i4 = float2int<int32, double>(src.d);
+            res.i4 = float2int<I_32, double>(src.d);
             if (ovfm && (src.d != CAST(double, res.i4))) return false;
             return true;
         }
@@ -587,22 +587,22 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
             if (Type::isIntegerOf4Bytes(fromType)) {
                 res.i4 = src.i4; return true;
             } else if (Type::isIntegerOf8Signed(fromType)) {
-                res.i4 = CAST(int32, CAST(uint32, src.i8));
-                if (ovfm && (src.i8 != CAST(int64, CAST(uint32, res.i4)))) return false;
+                res.i4 = CAST(I_32, CAST(U_32, src.i8));
+                if (ovfm && (src.i8 != CAST(int64, CAST(U_32, res.i4)))) return false;
                 return true;
             } else if (Type::isIntegerOf8Unsigned(fromType)) {
-                res.i4 = CAST(int32, CAST(uint32, CAST(uint64, src.i8)));
-                if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, CAST(uint32, res.i4)))) return false;
+                res.i4 = CAST(I_32, CAST(U_32, CAST(uint64, src.i8)));
+                if (ovfm && (CAST(uint64, src.i8) != CAST(uint64, CAST(U_32, res.i4)))) return false;
                 return true;
             }
             assert(0);
         } else if (fromType == Type::Single) {
-            res.i4 = float2uint<uint32, float>(src.s);
-            if (ovfm && (src.s != CAST(float, CAST(uint32, res.i4)))) return false;
+            res.i4 = float2uint<U_32, float>(src.s);
+            if (ovfm && (src.s != CAST(float, CAST(U_32, res.i4)))) return false;
             return true;
         } else if (fromType == Type::Double) {
-            res.i4 = float2uint<uint32, double>(src.d);
-            if (ovfm && (src.d != CAST(double, CAST(uint32, res.i4)))) return false;
+            res.i4 = float2uint<U_32, double>(src.d);
+            if (ovfm && (src.d != CAST(double, CAST(U_32, res.i4)))) return false;
             return true;
         }
         break;
@@ -615,7 +615,7 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
             if (Type::isIntegerOf4Signed(fromType)) {
                 res.i8 = src.i4; return true;
             } else if (Type::isIntegerOf4Unsigned(fromType)) {
-                res.i8 = CAST(uint32, src.i4); 
+                res.i8 = CAST(U_32, src.i4); 
                 if (ovfm && (src.i4 < 0)) return false;
                 return true;
             } else if (Type::isIntegerOf8Signed(fromType)) {
@@ -643,11 +643,11 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
         assert(!ovfm || mod.getOverflowModifier()==Overflow_Unsigned);
         if (Type::isInteger(fromType)) {
             if (Type::isIntegerOf4Signed(fromType)) {
-                res.i8 = CAST(uint64, CAST(uint32, src.i4));
+                res.i8 = CAST(uint64, CAST(U_32, src.i4));
                 if (ovfm && (src.i4 < 0)) return false;
                 return true;
             } else if (Type::isIntegerOf4Unsigned(fromType)) {
-                res.i8 = CAST(uint64, CAST(uint32, src.i4)); return true;
+                res.i8 = CAST(uint64, CAST(U_32, src.i4)); return true;
             } else if (Type::isIntegerOf8Bytes(fromType)) {
                 res.i8 = src.i8; return true;
             }
@@ -664,7 +664,7 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
         case Type::Int32:
             res.s = CAST(float, src.i4); return true;
         case Type::UInt32:
-            res.s = CAST(float, CAST(uint32, src.i4)); return true;
+            res.s = CAST(float, CAST(U_32, src.i4)); return true;
         case Type::Int64:
             res.s = CAST(float, src.i8);
             if (ovfm && (src.i8 != float2int<int64, float>(res.s))) return false;
@@ -687,7 +687,7 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
         case Type::Int32:
             res.d = CAST(double, src.i4); return true;
         case Type::UInt32:
-            res.d = CAST(double, CAST(uint32, src.i4)); return true;
+            res.d = CAST(double, CAST(U_32, src.i4)); return true;
         case Type::Int64:
             res.d = CAST(double, src.i8); return true;
         case Type::UInt64:
@@ -718,21 +718,21 @@ bool ConstantFolder::foldConv(Type::Tag fromType, Type::Tag toType, Modifier mod
 }
 
 bool
-ConstantFolder::foldCmp32(ComparisonModifier mod, int32 c1, int32 c2, int32& result) {
+ConstantFolder::foldCmp32(ComparisonModifier mod, I_32 c1, I_32 c2, I_32& result) {
     switch (mod) {
     case Cmp_EQ:    result = ((c1 == c2)?1:0);                  return true;
     case Cmp_NE_Un: result = ((c1 != c2)?1:0);                  return true;
     case Cmp_GT:    result = ((c1 > c2)?1:0);                   return true;
-    case Cmp_GT_Un: result = ((CAST(uint32, c1) > CAST(uint32, c2))?1:0);   return true;
+    case Cmp_GT_Un: result = ((CAST(U_32, c1) > CAST(U_32, c2))?1:0);   return true;
     case Cmp_GTE:   result = ((c1 >= c2)?1:0);                  return true;
-    case Cmp_GTE_Un:result = ((CAST(uint32, c1) >= CAST(uint32, c2))?1:0);  return true;
+    case Cmp_GTE_Un:result = ((CAST(U_32, c1) >= CAST(U_32, c2))?1:0);  return true;
     default: break;
     }
     return false;
 }
 
 bool
-ConstantFolder::foldCmpRef(ComparisonModifier mod, void* c1, void* c2, int32& result) {
+ConstantFolder::foldCmpRef(ComparisonModifier mod, void* c1, void* c2, I_32& result) {
     switch (mod) {
     case Cmp_EQ:    result = ((c1 == c2)?1:0);                  return true;
     case Cmp_NE_Un: result = ((c1 != c2)?1:0);                  return true;
@@ -746,7 +746,7 @@ ConstantFolder::foldCmpRef(ComparisonModifier mod, void* c1, void* c2, int32& re
 }
 
 bool
-ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c1, int64 c2, int32& result) {
+ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c1, int64 c2, I_32& result) {
     switch (mod) {
     case Cmp_EQ:    result = ((c1 == c2)?1:0);                  return true;
     case Cmp_NE_Un: result = ((c1 != c2)?1:0);                  return true;
@@ -760,7 +760,7 @@ ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c1, int64 c2, int32& res
 }
 
 bool
-ConstantFolder::foldCmpSingle(ComparisonModifier mod, float c1, float c2, int32& result) {
+ConstantFolder::foldCmpSingle(ComparisonModifier mod, float c1, float c2, I_32& result) {
     switch (mod) {
     case Cmp_EQ:
         if (isnan(c1) || isnan(c2)) { result = false; }
@@ -786,7 +786,7 @@ ConstantFolder::foldCmpSingle(ComparisonModifier mod, float c1, float c2, int32&
 }
 
 bool
-ConstantFolder::foldCmpDouble(ComparisonModifier mod, double c1, double c2, int32& result){
+ConstantFolder::foldCmpDouble(ComparisonModifier mod, double c1, double c2, I_32& result){
     switch (mod) {
     case Cmp_EQ:
         if (isnan(c1) || isnan(c2)) { result = false; }
@@ -812,7 +812,7 @@ ConstantFolder::foldCmpDouble(ComparisonModifier mod, double c1, double c2, int3
 }
 
 bool
-ConstantFolder::foldCmp32(ComparisonModifier mod, int32 c, int32& result) {
+ConstantFolder::foldCmp32(ComparisonModifier mod, I_32 c, I_32& result) {
     switch (mod) {
     case Cmp_Zero:      result = ((c == 0)?1:0);    return true;
     case Cmp_NonZero:   result = ((c != 0)?1:0);    return true;
@@ -822,7 +822,7 @@ ConstantFolder::foldCmp32(ComparisonModifier mod, int32 c, int32& result) {
 }
 
 bool
-ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c, int32& result) {
+ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c, I_32& result) {
     switch (mod) {
     case Cmp_Zero:      result = ((c == 0)?1:0);    return true;
     case Cmp_NonZero:   result = ((c != 0)?1:0);    return true;
@@ -832,7 +832,7 @@ ConstantFolder::foldCmp64(ComparisonModifier mod, int64 c, int32& result) {
 }
 
 bool
-ConstantFolder::foldCmpRef(ComparisonModifier mod, void* c, int32& result) {
+ConstantFolder::foldCmpRef(ComparisonModifier mod, void* c, I_32& result) {
     switch (mod) {
     case Cmp_Zero:      result = ((c == NULL)?1:0);    return true;
     case Cmp_NonZero:   result = ((c != NULL)?1:0);    return true;
@@ -943,7 +943,7 @@ ConstantFolder::foldConstant(Type::Tag type,
 //
 bool
 ConstantFolder::fold(Inst* inst, ConstInst::ConstValue& result) {
-    uint32 numSrcs = inst->getNumSrcOperands();
+    U_32 numSrcs = inst->getNumSrcOperands();
     if (numSrcs == 0)
         return false;
     ConstInst* constSrc0 = inst->getSrc(0)->getInst()->asConstInst();

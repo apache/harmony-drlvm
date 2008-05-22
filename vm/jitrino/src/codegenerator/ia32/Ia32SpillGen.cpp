@@ -47,7 +47,7 @@ struct SpillGen : public SessionAction
 //  Inter-blocks data
 //  -----------------
 
-    typedef uint32 RegMask;
+    typedef U_32 RegMask;
     typedef StlVector<Opnd*> Opnds;
 
     MemoryManager mm;           // this is private MemoryManager, not irm.getMemoryManager()
@@ -203,8 +203,8 @@ struct SpillGen : public SessionAction
                                     , lives_start(0), lives_exit(0)
                                     {}
 
-    uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
-    uint32 getSideEffects () const  {return SideEffect_InvalidatesLivenessInfo;}
+    U_32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
+    U_32 getSideEffects () const  {return SideEffect_InvalidatesLivenessInfo;}
 
     void runImpl();
     bool verify(bool force=false);
@@ -593,7 +593,7 @@ void SpillGen::runImpl()
     emitted = 0;
 
     opndcount = irManager->getOpndCount();
-    lives_exit = new (mm) BitSet(mm, (uint32)opndcount); 
+    lives_exit = new (mm) BitSet(mm, (U_32)opndcount); 
 
     actsmap.resize(opndcount);
     for (size_t i = 0; i < opndcount; ++i)
@@ -610,7 +610,7 @@ void SpillGen::runImpl()
             }
 
             lives_start = irManager->getLiveAtEntry(bblock);
-            lives_exit->resize((uint32)opndcount);
+            lives_exit->resize((U_32)opndcount);
             irManager->getLiveAtExit(bblock, *lives_exit);
 
             size_t bfails = 0;
@@ -643,7 +643,7 @@ void SpillGen::runImpl()
                 {
                     size_t oldcount = opndcount;
                     opndcount = irManager->getOpndCount();
-                    lives_exit->resize((uint32)opndcount);
+                    lives_exit->resize((U_32)opndcount);
                     irManager->fixLivenessInfo();
 
                     actsmap.resize(opndcount);
@@ -777,7 +777,7 @@ size_t SpillGen::pass0 ()
         {
             opnd = inst->getOpnd(it);
 
-            uint32 roles = inst->getOpndRoles(it);
+            U_32 roles = inst->getOpndRoles(it);
 
             OpRole oprole = 0;
 

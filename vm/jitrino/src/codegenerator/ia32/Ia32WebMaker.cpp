@@ -101,8 +101,8 @@ struct WebMaker : public SessionAction
 
     WebMaker ()                     :mm("WebMaker"), opndxs(mm), nodexs(mm) {}
 
-    uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
-    uint32 getSideEffects () const  {return splitcount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
+    U_32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
+    U_32 getSideEffects () const  {return splitcount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
 
     void runImpl();
     void calculateConstraints();
@@ -164,32 +164,32 @@ class InstOpnds
 {
 public:
 
-    InstOpnds (const Inst* inst, uint32 roles = Inst::OpndRole_All, bool forw = true);
+    InstOpnds (const Inst* inst, U_32 roles = Inst::OpndRole_All, bool forw = true);
 
     bool hasMore () const           {return opnd != 0;}
     void next ()                    {move();}
     Opnd*  getOpnd () const         {return opnd;}
-    uint32 getRole () const         {return role;}
+    U_32 getRole () const         {return role;}
 
 protected:
 
     bool move ();
 
     const Inst*  inst;
-    const uint32 roles;
+    const U_32 roles;
     const unsigned main_count;
 
     unsigned state,
              main_idx,
               sub_idx;
 
-    uint32 role;
+    U_32 role;
     Opnd* opnd;
     Opnd* main_opnd;
 };
 
 
-InstOpnds::InstOpnds (const Inst* i, uint32 r, bool forw)
+InstOpnds::InstOpnds (const Inst* i, U_32 r, bool forw)
 :inst(i), roles(r), main_count(i->getOpndCount())
 {
     if (main_count == 0)
@@ -366,7 +366,7 @@ void WebMaker::phase1()
         if (nodep->isBlockNode())
         {
             for (Inst* instp = (Inst*)nodep->getFirstInst(); instp!=NULL; instp = instp->getNextInst()) {
-                const uint32 iprops = instp->getProperties();
+                const U_32 iprops = instp->getProperties();
                 Inst::Opnds defs(instp, Inst::OpndRole_AllDefs);
                 unsigned itx = 0;
                 for (Inst::Opnds::iterator it = defs.begin(); it != defs.end(); it = defs.next(it), ++itx)
@@ -377,8 +377,8 @@ void WebMaker::phase1()
                     Opndx* opndxp = opndxs.at(opndp->getId());
                     if (opndxp != 0)
                     {
-                        const uint32 oprole = const_cast<const Inst*>(instp)->getOpndRoles(itx);
-                        //const uint32 oprole = inops.getRole();
+                        const U_32 oprole = const_cast<const Inst*>(instp)->getOpndRoles(itx);
+                        //const U_32 oprole = inops.getRole();
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
                         if (isdef)
@@ -466,7 +466,7 @@ void WebMaker::phase2()
             opndxp->copdefp = 0;
         }
     
-    BitSet wrkbs(mm, (uint32)globcount);
+    BitSet wrkbs(mm, (U_32)globcount);
     bool   wrkbsvalid;
     size_t passnb = 0;
     const Nodes& postOrder = irManager->getFlowGraph()->getNodesPostOrder();
@@ -558,7 +558,7 @@ void WebMaker::phase3()
             
             for (Inst* instp = (Inst*)nodep->getFirstInst(); instp != 0; instp = instp->getNextInst()) 
             {
-                const uint32 iprops = instp->getProperties();
+                const U_32 iprops = instp->getProperties();
 
                 for (InstOpnds inops(instp, Inst::OpndRole_All, false); inops.hasMore(); inops.next())
                 {
@@ -567,7 +567,7 @@ void WebMaker::phase3()
                     if (opndxp != 0)
                     {
                         OpDef* opdefp = 0;
-                        const uint32 oprole = inops.getRole();
+                        const U_32 oprole = inops.getRole();
                         const bool isdef = ((oprole & Inst::OpndRole_UseDef) == Inst::OpndRole_Def)
                                         && ((iprops & Inst::Properties_Conditional) == 0 );
                         DBGOUT(" B#" << instp->getBasicBlock()->getId() << " " << *instp;)

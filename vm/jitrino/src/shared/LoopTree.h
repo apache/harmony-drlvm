@@ -35,7 +35,7 @@ class LoopTree;
 class EdgeCoalescerCallback {
 public:
     virtual ~EdgeCoalescerCallback(){};
-    virtual void coalesce(Node* header, Node* newPreHeader, uint32 numEdges) = 0;
+    virtual void coalesce(Node* header, Node* newPreHeader, U_32 numEdges) = 0;
 };
 
 class LoopNode : public TreeNode {
@@ -89,7 +89,7 @@ public:
     
     LoopNode* getLoopNode(const Node* node, bool containingLoop) const;
 
-    uint32 getLoopDepth(const Node* node) const;
+    U_32 getLoopDepth(const Node* node) const;
         
     // true if edge is exit from any loop
     bool isLoopExit(const Edge* e) const;
@@ -98,14 +98,14 @@ public:
     
     bool isValid() const {  return traversalNum > fg->getModificationTraversalNum(); }
 
-    uint32 getTraversalNum() { return traversalNum; }
+    U_32 getTraversalNum() { return traversalNum; }
 
     EdgeCoalescerCallback* getCoalesceCallback() const {return coalesceCallback;}
     void setCoalesceCallback(EdgeCoalescerCallback* callback) {coalesceCallback = callback;}
    
     bool isNormalized() const { return normalized;}
 
-    uint32 getMaxLoopDepth() const {return getHeight()-1;}
+    U_32 getMaxLoopDepth() const {return getHeight()-1;}
 private:
 
     void findLoopHeaders(Nodes& headers);
@@ -117,7 +117,7 @@ private:
 
     MemoryManager& mm;
     ControlFlowGraph* fg;
-    uint32 traversalNum;
+    U_32 traversalNum;
 
     //nodes by dfn
     // loop header by node->dfn. 

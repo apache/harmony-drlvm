@@ -84,7 +84,7 @@ GCManagedPointerAnalyzer::computeBaseMaps()
     StlHashSet<SsaOpnd*> _staticMap(mm);
     
 #ifndef NDEBUG
-    uint32 iterCount = 0;
+    U_32 iterCount = 0;
 #endif
     bool done = false;
     while(!done) {
@@ -152,8 +152,8 @@ GCManagedPointerAnalyzer::computeBaseMaps()
                             SsaOpnd* base = NULL;
                             bool isStatic = false;
                             bool isAmbiguous = false;
-                            uint32 nSrcs = phi->getNumSrcOperands();
-                            for(uint32 i = 0; i < nSrcs; ++i) {
+                            U_32 nSrcs = phi->getNumSrcOperands();
+                            for(U_32 i = 0; i < nSrcs; ++i) {
                                 SsaVarOpnd* src = phi->getSrc(i)->asSsaVarOpnd();
                                 assert(src != NULL);
                                 if(_baseMap.find(src) != _baseMap.end()) {
@@ -259,10 +259,10 @@ GCManagedPointerAnalyzer::insertVarDef(SsaVarOpnd* ptr)
     InstFactory& instFactory = _irManager.getInstFactory();
     if(ptrOp == Op_Phi) {
         PhiInst* ptrPhi = ptrDef->asPhiInst();
-        uint32 numOpnds = ptrPhi->getNumSrcOperands();
+        U_32 numOpnds = ptrPhi->getNumSrcOperands();
         Opnd** newOpnds = new (_irManager.getMemoryManager()) Opnd*[numOpnds];
         Inst* basePhi = instFactory.makePhi(baseSsa, numOpnds, newOpnds);
-        for(uint32 i = 0; i < numOpnds; ++i)
+        for(U_32 i = 0; i < numOpnds; ++i)
             basePhi->setSrc(i, insertVarDef(ptrPhi->getSrc(i)->asSsaVarOpnd()));
         basePhi->insertBefore(ptrPhi);
     } else {
@@ -300,7 +300,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
         StlVector<Node*>::reverse_iterator niter;
         
 #ifndef NDEBUG
-        uint32 k = 0;
+        U_32 k = 0;
 #endif
         bool done = false;
         while(!done) {
@@ -367,8 +367,8 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                 bool rematerialize = false;
                                 PhiInst* phi = inst->asPhiInst();
                                 SsaOpnd* base = NULL;
-                                uint32 nSrcs = phi->getNumSrcOperands();
-                                for(uint32 i = 0; i < nSrcs; ++i) {
+                                U_32 nSrcs = phi->getNumSrcOperands();
+                                for(U_32 i = 0; i < nSrcs; ++i) {
                                     SsaVarOpnd* src = phi->getSrc(i)->asSsaVarOpnd();
                                     assert(src != NULL);
                                     if(_baseMap.find(src) != _baseMap.end()) {
@@ -405,11 +405,11 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     Opcode opcode = NumOpcodes;
                                     FieldDesc* fieldDesc = NULL;
                                     Type* elementType = NULL;
-                                    uint32 numArgs = 0;
+                                    U_32 numArgs = 0;
                                     StlVector<SsaTmpOpnd*> args(mm);
                                     StlVector<Type*> argTypes(mm);
                                     StlVector<SsaTmpOpnd*> defs(mm);
-                                    for(uint32 i = 0; i < nSrcs; ++i) {
+                                    for(U_32 i = 0; i < nSrcs; ++i) {
                                         SsaVarOpnd* src = phi->getSrc(i)->asSsaVarOpnd();
                                         assert(src != NULL);
                                         Inst* stVar = src->getInst();
@@ -439,7 +439,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                             default:
                                                 break;
                                             }
-                                            for(uint32 j = 0; j < numArgs; ++j) {
+                                            for(U_32 j = 0; j < numArgs; ++j) {
                                                 SsaTmpOpnd* arg = defInst->getSrc(j)->asSsaTmpOpnd();
                                                 assert(arg != NULL);
                                                 if(Log::isEnabled()) {
@@ -465,7 +465,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                             default:
                                                 break;
                                             }
-                                            for(uint32 j = 0; j < numArgs; ++j) {
+                                            for(U_32 j = 0; j < numArgs; ++j) {
                                                 SsaTmpOpnd* arg = defInst->getSrc(j)->asSsaTmpOpnd();
                                                 if(Log::isEnabled()) {
                                                     Log::out() << "Recording ";
@@ -483,7 +483,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                     OpndManager& opndManager = _irManager.getOpndManager();
                                     InstFactory& instFactory = _irManager.getInstFactory();
                                     Inst* last = inst;
-                                    for(uint32 j = 0; j < numArgs; ++j) {
+                                    for(U_32 j = 0; j < numArgs; ++j) {
                                         if(args[j] == NULL) {
                                             VarOpnd* var = opndManager.createVarOpnd(argTypes[j], false);
                                             if(Log::isEnabled()) {
@@ -493,7 +493,7 @@ GCManagedPointerAnalyzer::analyzeManagedPointers()
                                             }
                                             SsaTmpOpnd* tmp = opndManager.createSsaTmpOpnd(argTypes[j]);
                                             Opnd** phiArgs = new (_irManager.getMemoryManager()) Opnd*[nSrcs];
-                                            for(uint32 i = 0; i < nSrcs; ++i) {
+                                            for(U_32 i = 0; i < nSrcs; ++i) {
                                                 SsaTmpOpnd* def = defs[i];
                                                 Inst* defInst = def->getInst();
                                                 SsaVarOpnd* ssaVar = opndManager.createSsaVarOpnd(var);

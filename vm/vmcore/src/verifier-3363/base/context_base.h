@@ -209,7 +209,7 @@ protected:
     }
 
     //read four-byte value
-    static uint32 read_uint32(U_8* ptr) {
+    static U_32 read_uint32(U_8* ptr) {
         return (ptr[0] << 24) | (ptr[1] << 16) | (ptr[2] << 8) | ptr[3];
     }
 

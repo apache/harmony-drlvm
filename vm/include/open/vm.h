@@ -89,7 +89,7 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
 /**
  * @return <code>TRUE</code> if all instances of this class are pinned.
  */
- VMEXPORT void* class_alloc_via_classloader(Class_Handle ch, int32 size);
+ VMEXPORT void* class_alloc_via_classloader(Class_Handle ch, I_32 size);
 
 /**
  * This exactly what I want.
@@ -208,7 +208,7 @@ VMEXPORT int vector_first_element_offset_unboxed(Class_Handle element_type);
  * Return the length of a vector. The caller must ensure that GC will not
  * move or deallocate the vector while vector_get_length() is active.
  */
-VMEXPORT int32 vector_get_length(Vector_Handle vector);
+VMEXPORT I_32 vector_get_length(Vector_Handle vector);
 
 /**
  * Return the address to an element of a vector of references.
@@ -216,7 +216,7 @@ VMEXPORT int32 vector_get_length(Vector_Handle vector);
  * while vector_get_element_address_ref() is active.
  */
 VMEXPORT Managed_Object_Handle *
-vector_get_element_address_ref(Vector_Handle vector, int32 idx);
+vector_get_element_address_ref(Vector_Handle vector, I_32 idx);
 
 /**
  * Return the size of a vector of a given number of elements.

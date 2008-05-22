@@ -118,7 +118,7 @@ public:
     void  genBranch(Type::Tag instType, ComparisonModifier mod, LabelInst* label, Opnd* src1, Opnd* src2); // TR //SI
     void  genBranch(Type::Tag instType, ComparisonModifier mod, LabelInst* label, Opnd* src); // TR //SI
     void  genJump(LabelInst* label); //TR
-    void  genSwitch(uint32 numLabels, LabelInst* label[], LabelInst* defaultLabel, Opnd* src);//TR
+    void  genSwitch(U_32 numLabels, LabelInst* label[], LabelInst* defaultLabel, Opnd* src);//TR
 
         
     // Calls
@@ -127,11 +127,11 @@ public:
     Opnd* genIndirectCallWithResolve(Type* returnType,
                                     Opnd* tauNullCheckedFirstArg,
                                     Opnd* tauTypesChecked,
-                                    uint32 numArgs,
+                                    U_32 numArgs,
                                     Opnd* args[],
                                     ObjectType* ch,
                                     JavaByteCodes bc,
-                                    uint32 cpIndex,
+                                    U_32 cpIndex,
                                     MethodSignature* sig
                                     );
     
@@ -139,37 +139,37 @@ public:
                         Type* returnType,
                         Opnd* tauNullCheckedFirstArg, // 0 for unsafe
                         Opnd* tauTypesChecked,        // 0 to let IRBuilder find taus
-                        uint32 numArgs,
+                        U_32 numArgs,
                         Opnd* args[]);
    
    Opnd* genTauVirtualCall(MethodDesc* methodDesc,//TR
                                   Type* returnType,
                                   Opnd* tauNullCheckedFirstArg, // 0 to let IRBuilder add check
                                   Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
-                                  uint32 numArgs,
+                                  U_32 numArgs,
                                   Opnd* args[]);
 
     Opnd* genIndirectCall(      Type* returnType, //TR
                                   Opnd* funAddr,
                                   Opnd* tauNullCheckedFirstArg, // 0 for unsafe
                                   Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
-                                 uint32 numArgs,
+                                 U_32 numArgs,
                                   Opnd* args[]);
 
     Opnd*  genJitHelperCall(JitHelperCallId helperId,
                             Type* returnType,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd*  args[]);
     Opnd*  genJitHelperCall(JitHelperCallId helperId,
                             Type* returnType,
                             Opnd* tauNullCheckedRefArgs,
                             Opnd* tauTypesChecked,
-                            uint32 numArgs,
+                            U_32 numArgs,
                             Opnd*  args[]);
 
     Opnd*  genVMHelperCall(VM_RT_SUPPORT helperId,
                            Type* returnType,
-                           uint32 numArgs,
+                           U_32 numArgs,
                            Opnd*  args[]);
 
     
@@ -179,7 +179,7 @@ public:
     void       genThrow(ThrowModifier mod, Opnd* exceptionObj);//TR
     void       genPseudoThrow();//TR
     void       genThrowSystemException(CompilationInterface::SystemExceptionId);//SI
-    void       genThrowLinkingException(Class_Handle encClass, uint32 CPIndex, uint32 operation);//SI
+    void       genThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation);//SI
     void       genLeave(LabelInst* label);//TR
     void       genEndFinally(); // TR
     void       genEndFilter(); // TR
@@ -188,7 +188,7 @@ public:
     void       genRet(Opnd *src);//TR
     Opnd*      genSaveRet();//TR
     // load, store & move
-    Opnd* genLdConstant(int32 val); //TR //SI
+    Opnd* genLdConstant(I_32 val); //TR //SI
     Opnd* genLdConstant(int64 val); //TR //SI
     Opnd* genLdConstant(float val); //TR //SI
     Opnd* genLdConstant(double val); //TR //SI
@@ -197,7 +197,7 @@ public:
     Opnd*      genLdFloatConstant(double val);//TR
     Opnd*      genLdNull();//TR
 
-    Opnd*      genLdRef(MethodDesc* enclosingMethod, uint32 stringToken, Type* type);//TR
+    Opnd*      genLdRef(MethodDesc* enclosingMethod, U_32 stringToken, Type* type);//TR
     Opnd*      genLdVar(Type* dstType, VarOpnd* var);//TR
     Opnd*      genLdVarAddr(VarOpnd* var);//TR
     Opnd*      genLdInd(Type*, Opnd* ptr); // for use by front-ends, but not simplifier//TR
@@ -207,16 +207,16 @@ public:
     Opnd*      genLdElem(Type* elemType, Opnd* array, Opnd* index,
                          Opnd* tauNullCheck, Opnd* tauAddressInRange);
     Opnd*      genLdFieldAddr(Type* fieldType, Opnd* base, FieldDesc* fieldDesc); //TR
-    Opnd*      genLdFieldAddrWithResolve(Type* fieldType, Opnd* base, ObjectType* enclClass, uint32 cpIndex, bool putfield); //TR
+    Opnd*      genLdFieldAddrWithResolve(Type* fieldType, Opnd* base, ObjectType* enclClass, U_32 cpIndex, bool putfield); //TR
     Opnd*      genLdStaticAddr(Type* fieldType, FieldDesc* fieldDesc);//TR
-    Opnd*      genLdStaticAddrWithResolve(Type* fieldType, ObjectType* enclClass, uint32 cpIndex, bool putfield);//TR
+    Opnd*      genLdStaticAddrWithResolve(Type* fieldType, ObjectType* enclClass, U_32 cpIndex, bool putfield);//TR
     Opnd*      genLdElemAddr(Type* elemType, Opnd* array, Opnd* index);//TR
     Opnd*      genLdVirtFunAddr(Opnd* base, MethodDesc* methodDesc);//TR
     Opnd*      genLdFunAddr(MethodDesc* methodDesc);//TR
     Opnd*      genArrayLen(Type* dstType, Type::Tag type, Opnd* array); // TR
 
-    Opnd*      genLdFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, uint32 cpIdx); //TR
-    Opnd*      genLdStaticWithResolve(Type*, ObjectType* enclClass, uint32 cpIdx);//TR
+    Opnd*      genLdFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, U_32 cpIdx); //TR
+    Opnd*      genLdStaticWithResolve(Type*, ObjectType* enclClass, U_32 cpIdx);//TR
 
     // store instructions
     void       genStVar(VarOpnd* var, Opnd* src);//TR
@@ -227,8 +227,8 @@ public:
                          Opnd* tauNullCheck, Opnd* tauBaseTypeCheck, Opnd* tauAddressInRange);
     void       genStInd(Type*, Opnd* ptr, Opnd* src);//TR
 
-    void       genStFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, uint32 cpIdx, Opnd* src);//TR
-    void       genStStaticWithResolve(Type*, ObjectType* enclClass, uint32 cpIdx, Opnd* src);//TR
+    void       genStFieldWithResolve(Type*, Opnd* base, ObjectType* enclClass, U_32 cpIdx, Opnd* src);//TR
+    void       genStStaticWithResolve(Type*, ObjectType* enclClass, U_32 cpIdx, Opnd* src);//TR
 
     // checks
     Opnd*      genTauCheckNull(Opnd* base);
@@ -236,12 +236,12 @@ public:
     Opnd*      genCheckFinite(Type* dstType, Opnd* src); // TR
     // allocation
     Opnd*      genNewObj(Type* type);//TR
-    Opnd*      genNewObjWithResolve(ObjectType* enclClass, uint32 cpIndex);//TR
+    Opnd*      genNewObjWithResolve(ObjectType* enclClass, U_32 cpIndex);//TR
     Opnd*      genNewArray(NamedType* elemType, Opnd* numElems);//TR
-    Opnd*      genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, uint32 cpIndex);//TR
-    Opnd*      genMultianewarray(NamedType* arrayType, uint32 dimensions, Opnd** numElems);//TR
-    Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, ObjectType* enclClass, uint32 cpIndex, uint32 dimensions, Opnd** numElems);//TR
-    //Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, uint32 dimensions, Opnd** numElems);//TR
+    Opnd*      genNewArrayWithResolve(NamedType* elemType, Opnd* numElems, ObjectType* enclClass, U_32 cpIndex);//TR
+    Opnd*      genMultianewarray(NamedType* arrayType, U_32 dimensions, Opnd** numElems);//TR
+    Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, ObjectType* enclClass, U_32 cpIndex, U_32 dimensions, Opnd** numElems);//TR
+    //Opnd*      genMultianewarrayWithResolve(NamedType* arrayType, U_32 dimensions, Opnd** numElems);//TR
     // sync
     void       genMonitorEnter(Opnd* src); // also inserts nullcheck of src//TR
     void       genMonitorExit(Opnd* src);  // also inserts nullcheck of src//TR
@@ -251,17 +251,17 @@ public:
     // lowered parts of monitor enter/exit;
     //   these assume src is already checked and is not null
     Opnd*      genLdLockAddr(Type *dstType, Opnd *obj);    // result is ref:int16//TR
-    Opnd*      genBalancedMonitorEnter(Type *dstType, Opnd* src, Opnd *lockAddr); // result is int32 // TR
+    Opnd*      genBalancedMonitorEnter(Type *dstType, Opnd* src, Opnd *lockAddr); // result is I_32 // TR
     void       genBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *oldValue); // TR
     // type checking
     // CastException (succeeds if argument is null, returns casted object)
     Opnd*      genCast(Opnd* src, Type* type); // TR
-    Opnd*      genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, uint32 cpIndex); // TR
+    Opnd*      genCastWithResolve(Opnd* src, Type* type, ObjectType* enclClass, U_32 cpIndex); // TR
     // returns trueResult if src is an instance of type, 0 otherwise
     Opnd*      genAsType(Opnd* src, Type* type); // TR
     // returns 1 if src is not null and an instance of type, 0 otherwise
     Opnd*      genInstanceOf(Opnd* src, Type* type); //TR
-    Opnd*      genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, uint32 cpIndex); //TR
+    Opnd*      genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, U_32 cpIndex); //TR
     void       genInitType(NamedType* type); //TR
     // labels
     void       genLabel(LabelInst* labelInst); //TR
@@ -279,7 +279,7 @@ public:
     Opnd*      genRefAnyVal(Type* type, Opnd* typedRef);//TR
     Opnd*      genUnbox(Type* type, Opnd* obj);//TR
     Opnd*      genBox(Type* type, Opnd* val); // TR
-    Opnd*      genLdToken(MethodDesc* enclosingMethod, uint32 metadataToken);//TR
+    Opnd*      genLdToken(MethodDesc* enclosingMethod, U_32 metadataToken);//TR
     // block instructions
     void       genCopyBlock(Opnd* dstAddr, Opnd* srcAddr, Opnd* size); // TR
     void       genInitBlock(Opnd* dstAddr, Opnd* val, Opnd* size); //TR
@@ -294,12 +294,12 @@ public:
     Opnd*      genArgDef(Modifier, Type*); // TR
     VarOpnd*   genVarDef(Type*, bool isPinned);//TR
     // Phi-node instruction
-    Opnd*      genPhi(uint32 numArgs, Opnd* args[]);//TR
+    Opnd*      genPhi(U_32 numArgs, Opnd* args[]);//TR
 
     // label manipulation for translators
     LabelInst* createLabel();
     // this should really be genBlocks
-    void       createLabels(uint32 numLabels, LabelInst** labels);
+    void       createLabels(U_32 numLabels, LabelInst** labels);
     void       killCSE();
     LabelInst* getCurrentLabel() {return currentLabel;}
 
@@ -313,7 +313,7 @@ public:
     // Control flow
     // load, store & move
     Opnd* genLdRef(Modifier mod, Type *dstType,//TR //SI
-                      uint32 token, MethodDesc *enclosingMethod); // for simplifier use
+                      U_32 token, MethodDesc *enclosingMethod); // for simplifier use
     Opnd* genTauLdInd(Modifier mod, Type *dstType, Type::Tag ldType, Opnd *ptr, //SI
                       Opnd *tauNonNullBase, Opnd *tauAddressInRange); // for simplifier use
     Opnd* genLdFunAddrSlot(MethodDesc* methodDesc); //SI
@@ -331,7 +331,7 @@ public:
                                      Opnd* funAddr,
                                      Opnd* tauNullCheckedFirstArg, // 0 to let IRBuilder add check
                                      Opnd* tauTypesChecked,        // 0 to let IRBuilder find it
-                                     uint32 numArgs,
+                                     U_32 numArgs,
                                      Opnd* args[]);
 
     Opnd*      genLdElemAddrNoChecks(Type *elemType, Opnd* array, Opnd* index);
@@ -355,7 +355,7 @@ public:
     Opnd*      genTauArrayLen(Type* dstType, Type::Tag type, Opnd* array,
                               Opnd *tauNullChecked, Opnd *tauBaseTypeChecked);
     Opnd*      genTauBalancedMonitorEnter(Type *dstType, Opnd* src, Opnd *lockAddr,
-                                          Opnd *tauNullChecked); // result is int32
+                                          Opnd *tauNullChecked); // result is I_32
     Opnd*      genTauCheckFinite(Opnd* src);
     // tau operations
     Opnd*      genTauSafe();
@@ -384,12 +384,12 @@ public:
     //   these assume src is already checked and is not null
     void       genIncRecCount(Opnd *obj, Opnd *oldLock);   // result is ref:int16
     Opnd*      genTauOptimisticBalancedMonitorEnter(Type *dstType, Opnd* src, Opnd *lockAddr,
-                                                    Opnd *tauNullChecked); // result is int32
+                                                    Opnd *tauNullChecked); // result is I_32
     void       genOptimisticBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *oldValue);
     void       genMonitorEnterFence(Opnd *src);
     void       genMonitorExitFence(Opnd *src);
     // checks
-    void       genSourceLineNumber(uint32 fileId, uint32 lineNumber);
+    void       genSourceLineNumber(U_32 fileId, U_32 lineNumber);
 
 private:
 
@@ -407,23 +407,23 @@ private:
     Opnd*    createOpnd(Type*);
     PiOpnd*  createPiOpnd(Opnd *org);
     Opnd*    createTypeOpnd(ObjectType* type);
-    Opnd*    lookupHash(uint32 opc);
-    Opnd*    lookupHash(uint32 opc, uint32 op);
-    Opnd*    lookupHash(uint32 opc, uint32 op1, uint32 op2);
-    Opnd*    lookupHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3);
-    Opnd*    lookupHash(uint32 opc, Opnd* op) { return lookupHash(opc, op->getId()); };
-    Opnd*    lookupHash(uint32 opc, Opnd* op1, Opnd* op2) { return lookupHash(opc, op1->getId(), op2->getId()); };
-    Opnd*    lookupHash(uint32 opc, Opnd* op1, Opnd* op2, Opnd* op3) { return lookupHash(opc, op1->getId(), op2->getId(), op3->getId()); };
-    void     insertHash(uint32 opc, Inst*);
-    void     insertHash(uint32 opc, uint32 op, Inst*);
-    void     insertHash(uint32 opc, uint32 op1, uint32 op2, Inst*);
-    void     insertHash(uint32 opc, uint32 op1, uint32 op2, uint32 op3, Inst*);
-    void     insertHash(uint32 opc, Opnd* op, Inst*i) { insertHash(opc, op->getId(), i); };
-    void     insertHash(uint32 opc, Opnd* op1, Opnd* op2, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), i); };
-    void     insertHash(uint32 opc, Opnd* op1, Opnd* op2, Opnd* op3, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), op3->getId(), i); };
+    Opnd*    lookupHash(U_32 opc);
+    Opnd*    lookupHash(U_32 opc, U_32 op);
+    Opnd*    lookupHash(U_32 opc, U_32 op1, U_32 op2);
+    Opnd*    lookupHash(U_32 opc, U_32 op1, U_32 op2, U_32 op3);
+    Opnd*    lookupHash(U_32 opc, Opnd* op) { return lookupHash(opc, op->getId()); };
+    Opnd*    lookupHash(U_32 opc, Opnd* op1, Opnd* op2) { return lookupHash(opc, op1->getId(), op2->getId()); };
+    Opnd*    lookupHash(U_32 opc, Opnd* op1, Opnd* op2, Opnd* op3) { return lookupHash(opc, op1->getId(), op2->getId(), op3->getId()); };
+    void     insertHash(U_32 opc, Inst*);
+    void     insertHash(U_32 opc, U_32 op, Inst*);
+    void     insertHash(U_32 opc, U_32 op1, U_32 op2, Inst*);
+    void     insertHash(U_32 opc, U_32 op1, U_32 op2, U_32 op3, Inst*);
+    void     insertHash(U_32 opc, Opnd* op, Inst*i) { insertHash(opc, op->getId(), i); };
+    void     insertHash(U_32 opc, Opnd* op1, Opnd* op2, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), i); };
+    void     insertHash(U_32 opc, Opnd* op1, Opnd* op2, Opnd* op3, Inst*i) { insertHash(opc, op1->getId(), op2->getId(), op3->getId(), i); };
     void     invalid();    // called when the builder detects invalid IR
-    void     setBcOffset(uint32 bcOffset) {  offset =  bcOffset;}
-    uint32   getBcOffset() const {  return offset; };
+    void     setBcOffset(U_32 bcOffset) {  offset =  bcOffset;}
+    U_32   getBcOffset() const {  return offset; };
 
     friend class    JavaByteCodeTranslator;
     
@@ -454,7 +454,7 @@ private:
     Opnd*               tauMethodSafeOpnd;
 
     // current bc offset
-    uint32 offset;
+    U_32 offset;
 };
 
 } //namespace Jitrino 

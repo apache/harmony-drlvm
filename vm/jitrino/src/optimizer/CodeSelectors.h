@@ -35,23 +35,23 @@ namespace Jitrino {
 
 class _VarCodeSelector : public VarCodeSelector {
 public:
-    _VarCodeSelector(VarOpnd* opnds, uint32* varMap, GCBasePointerMap& gcMap) 
+    _VarCodeSelector(VarOpnd* opnds, U_32* varMap, GCBasePointerMap& gcMap) 
         : varOpnds(opnds), varIdMap(varMap), gcMap(gcMap)
     {}
 
     void genCode(Callback& callback);
-    uint32 getNumVarOpnds();
+    U_32 getNumVarOpnds();
 
 private:
     VarOpnd* varOpnds;
-    uint32*  varIdMap;
+    U_32*  varIdMap;
     GCBasePointerMap& gcMap;
 };
 
 class _BlockCodeSelector : public BlockCodeSelector {
 public:
     _BlockCodeSelector(MemoryManager& mm, IRManager& irmanager, Node* b,CG_OpndHandle** map,
-        uint32* varMap, bool sinkConstants0, bool sinkConstantsOne0) 
+        U_32* varMap, bool sinkConstants0, bool sinkConstantsOne0) 
         : irmanager(irmanager), memManager(mm), opndToCGInstMap(map), 
         localOpndToCGInstMap(mm), varIdMap(varMap), block(b),
         sinkConstants(sinkConstants0), sinkConstantsOne(sinkConstantsOne0), argCount(0)
@@ -106,9 +106,9 @@ public:
 
     JitHelperCallOp::Id convertJitHelperId(JitHelperCallId callId);
 
-    CG_OpndHandle ** genCallArgs(Inst * call, uint32 arg0Pos);
+    CG_OpndHandle ** genCallArgs(Inst * call, U_32 arg0Pos);
 
-    CG_OpndHandle ** genCallArgs(Opnd *extraArg, Inst * call, uint32 arg0Pos);
+    CG_OpndHandle ** genCallArgs(Opnd *extraArg, Inst * call, U_32 arg0Pos);
 
     void genInstCode(InstructionCallback& instructionCallback, Inst *inst, bool genConsts);
     
@@ -119,24 +119,24 @@ private:
     void setLocalCGInst(CG_OpndHandle* inst, Opnd* opnd);
     void clearLocalCGInsts();
     void setCGInst(CG_OpndHandle* inst,Opnd* opnd);
-    uint32 getVarHandle(VarOpnd *var);
+    U_32 getVarHandle(VarOpnd *var);
 
     IRManager&              irmanager;
     MemoryManager&          memManager;
     CG_OpndHandle**         opndToCGInstMap;
-    StlMap<uint32, CG_OpndHandle*> localOpndToCGInstMap;
-    uint32*                 varIdMap;
+    StlMap<U_32, CG_OpndHandle*> localOpndToCGInstMap;
+    U_32*                 varIdMap;
     Node*                   block;
     InstructionCallback*    callback;
     bool                    sinkConstants;
     bool                    sinkConstantsOne;
-    uint32                  argCount;
+    U_32                  argCount;
 };
 
 class _CFGCodeSelector : public CFGCodeSelector {
 public:
     _CFGCodeSelector(MemoryManager& mm, IRManager& irmanager, ControlFlowGraph* fg,CG_OpndHandle** map,
-                     uint32 *varMap, bool sinkConstants0, bool sinkConstantsOne0)
+                     U_32 *varMap, bool sinkConstants0, bool sinkConstantsOne0)
         : irmanager(irmanager), opndToCGInstMap(map), varIdMap(varMap), 
           flowGraph(fg), numNodes(0), memManager(mm), sinkConstants(sinkConstants0),
           sinkConstantsOne(sinkConstantsOne0)
@@ -145,13 +145,13 @@ public:
         numNodes = flowGraph->getNodeCount();
     }
     void genCode(Callback& callback); 
-    uint32 getNumNodes() {return numNodes;}
+    U_32 getNumNodes() {return numNodes;}
 private:
     IRManager&         irmanager;
     CG_OpndHandle**    opndToCGInstMap;
-    uint32*            varIdMap;
+    U_32*            varIdMap;
     ControlFlowGraph*  flowGraph;
-    uint32            numNodes;
+    U_32            numNodes;
     MemoryManager&    memManager;
     bool              sinkConstants;
     bool              sinkConstantsOne;
@@ -174,9 +174,9 @@ public:
     void selectCode(Callback& callback);
 private:
     IRManager&  irmanager;
-    uint32      numOpnds;
-    uint32      numArgs;
-    uint32      numVars;
+    U_32      numOpnds;
+    U_32      numArgs;
+    U_32      numVars;
     VarOpnd*    varOpnds;
     ControlFlowGraph*  flowGraph;
     MethodDesc* methodDesc;

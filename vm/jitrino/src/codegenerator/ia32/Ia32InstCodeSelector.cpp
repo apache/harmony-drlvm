@@ -113,19 +113,19 @@ double  __stdcall   convF4F8    (float v) { return (double)v;   }
 float   __stdcall   convF8F4    (double v) stdcall__;
 float   __stdcall   convF8F4    (double v) {    return (float)v;    }
 
-int32   __stdcall   convF4I4    (float v) stdcall__;
-int32   __stdcall   convF4I4    (float v) { 
+I_32   __stdcall   convF4I4    (float v) stdcall__;
+I_32   __stdcall   convF4I4    (float v) { 
 #ifdef PLATFORM_POSIX
     if (isnan(v))
 #else
     if (_isnan(v))
 #endif
         return 0;
-    if (v>(double)(int32)0x7fffffff)
-        return (int32)0x7fffffff;     // maxint
-    if (v<(double)(int32)0x80000000)
-        return (int32)0x80000000;     // minint
-    return (int32)v;
+    if (v>(double)(I_32)0x7fffffff)
+        return (I_32)0x7fffffff;     // maxint
+    if (v<(double)(I_32)0x80000000)
+        return (I_32)0x80000000;     // minint
+    return (I_32)v;
 }
 
 int64   __stdcall   convF4I8    (float v) stdcall__;
@@ -144,19 +144,19 @@ int64   __stdcall   convF4I8    (float v) {
     return (int64)v;
 }
 
-int32   __stdcall   convF8I4    (double v) stdcall__;
-int32   __stdcall   convF8I4    (double v) {
+I_32   __stdcall   convF8I4    (double v) stdcall__;
+I_32   __stdcall   convF8I4    (double v) {
 #ifdef PLATFORM_POSIX
     if (isnan(v))
 #else
     if (_isnan(v))
 #endif
         return 0;
-    if (v>(double)(int32)0x7fffffff)
-        return (int32)0x7fffffff;     // maxint
-    if (v<(double)(int32)0x80000000)
-        return (int32)0x80000000;     // minint
-    return (int32)v;
+    if (v>(double)(I_32)0x7fffffff)
+        return (I_32)0x7fffffff;     // maxint
+    if (v<(double)(I_32)0x80000000)
+        return (I_32)0x80000000;     // minint
+    return (I_32)v;
 }
 
 int64   __stdcall   convF8I8    (double v) stdcall__;
@@ -174,12 +174,12 @@ int64   __stdcall   convF8I8    (double v) {
     return (int64)v;
 }
 
-double  __stdcall   convI4F8    (uint32 v) stdcall__;
-double  __stdcall   convI4F8    (uint32 v) {
-    return (double)(int32)v;    }
+double  __stdcall   convI4F8    (U_32 v) stdcall__;
+double  __stdcall   convI4F8    (U_32 v) {
+    return (double)(I_32)v;    }
 
-float   __stdcall   convI4F4    (uint32 v) stdcall__;
-float   __stdcall   convI4F4    (uint32 v) {    return (float)(int32)v; }
+float   __stdcall   convI4F4    (U_32 v) stdcall__;
+float   __stdcall   convI4F4    (U_32 v) {    return (float)(I_32)v; }
 
 double  __stdcall   convI8F8    (uint64 v) stdcall__;
 double  __stdcall   convI8F8    (uint64 v) {    return (double)(int64)v;    }
@@ -198,27 +198,27 @@ double  __stdcall   remF8   (double v0, double v1)  {
     return jitrino_ieee754_fmod_double(v0,v1);
 } 
 
-void __stdcall initialize_array(uint8* array, uint32 elems_offset, uint8* data, uint32 num_elems) stdcall__;
-void __stdcall initialize_array(uint8* array, uint32 elems_offset, uint8* data, uint32 num_elems) {
+void __stdcall initialize_array(uint8* array, U_32 elems_offset, uint8* data, U_32 num_elems) stdcall__;
+void __stdcall initialize_array(uint8* array, U_32 elems_offset, uint8* data, U_32 num_elems) {
     uint8* array_data = array + elems_offset;
-    for (uint32 i = 0; i < num_elems; i++) {
+    for (U_32 i = 0; i < num_elems; i++) {
         array_data[i] = data[i];
     }
 }
 
-void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, uint32 index, POINTER_SIZE_INT value) stdcall__;
-void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, uint32 index, POINTER_SIZE_INT value) {
+void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, U_32 index, POINTER_SIZE_INT value) stdcall__;
+void __stdcall add_value_profile_value(EM_ProfileAccessInterface* profileAccessInterface, Method_Profile_Handle mpHandle, U_32 index, POINTER_SIZE_INT value) {
     profileAccessInterface->value_profiler_add_value(mpHandle, index, value);
 }
 
-void __stdcall fill_array_with_const(uint32 copyOp, uint32 arrayRef, uint32 arrayBound, uint32 baseOp) {
+void __stdcall fill_array_with_const(U_32 copyOp, U_32 arrayRef, U_32 arrayBound, U_32 baseOp) {
     Jitrino::crash("Illegal internal helper was called.\n Please enable cg_fastArrayFill optimization in the code generator path");
     assert(0);
     return;
 }
 
 //_______________________________________________________________________________________________________________
-uint32 InstCodeSelector::_tauUnsafe;
+U_32 InstCodeSelector::_tauUnsafe;
 
 //_______________________________________________________________________________________________________________
 void InstCodeSelector::onCFGInit(IRManager& irManager)
@@ -319,7 +319,7 @@ void InstCodeSelector::copyOpnd(Opnd *dst, Opnd *src, bool doZeroExtension)
 
 
 //_______________________________________________________________________________________________________________
-void InstCodeSelector::throwLinkingException(Class_Handle encClass, uint32 cp_ndx, uint32 opcode)
+void InstCodeSelector::throwLinkingException(Class_Handle encClass, U_32 cp_ndx, U_32 opcode)
 {  
     Opnd* encClassArg = irManager.newImmOpnd(getRuntimeIdType(), (POINTER_SIZE_INT)encClass);
     Opnd* cpIndexArg = irManager.newImmOpnd(typeManager.getUInt32Type(),cp_ndx);
@@ -1204,7 +1204,7 @@ Opnd * InstCodeSelector::shiftOp(IntegerOp::Types opType, Mnemonic mn, Opnd * va
 
 CG_OpndHandle*    InstCodeSelector::shladd(IntegerOp::Types opType, 
                                               CG_OpndHandle*   value, 
-                                              uint32           imm, 
+                                              U_32           imm, 
                                               CG_OpndHandle*   addto)  
 { 
     Opnd * shiftDest = (Opnd *)shl(opType, value, irManager.newImmOpnd(typeManager.getUInt8Type(), imm));
@@ -1426,7 +1426,7 @@ InstCodeSelector::heapBaseOpnd(Type* type, POINTER_SIZE_INT heapBase) {
     assert(0); // not supposed to be used on ia32
 #endif
     Opnd* heapBaseOpnd = NULL;
-    if((POINTER_SIZE_INT)heapBase == (uint32)heapBase) { // heap base fits into 32 bits
+    if((POINTER_SIZE_INT)heapBase == (U_32)heapBase) { // heap base fits into 32 bits
         heapBaseOpnd = irManager.newImmOpnd(type, heapBase);
     } else { // heapBase can not be an immediate at comparison
         heapBaseOpnd = irManager.newOpnd(type);
@@ -1462,7 +1462,7 @@ void InstCodeSelector::bnzero(CompareZeroOp::Types opType, CG_OpndHandle* src)
 //_______________________________________________________________________________________________________________
 //  Switch: generate compare and branch to the default case.
 
-void InstCodeSelector::tableSwitch(CG_OpndHandle* src, uint32 nTargets) 
+void InstCodeSelector::tableSwitch(CG_OpndHandle* src, U_32 nTargets) 
 {
     switchSrcOpnd=(Opnd*)src;
     switchNumTargets=nTargets;
@@ -1473,7 +1473,7 @@ void InstCodeSelector::tableSwitch(CG_OpndHandle* src, uint32 nTargets)
 //  Generate instructions for switch dispatch
 //  SwitchTableInst should be the first inst in the block.
 
-void InstCodeSelector::genSwitchDispatch(uint32 numTargets, Opnd *switchSrc)
+void InstCodeSelector::genSwitchDispatch(U_32 numTargets, Opnd *switchSrc)
 {
 #ifdef _EM64T_
     Opnd * opnd = irManager.newOpnd(typeManager.getUInt64Type());
@@ -1582,7 +1582,7 @@ void InstCodeSelector::throwSystemException(CompilationInterface::SystemExceptio
 //_______________________________________________________________________________________________________________
 //  Load 32-bit integer constant
 
-CG_OpndHandle*    InstCodeSelector::ldc_i4(int32 val) 
+CG_OpndHandle*    InstCodeSelector::ldc_i4(I_32 val) 
 {
     return irManager.newImmOpnd(typeManager.getInt32Type(), val);
 }
@@ -1824,7 +1824,7 @@ CG_OpndHandle* InstCodeSelector::tau_checkDivOpnds(CG_OpndHandle* src1,
 
 Opnd* InstCodeSelector::addOffset(Opnd *   addr, 
                                         Opnd *   base, 
-                                        uint32      offset) 
+                                        U_32      offset) 
 {
     ICS_ASSERT(0);
     return 0;
@@ -1986,7 +1986,7 @@ CG_OpndHandle*  InstCodeSelector::addElemIndexWithLEA(Type          * eType,
     Type * offType = typeManager.getInt32Type();
 #endif
         
-    uint32 elemSize = 0;
+    U_32 elemSize = 0;
     if (elemType->isReference()
         && Type::isCompressedReference(elemType->tag, compilationInterface)
         && !elemType->isCompressedReference()) {
@@ -2032,7 +2032,7 @@ CG_OpndHandle*  InstCodeSelector::addElemIndex(Type          * eType,
     PtrType * ptrType=type->asPtrType();
     Type * elemType = ptrType->getPointedToType();
 
-    uint32 elemSize=getByteSize(irManager.getTypeSize(elemType));
+    U_32 elemSize=getByteSize(irManager.getTypeSize(elemType));
 
     Type * indexType = 
 #ifdef _EM64T_
@@ -2264,7 +2264,7 @@ void InstCodeSelector::tau_stRef(CG_OpndHandle* src,
 //_______________________________________________________________________________________________________________
 //  Load variable address
 
-CG_OpndHandle* InstCodeSelector::ldVarAddr(uint32 varId) 
+CG_OpndHandle* InstCodeSelector::ldVarAddr(U_32 varId) 
 {
     ICS_ASSERT(0);
     return 0;
@@ -2273,7 +2273,7 @@ CG_OpndHandle* InstCodeSelector::ldVarAddr(uint32 varId)
 //_______________________________________________________________________________________________________________
 //  Load variable
 
-CG_OpndHandle * InstCodeSelector::ldVar(Type* dstType, uint32 varId) 
+CG_OpndHandle * InstCodeSelector::ldVar(Type* dstType, U_32 varId) 
 {
     if (dstType->tag==Type::Tau)
         return getTauUnsafe();
@@ -2285,7 +2285,7 @@ CG_OpndHandle * InstCodeSelector::ldVar(Type* dstType, uint32 varId)
 //_______________________________________________________________________________________________________________
 //  Store variable
 
-void InstCodeSelector::stVar(CG_OpndHandle* src, uint32 varId) 
+void InstCodeSelector::stVar(CG_OpndHandle* src, U_32 varId) 
 {
     if (src==getTauUnsafe())
         return;
@@ -2331,16 +2331,16 @@ CG_OpndHandle* InstCodeSelector::newArray(ArrayType*      arrayType,
 
 //_______________________________________________________________________________________________________________
 //    Create multidimentional new array
-//    Call Helper_NewMultiArray(arrayTypeRuntimeId, numDims, uint32 dimN, ...,uint32 dim1)    
+//    Call Helper_NewMultiArray(arrayTypeRuntimeId, numDims, U_32 dimN, ...,U_32 dim1)    
 
 CG_OpndHandle*  InstCodeSelector::newMultiArray(ArrayType*      arrayType, 
-                                                     uint32          numDims, 
+                                                     U_32          numDims, 
                                                      CG_OpndHandle** dims) 
 {
     Opnd ** helperOpnds = new (memManager) Opnd * [2+numDims];
     helperOpnds[0]=irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, arrayType);
     helperOpnds[1]=irManager.newImmOpnd(typeManager.getInt32Type(), numDims);
-    for (uint32 i = 0; i < numDims; i++) 
+    for (U_32 i = 0; i < numDims; i++) 
         helperOpnds[i + 2] = (Opnd*)dims[numDims - 1 - i];
     Opnd * retOpnd=irManager.newOpnd(arrayType);
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
@@ -2355,7 +2355,7 @@ CG_OpndHandle*  InstCodeSelector::newMultiArray(ArrayType*      arrayType,
 
 CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
                                        MethodDesc* enclosingMethod,
-                                       uint32 refToken,
+                                       U_32 refToken,
                                        bool uncompress) 
 {
     assert(dstType->isSystemString() || dstType->isSystemClass());
@@ -2432,7 +2432,7 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
 //_______________________________________________________________________________________________________________
 //  Load token
 
-CG_OpndHandle * InstCodeSelector::ldToken(Type *dstType,MethodDesc* enclosingMethod,uint32 token) 
+CG_OpndHandle * InstCodeSelector::ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token) 
 {
     ICS_ASSERT(0);
     return 0;
@@ -2441,12 +2441,12 @@ CG_OpndHandle * InstCodeSelector::ldToken(Type *dstType,MethodDesc* enclosingMet
 //_______________________________________________________________________________________________________________
 //  Increment counter for the program instrumentation
 
-void InstCodeSelector::incCounter(Type *counterType,uint32 key) 
+void InstCodeSelector::incCounter(Type *counterType,U_32 key) 
 {
     assert( counterType->isUInt4() );
     EdgeMethodProfile* edgeProfile = this->codeSelector.methodCodeSelector.edgeProfile;
     assert(edgeProfile!=NULL);
-    uint32* ptr = key == 0 ? edgeProfile->getEntryCounter() : edgeProfile->getCounter(key );
+    U_32* ptr = key == 0 ? edgeProfile->getEntryCounter() : edgeProfile->getCounter(key );
     assert( ptr != NULL /*&& *ptr == 0 if compilation is locked*/);
     Opnd* baseOpnd = irManager.newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getUIntPtrType()), (POINTER_SIZE_INT)ptr);
     Opnd* memOpnd = irManager.newMemOpnd(typeManager.getUIntPtrType(), MemOpndKind_Heap, baseOpnd, NULL, NULL, NULL);
@@ -2508,7 +2508,7 @@ void InstCodeSelector::genReturn()
 //_______________________________________________________________________________________________________________
 //  Define an argument
 
-CG_OpndHandle*    InstCodeSelector::defArg(uint32 position, Type *type) 
+CG_OpndHandle*    InstCodeSelector::defArg(U_32 position, Type *type) 
 {
     return irManager.defArg(type, position);
 }
@@ -2598,7 +2598,7 @@ CG_OpndHandle*  InstCodeSelector::tau_ldIntfTableAddr(Type *         dstType,
 //_______________________________________________________________________________________________________________
 //  Indirect call w/o a tau that indicates that first argument is non-null
 
-CG_OpndHandle* InstCodeSelector::calli(uint32            numArgs, 
+CG_OpndHandle* InstCodeSelector::calli(U_32            numArgs, 
                                           CG_OpndHandle**   args, 
                                           Type*             retType, 
                                           CG_OpndHandle*    methodPtr)
@@ -2609,7 +2609,7 @@ CG_OpndHandle* InstCodeSelector::calli(uint32            numArgs,
 //_______________________________________________________________________________________________________________
 //  Indirect call with the tau that indicates that first argument is non-null
 
-CG_OpndHandle* InstCodeSelector::tau_calli(uint32        numArgs, 
+CG_OpndHandle* InstCodeSelector::tau_calli(U_32        numArgs, 
                                               CG_OpndHandle**   args, 
                                               Type*             retType, 
                                               CG_OpndHandle*    methodPtr,
@@ -2628,7 +2628,7 @@ CG_OpndHandle* InstCodeSelector::tau_calli(uint32        numArgs,
 //  either expand direct call into loading method address into a register and
 //  indirect call or true direct call that will be patched if method is recompiled.
 
-CG_OpndHandle* InstCodeSelector::call(uint32          numArgs, 
+CG_OpndHandle* InstCodeSelector::call(U_32          numArgs, 
                                          CG_OpndHandle** args, 
                                          Type*           retType,
                                          MethodDesc *    desc)
@@ -2641,7 +2641,7 @@ CG_OpndHandle* InstCodeSelector::call(uint32          numArgs,
 //  either expand direct call into loading method address into a register and
 //  indirect call or true direct call that will be patched if method is recompiled.
 
-CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs, 
+CG_OpndHandle* InstCodeSelector::tau_call(U_32          numArgs, 
                                              CG_OpndHandle** args, 
                                              Type*           retType,
                                              MethodDesc *    desc,
@@ -2666,7 +2666,7 @@ CG_OpndHandle* InstCodeSelector::tau_call(uint32          numArgs,
 //  Virtual call.
 //  'this' reference is in args[0]
 
-CG_OpndHandle* InstCodeSelector::tau_callvirt(uint32          numArgs,
+CG_OpndHandle* InstCodeSelector::tau_callvirt(U_32          numArgs,
                                                  CG_OpndHandle** args, 
                                                  Type*           retType,
                                                  MethodDesc *    desc,
@@ -2690,7 +2690,7 @@ CG_OpndHandle* InstCodeSelector::tau_callvirt(uint32          numArgs,
 //_______________________________________________________________________________________________________________
 //  JIT helper call
 
-CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs, 
+CG_OpndHandle* InstCodeSelector::callhelper(U_32              numArgs, 
                                             CG_OpndHandle**     args, 
                                             Type*               retType,
                                             JitHelperCallOp::Id callId) 
@@ -2763,7 +2763,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Type* int32type = typeManager.getInt32Type();
         Type* unmanPtr = typeManager.getUnmanagedPtrType(int32type);
         Opnd * tlsBase = createTlsBaseLoadSequence(irManager, currentBasicBlock, unmanPtr);
-        uint32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
+        U_32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
         Opnd* pStateFlag = irManager.newMemOpnd(int32type, MemOpndKind_Any, tlsBase, offsetInTLS);
         Inst* ii = irManager.newCopyPseudoInst(Mnemonic_MOV, pStateFlag, (Opnd*)args[0]);
         appendInsts(ii);
@@ -2776,7 +2776,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         Type* unmanPtr = typeManager.getUnmanagedPtrType(int32type);
 
         Opnd * tlsBase = createTlsBaseLoadSequence(irManager, currentBasicBlock, unmanPtr);
-        uint32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
+        U_32 offsetInTLS = VMInterface::flagTLSThreadStateOffset();
         Opnd* pStateFlag = irManager.newMemOpnd(int32type, MemOpndKind_Any, tlsBase, offsetInTLS);
         Inst* ii = irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, pStateFlag);
         appendInsts(ii);
@@ -2820,7 +2820,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
         assert(numArgs == 2);
         Opnd* empiOpnd = irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_EM_ProfileAccessInterface);
         Opnd* mphOpnd = irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_Method_Value_Profile_Handle);
-        const uint32 nArgs = 4;
+        const U_32 nArgs = 4;
         Opnd* newArgs[4] = {empiOpnd, mphOpnd, ((Opnd **)args)[0], ((Opnd **)args)[1]};
         appendInsts(irManager.newInternalRuntimeHelperCallInst("add_value_profile_value", nArgs, newArgs, dstOpnd));
         break;
@@ -2881,7 +2881,7 @@ CG_OpndHandle* InstCodeSelector::callhelper(uint32              numArgs,
 //_______________________________________________________________________________________________________________
 //  VM helper call
 
-CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs, 
+CG_OpndHandle* InstCodeSelector::callvmhelper(U_32              numArgs, 
                                               CG_OpndHandle**     args, 
                                               Type*               retType,
                                               VM_RT_SUPPORT  callId) 
@@ -2896,7 +2896,7 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(uint32              numArgs,
 
         hlpArgs[0] = irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, 
                                           md->getParentType());
-        for (uint32 i = 0; i < numArgs-1; i++)
+        for (U_32 i = 0; i < numArgs-1; i++)
             hlpArgs[i+1] = (Opnd*)args[i+1];
         hlpArgs[numArgs] = irManager.newImmOpnd(getRuntimeIdType(), 
                                                Opnd::RuntimeInfo::Kind_MethodRuntimeId, md);
@@ -3260,7 +3260,7 @@ CG_OpndHandle*  InstCodeSelector::tauEdge()
 //_______________________________________________________________________________________________________________
 //    And several tau operands
 
-CG_OpndHandle*  InstCodeSelector::tauAnd(uint32 numArgs, CG_OpndHandle** args) 
+CG_OpndHandle*  InstCodeSelector::tauAnd(U_32 numArgs, CG_OpndHandle** args) 
 {
     return getTauUnsafe();
 }

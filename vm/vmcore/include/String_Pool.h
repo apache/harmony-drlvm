@@ -37,7 +37,7 @@ struct String
         // raw reference to interned string if not compressing references
         ManagedObject   * raw_ref;
         // equivalent compressed reference.
-        uint32          compressed_ref;
+        U_32          compressed_ref;
     } intern;
     char bytes[STRING_PADDING];
 };

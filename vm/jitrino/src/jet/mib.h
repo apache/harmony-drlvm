@@ -339,11 +339,11 @@ public:
         
        // load profiling counters info
         char* countersInfo =  from + get_hdr_size() + get_bcmap_size();
-        num_profiler_counters = *(uint32*)countersInfo;
+        num_profiler_counters = *(U_32*)countersInfo;
 		if (num_profiler_counters > 0) {
-			profiler_counters_map = (uint32*)(countersInfo + sizeof(uint32));
+			profiler_counters_map = (U_32*)(countersInfo + sizeof(U_32));
 		}
-        profiler_counters_map = (uint32*)(countersInfo + sizeof(uint32));
+        profiler_counters_map = (U_32*)(countersInfo + sizeof(U_32));
     }
 
     /**
@@ -439,7 +439,7 @@ private:
    *
    */
     unsigned get_profile_counters_map_size() const {
-        return sizeof (uint32) + num_profiler_counters * sizeof(uint32);
+        return sizeof (U_32) + num_profiler_counters * sizeof(U_32);
     }
 
     /**
@@ -569,11 +569,11 @@ public:
    /**
    * Number of profile counters in the method
    */
-    uint32   num_profiler_counters;
+    U_32   num_profiler_counters;
    /**
    * Profiling counters information for patching: counter size and offset
    */
-    uint32*  profiler_counters_map;
+    U_32*  profiler_counters_map;
 };
 
 

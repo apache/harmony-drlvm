@@ -175,9 +175,9 @@ void ThrowInstEliminator::eliminateThrowInst() {
                         Opnd * dst1 = opndManager.createSsaVarOpnd(var);
                         inst->setDst(dst1);
                         // Create phi instruction to stick source operands on new path.
-                        uint32 num_opnds = inst->getNumSrcOperands();
+                        U_32 num_opnds = inst->getNumSrcOperands();
                         Opnd** opnds = new (irManager.getMemoryManager()) Opnd*[num_opnds];
-                        for (uint32 i = 0; i < num_opnds; ++i) {
+                        for (U_32 i = 0; i < num_opnds; ++i) {
                             opnds[i] = inst->getSrc(i);
                         }
                         Opnd * dst2 = opndManager.createSsaVarOpnd(var);

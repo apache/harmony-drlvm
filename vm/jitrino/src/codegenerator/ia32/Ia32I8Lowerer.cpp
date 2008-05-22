@@ -49,11 +49,11 @@ private:
     //
     // virtuals
     //
-    uint32 getNeedInfo(void) const
+    U_32 getNeedInfo(void) const
     {
         return NeedInfo_LoopInfo;
     }
-    uint32 getSideEffects(void) const
+    U_32 getSideEffects(void) const
     {
         // Simplest presumption - if we found at least one I8PseudoInst
         // we might affect everything, including liveness, loop info 
@@ -114,7 +114,7 @@ protected:
     void propagateDivRemResults(Inst* originalInst, Node* originalInstNode, 
         Opnd* quot_lo, Opnd* quot_hi, Opnd* rem_lo, Opnd* rem_hi);
 
-    uint32 foundI8Opnds;
+    U_32 foundI8Opnds;
 private:
     /**
      * Tests whether the type is subject for lowering.
@@ -184,7 +184,7 @@ static const char* help =
 "inline_mul64=true/false\n"
 "   default=true. Inlines multiplication of 64 bits longs, instead of generating call to helper.\n"
 "inline_mul64_checks=true/false\n"
-"   default=false. Adds additional checks whether multipliers are indeed int32 for simpler operation.\n"
+"   default=false. Adds additional checks whether multipliers are indeed I_32 for simpler operation.\n"
 "inline_div64=true/false\n"
 "   default=true. Inlines division of 64 bits longs, instead of generating call to helper.\n"
 "inline_rem64=true/false\n"
@@ -288,7 +288,7 @@ void I8Lowerer::runImpl()
         Inst *  cdq = NULL;
         for (Inst* inst = (Inst*)node->getFirstInst(),*nextInst=NULL; inst!=NULL; inst = nextInst) {
             nextInst = inst->getNextInst();
-            uint32  defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+            U_32  defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
             if(inst->getMnemonic() == Mnemonic_CDQ) {
                 if (inst->getNextInst()!=NULL && inst->getNextInst()->getMnemonic() == Mnemonic_IDIV) {
                     continue;
@@ -326,13 +326,13 @@ void I8Lowerer::processOpnds(Inst * inst)
         mn==Mnemonic_RET ||
         inst->hasKind(Inst::Kind_EntryPointPseudoInst) || 
         inst->hasKind(Inst::Kind_AliasPseudoInst)) {
-        for(uint32 i = 0; i < inst->getOpndCount(); i++) {
+        for(U_32 i = 0; i < inst->getOpndCount(); i++) {
             Opnd * opnd = inst->getOpnd(i);
             if (!isI8Type(opnd->getType())) {
                 continue;
             }
-            foundI8Opnds = ~(uint32)0;
-            uint32 roles = inst->getOpndRoles(i);
+            foundI8Opnds = ~(U_32)0;
+            U_32 roles = inst->getOpndRoles(i);
             if (inst->hasKind(Inst::Kind_AliasPseudoInst)) {
                 if (roles & Inst::OpndRole_Use) {
                     prepareNewOpnds(opnd,newOp1,newOp2);
@@ -349,7 +349,7 @@ void I8Lowerer::processOpnds(Inst * inst)
             }
         }
     } else if (inst->hasKind(Inst::Kind_I8PseudoInst)){
-        uint32  defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def),
+        U_32  defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def),
                 useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
         Opnd * dst = defCount > 0 ? inst->getOpnd(0) : NULL;
         Opnd * src1 = useCount> 0 ? inst->getOpnd(defCount): NULL;
@@ -862,8 +862,8 @@ void I8Lowerer::prepareNewOpnds(Opnd * longOpnd, Opnd*& newOp1, Opnd*& newOp2)
             Opnd * opnds[2] = { newOp1, newOp2 };
             irManager->assignInnerMemOpnds(longOpnd, opnds, 2);
         } else if(longOpnd->isPlacedIn(OpndKind_Imm)){
-            newOp1 = irManager->newImmOpnd(irManager->getTypeManager().getUInt32Type(), (uint32)longOpnd->getImmValue());
-            newOp2 = irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), (int32)(longOpnd->getImmValue()>>32));
+            newOp1 = irManager->newImmOpnd(irManager->getTypeManager().getUInt32Type(), (U_32)longOpnd->getImmValue());
+            newOp2 = irManager->newImmOpnd(irManager->getTypeManager().getInt32Type(), (I_32)(longOpnd->getImmValue()>>32));
         } else {
             newOp1 = irManager->newOpnd(irManager->getTypeManager().getUInt32Type());
             newOp2 = irManager->newOpnd(irManager->getTypeManager().getInt32Type());

@@ -24,7 +24,7 @@ InlineInfoMap::Entry* InlineInfoMap::newEntry(Entry* parent, Method_Handle mh, u
     return e;
 }
 
-void InlineInfoMap::registerEntry(Entry* e, uint32 nativeOffs) {
+void InlineInfoMap::registerEntry(Entry* e, U_32 nativeOffs) {
     entryByOffset[nativeOffs] = e;
     for (Entry* current = e; current!=NULL; current = current->parentEntry) {
         if (std::find(entries.begin(), entries.end(), current)!=entries.end()) {
@@ -35,17 +35,17 @@ void InlineInfoMap::registerEntry(Entry* e, uint32 nativeOffs) {
     }
 }
 
-static uint32 getIndexSize(size_t nEntriesInIndex) {
-    return (uint32)(2 * nEntriesInIndex * sizeof(uint32) + sizeof(uint32)); //zero ending list of [nativeOffset, entryOffsetInImage] pairs
+static U_32 getIndexSize(size_t nEntriesInIndex) {
+    return (U_32)(2 * nEntriesInIndex * sizeof(U_32) + sizeof(U_32)); //zero ending list of [nativeOffset, entryOffsetInImage] pairs
 }
 
-uint32
+U_32
 InlineInfoMap::getImageSize() const {
     if (isEmpty()) {
-        return sizeof(uint32);
+        return sizeof(U_32);
     }
     return getIndexSize(entryByOffset.size())   //index size
-          + (uint32)(entries.size() * sizeof(Entry)); //all entries size;
+          + (U_32)(entries.size() * sizeof(Entry)); //all entries size;
 }
 
 
@@ -63,7 +63,7 @@ void
 InlineInfoMap::write(InlineInfoPtr image)
 {
     if (isEmpty()) {
-        *(uint32*)image=0;
+        *(U_32*)image=0;
         return;
     }
 
@@ -78,7 +78,7 @@ InlineInfoMap::write(InlineInfoPtr image)
     assert(((char*)entriesPtr) == ((char*)image) + getImageSize());
 
     //now update parentEntry reference to written entries
-    for (uint32 i=0; i < entries.size(); i++) {
+    for (U_32 i=0; i < entries.size(); i++) {
         Entry* imageChild = entriesInImage + i;
         Entry* compileTimeParent = imageChild->parentEntry;
         if (compileTimeParent!=NULL) {
@@ -90,16 +90,16 @@ InlineInfoMap::write(InlineInfoPtr image)
     }
 
     //now write index header
-    uint32* header = (uint32*)image;
-    for (StlMap<uint32, Entry*>::iterator it = entryByOffset.begin(), end = entryByOffset.end(); it!=end; it++) {
-        uint32 nativeOffset = it->first;
+    U_32* header = (U_32*)image;
+    for (StlMap<U_32, Entry*>::iterator it = entryByOffset.begin(), end = entryByOffset.end(); it!=end; it++) {
+        U_32 nativeOffset = it->first;
         Entry* compileTimeEntry = it->second;
         size_t entryIdx = std::find(entries.begin(), entries.end(), compileTimeEntry) - entries.begin();
         assert(entryIdx<entries.size());
         Entry* imageEntry = entriesInImage + entryIdx;
         *header = nativeOffset;
         header++;
-        *header = (uint32)((char*)imageEntry - (char*)image);
+        *header = (U_32)((char*)imageEntry - (char*)image);
         header++;
     }
     *header = 0;
@@ -108,12 +108,12 @@ InlineInfoMap::write(InlineInfoPtr image)
 }
 
 
-const InlineInfoMap::Entry* InlineInfoMap::getEntryWithMaxDepth(InlineInfoPtr ptr, uint32 nativeOffs) {
-    uint32* header = (uint32*)ptr;
+const InlineInfoMap::Entry* InlineInfoMap::getEntryWithMaxDepth(InlineInfoPtr ptr, U_32 nativeOffs) {
+    U_32* header = (U_32*)ptr;
     while (*header!=0) {
-        uint32 nativeOffset = *header;
+        U_32 nativeOffset = *header;
         header++;
-        uint32 entryOffset = *header;
+        U_32 entryOffset = *header;
         header++;
         if (nativeOffset == nativeOffs) {
             Entry* e = (Entry*)((char*)ptr + entryOffset);
@@ -123,7 +123,7 @@ const InlineInfoMap::Entry* InlineInfoMap::getEntryWithMaxDepth(InlineInfoPtr pt
     return NULL;
 }
 
-const InlineInfoMap::Entry* InlineInfoMap::getEntry(InlineInfoPtr ptr, uint32 nativeOffs, uint32 inlineDepth) {
+const InlineInfoMap::Entry* InlineInfoMap::getEntry(InlineInfoPtr ptr, U_32 nativeOffs, U_32 inlineDepth) {
     const Entry* e = getEntryWithMaxDepth(ptr, nativeOffs);
     while (e!=NULL) {
         if (e->getInlineDepth() == inlineDepth) {

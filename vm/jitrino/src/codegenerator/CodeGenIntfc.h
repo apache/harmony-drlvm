@@ -179,7 +179,7 @@ public:
     // tau generating instructions
     virtual CG_OpndHandle*  tauPoint() = 0; // depends on all preceding branches
     virtual CG_OpndHandle*  tauEdge() = 0; // tied to incoming edge
-    virtual CG_OpndHandle*  tauAnd(uint32 numArgs, CG_OpndHandle** args) = 0;
+    virtual CG_OpndHandle*  tauAnd(U_32 numArgs, CG_OpndHandle** args) = 0;
     virtual CG_OpndHandle*  tauUnsafe() = 0; // have lost dependence info, don't move uses
     virtual CG_OpndHandle*  tauSafe() = 0;   // operation is always safe
 
@@ -204,7 +204,7 @@ public:
     virtual CG_OpndHandle*  xor_(IntegerOp::Types,CG_OpndHandle* src1,CG_OpndHandle* src2) = 0;
     virtual CG_OpndHandle*  not_(IntegerOp::Types,CG_OpndHandle* src) = 0;
     virtual CG_OpndHandle*  shladd(IntegerOp::Types,CG_OpndHandle* value,
-                                   uint32 shiftamount,
+                                   U_32 shiftamount,
                                    CG_OpndHandle* addto) = 0;
     virtual CG_OpndHandle*  shl(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount) = 0;
     virtual CG_OpndHandle*  shr(IntegerOp::Types,CG_OpndHandle* value,CG_OpndHandle* shiftAmount) = 0;
@@ -229,10 +229,10 @@ public:
     // END PRED DEPRECATED
 
     virtual void            jump() = 0;
-    virtual void            tableSwitch(CG_OpndHandle* src, uint32 nTargets) = 0;       
+    virtual void            tableSwitch(CG_OpndHandle* src, U_32 nTargets) = 0;       
     virtual void            throwException(CG_OpndHandle* exceptionObj, bool createStackTrace) = 0;
     virtual void            throwSystemException(CompilationInterface::SystemExceptionId) = 0;
-    virtual void            throwLinkingException(Class_Handle encClass, uint32 cp_ndx, uint32 opcode) = 0;
+    virtual void            throwLinkingException(Class_Handle encClass, U_32 cp_ndx, U_32 opcode) = 0;
 
     /// convert unmanaged pointer to object. Boxing
     virtual CG_OpndHandle*  convUPtrToObject(ObjectType * dstType, CG_OpndHandle* val) = 0;
@@ -254,26 +254,26 @@ public:
     virtual CG_OpndHandle*  getVTableAddr(Type *dstType, ObjectType *base) = 0;
     virtual CG_OpndHandle*  tau_ldIntfTableAddr(Type *dstType, CG_OpndHandle* base, 
                                                 NamedType* vtableType) = 0;
-    virtual CG_OpndHandle*  call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  call(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                  MethodDesc *desc) = 0;
-    virtual CG_OpndHandle*  tau_call(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  tau_call(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                      MethodDesc *desc,
                                      CG_OpndHandle *tauNullChecked,
                                      CG_OpndHandle *tauTypesChecked) = 0;
     // for callvirt this reference is in args[0]
-    virtual CG_OpndHandle*  tau_callvirt(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  tau_callvirt(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                          MethodDesc *desc, CG_OpndHandle* tauNullChecked,
                                          CG_OpndHandle* tauTypesChecked) = 0;
-    virtual CG_OpndHandle*  tau_calli(uint32 numArgs,CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  tau_calli(U_32 numArgs,CG_OpndHandle** args, Type* retType,
                                       CG_OpndHandle* methodPtr, 
                                       CG_OpndHandle* tauNullChecked,
                                       CG_OpndHandle* tauTypesChecked) = 0;
-    virtual CG_OpndHandle*  callhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  callhelper(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                        JitHelperCallOp::Id callId) = 0;
-    virtual CG_OpndHandle*  callvmhelper(uint32 numArgs, CG_OpndHandle** args, Type* retType,
+    virtual CG_OpndHandle*  callvmhelper(U_32 numArgs, CG_OpndHandle** args, Type* retType,
                                        VM_RT_SUPPORT callId) = 0;
 
-    virtual CG_OpndHandle*  ldc_i4(int32 val) = 0;
+    virtual CG_OpndHandle*  ldc_i4(I_32 val) = 0;
     virtual CG_OpndHandle*  ldc_i8(int64 val) = 0;
     virtual CG_OpndHandle*  ldc_s(float val) = 0;
     virtual CG_OpndHandle*  ldc_d(double val) = 0;
@@ -359,8 +359,8 @@ public:
                                        CG_OpndHandle* tauBaseNonNull,
                                        CG_OpndHandle* tauIdxIsInBounds) = 0;
     // COMPRESSED_PTR note: var is already uncompressed, so compression doesn't affect these:
-    virtual CG_OpndHandle*  ldVarAddr(uint32 varId) = 0;
-    virtual CG_OpndHandle*  ldVar(Type* dstType, uint32 varId) = 0;
+    virtual CG_OpndHandle*  ldVarAddr(U_32 varId) = 0;
+    virtual CG_OpndHandle*  ldVar(Type* dstType, U_32 varId) = 0;
     virtual CG_OpndHandle*  tau_arrayLen(Type* dstType, ArrayType* arrayType, Type* lenType,
                                          CG_OpndHandle* array,
                                          CG_OpndHandle* tauArrayNonNull,
@@ -398,18 +398,18 @@ public:
                                        CG_OpndHandle* tauAddressInRange, 
                                        CG_OpndHandle* tauElemTypeChecked) = 0;
     // COMPRESSED_PTR note: var is already uncompressed, so compression doesn't affect it
-    virtual void            stVar(CG_OpndHandle* src, uint32 varId) = 0;
+    virtual void            stVar(CG_OpndHandle* src, U_32 varId) = 0;
 
     virtual CG_OpndHandle*  newObj(ObjectType* objType) = 0; 
     virtual CG_OpndHandle*  newArray(ArrayType* arrayType, CG_OpndHandle* numElems) = 0;
-    virtual CG_OpndHandle*  newMultiArray(ArrayType* arrayType, uint32 numDims, CG_OpndHandle** dims) = 0;
-    virtual CG_OpndHandle*  ldRef(Type* type,MethodDesc* enclosingMethod,uint32 stringToken, bool autouncompress) = 0;
-    virtual CG_OpndHandle*  ldToken(Type *dstType,MethodDesc* enclosingMethod,uint32 token) = 0;
-    virtual void            incCounter(Type *counterType,uint32 counter) = 0;
+    virtual CG_OpndHandle*  newMultiArray(ArrayType* arrayType, U_32 numDims, CG_OpndHandle** dims) = 0;
+    virtual CG_OpndHandle*  ldRef(Type* type,MethodDesc* enclosingMethod,U_32 stringToken, bool autouncompress) = 0;
+    virtual CG_OpndHandle*  ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token) = 0;
+    virtual void            incCounter(Type *counterType,U_32 counter) = 0;
 
     virtual void            ret() = 0;
     virtual void            ret(CG_OpndHandle* returnValue) = 0;
-    virtual CG_OpndHandle*  defArg(uint32 position,Type *type) = 0;
+    virtual CG_OpndHandle*  defArg(U_32 position,Type *type) = 0;
 
     virtual void            tau_monitorEnter(CG_OpndHandle* obj, 
                                              CG_OpndHandle* tauIsNonNull) = 0;
@@ -480,8 +480,8 @@ public:
     class Callback {
     public:
         virtual ~Callback() {}
-        virtual uint32 defVar(Type* varType,bool isAddressTaken,bool isPinned) = 0;
-        virtual void setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) = 0;
+        virtual U_32 defVar(Type* varType,bool isAddressTaken,bool isPinned) = 0;
+        virtual void setManagedPointerBase(U_32 managedPtrVarNum, U_32 baseVarNum) = 0;
     };
     virtual void genCode(Callback&) = 0;
 };
@@ -505,22 +505,22 @@ public:
     public:
         enum BlockKind {Prolog, InnerBlock, Epilog};
         virtual ~Callback() {}
-        virtual uint32  genDispatchNode(uint32 numInEdges,uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) = 0;
-        virtual uint32  genBlock(uint32 numInEdges,uint32 numOutEdges, BlockKind blockKind,
+        virtual U_32  genDispatchNode(U_32 numInEdges,U_32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) = 0;
+        virtual U_32  genBlock(U_32 numInEdges,U_32 numOutEdges, BlockKind blockKind,
                                  BlockCodeSelector&, double cnt) = 0;
-        virtual uint32  genUnwindNode(uint32 numInEdges, uint32 numOutEdges,double cnt) = 0;
-        virtual uint32  genExitNode(uint32 numInEdges, double cnt) = 0;
-        virtual void    genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId,double prob) = 0;
-        virtual void    genTrueEdge(uint32 tailNodeId,uint32 headNodeId,double prob) = 0;
-        virtual void    genFalseEdge(uint32 tailNodeId,uint32 headNodeId, double prob) = 0;
-        virtual void    genSwitchEdges(uint32 tailNodeId, uint32 numTargets, 
-                                       uint32 *targets, double *probs, uint32 defaultTarget) = 0;
-        virtual void    genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, double prob) = 0;
-        virtual void    genCatchEdge(uint32 tailNodeId,uint32 headNodeId,
-                                     uint32 priority,Type* exceptionType, double prob) = 0;
+        virtual U_32  genUnwindNode(U_32 numInEdges, U_32 numOutEdges,double cnt) = 0;
+        virtual U_32  genExitNode(U_32 numInEdges, double cnt) = 0;
+        virtual void    genUnconditionalEdge(U_32 tailNodeId,U_32 headNodeId,double prob) = 0;
+        virtual void    genTrueEdge(U_32 tailNodeId,U_32 headNodeId,double prob) = 0;
+        virtual void    genFalseEdge(U_32 tailNodeId,U_32 headNodeId, double prob) = 0;
+        virtual void    genSwitchEdges(U_32 tailNodeId, U_32 numTargets, 
+                                       U_32 *targets, double *probs, U_32 defaultTarget) = 0;
+        virtual void    genExceptionEdge(U_32 tailNodeId, U_32 headNodeId, double prob) = 0;
+        virtual void    genCatchEdge(U_32 tailNodeId,U_32 headNodeId,
+                                     U_32 priority,Type* exceptionType, double prob) = 0;
         
         // Set the persistent block ID for a given block.
-        virtual void    setPersistentId(uint32 nodeId, uint32 persistentId) = 0;
+        virtual void    setPersistentId(U_32 nodeId, U_32 persistentId) = 0;
     };
     virtual void genCode(Callback&) = 0;
 };
@@ -533,9 +533,9 @@ public:
     virtual ~MethodCodeSelector() {}
     class Callback {
     public:
-        virtual void    genVars(uint32 numLocals,VarCodeSelector&) = 0;
+        virtual void    genVars(U_32 numLocals,VarCodeSelector&) = 0;
         virtual void    setMethodDesc(MethodDesc * desc) = 0;
-        virtual void    genCFG(uint32 numNodes,CFGCodeSelector&,bool useProfile) = 0;
+        virtual void    genCFG(U_32 numNodes,CFGCodeSelector&,bool useProfile) = 0;
         virtual ~Callback() {}
     };
     virtual void selectCode(Callback&) = 0;

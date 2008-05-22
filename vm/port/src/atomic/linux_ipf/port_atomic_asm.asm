@@ -72,7 +72,7 @@ port_atomic_cas16:
 	.global port_atomic_cas32#
 	.align 32
 port_atomic_cas32:
-	// r32 -- Destination (uint32 *)
+	// r32 -- Destination (U_32 *)
 	// r33 -- Exchange
 	// r34 -- Comperand
 	// r35 -- for save ar.pfs

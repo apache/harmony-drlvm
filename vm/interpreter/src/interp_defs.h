@@ -84,8 +84,8 @@ extern bool interpreter_enable_debug;
 #   define uword uint64
 #   define word int64
 #else
-#   define uword uint32
-#   define word int32
+#   define uword U_32
+#   define word I_32
 #endif
 
 #if defined(POINTER64) && defined(REFS_USE_COMPRESSED)
@@ -179,9 +179,9 @@ typedef ManagedObject* REF;  // Use uncompressed references
 /** Holds 32-bit values.*/
 union Value {
 /** The unsigned integer value.*/
-    uint32 u;
+    U_32 u;
 /** The integer value.*/
-    int32 i;
+    I_32 i;
 /** The float value.*/
     float f;
 ///** Compressed/uncompressed reference.*/
@@ -238,9 +238,9 @@ class Stack {
 /** The value to the object reference.*/
     uint8 *refs;
 /** The number of elements on the stack.*/
-    int32 index;
+    I_32 index;
 /** The stack size.*/
-    int32 size;
+    I_32 size;
 
     public:
 /** The empty constructor.*/
@@ -354,7 +354,7 @@ class Locals {
     // references to the local variable type
     uint8 *refs;
     // locals size
-    uint32 varNum;
+    U_32 varNum;
 
     public:
 /** The empty constructor.*/
@@ -368,7 +368,7 @@ class Locals {
  * @param[in] ptr  - the pointer to the data
  * @param[in] size - the locals size value
  */
-    inline void init(void *ptr, uint32 size);
+    inline void init(void *ptr, U_32 size);
 
 /**
  * Returns the reference to the local variable of the specifie ID.
@@ -376,7 +376,7 @@ class Locals {
  * @param[in] id - the local variable ID
  * @return The reference to the requested local variable.
  */
-    inline Value& operator () (uint32 id);
+    inline Value& operator () (U_32 id);
 
 /**
  * Sets the value of an object of the <code>Long</code> or <code>Double</code>
@@ -403,7 +403,7 @@ class Locals {
  * @return The reference to the local variable type.
  * @sa     FLAG_NONE, FLAG_RET_ADDR, FLAG_OBJECT
  */
-    inline uint8& ref(uint32 id);
+    inline uint8& ref(U_32 id);
 
 /**
  * Returns the size of the allocated locals area by its size in elements.
@@ -417,7 +417,7 @@ class Locals {
  * Returns the number of local variables in this object.
  * 
  * @return The number of local variables.*/
-    inline uint32 getLocalsNumber() { return varNum; }
+    inline U_32 getLocalsNumber() { return varNum; }
 
 /**
  * Enumerates references associated with the thread.
@@ -677,11 +677,11 @@ Locals::~Locals() {
 }
 
 void
-Locals::init(void *ptr, uint32 size) {
+Locals::init(void *ptr, U_32 size) {
     vars = (Value*) ptr;
     refs = (uint8*)(vars + size);
     varNum = size;
-    for(uint32 i = 0; i < varNum; i++) refs[i] = 0;
+    for(U_32 i = 0; i < varNum; i++) refs[i] = 0;
 }
 
 int
@@ -690,7 +690,7 @@ Locals::getStorageSize(int size) {
 }
 
 Value&
-Locals::operator () (uint32 id) {
+Locals::operator () (U_32 id) {
     assert(id < varNum);
     return vars[id];
 }
@@ -718,7 +718,7 @@ Locals::getLong(int idx) {
 }
 
 uint8&
-Locals::ref(uint32 id) {
+Locals::ref(U_32 id) {
     assert(id < varNum);
     return refs[id];
 }

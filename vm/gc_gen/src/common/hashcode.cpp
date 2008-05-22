@@ -52,7 +52,7 @@ Obj_Info_Type slide_compact_process_hashcode(Partial_Reveal_Object* p_obj, void*
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)obj_end_pos);
         collector_hashcodeset_add_entry(collector, (Partial_Reveal_Object**)hashcode);
       }else{
-        hashcode_buf_add((Partial_Reveal_Object*)dest_addr, (int32)hashcode, new_buf);          
+        hashcode_buf_add((Partial_Reveal_Object*)dest_addr, (I_32)hashcode, new_buf);          
       }
       break;
       

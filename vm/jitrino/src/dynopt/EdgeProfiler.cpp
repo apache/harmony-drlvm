@@ -41,11 +41,11 @@ namespace Jitrino {
 
 static bool isMethodTrivial( ControlFlowGraph& cfg );
 static void checkBCMapping( ControlFlowGraph& cfg );
-static uint32 computeCheckSum( MemoryManager& mm, IRManager& irm, const StlSet<Node*>& nodesToIgnore, bool bcLevel);
+static U_32 computeCheckSum( MemoryManager& mm, IRManager& irm, const StlSet<Node*>& nodesToIgnore, bool bcLevel);
 static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, const Edges& edges, DominatorTree* dt, LoopTree* lt, EdgeMethodProfile* profile, bool bcLevelProfiling, const StlSet<Node*>& nodesToIgnore);
 static Node* selectNodeToInstrument(IRManager& irm, Edge* edge);
 static void selectEdgesToInstrument(MemoryManager& mm, IRManager& irm, Edges& result, const StlSet<Node*>& nodesToIgnore, bool bcLevel);
-static uint32 genKey( uint32 n, Edge* edge, bool bcLevel, bool debug);
+static U_32 genKey( U_32 n, Edge* edge, bool bcLevel, bool debug);
 static bool hasCatch( Node* node );
 static void selectNodesToIgnore(IRManager& irm, LoopTree* lt, StlSet<Node*>& result, bool bcLevel);
 
@@ -102,8 +102,8 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     StlSet<Node*> nodesToIgnore(mm);
     selectNodesToIgnore(irm, lt, nodesToIgnore, flags.bcLevelProfiling);
     //compute checksum first
-    uint32 _checkSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
-    StlVector<uint32> counterKeys(mm);
+    U_32 _checkSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
+    StlVector<U_32> counterKeys(mm);
     // Instrument method entry first.
     Node* entryNode = flowGraph.getEntryNode();
     entryNode->prependInst(instFactory.makeIncCounter(0));
@@ -119,18 +119,18 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
         //compute edge-ids before CFG modification: edge-ids are part of CFG consistency check.
         for (Edges::const_iterator it = edgesToInstrument.begin(), end = edgesToInstrument.end(); it!=end; ++it) {
             Edge* edge = *it;
-            uint32 key = genKey((uint32)counterKeys.size() + 1, edge, flags.bcLevelProfiling, debug);
+            U_32 key = genKey((U_32)counterKeys.size() + 1, edge, flags.bcLevelProfiling, debug);
             assert( key != 0 );
             counterKeys.push_back(key);
         }
         // Now revisit all of the edges that need to be instrumented
         // and generate instrumentation code.
-        uint32 i = 0;
+        U_32 i = 0;
         for (Edges::const_iterator it = edgesToInstrument.begin(), end = edgesToInstrument.end(); it!=end; ++it, ++i) {
             Edge* edge = *it;
             Node* nodeToInstrument = selectNodeToInstrument(irm, edge);
             assert(nodeToInstrument!=NULL && nodeToInstrument->isBlockNode());
-            uint32 key = counterKeys[i];
+            U_32 key = counterKeys[i];
             Inst* incInst = instFactory.makeIncCounter( key );
             assert(((Inst*)nodeToInstrument->getFirstInst())->getOpcode() != Op_IncCounter );
             nodeToInstrument->prependInst(incInst);
@@ -146,7 +146,7 @@ void EdgeProfilerInstrumentationPass::_run(IRManager& irm)
     
     ProfilingInterface* pi = irm.getProfilingInterface();
     if (!pi->hasMethodProfile(ProfileType_Edge, md, JITProfilingRole_GEN)) {
-        pi->createEdgeMethodProfile(mm , md,  (uint32)counterKeys.size(),  counterKeys.empty()?NULL:(uint32*)&counterKeys.front(), _checkSum);
+        pi->createEdgeMethodProfile(mm , md,  (U_32)counterKeys.size(),  counterKeys.empty()?NULL:(U_32*)&counterKeys.front(), _checkSum);
     }
 
     irm.getCompilationInterface().unlockMethodData();
@@ -176,7 +176,7 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     ProfilingInterface* pi = irm.getProfilingInterface();
     bool edgeProfilerMode = pi->isProfilingEnabled(ProfileType_Edge, JITProfilingRole_USE);
     bool entryBackedgeProfilerMode = !edgeProfilerMode && pi->isProfilingEnabled(ProfileType_EntryBackedge, JITProfilingRole_USE);
-    uint32 entryCount = (edgeProfilerMode || entryBackedgeProfilerMode) ? pi->getProfileMethodCount(md) : 0;
+    U_32 entryCount = (edgeProfilerMode || entryBackedgeProfilerMode) ? pi->getProfileMethodCount(md) : 0;
     if (isMethodTrivial(flowGraph) || !edgeProfilerMode || entryCount == 0) { 
         // Annotate the CFG using static profiler heuristics.
         if (debug) {
@@ -200,10 +200,10 @@ void EdgeProfilerAnnotationPass::_run(IRManager& irm) {
     StlSet<Node*> nodesToIgnore(mm); //see instrumentation pass for comments
     selectNodesToIgnore(irm, lt, nodesToIgnore, flags.bcLevelProfiling);
 
-    uint32 cfgCheckSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
+    U_32 cfgCheckSum = computeCheckSum(mm, irm, nodesToIgnore, flags.bcLevelProfiling);
 
     EdgeMethodProfile* edgeProfile = pi->getEdgeMethodProfile(mm, md);
-    uint32 profileCheckSum = edgeProfile->getCheckSum();
+    U_32 profileCheckSum = edgeProfile->getCheckSum();
     //assert(profileCheckSum == cfgCheckSum);
     if (cfgCheckSum == profileCheckSum) {
         // Start propagating the CFG from instrumented edges.
@@ -263,7 +263,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
     if (debug) {
         Log::out()<<"Starting probs calculation" <<std::endl;
     }
-    uint32 entryCount = *profile->getEntryCounter();
+    U_32 entryCount = *profile->getEntryCounter();
  
     //1. assign default value to nodes and edges, this value is used for consistency checks latter
     StlVector<Node*> nodes(mm);
@@ -282,13 +282,13 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
     
     //2.1 get freqs from profile
     StlVector<double> edgeFreqs(mm, fg.getMaxEdgeId(), -1);
-    uint32 n = 1;
+    U_32 n = 1;
     for (Edges::const_iterator it = pEdges.begin(), end = pEdges.end(); it!=end; ++it, ++n) {
         Edge* edge = *it;
-        uint32 key = genKey(n, edge, bcLevelProfiling, debug);
-        uint32* counterAddr = profile->getCounter(key);
+        U_32 key = genKey(n, edge, bcLevelProfiling, debug);
+        U_32* counterAddr = profile->getCounter(key);
         //assert(bcLevelProfiling || counterAddr!=NULL); -> TODO: hits in lazy resolution mode
-        uint32 freq = 0;
+        U_32 freq = 0;
         if (counterAddr == NULL) {
             if (!bcLevelProfiling) { //avoid crash, use static profiler for a method
                 return false;
@@ -506,7 +506,7 @@ static bool calculateProbsFromProfile(MemoryManager& mm, ControlFlowGraph& fg, c
 //
 // Compute the checksum contribution of the given Edge
 //
-static uint32 _computeCheckSum(Node* node, const StlSet<Node*>& nodesToIgnore, StlVector<bool>& flags, uint32 depth, bool debug) {
+static U_32 _computeCheckSum(Node* node, const StlSet<Node*>& nodesToIgnore, StlVector<bool>& flags, U_32 depth, bool debug) {
     assert(flags[node->getId()] == false);
     flags[node->getId()] = true;
     //node is removed from checksum calculation if 
@@ -515,10 +515,10 @@ static uint32 _computeCheckSum(Node* node, const StlSet<Node*>& nodesToIgnore, S
     bool ignored = nodesToIgnore.find(node)!=nodesToIgnore.end();
     bool skipped = ignored || node->getOutDegree()==1
         || (node->isCatchBlock() && node->isEmpty()) || node->isDispatchNode() || node->isExitNode(); 
-    uint32 dSum = skipped ? 0 : depth;
-    uint32 childDepth = skipped ? depth : depth + 1;
+    U_32 dSum = skipped ? 0 : depth;
+    U_32 childDepth = skipped ? depth : depth + 1;
     const Edges& outEdges = node->getOutEdges();
-    uint32 childsSum = 0;
+    U_32 childsSum = 0;
     for (Edges::const_iterator it = outEdges.begin(), end = outEdges.end(); it!=end; ++it) {
         Edge* edge = *it;
         Node* childNode = edge->getTargetNode();
@@ -534,12 +534,12 @@ static uint32 _computeCheckSum(Node* node, const StlSet<Node*>& nodesToIgnore, S
     return dSum+childsSum;
 }
 
-static uint32 computeCheckSum( MemoryManager& mm, IRManager& irm,  const StlSet<Node*>& nodesToIgnore, bool bcLevel) {
+static U_32 computeCheckSum( MemoryManager& mm, IRManager& irm,  const StlSet<Node*>& nodesToIgnore, bool bcLevel) {
     bool debug = Log::isEnabled();
     if (debug) {
         Log::out()<< "calculating checksum.." << std::endl;
     }
-    uint32 checkSum = 0;
+    U_32 checkSum = 0;
     if (!bcLevel) {
         ControlFlowGraph& cfg = irm.getFlowGraph();
         StlVector<bool> flags(mm, cfg.getMaxNodeId(), false);
@@ -772,8 +772,8 @@ static bool isMethodTrivial( ControlFlowGraph& cfg ) {
     return true;
 }
 
-static uint32 genKey( uint32 pos, Edge* edge, bool bcLevel, bool debug)  {
-    uint32 key = 0;
+static U_32 genKey( U_32 pos, Edge* edge, bool bcLevel, bool debug)  {
+    U_32 key = 0;
     if (debug) {
         Log::out()<<"\t\t key for edge with id="<<edge->getId()<<" ("; FlowGraph::printLabel(Log::out(), edge->getSourceNode());
         Log::out() << "->"; FlowGraph::printLabel(Log::out(), edge->getTargetNode()); Log::out()<<") is ";Log::out().flush();
@@ -782,10 +782,10 @@ static uint32 genKey( uint32 pos, Edge* edge, bool bcLevel, bool debug)  {
         uint16 bcBefore = edge->getSourceNode()->getNodeEndBCOffset();
         uint16 bcAfter  = edge->getTargetNode()->getNodeStartBCOffset();
         assert(bcBefore!=ILLEGAL_BC_MAPPING_VALUE && bcAfter!=ILLEGAL_BC_MAPPING_VALUE);
-        key = (((uint32)bcBefore)<<16) + bcAfter;
+        key = (((U_32)bcBefore)<<16) + bcAfter;
     } else {
         //TODO: this algorithm is not 100% effective: we can't rely on edges order in CFG
-        uint32 edgePos = 0;
+        U_32 edgePos = 0;
         const Edges& edges = edge->getSourceNode()->getOutEdges();
         for (Edges::const_iterator it = edges.begin(), end = edges.end(); it!=end; ++it) {
             Edge* outEdge = *it;

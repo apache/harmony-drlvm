@@ -562,8 +562,8 @@ void jvmti_send_vm_init_event(Global_Env *env)
     oh_discard_local_handle(hThread);
 }
 
-void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSize, 
-                                  const void* codeAddr, uint32 mapLength, 
+void jvmti_send_region_compiled_method_load_event(Method *method, U_32 codeSize, 
+                                  const void* codeAddr, U_32 mapLength, 
                                   const AddrLocation* addrLocationMap, 
                                   const void* compileInfo)
 {
@@ -575,7 +575,7 @@ void jvmti_send_region_compiled_method_load_event(Method *method, uint32 codeSiz
     // convert AddrLocation[] to jvmtiAddrLocationMap[]
     jvmtiAddrLocationMap* jvmtiLocationMap = (jvmtiAddrLocationMap*) 
             STD_MALLOC( mapLength * sizeof(jvmtiAddrLocationMap) );
-    for (uint32 i = 0; i < mapLength; i++) {
+    for (U_32 i = 0; i < mapLength; i++) {
         jlocation location = (jlocation) addrLocationMap[i].location;
 
         if (location == 65535)

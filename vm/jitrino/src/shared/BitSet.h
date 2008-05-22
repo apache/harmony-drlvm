@@ -40,7 +40,7 @@ public:
     //
     // Constructors
     //
-    BitSet(MemoryManager&, uint32 size);
+    BitSet(MemoryManager&, U_32 size);
     //
     //  copy constructors
     //
@@ -49,7 +49,7 @@ public:
     //
     //  This constructor is useful when a bit set needs to be expanded into a larger one
     //
-    BitSet(MemoryManager&, const BitSet&, uint32 size);
+    BitSet(MemoryManager&, const BitSet&, U_32 size);
     //
     // assignment operator (resizes the set if necessary)
     //
@@ -57,19 +57,19 @@ public:
     //
     // resizes BitSet. Sets new bits to FALSE
     //
-    void resize(uint32 newSetSize);
+    void resize(U_32 newSetSize);
     //
     // resizes BitSet. Sets all bits to FALSE
     //
-    void resizeClear(uint32 newSetSize);
+    void resizeClear(U_32 newSetSize);
     //
     // returns the size of the set
     //
-    uint32 getSetSize() const {return setSize;}
+    U_32 getSetSize() const {return setSize;}
     //
     // returns the value of the bit
     //
-    bool getBit(uint32 bitNumber) const
+    bool getBit(U_32 bitNumber) const
     {
         assert(words != 0 && bitNumber < setSize);
         return (reinterpret_cast<char*>(words)[bitNumber >> 3] & (1 << (bitNumber & 7))) != 0;
@@ -77,7 +77,7 @@ public:
     //
     // sets a bit to the given value and returns old value of bit
     //
-    bool setBit(uint32 bitNumber, bool value = true)
+    bool setBit(U_32 bitNumber, bool value = true)
     {
         assert(words != 0 && bitNumber < setSize);
         char& wd = reinterpret_cast<char*>(words)[bitNumber >> 3];
@@ -106,11 +106,11 @@ public:
     //
     //  Sets 32 bits to values indicated by a bit mask and returns old values
     //
-    uint32 set32Bits(uint32 firstBitNumber, uint32 value);
+    U_32 set32Bits(U_32 firstBitNumber, U_32 value);
     //
     //  Returns values of 32 bits encoded as a bit mask
     //
-    uint32 get32Bits(uint32 firstBitNumber);
+    U_32 get32Bits(U_32 firstBitNumber);
     //
     //  Copies another set
     //
@@ -161,8 +161,8 @@ private:
     //
     // makes initial allocation
     //
-    void alloc(uint32 size);
-    void copy (uint32* src);
+    void alloc(U_32 size);
+    void copy (U_32* src);
     //
     // zero bits that out of setSize
     //
@@ -170,15 +170,15 @@ private:
     //
     // words containing the set's bits; 
     //
-    uint32* words;
+    U_32* words;
     //
     // size of set (in bits)
     //
-    uint32 setSize;
+    U_32 setSize;
     //
     // number of words reserved
     //
-    uint32 wordsCapacity; 
+    U_32 wordsCapacity; 
     //
     // mem manager used to resize the set
     //
@@ -189,7 +189,7 @@ private:
 class BitSet::Visitor {
 public:
     virtual ~Visitor() {}
-    virtual void visit(uint32 elem) = 0;
+    virtual void visit(U_32 elem) = 0;
 };
 
 
@@ -197,7 +197,7 @@ class BitSet::Printer : public BitSet::Visitor {
 public:
     Printer(::std::ostream & _os) : os(_os) {}
     virtual ~Printer() {}
-    void visit(uint32 i) { os << " " << (int) i;}
+    void visit(U_32 i) { os << " " << (int) i;}
 private:
     ::std::ostream & os;
 };
@@ -214,8 +214,8 @@ public:
 
 protected:
 
-    uint32 * ptr, * end;
-    uint32 mask;
+    U_32 * ptr, * end;
+    U_32 mask;
     int idx;
 };
 

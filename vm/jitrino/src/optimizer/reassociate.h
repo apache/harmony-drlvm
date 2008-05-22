@@ -48,11 +48,11 @@ class LoopTree;
 class Simplifier;
 
 struct OpndWithPriority {
-    OpndWithPriority(Opnd *op, uint32 priority0,
+    OpndWithPriority(Opnd *op, U_32 priority0,
                      bool negate0) 
         : opnd(op), priority(priority0), negate(negate0) {};
     Opnd *opnd;
-    uint32 priority;
+    U_32 priority;
     bool negate;
 };
 bool operator < (const OpndWithPriority &a, const OpndWithPriority &b);
@@ -109,22 +109,22 @@ private:
     
 private:
     // we compute Reverse-Postorder numbers for CFGnodes:
-    StlHashMap<Node *, uint32> cfgRpoNum;
+    StlHashMap<Node *, U_32> cfgRpoNum;
 
-    StlHashMap<Opnd *, uint32> priority;
-    uint32 getPriority(Opnd *opnd); // computes if not in the hash map
+    StlHashMap<Opnd *, U_32> priority;
+    U_32 getPriority(Opnd *opnd); // computes if not in the hash map
 
     // build a LdConstant(k), put it in header of FlowGraph
     SsaTmpOpnd *makeLdConst(Type *type, ConstInst::ConstValue k, SsaOpnd *dstOp);
 
-    uint32 costOfAdd, costOfSub, 
+    U_32 costOfAdd, costOfSub, 
         costOfNeg, costOfMul, costOfConv, costOfBoolOp,
     costOfNot, costOfShladd, costOfShift, costOfMisc, 
     priorityFactorOfBlock, priorityFactorOfPosition;
-    uint32 numBlocks;
+    U_32 numBlocks;
     
     bool minDepth;
-    uint32 maxReassocDepth;
+    U_32 maxReassocDepth;
 };
 
 } //namespace Jitrino 

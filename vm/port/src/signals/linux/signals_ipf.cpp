@@ -197,7 +197,7 @@ void sig_process_crash_flags_change(unsigned added, unsigned removed)
 // Variables used to locate the context from the signal handler
 static int sc_nest = -1;
 static bool use_ucontext = false;
-static uint32 exam_point;
+static U_32 exam_point;
 
 /*
  * We find the true signal stack frame set-up by kernel,which is located
@@ -238,7 +238,7 @@ in our experiments.
 volatile void locate_sigcontext(int signum)
 {
     sigcontext *sc, *found_sc;
-    uint32 *ebp = NULL;
+    U_32 *ebp = NULL;
     int i;
 
 //TODO: ADD correct stack handling here!!
@@ -246,7 +246,7 @@ volatile void locate_sigcontext(int signum)
 #define SC_SEARCH_WIDTH 3
     for (i = 0; i < SC_SEARCH_WIDTH; i++) {
         sc = (sigcontext *)(ebp + 3 );
-        if (sc->sc_ip == ((uint32)exam_point)) {    // found
+        if (sc->sc_ip == ((U_32)exam_point)) {    // found
             sc_nest = i;
             use_ucontext = false;
             found_sc = sc;
@@ -271,9 +271,9 @@ volatile void locate_sigcontext(int signum)
         } else {                    // not found
             struct ucontext *uc;
             uc = (struct ucontext *)((uint64)ebp[4]);
-            if ((ebp < (uint32 *)uc) && ((uint32 *)uc < ebp + 0x100)) {
+            if ((ebp < (U_32 *)uc) && ((U_32 *)uc < ebp + 0x100)) {
                 sc = (sigcontext *)&uc->uc_mcontext;
-                if (sc->sc_ip == ((uint32)exam_point)) {    // found
+                if (sc->sc_ip == ((U_32)exam_point)) {    // found
                     sc_nest = i;
                     use_ucontext = true;
                     found_sc = sc;
@@ -282,7 +282,7 @@ volatile void locate_sigcontext(int signum)
             }
         }
 
-        ebp = (uint32 *)((uint64)ebp[0]);
+        ebp = (U_32 *)((uint64)ebp[0]);
     }
 
     if (sc_nest < 0) {

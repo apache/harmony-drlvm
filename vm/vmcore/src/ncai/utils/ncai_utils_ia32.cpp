@@ -14,22 +14,22 @@
 
 struct NcaiRegisters
 {
-    uint32  eax;
-    uint32  ebx;
-    uint32  ecx;
-    uint32  edx;
-    uint32  esp;
-    uint32  ebp;
-    uint32  esi;
-    uint32  edi;
+    U_32  eax;
+    U_32  ebx;
+    U_32  ecx;
+    U_32  edx;
+    U_32  esp;
+    U_32  ebp;
+    U_32  esi;
+    U_32  edi;
     uint16  ds;
     uint16  es;
     uint16  fs;
     uint16  gs;
     uint16  ss;
     uint16  cs;
-    uint32  eip;
-    uint32  eflags;
+    U_32  eip;
+    U_32  eflags;
 };
 
 #define REGSIZE(_field_) ((jint)sizeof(((NcaiRegisters*)0)->_field_))

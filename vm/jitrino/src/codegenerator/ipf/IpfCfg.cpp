@@ -88,7 +88,7 @@ ExceptionEdge::ExceptionEdge(Node   *source,
                              Node   *target, 
                              double  prob, 
                              Type   *exceptionType, 
-                             uint32  priority) :
+                             U_32  priority) :
     Edge(source, target, prob, EDGE_EXCEPTION), 
     exceptionType(exceptionType),
     priority(priority) {
@@ -98,7 +98,7 @@ ExceptionEdge::ExceptionEdge(Node   *source,
 // Node
 //========================================================================================//
 
-Node::Node(MemoryManager &mm, uint32 id, uint32 execCounter, NodeKind kind) : 
+Node::Node(MemoryManager &mm, U_32 id, U_32 execCounter, NodeKind kind) : 
     id(id), 
     execCounter(execCounter),
     nodeKind(kind),  
@@ -202,7 +202,7 @@ void Node::remove() {
 // BbNode
 //========================================================================================//
 
-BbNode::BbNode(MemoryManager &mm, uint32 id, uint32 execCounter) : 
+BbNode::BbNode(MemoryManager &mm, U_32 id, U_32 execCounter) : 
     Node(mm, id, execCounter, NODE_BB),
     insts(mm),
     layoutSucc(NULL),
@@ -253,7 +253,7 @@ void Cfg::makeDirectOrdered(Node *node, NodeSet &visitedNodes) {
     visitedNodes.insert(node);                       // mark node visited
 
     EdgeVector& inEdges = node->getInEdges();        // get inEdges
-    for (uint32 i=0; i<inEdges.size(); i++) {        // iterate through inEdges
+    for (U_32 i=0; i<inEdges.size(); i++) {        // iterate through inEdges
         Node *pred = inEdges[i]->getSource();        // get pred node
         if (visitedNodes.count(pred) == 1) continue; // if it is already visited - ignore
         makeDirectOrdered(pred, visitedNodes);       // we have found unvisited pred - reenter
@@ -269,7 +269,7 @@ void Cfg::makePostOrdered(Node *node, NodeSet &visitedNodes) {
     visitedNodes.insert(node);                        // mark node visited
 
     EdgeVector& outEdges = node->getOutEdges();       // get outEdges
-    for (uint32 i=0; i<outEdges.size(); i++) {        // iterate through outEdges
+    for (U_32 i=0; i<outEdges.size(); i++) {        // iterate through outEdges
         Node *succ = outEdges[i]->getTarget();        // get succ node
         if (visitedNodes.count(succ) == 1) continue;  // if it is already visited - ignore
         makePostOrdered(succ, visitedNodes);          // we have found unvisited succ - reenter

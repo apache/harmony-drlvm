@@ -49,11 +49,11 @@ class Method_Table;
 
 class InliningContext {
 public:
-    InliningContext(uint32 _nArgs, Type** _argTypes) : nArgs(_nArgs), argTypes(_argTypes) {}
-    uint32 getNumArgs() const {return nArgs;}
+    InliningContext(U_32 _nArgs, Type** _argTypes) : nArgs(_nArgs), argTypes(_argTypes) {}
+    U_32 getNumArgs() const {return nArgs;}
     Type** getArgTypes() const {return argTypes;}
 private:
-    uint32 nArgs;
+    U_32 nArgs;
     Type** argTypes;
 };
 
@@ -82,9 +82,9 @@ public:
     }
     InlineNode *getRoot() { return (InlineNode*)root; }
 
-    uint32 computeCheckSum() { return computeCheckSum(getRoot()); }
+    U_32 computeCheckSum() { return computeCheckSum(getRoot()); }
 private:
-    uint32 computeCheckSum(InlineNode* node);
+    U_32 computeCheckSum(InlineNode* node);
 };
 
 class Inliner
@@ -132,9 +132,9 @@ private:
 
     class CallSite {
     public:
-        CallSite(int32 benefit, Node* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}
+        CallSite(I_32 benefit, Node* callNode, InlineNode* inlineNode) : benefit(benefit), callNode(callNode), inlineNode(inlineNode) {}
 
-        int32 benefit;
+        I_32 benefit;
         Node* callNode;
         InlineNode* inlineNode;
     };
@@ -159,7 +159,7 @@ private:
 
     bool isLeafMethod(MethodDesc& methodDesc);
 
-    int32 computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, uint32 loopDepth);
+    I_32 computeInlineBenefit(Node* node, MethodDesc& methodDesc, InlineNode* parentInlineNode, U_32 loopDepth);
 
     MemoryManager& _tmpMM;
     IRManager& _toplevelIRM;
@@ -170,8 +170,8 @@ private:
     bool _hasProfileInfo;
     
     StlPriorityQueue<CallSite, StlVector<CallSite>, CallSiteCompare> _inlineCandidates;
-    uint32 _initByteSize;
-    uint32 _currentByteSize;
+    U_32 _initByteSize;
+    U_32 _currentByteSize;
 
     InlineTree _inlineTree;
 
@@ -179,26 +179,26 @@ private:
     bool _useInliningTranslator;
 
     double _maxInlineGrowthFactor;
-    uint32 _minInlineStop;
-    int32 _minBenefitThreshold;
+    U_32 _minInlineStop;
+    I_32 _minBenefitThreshold;
     
-    uint32 _inlineSmallMaxByteSize;
-    int32 _inlineSmallBonus;
+    U_32 _inlineSmallMaxByteSize;
+    I_32 _inlineSmallBonus;
     
-    uint32 _inlineMediumMaxByteSize;
-    int32 _inlineMediumBonus;
+    U_32 _inlineMediumMaxByteSize;
+    I_32 _inlineMediumBonus;
 
-    uint32 _inlineLargeMinByteSize;
-    int32 _inlineLargePenalty;
+    U_32 _inlineLargeMinByteSize;
+    I_32 _inlineLargePenalty;
 
-    int32 _inlineLoopBonus;
-    int32 _inlineLeafBonus;
-    int32 _inlineSynchBonus;
-    int32 _inlineRecursionPenalty;
-    int32 _inlineExactArgBonus;
-    int32 _inlineExactAllBonus;
+    I_32 _inlineLoopBonus;
+    I_32 _inlineLeafBonus;
+    I_32 _inlineSynchBonus;
+    I_32 _inlineRecursionPenalty;
+    I_32 _inlineExactArgBonus;
+    I_32 _inlineExactAllBonus;
 
-    uint32 _inlineMaxNodeThreshold;
+    U_32 _inlineMaxNodeThreshold;
 
     bool _inlineSkipExceptionPath;
     bool _inlineSkipApiMagicMethods;

@@ -435,8 +435,8 @@ struct SsaCheckingFun : public ::std::binary_function<Node *, Inst *, void> {
     void operator()(Node *node, Inst *i) {
         if (i->getOpcode() == Op_Phi) {
             const Edges& edges2 = node->getInEdges();
-            uint32 numEdges = (uint32) edges2.size();
-            uint32 numOps = i->getNumSrcOperands();
+            U_32 numEdges = (U_32) edges2.size();
+            U_32 numOps = i->getNumSrcOperands();
             if( !(numOps == numEdges) ) assert(0);
         }
     }
@@ -542,7 +542,7 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
     OpndManager &opndManager = irManager.getOpndManager();
     TypeManager &typeManager = irManager.getTypeManager();
 
-    uint32 n = (uint32) reasons.size();
+    U_32 n = (U_32) reasons.size();
     assert(derefVarVersions.size() == n);
     Opnd **newPhiOpnds = new (mm) Opnd*[n];
 
@@ -552,7 +552,7 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
     SsaVarOpnd *tauPhiDstOpnd = opndManager.createSsaVarOpnd(tauBaseVar);
     SsaTmpOpnd *tauResOpnd = opndManager.createSsaTmpOpnd(typeManager.getTauType());
 
-    for (uint32 i=0; i<n; ++i) {
+    for (U_32 i=0; i<n; ++i) {
         AbcdReasons *reason = reasons[i];
         Opnd *derefVarVersion = derefVarVersions[i];
         Inst *derefVarInst = derefVarVersion->getInst();
@@ -621,7 +621,7 @@ SsaTmpOpnd* Abcd::getReasonTau(AbcdReasons *reason, Inst *useSite)
     OpndManager &opndManager = irManager.getOpndManager();
     TypeManager &typeManager = irManager.getTypeManager();
 
-    uint32 numReasons = (uint32) reason->facts.size();
+    U_32 numReasons = (U_32) reason->facts.size();
     assert(numReasons < 100);
     if (numReasons == 1) {
         SsaTmpOpnd *reasonOpnd = *(reason->facts.begin());
@@ -633,7 +633,7 @@ SsaTmpOpnd* Abcd::getReasonTau(AbcdReasons *reason, Inst *useSite)
         // need to build a tauAnd
         Opnd **newAndOpnds = new (mm) Opnd*[numReasons];
         StlSet<SsaTmpOpnd*>::iterator iter = reason->facts.begin();
-        for (uint32 i = 0; i < numReasons;  ++i, ++iter) {
+        for (U_32 i = 0; i < numReasons;  ++i, ++iter) {
             newAndOpnds[i] = *iter;
         }
         SsaTmpOpnd *tauDst = opndManager.createSsaTmpOpnd(typeManager.getTauType());
@@ -697,8 +697,8 @@ void Abcd::removePiEliminateChecksOnInst(Node *block, Inst *inst)
         copy->insertBefore(inst);
         FlowGraph::eliminateCheck(irManager.getFlowGraph(),block, inst, false);
     } else {
-        uint32 numOpnds = inst->getNumSrcOperands();
-        for (uint32 i=0; i<numOpnds; i++) {
+        U_32 numOpnds = inst->getNumSrcOperands();
+        for (U_32 i=0; i<numOpnds; i++) {
             Opnd *opnd0 = inst->getSrc(i);
             Opnd *opnd = opnd0;
             Opnd *newOpnd = opnd0;

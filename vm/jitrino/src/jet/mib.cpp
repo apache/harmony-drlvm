@@ -69,10 +69,10 @@ void MethodInfoBlock::save(char * to)
     rt_inst_addrs = (const char**)(to + get_hdr_size());
 
    //store information about profiling counters for the method in MethodInfoBlock
-    uint32* countersInfo = (uint32*)(to +  get_hdr_size() + get_bcmap_size());
+    U_32* countersInfo = (U_32*)(to +  get_hdr_size() + get_bcmap_size());
     countersInfo[0]=num_profiler_counters;
     if (num_profiler_counters > 0) {
-        memcpy(countersInfo+1, profiler_counters_map, num_profiler_counters * sizeof(uint32));
+        memcpy(countersInfo+1, profiler_counters_map, num_profiler_counters * sizeof(U_32));
     }
 }
 

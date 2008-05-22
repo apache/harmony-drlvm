@@ -99,7 +99,7 @@ bool Opnd::replaceMemOpndSubOpnd(Opnd * opndOld, Opnd * opndNew)
     bool replaced = false;
     if (memOpndKind != MemOpndKind_Null){
         assert(isPlacedIn(OpndKind_Mem));
-        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++) {
+        for (U_32 i=0; i<MemOpndSubOpndKind_Count; i++) {
             if (memOpndSubOpnds[i]!=NULL && memOpndSubOpnds[i]==opndOld) {
                 setMemOpndSubOpnd((MemOpndSubOpndKind)i, opndNew);
                 replaced = true;
@@ -118,7 +118,7 @@ bool Opnd::replaceMemOpndSubOpnds(Opnd * const * opndMap)
     bool replaced = false;
     if (memOpndKind != MemOpndKind_Null){
         assert(isPlacedIn(OpndKind_Mem));
-        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++) {
+        for (U_32 i=0; i<MemOpndSubOpndKind_Count; i++) {
             if (memOpndSubOpnds[i]!=NULL && opndMap[memOpndSubOpnds[i]->id]!=NULL){
                 setMemOpndSubOpnd((MemOpndSubOpndKind)i, opndMap[memOpndSubOpnds[i]->id]);
                 replaced = true;
@@ -165,7 +165,7 @@ void Opnd::setCalculatedConstraint(Constraint c)
 }
 
 //_________________________________________________________________________________________________
-void Opnd::addRefCount(uint32& index, uint32 blockExecCount)
+void Opnd::addRefCount(U_32& index, U_32 blockExecCount)
 {
     if (blockExecCount==0)
         blockExecCount=1;
@@ -173,7 +173,7 @@ void Opnd::addRefCount(uint32& index, uint32 blockExecCount)
     if (id==EmptyUint32)
         id=index++;
     if (memOpndKind != MemOpndKind_Null){
-        for (uint32 i=0; i<MemOpndSubOpndKind_Count; i++)
+        for (U_32 i=0; i<MemOpndSubOpndKind_Count; i++)
             if (memOpndSubOpnds[i]!=NULL){
                 memOpndSubOpnds[i]->addRefCount(index, blockExecCount);
             }
@@ -201,7 +201,7 @@ void Opnd::setDefiningInst(Inst * inst)
 //=================================================================================================
 // class Inst
 //=================================================================================================
-void* Inst::operator new(size_t sz, MemoryManager& mm, uint32 opndCount)
+void* Inst::operator new(size_t sz, MemoryManager& mm, U_32 opndCount)
 {   
     Inst * p = (Inst*)mm.alloc(sz + Inst::getOpndChunkSize(opndCount)); 
     p->allocatedOpndCount = opndCount; p->opnds = (Opnd**)((uint8*)p + sz);
@@ -209,7 +209,7 @@ void* Inst::operator new(size_t sz, MemoryManager& mm, uint32 opndCount)
 }
 
 //_________________________________________________________________________________________________
-void Inst::insertOpnd(uint32 idx, Opnd * opnd, uint32 roles)
+void Inst::insertOpnd(U_32 idx, Opnd * opnd, U_32 roles)
 {
     assert(opndCount < allocatedOpndCount);
     
@@ -225,10 +225,10 @@ void Inst::insertOpnd(uint32 idx, Opnd * opnd, uint32 roles)
     if (idx > opndCount)
         idx = opndCount;
 
-    uint32 * opndRoles = getOpndRoles();
+    U_32 * opndRoles = getOpndRoles();
     Constraint * opndConstraints = getConstraints();
 
-    for (uint32 i = opndCount; i > idx; i--){
+    for (U_32 i = opndCount; i > idx; i--){
         opnds[i] = opnds[i - 1];
         opndRoles[i] = opndRoles[i - 1];
         opndConstraints[i] = opndConstraints[i - 1];
@@ -241,23 +241,23 @@ void Inst::insertOpnd(uint32 idx, Opnd * opnd, uint32 roles)
 }
 
 //_________________________________________________________________________________________________
-uint32 Inst::countOpnds(uint32 roles)const
+U_32 Inst::countOpnds(U_32 roles)const
 {
-    uint32 count=0;
+    U_32 count=0;
     if ( (roles & OpndRole_InstLevel) != 0 ){
-        const uint32 * opndRoles = getOpndRoles();
-        for (uint32 i = 0, n = opndCount; i < n; i++){
-            uint32 r = opndRoles [i];
+        const U_32 * opndRoles = getOpndRoles();
+        for (U_32 i = 0, n = opndCount; i < n; i++){
+            U_32 r = opndRoles [i];
             if ( (r & roles & OpndRole_FromEncoder) != 0 && (r & roles & OpndRole_ForIterator) != 0 )
                 count++;
         }
     }
     if ( (roles & OpndRole_OpndLevel) != 0 && (roles & OpndRole_Use) != 0  ){
-        for (uint32 i = 0, n = opndCount; i < n; i++){
+        for (U_32 i = 0, n = opndCount; i < n; i++){
             const Opnd * opnd = opnds[i];
             if ( opnd->memOpndKind != MemOpndKind_Null ){
                 const Opnd * const * subOpnds = opnd->getMemOpndSubOpnds();
-                for (uint32 j = 0; j < MemOpndSubOpndKind_Count; j++){
+                for (U_32 j = 0; j < MemOpndSubOpndKind_Count; j++){
                     const Opnd * subOpnd = subOpnds[j];
                     if (subOpnd != NULL)
                         count++;
@@ -269,11 +269,11 @@ uint32 Inst::countOpnds(uint32 roles)const
 }
 
 //_________________________________________________________________________________________________
-Constraint Inst::getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size) const
+Constraint Inst::getConstraint(U_32 idx, U_32 memOpndMask, OpndSize size) const
 { 
     Constraint c(OpndKind_Any); 
     if (idx < opndCount){
-        const uint32 * opndRoles = getOpndRoles();
+        const U_32 * opndRoles = getOpndRoles();
         const Constraint * constraints = getConstraints();
         c = constraints[idx];        
         if ((opndRoles[idx] & OpndRole_Explicit) && (properties & Inst::Properties_MemoryOpndConditional)){
@@ -300,7 +300,7 @@ Constraint Inst::getConstraint(uint32 idx, uint32 memOpndMask, OpndSize size) co
 }
 
 //_________________________________________________________________________________________________
-void Inst::setOpnd(uint32 index, Opnd * opnd)
+void Inst::setOpnd(U_32 index, Opnd * opnd)
 {
     Opnd ** opnds = getOpnds();
     if (index < opndCount) {
@@ -329,12 +329,12 @@ void Inst::setOpnd(uint32 index, Opnd * opnd)
 }
 
 //_________________________________________________________________________________________________
-bool Inst::replaceOpnd(Opnd * oldOpnd, Opnd * newOpnd, uint32 opndRoleMask)
+bool Inst::replaceOpnd(Opnd * oldOpnd, Opnd * newOpnd, U_32 opndRoleMask)
 {
     bool replaced = false;
     assert(newOpnd != NULL);
-    for (uint32 i=0, n=getOpndCount(); i<n; i++){
-        uint32 opndRole=getOpndRoles(i);
+    for (U_32 i=0, n=getOpndCount(); i<n; i++){
+        U_32 opndRole=getOpndRoles(i);
         Opnd * opnd=getOpnd(i);
         if (
             (opndRole&opndRoleMask&OpndRole_FromEncoder)!=0 && 
@@ -358,7 +358,7 @@ bool Inst::getPureDefProperty() const {
     if (getProperties() & Properties_PureDef) {
         assert(getOpndCount(OpndRole_InstLevel|OpndRole_Use)==2);
         Opnd * use = NULL;
-        for (uint32 i=0, n=getOpndCount(); i<n; i++){
+        for (U_32 i=0, n=getOpndCount(); i<n; i++){
             if (getOpndRoles(i)&OpndRole_Use) {
                 if(!use) {
                    use = getOpnd(i);
@@ -371,11 +371,11 @@ bool Inst::getPureDefProperty() const {
     return false;
 }
 //_________________________________________________________________________________________________
-bool Inst::replaceOpnds(Opnd * const * opndMap, uint32 opndRoleMask)
+bool Inst::replaceOpnds(Opnd * const * opndMap, U_32 opndRoleMask)
 {
     bool replaced = false;
-    for (uint32 i=0, n=getOpndCount(); i<n; i++){
-        uint32 opndRole=getOpndRoles(i);
+    for (U_32 i=0, n=getOpndCount(); i<n; i++){
+        U_32 opndRole=getOpndRoles(i);
         if (
             (opndRole&opndRoleMask&OpndRole_FromEncoder)!=0 && 
             (opndRole&opndRoleMask&OpndRole_ForIterator)!=0
@@ -396,7 +396,7 @@ bool Inst::replaceOpnds(Opnd * const * opndMap, uint32 opndRoleMask)
 }
 
 //_________________________________________________________________________________________________
-void Inst::swapOperands(uint32 idx0, uint32 idx1)
+void Inst::swapOperands(U_32 idx0, U_32 idx1)
 {
     Opnd * opnd0=getOpnd(idx0), * opnd1=getOpnd(idx1);
     setOpnd(idx1, opnd0);
@@ -433,7 +433,7 @@ uint8* Inst::emit(uint8* stream)
         assert(form==Form_Native);
         instEnd = Encoder::emit(stream, this);
     }
-    setCodeSize((uint32)(instEnd - stream));
+    setCodeSize((U_32)(instEnd - stream));
     return instEnd;
 }
 
@@ -441,10 +441,10 @@ uint8* Inst::emit(uint8* stream)
 void Inst::initFindInfo(Encoder::FindInfo& fi, Opnd::ConstraintKind opndConstraintKind)const
 {
     Opnd * const * opnds = getOpnds();
-    const uint32 * roles = getOpndRoles();
-    uint32 count = 0, defCount = 0, defCountFromInst = defOpndCount;
-    for (uint32 i=0, n=opndCount; i<n; i++){
-        uint32 r = roles[i];
+    const U_32 * roles = getOpndRoles();
+    U_32 count = 0, defCount = 0, defCountFromInst = defOpndCount;
+    for (U_32 i=0, n=opndCount; i<n; i++){
+        U_32 r = roles[i];
         if (r & Inst::OpndRole_Explicit){
             fi.opndConstraints[count++] = opnds[i]->getConstraint(opndConstraintKind);
             if (i < defCountFromInst)
@@ -461,16 +461,16 @@ void Inst::initFindInfo(Encoder::FindInfo& fi, Opnd::ConstraintKind opndConstrai
 //_________________________________________________________________________________________________
 void Inst::fixOpndsForOpcodeGroup(IRManager * irManager)
 {
-    uint32 handledExplicitOpnds = 0, handledImplicitOpnds = 0;
+    U_32 handledExplicitOpnds = 0, handledImplicitOpnds = 0;
 
-    uint32 * roles = getOpndRoles();
+    U_32 * roles = getOpndRoles();
     Constraint * constraints = getConstraints();
 
     Form f = getForm();
 
-    for (uint32 i=0, n=opndCount; i<n; i++){
+    for (U_32 i=0, n=opndCount; i<n; i++){
         if (roles[i] & Inst::OpndRole_Explicit){
-            uint32 idx, r;  
+            U_32 idx, r;  
             if (f == Form_Native){
                 idx = handledExplicitOpnds; 
                 r = Encoder::getOpndRoles(opcodeGroup->opndRoles, idx);
@@ -491,10 +491,10 @@ void Inst::fixOpndsForOpcodeGroup(IRManager * irManager)
         }
     }
 
-    for (uint32 i = handledImplicitOpnds; i < opcodeGroup->implicitOpndRoles.count; i++){
+    for (U_32 i = handledImplicitOpnds; i < opcodeGroup->implicitOpndRoles.count; i++){
         RegName iorn = opcodeGroup->implicitOpndRegNames[i];
         Opnd * implicitOpnd = irManager->getRegOpnd(iorn);
-        uint32 implicitOpndRoles = 
+        U_32 implicitOpndRoles = 
             Encoder::getOpndRoles(opcodeGroup->implicitOpndRoles, i) | Inst::OpndRole_Implicit;
         if (implicitOpndRoles & OpndRole_Def){
             insertOpnd(defOpndCount, implicitOpnd, implicitOpndRoles);
@@ -512,11 +512,11 @@ void Inst::assignOpcodeGroup(IRManager * irManager)
     if (hasKind(Inst::Kind_PseudoInst)){
         assert(getForm() == Form_Extended);
         opcodeGroup= (Encoder::OpcodeGroup *)Encoder::getDummyOpcodeGroup();
-        uint32 * roles = getOpndRoles();
-        uint32 i = 0;
-        for (uint32 n = defOpndCount; i < n; i++)
+        U_32 * roles = getOpndRoles();
+        U_32 i = 0;
+        for (U_32 n = defOpndCount; i < n; i++)
             roles[i] = OpndRole_Auxilary | OpndRole_Def;
-        for (uint32 n = opndCount; i < n; i++)
+        for (U_32 n = opndCount; i < n; i++)
             roles[i] = OpndRole_Auxilary | OpndRole_Use;
     }else{
         Encoder::FindInfo fi;
@@ -537,17 +537,17 @@ void Inst::makeNative(IRManager * irManager)
 
     Node* bb = getNode();
 
-    uint32 * opndRoles = getOpndRoles();
+    U_32 * opndRoles = getOpndRoles();
     Constraint * constraints = getConstraints();
 
-    int32 defs[IRMaxNativeOpnds]={ -1, -1, -1, -1 };
-    for (uint32 i=0; i<opndCount; i++){
-        uint32 r = opndRoles[i];
+    I_32 defs[IRMaxNativeOpnds]={ -1, -1, -1, -1 };
+    for (U_32 i=0; i<opndCount; i++){
+        U_32 r = opndRoles[i];
         if ((r & OpndRole_Explicit) == 0) continue;
-        uint32 extendedIdx = r >> 16;
-        uint32 nativeIdx = opcodeGroup->extendedToNativeMap[extendedIdx];
+        U_32 extendedIdx = r >> 16;
+        U_32 nativeIdx = opcodeGroup->extendedToNativeMap[extendedIdx];
         assert(nativeIdx < IRMaxNativeOpnds);
-        int32 defNativeIdx = defs[nativeIdx];
+        I_32 defNativeIdx = defs[nativeIdx];
         if (defNativeIdx != -1){
             assert(i >= defOpndCount);
             opndRoles[defNativeIdx] |= OpndRole_Use;
@@ -560,10 +560,10 @@ void Inst::makeNative(IRManager * irManager)
             defs[nativeIdx] = i;
     }
 
-    uint32 packedOpnds = 0, explicitOpnds = 0;
-    for (uint32 i = 0, n = opndCount; i < n; i++){
+    U_32 packedOpnds = 0, explicitOpnds = 0;
+    for (U_32 i = 0, n = opndCount; i < n; i++){
         if (opnds[i] == NULL) continue;
-        uint32 r = opndRoles[i];
+        U_32 r = opndRoles[i];
         if ((r & OpndRole_Explicit) != 0){
             r = (r & 0xffff) | (explicitOpnds << 16);
             explicitOpnds++;
@@ -683,7 +683,7 @@ ConstantAreaItem * SwitchInst::getConstantAreaItem() const
     return (ConstantAreaItem *)tableAddrRI->getValue(0);
 }
 
-Node* SwitchInst::getTarget(uint32 i)const
+Node* SwitchInst::getTarget(U_32 i)const
 {
     ConstantAreaItem * cai = getConstantAreaItem();
     assert(i<cai->getSize()/sizeof(Node*));
@@ -697,7 +697,7 @@ Edge::Kind SwitchInst::getEdgeKind(const Edge* edge) const
     Node* target = edge->getTargetNode();
     assert(target->isBlockNode());
     bool found = false;
-    for (uint32 i =0 ; i < getNumTargets(); i++) {
+    for (U_32 i =0 ; i < getNumTargets(); i++) {
         Node* myTarget = getTarget(i);
         if (myTarget == target) {
             found = true;
@@ -710,13 +710,13 @@ Edge::Kind SwitchInst::getEdgeKind(const Edge* edge) const
 }
 
 //_________________________________________________________________________________________________
-uint32 SwitchInst::getNumTargets() const 
+U_32 SwitchInst::getNumTargets() const 
 {
     return getConstantAreaItem()->getSize() / sizeof(Node*);
 }
 
 //_________________________________________________________________________________________________
-void SwitchInst::setTarget(uint32 i, Node* bb)
+void SwitchInst::setTarget(U_32 i, Node* bb)
 {
     assert(bb->isBlockNode());
     
@@ -734,7 +734,7 @@ void SwitchInst::replaceTarget(Node * bbFrom, Node * bbTo)
 #ifdef _DEBUG
     bool found = false;
 #endif
-    for (uint32 i=0, n=cai->getSize()/sizeof(Node*); i<n; i++) {
+    for (U_32 i=0, n=cai->getSize()/sizeof(Node*); i<n; i++) {
         if (bbs[i]==bbFrom) {
 #ifdef _DEBUG
             found = true;
@@ -774,7 +774,7 @@ void SwitchInst::verify() const
 {
     Inst::verify();
 #ifdef _DEBUG
-    for (uint32 i=0, n = getNumTargets(); i<n; ++i) {
+    for (U_32 i=0, n = getNumTargets(); i<n; ++i) {
         Node* target = getTarget(i);
         assert(target!=NULL && target->isBlockNode());
         assert(node->isConnectedTo(true, target));
@@ -804,18 +804,18 @@ void JumpInst::verify() const {
 //_________________________________________________________________________________________________
 void CallingConventionClient::finalizeInfos(Inst::OpndRole role, CallingConvention::ArgKind argKind)
 {
-    uint32 slotNumber=0;
+    U_32 slotNumber=0;
     StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
 
     assert(callingConvention != NULL);
 
-    callingConvention->getOpndInfo(argKind, (uint32)infos.size(),
+    callingConvention->getOpndInfo(argKind, (U_32)infos.size(),
         infos.empty() ? (CallingConvention::OpndInfo*)NULL : &infos.front());
     
-    for (uint32 i = 0, n = (uint32)infos.size(); i != n; i++) {
-        uint32 index = callingConvention->pushLastToFirst() ? i : (n - 1 - i);
+    for (U_32 i = 0, n = (U_32)infos.size(); i != n; i++) {
+        U_32 index = callingConvention->pushLastToFirst() ? i : (n - 1 - i);
         CallingConvention::OpndInfo & info = infos[index];
-        for (uint32 j = 0; j < info.slotCount; j++) {
+        for (U_32 j = 0; j < info.slotCount; j++) {
             if (!info.isReg)
                 info.slots[j] = 0xFFFF & slotNumber++;
         }
@@ -845,20 +845,20 @@ void CallingConventionClient::layoutAuxilaryOpnds(Inst::OpndRole role, OpndKind 
 {
     StlVector<CallingConvention::OpndInfo> & infos = getInfos(role);
     StlVector<StackOpndInfo> & stackOpndInfos = getStackOpndInfos(role);
-    uint32 slotSize=sizeof(POINTER_SIZE_INT);
-    uint32 regArgCount=0, stackArgCount=0;
+    U_32 slotSize=sizeof(POINTER_SIZE_INT);
+    U_32 regArgCount=0, stackArgCount=0;
     Inst::Opnds opnds(ownerInst, Inst::OpndRole_Auxilary|role);
     Inst::Opnds::iterator handledOpnds=opnds.begin();
-    for (uint32 i=0, n=(uint32)infos.size(); i<n; i++){
+    for (U_32 i=0, n=(U_32)infos.size(); i<n; i++){
         const CallingConvention::OpndInfo& info=infos[i];
 #ifdef _DEBUG
         bool eachSlotRequiresOpnd=false;
 #endif
-        uint32 offset=0;
-        for (uint32 j=0, cbCurrent=0; j<info.slotCount; j++){
+        U_32 offset=0;
+        for (U_32 j=0, cbCurrent=0; j<info.slotCount; j++){
             Opnd * opnd=opnds.getOpnd(handledOpnds);
             OpndSize sz=opnd->getSize();
-            uint32 cb=getByteSize(sz);
+            U_32 cb=getByteSize(sz);
             RegName r=(RegName)info.slots[j];
             if (info.isReg) {
                 r=Constraint::getAliasRegName(r,sz);
@@ -912,7 +912,7 @@ EntryPointPseudoInst::EntryPointPseudoInst(IRManager * irm, int id, const Callin
 #endif
 {   kind=Kind_EntryPointPseudoInst;  callingConventionClient.setOwnerInst(this); }
 //_________________________________________________________________________________________________________
-Opnd * EntryPointPseudoInst::getDefArg(uint32 i)const
+Opnd * EntryPointPseudoInst::getDefArg(U_32 i)const
 { 
     return NULL;
 }

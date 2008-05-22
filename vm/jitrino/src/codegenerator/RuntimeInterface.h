@@ -49,9 +49,9 @@ public:
 
     virtual bool  recompiledMethodEvent(MethodDesc * methodDesc, void * data) = 0;
 
-    virtual uint32          getInlineDepth(InlineInfoPtr ptr, uint32 offset) { return 0; }
-    virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth) { return NULL; }
-    virtual uint16   getInlinedBc(InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)  = 0;
+    virtual U_32          getInlineDepth(InlineInfoPtr ptr, U_32 offset) { return 0; }
+    virtual Method_Handle   getInlinedMethod(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth) { return NULL; }
+    virtual uint16   getInlinedBc(InlineInfoPtr ptr, U_32 offset, U_32 inline_depth)  = 0;
 
 };
 
@@ -77,7 +77,7 @@ public:
         /**
          * Counts number of inlined calls in the chain, including this.
          */
-        uint32 getInlineDepth() const { 
+        U_32 getInlineDepth() const { 
             return (parentEntry == 0) ? 1 : 1 + parentEntry->getInlineDepth(); 
         }
     };
@@ -93,14 +93,14 @@ public:
      * Records unique mapping of a top-level entry to the specified native offset.
      * Parent entries are added to a common list for future references.
      */
-    void registerEntry(Entry* entry, uint32 nativeOff);
+    void registerEntry(Entry* entry, U_32 nativeOff);
 
     bool isEmpty() const { return entries.empty();}
-    uint32 getImageSize() const;
+    U_32 getImageSize() const;
     void write(InlineInfoPtr output);
 
-    static const Entry* getEntryWithMaxDepth(InlineInfoPtr ptr, uint32 nativeOffs);
-    static const Entry* getEntry(InlineInfoPtr ptr, uint32 nativeOffs, uint32 inlineDepth);
+    static const Entry* getEntryWithMaxDepth(InlineInfoPtr ptr, U_32 nativeOffs);
+    static const Entry* getEntry(InlineInfoPtr ptr, U_32 nativeOffs, U_32 inlineDepth);
 private:
     MemoryManager& memManager;
     /** 
@@ -110,7 +110,7 @@ private:
     /**
      * Unique mapping of native offset -> top-level entry
      */
-    StlMap<uint32, Entry*> entryByOffset;
+    StlMap<U_32, Entry*> entryByOffset;
 };
 
 }

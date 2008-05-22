@@ -80,13 +80,13 @@ lib_handle(NULL)
     _recompiled_method_callback = (Boolean (*)(JIT_Handle, Method_Handle, void *)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inline_depth");
-    _get_inline_depth = (uint32 (*)(JIT_Handle, InlineInfoPtr, uint32)) fn;
+    _get_inline_depth = (U_32 (*)(JIT_Handle, InlineInfoPtr, U_32)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inlined_method");
-    _get_inlined_method = (Method_Handle (*)(JIT_Handle, InlineInfoPtr, uint32, uint32)) fn;
+    _get_inlined_method = (Method_Handle (*)(JIT_Handle, InlineInfoPtr, U_32, U_32)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inlined_bc");
-    _get_inlined_bc = (uint16 (*)(JIT_Handle, InlineInfoPtr, uint32, uint32)) fn;
+    _get_inlined_bc = (uint16 (*)(JIT_Handle, InlineInfoPtr, U_32, U_32)) fn;
 
     GET_FUNCTION(fn, handle, "JIT_unwind_stack_frame");
     _unwind_stack_frame = (void (*)(JIT_Handle, Method_Handle, JitFrameContext *)) fn;

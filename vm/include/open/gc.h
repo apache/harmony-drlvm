@@ -155,7 +155,7 @@ GCExport void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinne
  * Resembles <code>gc_add_root_set_entry()</code> but is passed the address of a slot
  * containing a compressed reference.
  */
-GCExport void gc_add_compressed_root_set_entry(uint32 *ref, Boolean is_pinned);
+GCExport void gc_add_compressed_root_set_entry(U_32 *ref, Boolean is_pinned);
 
 /**
  * Is called by the VM to enumerate weak root reference.
@@ -560,7 +560,7 @@ GCExport int64 gc_get_collection_time();
  */
 
 extern void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned);
-extern void (*gc_add_compressed_root_set_entry)(uint32 *ref, Boolean is_pinned);
+extern void (*gc_add_compressed_root_set_entry)(U_32 *ref, Boolean is_pinned);
 extern void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, Boolean is_pinned);
 extern void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref1, Boolean is_pinned,Boolean is_short_weak);
 extern void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned);
@@ -591,8 +591,8 @@ extern void (*gc_test_safepoint)();
 
 extern void (*gc_pin_object)(Managed_Object_Handle* p_object);
 extern void (*gc_unpin_object)(Managed_Object_Handle* p_object);
-extern int32 (*gc_get_hashcode)(Managed_Object_Handle);
-extern int32 (*gc_get_hashcode0) (Managed_Object_Handle p_object);
+extern I_32 (*gc_get_hashcode)(Managed_Object_Handle);
+extern I_32 (*gc_get_hashcode0) (Managed_Object_Handle p_object);
 extern Managed_Object_Handle (*gc_get_next_live_object)(void *iterator);
 extern void (*gc_iterate_heap)();
 extern void (*gc_finalize_on_exit)();
@@ -613,10 +613,10 @@ extern Boolean (*gc_clear_mutator_block_flag)();
  * Arrays will be required to start on the indicated alignement. This means that
  * for 8 byte alignment on the IA32 the header will look like this:
  *
- * uint32 gc_header_lock_hash
+ * U_32 gc_header_lock_hash
  * VTable *vt
- * uint32 array_length
- * uint32 padding
+ * U_32 array_length
+ * U_32 padding
  * the array elements.
  */
 #ifdef POINTER64
@@ -643,11 +643,11 @@ extern void (*gc_heap_slot_write_ref)(Managed_Object_Handle p_base_of_object_wit
                                       Managed_Object_Handle *p_slot,
                                       Managed_Object_Handle value);
 extern void (*gc_heap_slot_write_ref_compressed)(Managed_Object_Handle p_base_of_object_with_slot,
-                                                 uint32 *p_slot,
+                                                 U_32 *p_slot,
                                                  Managed_Object_Handle value);
 extern void (*gc_heap_write_global_slot)(Managed_Object_Handle *p_slot,
                                          Managed_Object_Handle value);
-extern void (*gc_heap_write_global_slot_compressed)(uint32 *p_slot,
+extern void (*gc_heap_write_global_slot_compressed)(U_32 *p_slot,
                                                     Managed_Object_Handle value);
 extern void (*gc_heap_wrote_object)(Managed_Object_Handle p_base_of_object_just_written);
 
@@ -712,7 +712,7 @@ GCExport void gc_heap_write_global_slot(Managed_Object_Handle *p_slot,
  * compressed references that are heap offsets; these functions handle details of 
  * converting raw reference pointers to compressed references before updating slots.
  */
-GCExport void gc_heap_write_global_slot_compressed(uint32 *p_slot,
+GCExport void gc_heap_write_global_slot_compressed(U_32 *p_slot,
                                                    Managed_Object_Handle value);
 
 /**
@@ -732,7 +732,7 @@ GCExport void gc_heap_slot_write_ref (Managed_Object_Handle p_base_of_object_wit
  * @copydoc gc_heap_write_ref()
  */
 GCExport void gc_heap_slot_write_ref_compressed (Managed_Object_Handle p_base_of_object_with_slot,
-                                                 uint32 *p_slot,
+                                                 U_32 *p_slot,
                                                  Managed_Object_Handle value);
 
 
@@ -750,12 +750,12 @@ GCExport void gc_unpin_object (Managed_Object_Handle* p_object);
 /**
  * Get identity hashcode.
  */
-GCExport int32 gc_get_hashcode (Managed_Object_Handle object);
+GCExport I_32 gc_get_hashcode (Managed_Object_Handle object);
 
 /**
  * Get object hashcode.
  */
-GCExport int32 gc_get_hashcode (Managed_Object_Handle p_object);
+GCExport I_32 gc_get_hashcode (Managed_Object_Handle p_object);
 
 /**
  * Iterate all live objects in heap.

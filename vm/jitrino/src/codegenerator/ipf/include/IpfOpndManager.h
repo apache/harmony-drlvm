@@ -45,12 +45,12 @@ class RegStack {
 public:
                  RegStack();
 
-    int32        newInReg(int32);
-    int32        newOutReg(int32);
-    void         setLocRegSize(int32 locRegSize_)     { locRegSize = locRegSize_; }
-    int32        getInRegSize()                       { return inRegSize; }
-    int32        getLocRegSize()                      { return locRegSize; }
-    int32        getOutRegSize()                      { return outRegSize; }
+    I_32        newInReg(I_32);
+    I_32        newOutReg(I_32);
+    void         setLocRegSize(I_32 locRegSize_)     { locRegSize = locRegSize_; }
+    I_32        getInRegSize()                       { return inRegSize; }
+    I_32        getLocRegSize()                      { return locRegSize; }
+    I_32        getOutRegSize()                      { return outRegSize; }
     bool         isOutReg(RegOpnd*);
 
     //----------------------------------------------------------------------------//
@@ -74,9 +74,9 @@ public:
     RegBitSet    spillBrMask;          // brs that can be used for spilling/filling
 
 protected:
-    int32        inRegSize;            // number of general registers used for in args passing
-    int32        locRegSize;           // number of general registers actually used in local area (including in args)
-    int32        outRegSize;           // number of general registers used for out args passing
+    I_32        inRegSize;            // number of general registers used for in args passing
+    I_32        locRegSize;           // number of general registers actually used in local area (including in args)
+    I_32        outRegSize;           // number of general registers used for out args passing
 };
 
 //========================================================================================//
@@ -112,24 +112,24 @@ protected:
 class MemStack {
 public:
            MemStack();
-    int32  newInSlot(int32);
-    int32  newLocSlot(DataKind);
-    int32  newOutSlot(int32);
+    I_32  newInSlot(I_32);
+    I_32  newLocSlot(DataKind);
+    I_32  newOutSlot(I_32);
 
     void   calculateOffset(RegOpnd*);
-    int32  calculateOffset(int32);
-    int32  getMemStackSize();
-    int32  getSavedBase();
+    I_32  calculateOffset(I_32);
+    I_32  getMemStackSize();
+    I_32  getSavedBase();
     
 protected:
-    int32  align(int32, int32);
+    I_32  align(I_32, I_32);
 
-    int32  locMemSize;        // size of memory stack area used for opnd spilling (bytes)
-    int32  outMemSize;        // size of memory stack area used for out args passing (bytes)
+    I_32  locMemSize;        // size of memory stack area used for opnd spilling (bytes)
+    I_32  outMemSize;        // size of memory stack area used for out args passing (bytes)
 
-    int32  inBase;            // first memory inArg offset
-    int32  locBase;           // first local memory opnd offset
-    int32  outBase;           // first memory outArg offset
+    I_32  inBase;            // first memory inArg offset
+    I_32  locBase;           // first local memory opnd offset
+    I_32  outBase;           // first memory outArg offset
 };
 
 //========================================================================================//
@@ -139,15 +139,15 @@ protected:
 class StackInfo {
 public:
            StackInfo();
-    int32  rpBak;           // gr num or stack offset containing return pointer (e.g. r33)
-    int32  prBak;           // gr num or stack offset containing predicate registers (e.g. r34)
-    int32  pfsBak;          // gr num or stack offset containing AR.PFS (e.g. r35)
-    int32  unatBak;         // gr num or stack offset containing AR.UNAT (e.g. r36)
-    int32  savedBase;       // mem stack offset of first saved gr (bytes)
-    uint32 savedGrMask;     // mask of preserved grs saved on stack
-    uint32 savedFrMask;     // mask of preserved frs saved on stack
-    uint32 savedBrMask;     // mask of preserved brs saved on stack
-    uint32 memStackSize;    // mem stack frame size (bytes)
+    I_32  rpBak;           // gr num or stack offset containing return pointer (e.g. r33)
+    I_32  prBak;           // gr num or stack offset containing predicate registers (e.g. r34)
+    I_32  pfsBak;          // gr num or stack offset containing AR.PFS (e.g. r35)
+    I_32  unatBak;         // gr num or stack offset containing AR.UNAT (e.g. r36)
+    I_32  savedBase;       // mem stack offset of first saved gr (bytes)
+    U_32 savedGrMask;     // mask of preserved grs saved on stack
+    U_32 savedFrMask;     // mask of preserved frs saved on stack
+    U_32 savedBrMask;     // mask of preserved brs saved on stack
+    U_32 memStackSize;    // mem stack frame size (bytes)
 };
 
 //========================================================================================//
@@ -163,12 +163,12 @@ public:
     //----------------------------------------------------------------------------//
 
     Opnd           *newOpnd(OpndKind = OPND_INVALID);
-    RegOpnd        *newRegOpnd(OpndKind, DataKind, int32 = LOCATION_INVALID);
+    RegOpnd        *newRegOpnd(OpndKind, DataKind, I_32 = LOCATION_INVALID);
     Opnd           *newImm(int64 = 0);
     ConstantRef    *newConstantRef(Constant*, DataKind = DATA_CONST_REF);
     NodeRef        *newNodeRef(BbNode* = NULL);
     MethodRef      *newMethodRef(MethodDesc* = NULL);
-    Opnd           *newInArg(OpndKind, DataKind, uint32);
+    Opnd           *newInArg(OpndKind, DataKind, U_32);
     uint16         getFpArgsNum();
 
     //----------------------------------------------------------------------------//
@@ -196,9 +196,9 @@ public:
     // Reg allocation support
     //----------------------------------------------------------------------------//
 
-    int32          newLocation(OpndKind, DataKind, RegBitSet, bool);
-    int32          newScratchReg(OpndKind, RegBitSet&);
-    int32          newPreservReg(OpndKind, RegBitSet&);
+    I_32          newLocation(OpndKind, DataKind, RegBitSet, bool);
+    I_32          newScratchReg(OpndKind, RegBitSet&);
+    I_32          newPreservReg(OpndKind, RegBitSet&);
     
     //----------------------------------------------------------------------------//
     // Compressed references

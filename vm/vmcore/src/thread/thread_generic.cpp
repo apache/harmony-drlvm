@@ -270,7 +270,7 @@ jint vm_detach(jobject java_thread)
 
 void vm_notify_obj_alive(void *p_obj)
 {
-    uint32 obj_info = ((ManagedObject*)p_obj)->get_obj_info();
+    U_32 obj_info = ((ManagedObject*)p_obj)->get_obj_info();
     if (hythread_is_fat_lock(obj_info)) {
         hythread_native_resource_is_live(obj_info);
     }

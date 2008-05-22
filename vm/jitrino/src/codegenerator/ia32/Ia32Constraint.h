@@ -91,7 +91,7 @@ public:
 
     For OpndKind_Reg and sub-kinds initializes the mask field to 0xffff
     */
-    Constraint(OpndKind k, OpndSize s, uint32 m)
+    Constraint(OpndKind k, OpndSize s, U_32 m)
         :mask(m), size(s), kind(k)
     {   assert(k!=OpndKind_Null && size!=OpndSize_Null); assert(mask==0||(OpndKind_Reg&k)!=0);  }
 
@@ -113,14 +113,14 @@ public:
 
     //----------------------------------------------------------------------
     /** returns the kind field of the constraint */
-    uint32 getKind()const{ return kind; }
+    U_32 getKind()const{ return kind; }
     /** returns the size field of the constraint */
     OpndSize getSize()const{ return (OpndSize)size; }
     /** returns the mask field of the constraint */
-    uint32 getMask()const{ return mask; }
+    U_32 getMask()const{ return mask; }
 
     /** sets the mask field of the constraint */
-    void setMask(uint32 m){ mask=m; }
+    void setMask(U_32 m){ mask=m; }
 
     /** resets the constraint to the Null value */
     void makeNull(){ fullValue = 0; }
@@ -147,7 +147,7 @@ public:
     bool isNull()const{ return kind==OpndKind_Null; }
 
     /** Returns the default size for the OpndKind combination k */
-    static OpndSize getDefaultSize(uint32 k);
+    static OpndSize getDefaultSize(U_32 k);
 
     /** Returns true if 'this' can be merged (via unionWith) with c 
     
@@ -157,11 +157,11 @@ public:
     */
     bool        canBeMergedWith(Constraint c)
     {
-        uint32 filter = (uint32)OpndKind_Reg << 24;
-        uint32 thisTmp = fullValue & filter, cTmp = c.fullValue & filter, rTmp = thisTmp & cTmp; 
+        U_32 filter = (U_32)OpndKind_Reg << 24;
+        U_32 thisTmp = fullValue & filter, cTmp = c.fullValue & filter, rTmp = thisTmp & cTmp; 
         if (rTmp!=thisTmp && rTmp!=cTmp)
             return false;
-        filter = (uint32)OpndSize_Any << 16;
+        filter = (U_32)OpndSize_Any << 16;
         thisTmp = fullValue & filter, cTmp = c.fullValue & filter, rTmp = thisTmp & cTmp; 
         return rTmp==thisTmp || rTmp==cTmp;
     }
@@ -201,7 +201,7 @@ public:
     /** Returns the constraint for an outer aliased operand
     s must be greater than or equal to the constraint's size
     */
-    Constraint getAliasConstraint(OpndSize s, uint32 offset=0)const;
+    Constraint getAliasConstraint(OpndSize s, U_32 offset=0)const;
 
 
     /** Returns the regname for an aliased regname
@@ -209,18 +209,18 @@ public:
     e.g. for eax it can return eax, ax, ah, al, depending on the constraint
     The constraint's size must be less than or equal to regName's size
     */
-    static RegName      getAliasRegName(RegName regName, OpndSize s, uint32 offset=0);
-    RegName     getAliasRegName(RegName regName, uint32 offset=0)const;
+    static RegName      getAliasRegName(RegName regName, OpndSize s, U_32 offset=0);
+    RegName     getAliasRegName(RegName regName, U_32 offset=0)const;
 
     //----------------------------------------------------------------------
 private:
     union{
         struct {
-            uint32  mask:16;
-            uint32  size:8;
-            uint32  kind:8;
+            U_32  mask:16;
+            U_32  size:8;
+            U_32  kind:8;
         };
-        uint32  fullValue;
+        U_32  fullValue;
     };
     
     friend struct DefaultConstraintInitializer;

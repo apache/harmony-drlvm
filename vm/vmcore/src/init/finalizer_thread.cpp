@@ -34,11 +34,11 @@ static Boolean native_fin_thread_flag = FALSE;
 static Fin_Thread_Info *fin_thread_info = NULL;
 unsigned int cpu_num_bits;
 
-static uint32 atomic_inc32(volatile apr_uint32_t *mem)
-{  return (uint32)apr_atomic_inc32(mem); }
+static U_32 atomic_inc32(volatile apr_uint32_t *mem)
+{  return (U_32)apr_atomic_inc32(mem); }
 
-static uint32 atomic_dec32(volatile apr_uint32_t *mem)
-{  return (uint32)apr_atomic_dec32(mem); }
+static U_32 atomic_dec32(volatile apr_uint32_t *mem)
+{  return (U_32)apr_atomic_dec32(mem); }
 
 Boolean get_native_finalizer_thread_flag()
 {  return native_fin_thread_flag; }

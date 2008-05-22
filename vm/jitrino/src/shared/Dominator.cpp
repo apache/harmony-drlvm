@@ -40,7 +40,7 @@ DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgra
 
     // Get the nodes of the flowgraph in postorder.
     flowgraph->getNodesPostOrder(nodes, !isPost);
-    uint32 numNodes = (uint32) nodes.size();
+    U_32 numNodes = (U_32) nodes.size();
 #ifdef _DEBUG
     // Start (entry/exit) node should be last.
     Node* start = nodes.back();
@@ -49,7 +49,7 @@ DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgra
 #endif         
     // Initialize the idom array to UNDEFINED.  Idiom maps the postorder
     // number of a node to the postorder number of its idom.
-    StlVector<uint32> idom(tmm);
+    StlVector<U_32> idom(tmm);
     idom.insert(idom.end(), (unsigned int) numNodes-1, UNDEFINED);
     // Initialize idom[entry] = NONE.
     idom.insert(idom.end(), NONE);
@@ -62,10 +62,10 @@ DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgra
         Nodes::reverse_iterator i;
         for(i = nodes.rbegin()+1; i != nodes.rend(); ++i) {
             Node* node = *i;
-            uint32 nodeNum = node->getPostNum();
+            U_32 nodeNum = node->getPostNum();
 
             // Compute updated idom from predecessors
-            uint32 newIdom = UNDEFINED;
+            U_32 newIdom = UNDEFINED;
             Edges::const_iterator j;
             for(j = node->getEdges(isPost).begin(); j != node->getEdges(isPost).end(); ++j) {
                 Node* pred = (*j)->getNode(isPost);
@@ -73,7 +73,7 @@ DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgra
                 if (!ignoreUnreach)
                     assert(pred->getTraversalNum() == flowgraph->getTraversalNum());
                 if (!ignoreUnreach || (ignoreUnreach && (pred->getTraversalNum() == flowgraph->getTraversalNum()))) {
-                    uint32 predNum = pred->getPostNum();
+                    U_32 predNum = pred->getPostNum();
                     // Skip unprocessed preds (only happens on first iteration).
                     if(idom[predNum] != UNDEFINED)
                         // Intersect dominator sets.
@@ -96,8 +96,8 @@ DominatorBuilder::computeDominators(MemoryManager& mm, ControlFlowGraph* flowgra
     return new (mm) DominatorTree(mm, flowgraph, nodes, idom, isPost);
 }
 
-uint32 
-DominatorBuilder::intersect(StlVector<uint32>& idom, uint32 finger1, uint32 finger2) {
+U_32 
+DominatorBuilder::intersect(StlVector<U_32>& idom, U_32 finger1, U_32 finger2) {
     // Intersect the dominator sets represented by finger1 and finger2.
     while(finger1 != finger2) {
         while(finger1 < finger2)
@@ -113,13 +113,13 @@ DominatorBuilder::intersect(StlVector<uint32>& idom, uint32 finger1, uint32 fing
 DominatorTree::DominatorTree(MemoryManager& mm,
                              ControlFlowGraph* fg,
                              Nodes& nodes,
-                             StlVector<uint32>& idom,
+                             StlVector<U_32>& idom,
                              bool isPostDominator)     
                              : flowgraph(fg), traversalNum(fg->getTraversalNum()), 
                                numNodes(fg->getMaxNodeId()), 
                                _isPostDominator(isPostDominator), tree(mm, numNodes, NULL) {
     // Create the dominator tree nodes..
-    uint32 postNum, id=MAX_UINT32;
+    U_32 postNum, id=MAX_UINT32;
     for(postNum = 0; postNum < nodes.size(); ++postNum) {
         Node* node = nodes[postNum];
         id = node->getId();
@@ -134,12 +134,12 @@ DominatorTree::DominatorTree(MemoryManager& mm,
         Node* node = nodes[postNum];
         id = node->getId();
         // Assert post-ordering of nodes.
-        assert((uint32) postNum == node->getPostNum());
+        assert((U_32) postNum == node->getPostNum());
         if(idom[postNum] != NONE) {
             // Assert that idoms are acyclic.
             assert(idom[postNum] > postNum);
             Node* parent = nodes[idom[postNum]];
-            uint32 parentId = parent->getId();
+            U_32 parentId = parent->getId();
             assert(tree[parentId] != NULL);
             // Assert that new child (added to beginning) has highest postorder number.
             assert(tree[parentId]->getChild() == NULL || tree[parentId]->getChild()->getNode()->getPostNum() < postNum);
@@ -169,7 +169,7 @@ DomFrontier::DomFrontier(MemoryManager& mm,
                          ControlFlowGraph*     fg) 
 : memManager(mm), dom(d), isPostDominator(d.isPostDominator()) {
     // To Do: may want to keep number of nodes in flow graph instead of recomputing every time
-    numNodes = (uint32) fg->getNodeCount();
+    numNodes = (U_32) fg->getNodeCount();
 
     // if flow graph has been modified since dominator was computed, then
     // dominator information needs to be recomputed
@@ -183,7 +183,7 @@ DomFrontier::DomFrontier(MemoryManager& mm,
     memset(DF, 0, numNodes*sizeof(List<Node>*));  // initialized with NULL
 }
 
-void DomFrontier::addDF(uint32 entry, Node* n) {
+void DomFrontier::addDF(U_32 entry, Node* n) {
     assert(entry < numNodes);
     // make sure no duplicate entry
     for (List<Node>* l = DF[entry]; l != NULL; l = l->getNext())
@@ -193,7 +193,7 @@ void DomFrontier::addDF(uint32 entry, Node* n) {
 }
 
 void DomFrontier::computeDomFrontier(Node* node) {
-    uint32 dfnum = node->getDfNum();
+    U_32 dfnum = node->getDfNum();
     // if dom frontiers are not computed yet
     if (beenComputed->getBit(dfnum))
         return;

@@ -269,7 +269,7 @@ static void setHeatThreshold(IRManager& irm) {
     double profile_threshold = optimizerFlags.profile_threshold;
     if(optimizerFlags.use_average_threshold) {
         // Keep a running average of method counts.
-        static uint32 count = 0;
+        static U_32 count = 0;
         static double total = 0.0;
         count++;
         double methodFreq = flowGraph.getEntryNode()->getExecCount();
@@ -315,7 +315,7 @@ static void estimateNode(StaticProfilerContext* c) {
     Edge* falseEdge = c->node->getFalseEdge();
     Edge* trueEdge = c->node->getTrueEdge();
     double probLeft = 1.0;
-    uint32 edgesLeft = (uint32)edges.size();
+    U_32 edgesLeft = (U_32)edges.size();
     if (falseEdge == NULL || trueEdge == NULL) { // can't apply general heuristics.
         Edge* uncondEdge = c->node->getUnconditionalEdge();
         if (uncondEdge) {
@@ -642,7 +642,7 @@ void StaticProfiler::fixEdgeProbs(IRManager& irm) {
     for (Nodes::const_iterator it = nodes.begin(), end = nodes.end(); it!=end; ++it) {
         Node* node = *it;
         double sumProb = 0;
-        uint32 nNotEstimated = 0;
+        U_32 nNotEstimated = 0;
         const Edges& outEdges = node->getOutEdges();
         for(Edges::const_iterator eit = outEdges.begin(), eend = outEdges.end(); eit!=eend; ++eit) {
             Edge* e = *eit;

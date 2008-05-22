@@ -25,8 +25,8 @@
 InlineInfo::InlineInfo(): _entries(0)
 {}
 
-void InlineInfo::add(Method* method, uint32 codeSize, void* codeAddr, 
-                     uint32 mapLength, AddrLocation* addrLocationMap)
+void InlineInfo::add(Method* method, U_32 codeSize, void* codeAddr, 
+                     U_32 mapLength, AddrLocation* addrLocationMap)
 {
     Entry entry = {method, codeSize, codeAddr, mapLength, addrLocationMap};
  

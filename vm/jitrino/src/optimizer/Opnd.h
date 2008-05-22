@@ -49,11 +49,11 @@ class PiOpnd;
 class OpndBase {    // rename to Opnd
 public:
     virtual ~OpndBase() {}
-    uint32  getId() const                 {return id;}
+    U_32  getId() const                 {return id;}
     Type*   getType() const               {return type;}
     void    setType(Type *t)              {type = t;}
-    void    setProperties(uint32 v)       {properties = v;}
-    uint32  getProperties() const         {return properties;}
+    void    setProperties(U_32 v)       {properties = v;}
+    U_32  getProperties() const         {return properties;}
     //
     // methods for dynamic type checking and casting
     //
@@ -88,19 +88,19 @@ protected:
     //
     // Constructor
     //
-    OpndBase(Type* t,uint32 i) : properties(0), type(t), id(i) {}
+    OpndBase(Type* t,U_32 i) : properties(0), type(t), id(i) {}
     //
     // default constructor creates a null opnd
     //
     OpndBase() : properties(0), type(NULL), id(0) {}
 private:
     friend class OpndManager;
-    uint32    properties;
+    U_32    properties;
     Type*     type;
     //
     // used by code generator to map to back end operand
     //
-    uint32    id;
+    U_32    id;
 };
 
 class Opnd : public OpndBase {
@@ -117,7 +117,7 @@ public:
     virtual void    print(::std::ostream&) const;
 protected:
     friend class OpndManager;
-    Opnd(Type* t,uint32 i) : OpndBase(t,i), isGlobalFlag(false), inst(NULL) {}
+    Opnd(Type* t,U_32 i) : OpndBase(t,i), isGlobalFlag(false), inst(NULL) {}
     Opnd() : OpndBase(), isGlobalFlag(false), inst(NULL) {}
     bool    isGlobalFlag;
     //
@@ -132,7 +132,7 @@ public:
     virtual bool isSsaOpnd() const    {return true;}
 protected:
     friend class OpndManager;
-    SsaOpnd(Type* t,uint32 i) : Opnd(t,i) 
+    SsaOpnd(Type* t,U_32 i) : Opnd(t,i) 
         {}
 
 };
@@ -143,7 +143,7 @@ public:
     virtual bool isSsaTmpOpnd() const    {return true;}
 private:
     friend class OpndManager;
-    SsaTmpOpnd(Type* t,uint32 i) : SsaOpnd(t,i) {}
+    SsaTmpOpnd(Type* t,U_32 i) : SsaOpnd(t,i) {}
 };
 
 class PiOpnd : public SsaOpnd {
@@ -156,7 +156,7 @@ public:
     virtual void    print(::std::ostream&) const;
 private:
     friend class OpndManager;
-    PiOpnd(Opnd *orgOpnd0, uint32 i) : 
+    PiOpnd(Opnd *orgOpnd0, U_32 i) : 
         SsaOpnd(orgOpnd0->getType(),i), 
         orgOpnd(orgOpnd0)
         {};
@@ -172,8 +172,8 @@ public:
     bool            isAddrTaken() const    {return isAddrTakenFlag;}
     void            setAddrTaken()         {isAddrTakenFlag = true;}
     bool            isPinned() const       {return isPinnedFlag;}
-    uint32          getNumLoads() const    {return numLoads;}
-    uint32          getNumStores() const   {return numStores;}
+    U_32          getNumLoads() const    {return numLoads;}
+    U_32          getNumStores() const   {return numStores;}
     VarOpnd*        getNextVarOpnd()       {return nextVarInMethod;}
     VarOpnd*        getPrevVarOpnd()       {return prevVarInMethod;}
     void            addVarAccessInst(VarAccessInst*);
@@ -187,7 +187,7 @@ public:
     virtual void    printWithType(::std::ostream& os) const;
 private:
     friend class OpndManager;
-    VarOpnd(Type* t,uint32 i,VarOpnd* next,bool isPinned) 
+    VarOpnd(Type* t,U_32 i,VarOpnd* next,bool isPinned) 
         : Opnd(t,i), nextVarInMethod(0), prevVarInMethod(0),varAccessInsts(NULL)
     {
         isPinnedFlag = isPinned;
@@ -210,8 +210,8 @@ private:
     bool            isDeadFlag;
     bool            isPinnedFlag;
     bool            isAddrTakenFlag;
-    uint32          numLoads;
-    uint32          numStores;
+    U_32          numLoads;
+    U_32          numStores;
     VarOpnd*        nextVarInMethod;
     VarOpnd*        prevVarInMethod;
     VarAccessInst*  varAccessInsts;     // ldvar, stvars that access this var
@@ -237,7 +237,7 @@ public:
     };
 private:
     friend class OpndManager;
-    SsaVarOpnd(uint32 i, VarOpnd* v) : SsaOpnd(v->getType(),i), var(v) {}
+    SsaVarOpnd(U_32 i, VarOpnd* v) : SsaOpnd(v->getType(),i), var(v) {}
     VarOpnd* var;
 };
 
@@ -288,10 +288,10 @@ public:
     }
     static Opnd*  getNullOpnd()    {return &_nullOpnd;}
     VarOpnd*      getVarOpnds()    {return varOpnds;}
-    uint32        getNumVarOpnds() {return nextVarId;}
-    uint32        getNumSsaOpnds() {return nextSsaOpndId;}
-    uint32        getNumArgs()     {return numArgs;}
-    uint32        getNumPiOpnds() {return nextPiOpndId;}
+    U_32        getNumVarOpnds() {return nextVarId;}
+    U_32        getNumSsaOpnds() {return nextSsaOpndId;}
+    U_32        getNumArgs()     {return numArgs;}
+    U_32        getNumPiOpnds() {return nextPiOpndId;}
 
     void          deleteVar(VarOpnd *var);
 private:
@@ -299,10 +299,10 @@ private:
     // private fields
     //
     static NullOpnd  _nullOpnd;
-    uint32          nextSsaOpndId;
-    uint32          nextPiOpndId;
-    uint32          nextVarId;
-    uint32          numArgs;
+    U_32          nextSsaOpndId;
+    U_32          nextPiOpndId;
+    U_32          nextVarId;
+    U_32          numArgs;
     VarOpnd*        varOpnds;
     TypeManager&    typeManager;
     MemoryManager&  memManager;
@@ -310,7 +310,7 @@ private:
 
 class OpndRenameTable : public HashTable<Opnd,Opnd> {
 public:
-    OpndRenameTable(MemoryManager& mm, uint32 size = 16, bool renameSSA = true): 
+    OpndRenameTable(MemoryManager& mm, U_32 size = 16, bool renameSSA = true): 
         HashTable<Opnd,Opnd>(mm,size) {renameSsaOpnd = renameSSA;}
     
     virtual ~OpndRenameTable() {}    
@@ -332,7 +332,7 @@ protected:
     virtual bool keyEquals(Opnd* key1,Opnd* key2) const {
         return key1 == key2;
     }
-    virtual uint32 getKeyHashCode(Opnd* key) const {
+    virtual U_32 getKeyHashCode(Opnd* key) const {
         // return hash of address bits
         return (key ? key->getId() : 0);
     }

@@ -129,7 +129,7 @@ OptPass::uce(IRManager& irm, bool fixup_ssa) {
 void
 OptPass::fixupSsa(IRManager& irm) {
     static CountTime fixupSsaTimer("opt::helper::fixupSsa");
-    static uint32 globalSsaFixupCounter = 0;
+    static U_32 globalSsaFixupCounter = 0;
 
     if(!irm.isSsaUpdated()) {
         AutoTimer tm(fixupSsaTimer);

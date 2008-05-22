@@ -53,7 +53,7 @@ struct StackIterator {
     CodeChunkInfo*    cci;
     JitFrameContext   c;
     M2nFrame*         m2nfl;
-    uint32            ip;
+    U_32            ip;
 };
 
 //////////////////////////////////////////////////////////////////////////
@@ -76,7 +76,7 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
     CTRACE(("si_unwind_from_m2n, ip = %p",(void*)m2nfl->eip));
 
     // Is it a normal M2nFrame or one for suspended managed code?
-    if ((uint32)m2nfl->p_lm2nf==1) {
+    if ((U_32)m2nfl->p_lm2nf==1) {
         // Suspended managed code, eip is at instruction, esp & registers are in regs structure
         CTRACE(("si_unwind_from_m2n from suspended managed code, ip = %p", 
             (void*)m2nfl->regs->eip));
@@ -106,7 +106,7 @@ static void si_unwind_from_m2n(StackIterator* si, bool over_popped = true)
         si->c.eflags = m2nfl->pop_regs->eflags;
     } else {
         // Normal M2nFrame, eip is past instruction, esp is implicitly address just beyond the frame, callee saves registers in M2nFrame
-        si->c.esp   = (uint32)m2nfl + m2n_sizeof_m2n_frame;
+        si->c.esp   = (U_32)m2nfl + m2n_sizeof_m2n_frame;
         si->c.p_eip = &m2nfl->eip;
         si->c.is_ip_past = TRUE;
         si->c.p_edi = &m2nfl->edi;
@@ -394,9 +394,9 @@ NativeCodePtr si_get_ip(StackIterator* si)
 void si_set_ip(StackIterator* si, NativeCodePtr ip, bool also_update_stack_itself)
 {
     if (also_update_stack_itself) {
-        *(si->c.p_eip) = (uint32)ip;
+        *(si->c.p_eip) = (U_32)ip;
     } else {
-        si->ip = (uint32)ip;
+        si->ip = (U_32)ip;
         si->c.p_eip = &si->ip;
     }
 }
@@ -438,7 +438,7 @@ void** si_get_return_pointer(StackIterator* si)
 
 void si_set_return_pointer(StackIterator* si, void** return_value)
 {
-    si->c.p_eax = (uint32*)return_value;
+    si->c.p_eax = (U_32*)return_value;
 }
 
 #ifdef _WIN32
@@ -505,13 +505,13 @@ void si_transfer_control(StackIterator* si)
     memcpy(&local_si, si, sizeof(StackIterator));
 
     if (NULL == si->c.p_eax)
-        local_si.c.p_eax = (uint32*)&null_pointer;
+        local_si.c.p_eax = (U_32*)&null_pointer;
     if (NULL == si->c.p_ebx)
-        local_si.c.p_ebx = (uint32*)&null_pointer;
+        local_si.c.p_ebx = (U_32*)&null_pointer;
     if (NULL == si->c.p_ecx)
-        local_si.c.p_ecx = (uint32*)&null_pointer;
+        local_si.c.p_ecx = (U_32*)&null_pointer;
     if (NULL == si->c.p_edx)
-        local_si.c.p_edx = (uint32*)&null_pointer;
+        local_si.c.p_edx = (U_32*)&null_pointer;
 
     if (si->c.p_eip == &si->ip)
         local_si.c.p_eip = &local_si.ip;
@@ -531,7 +531,7 @@ void si_transfer_control(StackIterator* si)
     tcs(&local_si);
 }
 
-inline static uint32 unref_reg(uint32* p_reg) {
+inline static U_32 unref_reg(U_32* p_reg) {
     return p_reg ? *p_reg : 0;
 }
 void si_copy_to_registers(StackIterator* si, Registers* regs)
@@ -552,8 +552,8 @@ void si_copy_to_registers(StackIterator* si, Registers* regs)
 
 void si_set_callback(StackIterator* si, NativeCodePtr* callback) {
     si->c.esp = si->c.esp - 4;
-    *((uint32*) si->c.esp) = *(si->c.p_eip);
-    si->c.p_eip = ((uint32*)callback);
+    *((U_32*) si->c.esp) = *(si->c.p_eip);
+    si->c.p_eip = ((U_32*)callback);
 }
 
 void si_reload_registers()

@@ -875,7 +875,7 @@ void * JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
  * @return 0
  */
 extern "C" JITEXPORT
-uint32 JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset)
+U_32 JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, U_32 offset)
 {
     return 0;
 }
@@ -886,7 +886,7 @@ uint32 JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset)
  */
 extern "C" JITEXPORT
 Method_Handle JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr,
-                                     uint32 offset, uint32 inline_depth)
+                                     U_32 offset, U_32 inline_depth)
 {
     return 0;
 }
@@ -897,7 +897,7 @@ Method_Handle JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr,
  */
 extern "C" JITEXPORT
 uint16 JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr,
-                                     uint32 offset, uint32 inline_depth)
+                                     U_32 offset, U_32 inline_depth)
 {
     return 0;
 }

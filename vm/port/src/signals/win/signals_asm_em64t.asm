@@ -55,7 +55,7 @@ port_win_dbg_break ENDP
 ; uint64 r10;   ; 78h
 ; uint64 r11;   ; 80h
 ;
-; uint32 eflags;; 88h
+; U_32 eflags;; 88h
 ; };
 ;
 ; void port_transfer_to_regs(Registers* regs)

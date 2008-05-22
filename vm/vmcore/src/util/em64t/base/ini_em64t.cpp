@@ -82,13 +82,13 @@ static invoke_managed_func_int_t gen_invoke_managed_func() {
     // [rbp + 48] - gr_args
     // [rbp + 56] - fr_args
     // [rbp + 64] - stack_args
-    const int32 METHOD_ENTRY_POINT_OFFSET = 16 + SHADOW;
-    const int32 UNUSED GR_NARGS_OFFSET = 24 + SHADOW;
-    const int32 FR_NARGS_OFFSET = 32 + SHADOW;
-    const int32 STACK_NARGS_OFFSET = 40 + SHADOW;
-    const int32 GR_ARGS_OFFSET = 48 + SHADOW;
-    const int32 FR_ARGS_OFFSET = 56 + SHADOW;
-    const int32 STACK_ARGS_OFFSET = 64 + SHADOW;
+    const I_32 METHOD_ENTRY_POINT_OFFSET = 16 + SHADOW;
+    const I_32 UNUSED GR_NARGS_OFFSET = 24 + SHADOW;
+    const I_32 FR_NARGS_OFFSET = 32 + SHADOW;
+    const I_32 STACK_NARGS_OFFSET = 40 + SHADOW;
+    const I_32 GR_ARGS_OFFSET = 48 + SHADOW;
+    const I_32 FR_ARGS_OFFSET = 56 + SHADOW;
+    const I_32 STACK_ARGS_OFFSET = 64 + SHADOW;
     
     const int STUB_SIZE = 200;
     char * stub = (char *) malloc_fixed_code_for_jit(STUB_SIZE,

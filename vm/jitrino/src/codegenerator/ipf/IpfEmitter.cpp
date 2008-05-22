@@ -99,7 +99,7 @@ const char Emitter::Itanium2_DualIssueBundles[30][30] = {
 void Emitter::checkForDualIssueBundles() {
     EmitterBb *bb;
     Bundle *bundle1, *bundle2;
-    uint32 tmpl1, tmpl2;
+    U_32 tmpl1, tmpl2;
     bool header_printed = false;
 
     for (int bbindex=0 ; bbindex<(int)bbs->size() ; bbindex++) {
@@ -159,7 +159,7 @@ void Emitter::checkForDualIssueBundles() {
 
 //============================================================================//
 
-Bundle::Bundle(Cfg& cfg, uint32 itmp, Inst *i0, Inst *i1, Inst *i2) {
+Bundle::Bundle(Cfg& cfg, U_32 itmp, Inst *i0, Inst *i1, Inst *i2) {
     indxtmpl = itmp;   // !!! THis is not template, but index in Bundle::BundleDesc[] !!!
 
     MemoryManager& mm          = cfg.getMM();
@@ -211,7 +211,7 @@ void Bundle::emitBundleGeneral(void *whereToEmit) {
 void Bundle::emitBundleBranch(void *whereToEmit, int * bundletarget) {
     uint64 * p  = (uint64 *)whereToEmit;
     uint64   s;
-    uint32   itmp = getTmpl();
+    U_32   itmp = getTmpl();
 
     p[0] = 0;
     p[1] = 0;
@@ -275,7 +275,7 @@ uint64 * Bundle::getSlotBitsExtended(uint64 *slots12, void *whereToEmit) {
 //============================================================================//
 void Bundle::print() {
     Inst * inst = getSlot(0);
-    uint32 tmpl = getTmpl();
+    U_32 tmpl = getTmpl();
 
     IPF_LOG << "(" << tmpl << ")\n";
     IPF_LOG << IrPrinter::toString(inst);
@@ -534,10 +534,10 @@ void Emitter::getWriteDpndBitset(Inst * inst, RegistersBitset * regs)
     OpndVector & opnds = inst->getOpnds();
     if(opnds.size() <= 1) return;
 
-    uint32 dstcount=inst->getNumDst();
+    U_32 dstcount=inst->getNumDst();
     Opnd *opnd;
 
-    for( uint32 i=0 ; i<dstcount ; i++ ) {
+    for( U_32 i=0 ; i<dstcount ; i++ ) {
         opnd = opnds[i+1];
         switch (opnd->getOpndKind()) {
         case OPND_G_REG:
@@ -564,11 +564,11 @@ void Emitter::getReadDpndBitset(Inst * inst, RegistersBitset * regs)
     OpndVector & opnds = inst->getOpnds();
     if(opnds.size() <= 1) return;
 
-    uint32 dstcount=inst->getNumDst();
-    uint32 opndcount=inst->getNumOpnd();
+    U_32 dstcount=inst->getNumDst();
+    U_32 opndcount=inst->getNumOpnd();
     Opnd *opnd;
 
-    for( uint32 i=1+dstcount ; i<opndcount ; i++ ) {
+    for( U_32 i=1+dstcount ; i<opndcount ; i++ ) {
         opnd = opnds[i];
         switch (opnd->getOpndKind()) {
         case OPND_G_REG:
@@ -632,8 +632,8 @@ bool Emitter::parsing(int bbindex) {
     vectorregs * rr = bb->rregs;
     Inst *inst;
     RegistersBitset * regs;
-    uint32 dstcount;
-    uint32 opndcount;
+    U_32 dstcount;
+    U_32 opndcount;
     Opnd         * opnd;
     vectorconst  * consts = bb->consts;
     Constant     * constant;
@@ -671,7 +671,7 @@ bool Emitter::parsing(int bbindex) {
         dstcount=inst->getNumDst();
         opndcount=inst->getNumOpnd();
 
-        for( uint32 j=1 ; j<opndcount ; j++ ) {
+        for( U_32 j=1 ; j<opndcount ; j++ ) {
             opnd = opnds[j];
             if (opnd->isImm()) {
                 if ( opnd->getDataKind() == DATA_CONST_REF) {
@@ -1174,9 +1174,9 @@ bool Emitter::emitCode() {
             bundles = bb->bundles;
             for(int i=0, ii=(int)bundles->size() ; i<ii ; i++ ) {
                 bundle = bundles->at(i);
-                for (uint32 si=0 ; si < IPF_SLOTS_COUNT ; si++) {
+                for (U_32 si=0 ; si < IPF_SLOTS_COUNT ; si++) {
                     inst = bundle->getSlot(si);
-                    inst->setAddr((uint32)(off - bboff) + si);
+                    inst->setAddr((U_32)(off - bboff) + si);
                 }
 
                 if ( isBranchBundle(bundle, codeoff, off, target) ) {
@@ -1349,7 +1349,7 @@ void Emitter::printInsts(int bbindex) {
     Inst *inst;
 
     IPF_LOG << ".L" << bbs->at(bbindex)->node->getId() << "\n";
-    for (uint32 i = 0, ii=insts.size() ; i < ii ; i++) {
+    for (U_32 i = 0, ii=insts.size() ; i < ii ; i++) {
         inst = insts[i];
         if( inst==NULL ) {
             IPF_LOG << IrPrinter::toString(inst);

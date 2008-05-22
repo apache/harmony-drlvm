@@ -50,23 +50,23 @@ public:
     CSEHashKey(CSEHashKey* key) {
         copy(key);
     }
-    CSEHashKey(uint32 opc) {
+    CSEHashKey(U_32 opc) {
         opcode = opc;
         opnd1 = opnd2 = opnd3 = 0;
     }
-    CSEHashKey(uint32 opc, uint32 opnd) {
+    CSEHashKey(U_32 opc, U_32 opnd) {
         opcode = opc; 
         opnd1 = opnd; 
         opnd2 = 0;
         opnd3 = 0;
     }
-    CSEHashKey(uint32 opc, uint32 op1, uint32 op2) {
+    CSEHashKey(U_32 opc, U_32 op1, U_32 op2) {
         opcode = opc;
         opnd1 = op1;
         opnd2 = op2;
         opnd3 = 0;
     }
-    CSEHashKey(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
+    CSEHashKey(U_32 opc, U_32 op1, U_32 op2, U_32 op3) {
         opcode = opc;
         opnd1 = op1;
         opnd2 = op2;
@@ -114,7 +114,7 @@ public:
         return compare(other)>=0;
     }
 
-    uint32 getHashCode() const {
+    U_32 getHashCode() const {
         return opcode + (opnd1 ^ opnd2) + opnd3;
     }
     void copy(const CSEHashKey* key) {
@@ -132,15 +132,15 @@ public:
            << (int) opnd3 << ")";
     }
 private:
-    uint32   opcode;
-    uint32   opnd1;
-    uint32   opnd2;
-    uint32   opnd3;
+    U_32   opcode;
+    U_32   opnd1;
+    U_32   opnd2;
+    U_32   opnd3;
 };
 
 class CSEHash : public KeyLinkHashTable<CSEHashKey> {
 public:
-    CSEHash(MemoryManager& mm, uint32 size) : KeyLinkHashTable<CSEHashKey>(mm, size) {}
+    CSEHash(MemoryManager& mm, U_32 size) : KeyLinkHashTable<CSEHashKey>(mm, size) {}
 };
 
 #define CSE_NUM_HASH_LINKS 32
@@ -148,7 +148,7 @@ public:
 
 class FixedCSEHash : public FixedKeyLinkHashTable<CSEHashKey, CSE_NUM_HASH_LINKS> {
 public:
-    FixedCSEHash(MemoryManager& mm, uint32 size) 
+    FixedCSEHash(MemoryManager& mm, U_32 size) 
         : FixedKeyLinkHashTable<CSEHashKey, CSE_NUM_HASH_LINKS>(mm, size) {}
 };
 
@@ -162,46 +162,46 @@ public:
     void    kill() {hashTable.removeAll();}
     virtual Inst*  lookupKey(CSEHashKey* key) { return lookupKeyBase(key); }
 
-    Inst*    lookup(uint32 opc) {
+    Inst*    lookup(U_32 opc) {
         CSEHashKey key(opc);            
         return lookupKey(&key);
     }
-    Inst*    lookup(uint32 opc, uint32 op1) {
+    Inst*    lookup(U_32 opc, U_32 op1) {
         CSEHashKey key(opc, op1);        
         return lookupKey(&key);
     }
-    Inst*    lookup(uint32 opc, uint32 op1, uint32 op2) {
+    Inst*    lookup(U_32 opc, U_32 op1, U_32 op2) {
         CSEHashKey key(opc, op1, op2);    
         return lookupKey(&key);
     }
-    Inst*    lookup(uint32 opc, uint32 op1, uint32 op2, uint32 op3) {
+    Inst*    lookup(U_32 opc, U_32 op1, U_32 op2, U_32 op3) {
         CSEHashKey key(opc, op1, op2, op3);
         return lookupKey(&key);
     }
-    void    remove(uint32 opc, uint32 op1) {
+    void    remove(U_32 opc, U_32 op1) {
         CSEHashKey key(opc, op1);
         hashTable.remove(&key);
     }
-    void    insert(uint32 opc, Inst* inst) {
+    void    insert(U_32 opc, Inst* inst) {
         CSEHashKey key(opc);            
         hashTable.insert(&key, inst);
     }
-    void    insert(uint32 opc, uint32 op1, Inst* inst) {
+    void    insert(U_32 opc, U_32 op1, Inst* inst) {
         CSEHashKey key(opc, op1);        
         hashTable.insert(&key, inst);
     }
-    void    insert(uint32 opc, uint32 op1, uint32 op2, Inst* inst) {
+    void    insert(U_32 opc, U_32 op1, U_32 op2, Inst* inst) {
         CSEHashKey key(opc, op1, op2);    
         hashTable.insert(&key, inst);
     }
-    void    insert(uint32 opc, uint32 op1, uint32 op2, uint32 op3, Inst* inst) {
+    void    insert(U_32 opc, U_32 op1, U_32 op2, U_32 op3, Inst* inst) {
         CSEHashKey key(opc, op1, op2, op3);    
         hashTable.insert(&key, inst);
     }
     void    insert(CSEHashKey key, Inst* inst) {
         hashTable.insert(&key, inst);
     }
-    uint32  numCSE;
+    U_32  numCSE;
 
 protected:
     Inst*  lookupKeyBase(CSEHashKey* key);

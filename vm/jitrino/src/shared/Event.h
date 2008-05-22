@@ -51,7 +51,7 @@ public:
     //
     // Constructor
     //
-    Event(char *nm) : counter(0), threshold((uint32) -1), 
+    Event(char *nm) : counter(0), threshold((U_32) -1), 
                       state(Inactive), name(nm) {}
     //
     // Increment the event counter by reported number of events
@@ -75,7 +75,7 @@ public:
     //
     // Set overflow threshold
     //
-    void setThreshold(uint32 th) { threshold = th; }
+    void setThreshold(U_32 th) { threshold = th; }
     //
     // Is monitoring active on this event?
     //
@@ -89,7 +89,7 @@ public:
     // monitoring.
     //
     void startMonitor() {
-        assert(threshold != ((uint32) -1));
+        assert(threshold != ((U_32) -1));
         counter = 0;
         state   = Counting;
     }
@@ -140,8 +140,8 @@ public:
 
 private:
     // Fields
-    uint32 counter;     // Counts number of occurrences of the event 
-    uint32 threshold;   // Threshold for overflow
+    U_32 counter;     // Counts number of occurrences of the event 
+    U_32 threshold;   // Threshold for overflow
     State  state;       // Active indicates that the counter is being tracked
     char * name;        // Name for the event counter
 };

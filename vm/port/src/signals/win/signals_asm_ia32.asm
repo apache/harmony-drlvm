@@ -19,16 +19,16 @@
 _TEXT   SEGMENT PARA USE32 PUBLIC 'CODE'
 
 ; struct Registers {
-; uint32 eax;    +00
-; uint32 ebx;    +04
-; uint32 ecx;    +08
-; uint32 edx;    +0C
-; uint32 edi;    +10
-; uint32 esi;    +14
-; uint32 ebp;    +18
-; uint32 esp;    +1C
-; uint32 eip;    +20
-; uint32 eflags; +24
+; U_32 eax;    +00
+; U_32 ebx;    +04
+; U_32 ecx;    +08
+; U_32 edx;    +0C
+; U_32 edi;    +10
+; U_32 esi;    +14
+; U_32 ebp;    +18
+; U_32 esp;    +1C
+; U_32 eip;    +20
+; U_32 eflags; +24
 ; };
 ;
 ; void port_transfer_to_regs(Registers* regs)

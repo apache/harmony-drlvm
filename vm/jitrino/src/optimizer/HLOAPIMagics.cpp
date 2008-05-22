@@ -716,7 +716,7 @@ HLOAPIMagicIRBuilder::genSub(Type* dstType, Modifier mod, Opnd* src1, Opnd* src2
 }
 
 Opnd*
-HLOAPIMagicIRBuilder::genLdConstant(int32 val) {
+HLOAPIMagicIRBuilder::genLdConstant(I_32 val) {
     Opnd* dst = createOpnd(typeManager.getInt32Type());
     appendInst(instFactory.makeLdConst(dst, val));
     return dst;

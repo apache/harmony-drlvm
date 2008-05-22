@@ -78,7 +78,7 @@ struct RegAlloc3 : public SessionAction
     unsigned coalesceCount;
 
     class BoolMatrix;
-    typedef uint32 RegMask;     // used to represent set of registers
+    typedef U_32 RegMask;     // used to represent set of registers
 
     static void merge (Constraint& c, RegMask mk)   {c.setMask(c.getMask() | mk);}
 
@@ -106,7 +106,7 @@ struct RegAlloc3 : public SessionAction
     struct Oprole
     {
         Inst* inst;
-        uint32 role;
+        U_32 role;
     };
     typedef StlVector<Oprole> Oproles;
 
@@ -151,8 +151,8 @@ struct RegAlloc3 : public SessionAction
 
     RegAlloc3 ()                    : mm("RegAlloc3"), registers(mm), graph(mm), nstack(mm) {}
 
-    uint32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
-    uint32 getSideEffects () const  {return coalesceCount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
+    U_32 getNeedInfo () const     {return NeedInfo_LivenessInfo;}
+    U_32 getSideEffects () const  {return coalesceCount == 0 ? 0 : SideEffect_InvalidatesLivenessInfo;}
 
     void runImpl();
     void SpillGen ();
@@ -771,7 +771,7 @@ void RegAlloc3::processInst (Inst* inst, BitSet& lives, int* opandmap, BoolMatri
     Inst::Opnds opnds(inst, Inst::OpndRole_All);
     for (Inst::Opnds::iterator it = opnds.begin(); it != opnds.end(); it = opnds.next(it))
     {
-        uint32 role = inst->getOpndRoles(it);
+        U_32 role = inst->getOpndRoles(it);
         Opnd*  opnd = inst->getOpnd(it);
 
     //  For each operand def, look at the all live operand

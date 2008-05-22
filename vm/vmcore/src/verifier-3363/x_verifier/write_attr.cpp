@@ -197,7 +197,7 @@ void vf_Context_5e::writeStackMapFrame_Append( Address offset, int app_sz, int a
     lastLocalsNo += app_realsz;
 }
 
-void vf_Context_5e::writeStackMapElements( Address start, uint32 cnt ) {
+void vf_Context_5e::writeStackMapElements( Address start, U_32 cnt ) {
     while( cnt ) {
         SmConstant el = curFrame->elements[start].const_val;
         workmap->elements[start].const_val = el;

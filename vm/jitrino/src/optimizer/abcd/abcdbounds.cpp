@@ -434,11 +434,11 @@ VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
             Inst *shiftByInst = shiftByOp->getInst();
             ConstInst *shiftByConstInst = shiftByInst->asConstInst();
             if (shiftByConstInst != 0) {
-                uint32 shiftBy;
+                U_32 shiftBy;
                 if (shiftByConstInst->getType() == Type::Int32) {
-                    shiftBy = (uint32)shiftByConstInst->getValue().i4;
+                    shiftBy = (U_32)shiftByConstInst->getValue().i4;
                 } else if (shiftByConstInst->getType() == Type::Int64) {
-                    shiftBy = (uint32)shiftByConstInst->getValue().i8;
+                    shiftBy = (U_32)shiftByConstInst->getValue().i8;
                 } else {
                     return ConstBound();
                 }
@@ -449,13 +449,13 @@ VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
                     switch (typetag) {
                     case Type::Int32: 
                         {
-                            int32 bound = outputBound.getInt32();
+                            I_32 bound = outputBound.getInt32();
                             if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
                                 shiftBy = shiftBy & 31;
-                            int32 input = bound << shiftBy;
+                            I_32 input = bound << shiftBy;
                             if (!isLB) {
                                 if (shiftBy < 31) {
-                                    input = input + ((int32(1) << shiftBy) - 1);
+                                    input = input + ((I_32(1) << shiftBy) - 1);
                                 } else {
                                     input = 0xffffffff;
                                 }
@@ -533,7 +533,7 @@ bool PiBound::extractConstant(Type::Tag newtype, ConstInst *cinst0, PiBound &res
     switch (cinst0->getType()) {
     case Type::Int8: case Type::Int16: case Type::Int32:
         {
-            int32 c = cv.i4;
+            I_32 c = cv.i4;
             res = PiBound(newtype, int64(c));
             return true;
         }
@@ -545,7 +545,7 @@ bool PiBound::extractConstant(Type::Tag newtype, ConstInst *cinst0, PiBound &res
         }
     case Type::UInt8: case Type::UInt16: case Type::UInt32:
         {
-            uint32 c = (uint32) cv.i4;
+            U_32 c = (U_32) cv.i4;
             res = PiBound(newtype, int64(uint64(c)));
             return true;
         }
@@ -688,8 +688,8 @@ void PiBoundIter::setCurrent()
                 ConstInst *cinst1 = inst1->asConstInst();
                 assert(cinst1);
                 ConstInst::ConstValue cv = cinst1->getValue();
-                int32 c = cv.i4;
-                int32 negc = -c;
+                I_32 c = cv.i4;
+                I_32 negc = -c;
                 if (neg_overflowed(negc,c)) { // overflowed
                     instr = 0;
                 } else {

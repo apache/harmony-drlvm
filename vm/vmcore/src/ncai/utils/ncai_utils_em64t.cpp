@@ -34,7 +34,7 @@ struct NcaiRegisters
     uint16  ss;
     uint16  cs;
     uint64  rip;
-    uint32  eflags;
+    U_32  eflags;
 };
 
 #define REGSIZE(_field_) ((jint)sizeof(((NcaiRegisters*)0)->_field_))

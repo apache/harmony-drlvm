@@ -131,7 +131,7 @@ class AliasManager {
 public:
     typedef StlVector<AliasRep> AliasList;
 private:
-    uint32 numAliasReps;
+    U_32 numAliasReps;
     AliasList allAliasReps;
     typedef StlHashMap<AliasRep, StlVectorSet<AliasRep> *> AliasRep2AliasReps;
     AliasRep2AliasReps canon2others;
@@ -206,10 +206,10 @@ public:
 
 class AliasDefSites : public StlHashMap<AliasRep, VarDefSites *> {
     MemoryManager &mm;
-    uint32 numNodes;
+    U_32 numNodes;
 public:
     typedef StlHashMap<AliasRep, VarDefSites *> BaseType;
-    AliasDefSites(MemoryManager &m, uint32 n): BaseType(m), mm(m), numNodes(n) {};
+    AliasDefSites(MemoryManager &m, U_32 n): BaseType(m), mm(m), numNodes(n) {};
     void addAliasDefSite(const AliasRep &rep, Node* node) {
         VarDefSites* aliasSites = (*this)[rep];
         if (!aliasSites) {
@@ -256,8 +256,8 @@ public:
 
 struct AliasBinding {
     Inst *inst;
-    uint32 when;
-    AliasBinding(Inst *inst0=0, uint32 when0=0) : inst(inst0), when(when0) {};
+    U_32 when;
+    AliasBinding(Inst *inst0=0, U_32 when0=0) : inst(inst0), when(when0) {};
 };
 
 bool operator !=(const AliasBinding &a, const AliasBinding &b) {
@@ -266,13 +266,13 @@ bool operator !=(const AliasBinding &a, const AliasBinding &b) {
     
 class DescendentSet : public StlVectorSet<AliasRep> {
 public:
-    DescendentSet(MemoryManager &m, uint32 depth0) : StlVectorSet<AliasRep>(m), depth(depth0) {};
-    DescendentSet(MemoryManager &m, DescendentSet *other, uint32 depth0)
+    DescendentSet(MemoryManager &m, U_32 depth0) : StlVectorSet<AliasRep>(m), depth(depth0) {};
+    DescendentSet(MemoryManager &m, DescendentSet *other, U_32 depth0)
         : StlVectorSet<AliasRep>(m), depth(depth0)
     {
         insert(other->begin(), other->end());
     }
-    uint32 depth;
+    U_32 depth;
 };
 
 class AliasRenameMap {
@@ -280,8 +280,8 @@ class AliasRenameMap {
     typedef SparseScopedMap<AliasRep, DescendentSet *> DescendentMap;
     DefMap defMap;
     DescendentMap activeDescendents;
-    uint32 depth;
-    uint32 timeCount;
+    U_32 depth;
+    U_32 timeCount;
     AliasManager *aliasManager;
     MemoryManager &mm;
 public:

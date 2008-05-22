@@ -199,7 +199,7 @@ typedef StlVector< RegOpnd* >           RegOpndVector;
 typedef StlVector< Inst* >              InstVector;
 typedef StlVector< Node* >              NodeVector;
 typedef StlVector< Edge* >              EdgeVector;
-typedef StlVector< uint32 >             Uint32Vector;
+typedef StlVector< U_32 >             Uint32Vector;
 typedef StlList< Inst* >                InstList;
 typedef StlList< Node* >                NodeList;
 typedef StlList< Edge* >                EdgeList;
@@ -210,7 +210,7 @@ typedef StlMap< RegOpnd*, RegOpnd* >    RegOpnd2RegOpndMap;
 typedef StlMap< Inst*, RegOpndSet >     Inst2RegOpndSetMap;
 typedef StlMap< uint64, RegOpndSet >    Uint642RegOpndSetMap;
 typedef bitset< NUM_G_REG >             RegBitSet;
-typedef StlMultiMap <uint32, RegOpnd*, greater <uint32> > Int2OpndMap;
+typedef StlMultiMap <U_32, RegOpnd*, greater <U_32> > Int2OpndMap;
 
 typedef NodeVector::iterator            NodeIterator;
 typedef InstVector::iterator            InstIterator;
@@ -227,7 +227,7 @@ typedef Uint642RegOpndSetMap::iterator  Uint642RegOpndSetMapIterator;
 
 typedef NodeList                        Chain;
 typedef StlList< Chain* >               ChainList;
-typedef StlMultiMap< uint32, Chain*, greater < uint32 > > ChainMap;
+typedef StlMultiMap< U_32, Chain*, greater < U_32 > > ChainMap;
 typedef Chain::iterator                 ChainIterator;
 typedef ChainList::iterator             ChainListIterator;
 typedef ChainMap::iterator              ChainMapIterator;

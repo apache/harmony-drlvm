@@ -270,7 +270,7 @@ JIT_execute_method_default(JIT_Handle jh,
         return_value->j = int_result;
         break;
     case JAVA_TYPE_INT:
-        *((int32 *)return_value) = (int32) int_result;
+        *((I_32 *)return_value) = (I_32) int_result;
         break;
     case JAVA_TYPE_SHORT:
         *((int16 *)return_value) = (int16) int_result;

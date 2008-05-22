@@ -32,8 +32,8 @@ namespace Ia32{
 class DCE : public SessionAction {
 public:
     void runImpl();
-    uint32 getSideEffects() const {return 0;}
-    uint32 getNeedInfo()const {return 0;}
+    U_32 getSideEffects() const {return 0;}
+    U_32 getNeedInfo()const {return 0;}
 };
 
 static ActionFactory<DCE> _dce("cg_dce");

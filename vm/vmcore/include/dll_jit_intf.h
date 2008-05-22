@@ -83,9 +83,9 @@ public:
         _get_root_set_for_thread_dump(this, method, enum_handle, context);
     }
 
-    uint32
+    U_32
     get_inline_depth(InlineInfoPtr  ptr,
-                     uint32         offset)
+                     U_32         offset)
     {
         if (_get_inline_depth != NULL) {
             return _get_inline_depth(this, ptr, offset);
@@ -95,8 +95,8 @@ public:
 
     Method_Handle
     get_inlined_method(InlineInfoPtr  ptr,
-                     uint32         offset,
-                     uint32         inline_depth)
+                     U_32         offset,
+                     U_32         inline_depth)
     {
         if (_get_inlined_method != NULL) {
             return _get_inlined_method(this, ptr, offset, inline_depth);
@@ -106,8 +106,8 @@ public:
 
     uint16
     get_inlined_bc(InlineInfoPtr  ptr,
-                     uint32         offset,
-                     uint32         inline_depth)
+                     U_32         offset,
+                     U_32         inline_depth)
     {
         if (_get_inlined_bc != NULL) {
             return _get_inlined_bc(this, ptr, offset, inline_depth);
@@ -242,23 +242,23 @@ private:
                                       const JitFrameContext*  context
                                       );
     
-    uint32
+    U_32
     (*_get_inline_depth)(
                         JIT_Handle jit,                    
                         InlineInfoPtr  ptr, 
-                        uint32         offset);
+                        U_32         offset);
 
     Method_Handle
     (*_get_inlined_method)(JIT_Handle jit,
                             InlineInfoPtr  ptr, 
-                            uint32         offset,
-                            uint32         inline_depth);
+                            U_32         offset,
+                            U_32         inline_depth);
 
     uint16
     (*_get_inlined_bc)(JIT_Handle jit,
                             InlineInfoPtr  ptr,
-                            uint32         offset,
-                            uint32         inline_depth);
+                            U_32         offset,
+                            U_32         inline_depth);
 
     void
     (*_fix_handler_context)(JIT_Handle         jit,

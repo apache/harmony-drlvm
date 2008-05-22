@@ -77,7 +77,7 @@ inline void object_fix_ref_slots(Partial_Reveal_Object* p_obj)
     Partial_Reveal_Array* array = (Partial_Reveal_Array*)p_obj;
     assert(!obj_is_primitive_array(p_obj));
     
-    int32 array_length = array->array_len;
+    I_32 array_length = array->array_len;
     REF* p_refs = (REF *)((POINTER_SIZE_INT)array + (int)array_first_element_offset(array));
     for (int i = 0; i < array_length; i++) {
       slot_fix(p_refs + i);

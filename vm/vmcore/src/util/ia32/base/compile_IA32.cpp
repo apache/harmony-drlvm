@@ -63,7 +63,7 @@ void compile_flush_generated_code() {
     // Nothing to do on IA32
 }
 
-static uint32* get_arg_word(unsigned num_arg_words, unsigned word) {
+static U_32* get_arg_word(unsigned num_arg_words, unsigned word) {
     return m2n_get_args(m2n_get_last_frame())+num_arg_words-word-1;
 }
 
@@ -151,7 +151,7 @@ char * gen_convert_managed_to_unmanaged_null_ia32(char * ss,
 #ifdef REFS_RUNTIME_OR_COMPRESSED
     REFS_RUNTIME_SWITCH_IF
         ss = mov(ss,  eax_opnd,  M_Base_Opnd(esp_reg, stack_pointer_offset));
-        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((int32)VM_Global_State::loader_env->heap_base) );
+        ss = alu(ss, cmp_opc,  eax_opnd,  Imm_Opnd((I_32)VM_Global_State::loader_env->heap_base) );
         ss = branch8(ss, Condition_NE,  Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
         ss = mov(ss,  M_Base_Opnd(esp_reg, stack_pointer_offset),  Imm_Opnd(0));
@@ -218,9 +218,9 @@ NativeCodePtr compile_gen_compile_me(Method_Handle method) {
 #endif
 
 #ifdef VM_STATS
-    stub = inc(stub, M_Base_Opnd(n_reg, (int32)&VM_Statistics::get_vm_stats().num_compileme_used));
+    stub = inc(stub, M_Base_Opnd(n_reg, (I_32)&VM_Statistics::get_vm_stats().num_compileme_used));
 #endif
-    stub = mov(stub, ecx_opnd, Imm_Opnd((int32)method));
+    stub = mov(stub, ecx_opnd, Imm_Opnd((I_32)method));
     stub = jump(stub, (char *)compile_get_compile_me_generic());
     assert(stub - (char *)addr <= STUB_SIZE);
 

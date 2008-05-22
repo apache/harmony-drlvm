@@ -250,8 +250,8 @@ void GlobalCodeMotion::scheduleEarly(DominatorNode *domNode, Inst *i)
                 Log::out() << " Inst is not a Phi, processing operands" << std::endl;
             }
             // for others, record uses in this instruction
-            uint32 numSrcs = i->getNumSrcOperands();
-            for (uint32 srcNum=0; srcNum < numSrcs; ++srcNum) {
+            U_32 numSrcs = i->getNumSrcOperands();
+            for (U_32 srcNum=0; srcNum < numSrcs; ++srcNum) {
                 Opnd *srcOpnd = i->getSrc(srcNum);
                 Inst *srcInst = srcOpnd->getInst();
                 scheduleEarly(0, srcInst);
@@ -301,8 +301,8 @@ void GlobalCodeMotion::scheduleEarly(DominatorNode *domNode, Inst *i)
         // not pinned, figure out earliest placement
         DominatorNode *currentEarliest = dominators.getDominatorRoot();
         DominatorNode *srcInstEarliest = NULL;
-        uint32 numSrcs = i->getNumSrcOperands();
-        for (uint32 srcNum=0; srcNum < numSrcs; ++srcNum) {
+        U_32 numSrcs = i->getNumSrcOperands();
+        for (U_32 srcNum=0; srcNum < numSrcs; ++srcNum) {
             Opnd *srcOpnd = i->getSrc(srcNum);
             Inst *srcInst = srcOpnd->getInst();
             scheduleEarly(0, srcInst);
@@ -686,7 +686,7 @@ void GlobalCodeMotion::sinkAllConstants()
 
 void GlobalCodeMotion::sinkConstants(Inst *inst)
 {
-    for (uint32 i = 0; i < inst->getNumSrcOperands(); i++) {
+    for (U_32 i = 0; i < inst->getNumSrcOperands(); i++) {
         Opnd *opnd = inst->getSrc(i);
         Inst *opndInst = opnd->getInst();
         if (opndInst->isConst()) {

@@ -551,7 +551,7 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
     unsigned * map = (unsigned*)(ebp + frame.info_gc_locals());
 
     uint64* var_ptr_to_64;
-    uint32* var_ptr_to32;
+    U_32* var_ptr_to32;
 
     switch(var_type) {
     case VM_DATA_TYPE_INT64:
@@ -572,8 +572,8 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
         break;
 #endif
     default:
-        var_ptr_to32 = (uint32*)value_ptr;
-        *var_ptr_to32 = *(uint32*)(ebp + frame.local(var_num));
+        var_ptr_to32 = (U_32*)value_ptr;
+        *var_ptr_to32 = *(U_32*)(ebp + frame.local(var_num));
     }
     return EXE_ERROR_NONE;
 }
@@ -596,7 +596,7 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
 
     char * ebp = (char*)**devirt(bp, context);
     uint64* var_ptr_to_64;
-    uint32* var_ptr_to32;
+    U_32* var_ptr_to32;
     
     switch(var_type) {
     case VM_DATA_TYPE_INT64:
@@ -611,8 +611,8 @@ void rt_native2bc(JIT_Handle jit, Method_Handle method, const void * ip,
         *var_ptr_to_64 = *(uint64*)value_ptr;
         break;
     default:
-        var_ptr_to32 = (uint32*)(ebp + frame.local(var_num));
-        *var_ptr_to32 = *(uint32*)value_ptr;
+        var_ptr_to32 = (U_32*)(ebp + frame.local(var_num));
+        *var_ptr_to32 = *(U_32*)value_ptr;
     }
 
     return EXE_ERROR_NONE;
@@ -642,10 +642,10 @@ void rt_profile_notification_callback(JIT_Handle jit, PC_Handle pch, Method_Hand
        //2. Replace all the remaining bytes of counter instruction with nops
        //3. Atomically replace jump with 2 nops
        U_8* methodAddr = method_get_code_block_jit(mh, jit);
-       for (uint32 i = 0 ; i<infoBlock.num_profiler_counters; i++) {
-           uint32 offsetInfo = infoBlock.profiler_counters_map[i];
-           uint32 codeOffset = ProfileCounterInfo::getInstOffset(offsetInfo);
-           uint32 patchedSize = ProfileCounterInfo::getInstSize(offsetInfo);
+       for (U_32 i = 0 ; i<infoBlock.num_profiler_counters; i++) {
+           U_32 offsetInfo = infoBlock.profiler_counters_map[i];
+           U_32 codeOffset = ProfileCounterInfo::getInstOffset(offsetInfo);
+           U_32 patchedSize = ProfileCounterInfo::getInstSize(offsetInfo);
 
            U_8* patchedAddr = methodAddr + codeOffset;
            //1. Generate jump to the next instruction

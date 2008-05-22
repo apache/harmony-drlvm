@@ -48,9 +48,9 @@ class PeepHoleOpt :
 {
 private:
     // Virtuals
-    uint32  getSideEffects(void) const
+    U_32  getSideEffects(void) const
     {
-        return m_bHadAnyChange ? (uint32)-1 : 0;
+        return m_bHadAnyChange ? (U_32)-1 : 0;
     }
 private:
     enum Changed { 
@@ -400,8 +400,8 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_Convert_F2I_D2I(Inst* inst)
     return Changed_Node;
 }
 
-static int getMinBit(uint32 val) {
-    uint32 currentVal = val;
+static int getMinBit(U_32 val) {
+    U_32 currentVal = val;
     int i=0;
     do {
         if ((currentVal & 1)) {
@@ -412,8 +412,8 @@ static int getMinBit(uint32 val) {
     return i;
 }
 
-static int getMaxBit(uint32 val) {
-    uint32 currentVal = val;
+static int getMaxBit(U_32 val) {
+    U_32 currentVal = val;
     int i=31;
     do {
         if ((currentVal & (1<<31))) {

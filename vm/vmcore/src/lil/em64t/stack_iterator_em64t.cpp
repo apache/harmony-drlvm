@@ -135,7 +135,7 @@ static char* get_reg(char* ss, const R_Opnd & dst, Reg_No base, int64 offset,
 {
     char* patch_offset = NULL;
 
-    ss = mov(ss, dst,  M_Base_Opnd(base, (int32)offset));
+    ss = mov(ss, dst,  M_Base_Opnd(base, (I_32)offset));
 
     if (check_null)
     {

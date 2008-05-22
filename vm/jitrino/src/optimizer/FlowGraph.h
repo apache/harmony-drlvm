@@ -59,7 +59,7 @@ public:
     // from block.
     static void  foldBranch(ControlFlowGraph& fg, BranchInst* br, bool isTaken);
 
-    static void  foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, uint32 target);
+    static void  foldSwitch(ControlFlowGraph& fg, SwitchInst* sw, U_32 target);
 
     // Eliminates the check at the end of block and the associated exception
     // edge.  If (alwaysThrows), then eliminates the non-exception edge instead;
@@ -81,7 +81,7 @@ public:
     static void print(std::ostream& cout, Node* node);
     static void printLabel(std::ostream& cout, Node* node);
     static void printLabel(std::ostream& cout, DominatorNode* dNode) {printLabel(cout, dNode->getNode()); }
-    static void printInsts(std::ostream& cout, Node* node, uint32 indent);
+    static void printInsts(std::ostream& cout, Node* node, U_32 indent);
 
     static void printDotFile(ControlFlowGraph& cfg, MethodDesc& methodDesc,const char *suffix);
 
@@ -114,7 +114,7 @@ class NodeRenameTable : public HashTable<Node,Node> {
 public:
     typedef HashTableIter<Node, Node> Iter;
 
-    NodeRenameTable(MemoryManager& mm,uint32 size):HashTable<Node,Node>(mm,size) {}
+    NodeRenameTable(MemoryManager& mm,U_32 size):HashTable<Node,Node>(mm,size) {}
     Node *getMapping(Node *node) { return (Node*)lookup(node);  }
     void     setMapping(Node *node, Node *to) { insert(node,to); }
 
@@ -122,7 +122,7 @@ protected:
     virtual bool keyEquals(Node* key1,Node* key2) const { return key1 == key2; }
     
     // return hash of address bits
-    virtual uint32 getKeyHashCode(Node* key) const { return ((uint32)(((POINTER_SIZE_INT)key) >> sizeof(void*))); }
+    virtual U_32 getKeyHashCode(Node* key) const { return ((U_32)(((POINTER_SIZE_INT)key) >> sizeof(void*))); }
 };
 
 } //namespace Jitrino 

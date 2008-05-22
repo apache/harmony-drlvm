@@ -326,8 +326,8 @@ JIT_get_root_set_from_stack_frame(JIT_Handle jit, Method_Handle method,
 }
 
 extern "C"
-JITEXPORT uint32
-JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset)
+JITEXPORT U_32
+JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, U_32 offset)
 {
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINE_DEPTH()" << ::std::endl;
@@ -337,8 +337,8 @@ JIT_get_inline_depth(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset)
 
 extern "C"
 JITEXPORT Method_Handle
-JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset,
-                       uint32 inline_depth)
+JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr, U_32 offset,
+                       U_32 inline_depth)
 {
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINED_METHOD()" << ::std::endl;
@@ -352,7 +352,7 @@ JIT_get_inlined_method(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset,
 
 extern "C"
 JITEXPORT uint16
-JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr, uint32 offset, uint32 inline_depth)
+JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr, U_32 offset, U_32 inline_depth)
 {
     if (Log::cat_rt()->isEnabled()) {
         Log::cat_rt()->out() << "GET_INLINED_BC()" << ::std::endl;

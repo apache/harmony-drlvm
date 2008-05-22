@@ -97,7 +97,7 @@ MemoryOpt::MemoryOpt(IRManager &irManager0,
 {
     assert(aliasManager);
 
-    uint32 numNodes = df0.getNumNodes();
+    U_32 numNodes = df0.getNumNodes();
     aliasDefSites = new (mm) AliasDefSites(mm, numNodes);
     memPhiSites = new (mm) MemPhiSites(mm, numNodes);
     renameMap = new (mm) AliasRenameMap(mm, aliasManager,
@@ -1825,7 +1825,7 @@ void MemoryOpt::createMemPhiInst(const AliasRep &aliasRep, Node *node)
 // a ScopedDomNodeInstWalker, to be applied forwards/pre-order
 class MemoryRenameWalker {
     MemoryOpt *thePass;
-    uint32 timeCount;
+    U_32 timeCount;
 public:
     MemoryRenameWalker(MemoryOpt *thePass0) :
         thePass(thePass0), timeCount(1)
@@ -2248,7 +2248,7 @@ void AliasRenameMap::exit_scope()
 
 void AliasRenameMap::insert(const AliasRep &rep, Inst *defInst)
 {
-    uint32 timeNow = ++timeCount;
+    U_32 timeNow = ++timeCount;
     AliasBinding newBinding(defInst, timeNow);
 
     if (Log::isEnabled()) {
@@ -2299,7 +2299,7 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
     // rep and its ancestors which has been set
     AliasBinding bestFound = defMap.lookup(rep);
     Inst *bestInst = bestFound.inst;
-    uint32 bestWhen = bestInst ? bestFound.when : 0;
+    U_32 bestWhen = bestInst ? bestFound.when : 0;
     {    
         
         if (!bestInst) {
@@ -2337,7 +2337,7 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
             AliasBinding newFound = defMap.lookup(thisAncestor);
             Inst *thisInst = newFound.inst;
             if (thisInst) {
-                uint32 thisWhen = newFound.when;
+                U_32 thisWhen = newFound.when;
                 if (Log::isEnabled()) {
                     Log::out() << "    ";
                     thisAncestor.print(Log::out());
@@ -2380,7 +2380,7 @@ void AliasRenameMap::lookup(const AliasRep &rep, DefsSet &defs)
             const AliasRep &desc = *descIter;
             const AliasBinding &descBinding = defMap.lookup(desc);
             Inst *desci = descBinding.inst;
-            uint32 when = descBinding.when;
+            U_32 when = descBinding.when;
             if (when > bestWhen) {             // descendant is newer
                 defs.insert(desci);
             }

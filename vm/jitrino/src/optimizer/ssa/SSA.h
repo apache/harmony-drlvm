@@ -45,7 +45,7 @@ struct OptimizerFlags;
 // 
 class VarDefSites {
 public:
-    VarDefSites(MemoryManager& m, uint32 max) 
+    VarDefSites(MemoryManager& m, U_32 max) 
     : stack(m), alreadyRecorded(m, max), insertedPhi(m, max) {}
     void addDefSite(Node* node) {
         // avoid pushing the same node twice onto the stack
@@ -76,7 +76,7 @@ private:
 //
 class DefSites {
 public:
-    DefSites(MemoryManager& m, uint32 n) : table(m,32), mm(m), numNodes(n) {}
+    DefSites(MemoryManager& m, U_32 n) : table(m,32), mm(m), numNodes(n) {}
     void addVarDefSite(VarOpnd* var, Node* node) {
         if (var == NULL) return;
 
@@ -91,7 +91,7 @@ public:
 private:
      PtrHashTable<VarDefSites> table;
      MemoryManager&  mm;
-     uint32        numNodes;
+     U_32        numNodes;
 };
 
 class RenameStack;

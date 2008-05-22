@@ -600,7 +600,7 @@ static void jvmti_start_single_step_in_virtual_method(DebugUtilsTI *ti, const VM
             ip = (NativeCodePtr)((POINTER_SIZE_INT)ip + stub_disasm.get_length_with_prefix());
             stub_disasm = ip;
 #endif
-            // Now IP points on mov(stub, ecx_opnd, Imm_Opnd((int32)method));
+            // Now IP points on mov(stub, ecx_opnd, Imm_Opnd((I_32)method));
             // where method is the method handle. Need to get its
             // address from instruction, it is an immd operand in mov
             assert(stub_disasm.get_operands_count() == 1);

@@ -134,7 +134,7 @@ ProofLattice AbcdSolver::prove(bool prove_lower_bound,
             }
             return ProofLattice::ProvenReduced;
         } else if ((var1 == var2) && 
-                   (c >= ConstBound(int32(0)))) { // reached source:
+                   (c >= ConstBound(I_32(0)))) { // reached source:
             if (Log::isEnabled()) {
                 Log::out() << "Case 4: => TRUE" << ::std::endl;
             }                
@@ -420,7 +420,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                             0,
                             why)) {
                 
-                uint32 elemSize = 16;
+                U_32 elemSize = 16;
                 uint64 overflowSize = ((uint64)1 << 31) / elemSize;
                 
                 if (demandProve(false, // upper bound
@@ -529,7 +529,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                 theInst->print(Log::out());
                 Log::out() << " to eliminate mask" << ::std::endl;
             }
-            int32 mask;
+            I_32 mask;
             switch (theInst->getType()) {
             case Type::Int32:
                 mask = 31; break;
@@ -544,7 +544,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                                 : 0);
             if (mask > 0) {
                 VarBound shiftByVar = VarBound(shiftByOp);
-                ConstBound zerob(int32(0));
+                ConstBound zerob(I_32(0));
                 ProofLattice res1 = prove(true, // lower bound
                                           VarBound(),
                                           shiftByVar,
@@ -622,7 +622,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     // for var+constOpnd, bounds on var are [lb-constOpnd, ub-constOpnd],
                     // for var-constOpnd, bounds on var are [lb+constOpnd, ub+constOpnd]
                     // for constOpnd-var, bounds on var are [constOpnd-ub, constOpnd-lb]
-                    // (with values in int32, but calculations performed in int64)
+                    // (with values in I_32, but calculations performed in int64)
                     ConstInst *constInst = constOpnd->getInst()->asConstInst();
                     assert(constInst);
 #ifndef NDEBUG
@@ -634,9 +634,9 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                            ((constInstType == Type::UInt8)||
                             (constInstType == Type::UInt16)||(constInstType == Type::UInt32)));
                     ConstInst::ConstValue constValue = constInst->getValue();
-                    int32 constValue32 = constValue.i4;
+                    I_32 constValue32 = constValue.i4;
                     int64 varlb, varub;
-                    int64 constValue64 = isSigned ? (int64)constValue32 : (int64)(uint64)(uint32)constValue32;
+                    int64 constValue64 = isSigned ? (int64)constValue32 : (int64)(uint64)(U_32)constValue32;
                     if (negateConstant) { 
                         varlb = lb + constValue64 + 1; // tweak by 1 in case I have a fencepost problem
                         varub = ub + constValue64 - 1;
@@ -779,7 +779,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                             (constInstType == Type::UInt16)||(constInstType == Type::UInt32)));
 #endif
                     ConstInst::ConstValue constValue = constInst->getValue();
-                    int32 constValue32 = constValue.i4;
+                    I_32 constValue32 = constValue.i4;
                     int64 varlb, varub;
                     if (isSigned) {
                         if (constValue32 < 0) {
@@ -793,7 +793,7 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     } else {
                         assert(constValue32 > 0); // inst should have been simplified otherwise
                         varlb = 0;
-                        varub = ub/(uint32)constValue32;
+                        varub = ub/(U_32)constValue32;
                     }
                     VarBound varBound = VarBound(varOpnd);
                     lb = ::std::max(varlb, lb);
@@ -1273,7 +1273,7 @@ ProofLattice AbcdSolver::proveForPredecessors(const VarBound &var1,
                     
                     VarBound var3 = pred.getVar();
                     int64 d1 = pred.getConst();
-                    int32 d = (int32)d1;
+                    I_32 d = (I_32)d1;
                     assert(d1 == int64(d)); // check for overflow
                     ConstBound db(d);
                     

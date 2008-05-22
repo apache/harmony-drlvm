@@ -367,7 +367,7 @@ public:
     // The two types are pointer types, could their values be the same (i.e. point to the same locations)?
     static bool mayAliasPtr(Type*, Type*);
 
-    uint32 getId() { return id; }
+    U_32 getId() { return id; }
 
     // This is for switching integer types depending on the size
 #ifdef POINTER64
@@ -388,7 +388,7 @@ public:
 protected:
     virtual bool    _isFinalClass()    {return false;}
     
-    static uint32 genNextTypeId() {
+    static U_32 genNextTypeId() {
         // this operation can be unsafe until types are cached only per compilation session
         // and every compilation session is performed in a single thread
         UNSAFE_REGION_START
@@ -398,8 +398,8 @@ protected:
     }
 
 private:
-    const uint32 id;
-    static uint32 nextTypeId;
+    const U_32 id;
+    static U_32 nextTypeId;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -431,8 +431,8 @@ public:
     virtual ~FunctionPtrType() {}
 
     FunctionPtrType* asFunctionPtrType() { return this; }
-    virtual uint32 getNumParams() = 0;
-    virtual Type* getParamType(uint32) = 0;
+    virtual U_32 getNumParams() = 0;
+    virtual Type* getParamType(U_32) = 0;
     virtual Type* getReturnType() = 0;
     virtual bool isInstance() = 0;
 };
@@ -444,8 +444,8 @@ public:
     virtual ~MethodPtrType() {}
 
     MethodPtrType* asMethodPtrType() { return this; }
-    uint32 getNumParams() { return methodDesc->getNumParams(); }
-    Type* getParamType(uint32 i);
+    U_32 getNumParams() { return methodDesc->getNumParams(); }
+    Type* getParamType(U_32 i);
     Type* getReturnType() { return methodDesc->getReturnType(); }
     bool isInstance() { return methodDesc->isInstance(); }
     virtual MethodDesc*     getMethodDesc()         {return methodDesc;}
@@ -460,8 +460,8 @@ private:
 
 class UnresolvedMethodPtrType : public MethodPtrType {
 public:
-    UnresolvedMethodPtrType(ObjectType* _enclosingClass, uint32 _cpIndex, TypeManager& tm, 
-        uint32 _nParams, Type** _paramTypes, Type* _returnType,  const char* _signatureStr,
+    UnresolvedMethodPtrType(ObjectType* _enclosingClass, U_32 _cpIndex, TypeManager& tm, 
+        U_32 _nParams, Type** _paramTypes, Type* _returnType,  const char* _signatureStr,
         bool isCompressed=false, ValueName obj=NULL) 
         : MethodPtrType(NULL, tm, isCompressed, obj), 
         enclosingClass(_enclosingClass), cpIndex(_cpIndex),
@@ -471,8 +471,8 @@ public:
     virtual ~UnresolvedMethodPtrType() {}
 
     UnresolvedMethodPtrType* asUnresolvedMethodPtrType() { return this; }
-    uint32 getNumParams() {return nParams;}
-    Type* getParamType(uint32 n){ assert(n<nParams); return paramTypes[n];}
+    U_32 getNumParams() {return nParams;}
+    Type* getParamType(U_32 n){ assert(n<nParams); return paramTypes[n];}
     Type* getReturnType() {return returnType;}
     bool isInstance() { assert(0); return false;}
     virtual MethodDesc* getMethodDesc() {assert(0); return NULL;}
@@ -482,9 +482,9 @@ public:
 private:
     void initSignature();
     ObjectType* enclosingClass;
-    uint32      cpIndex;
+    U_32      cpIndex;
     
-    uint32 nParams;
+    U_32 nParams;
     Type** paramTypes;
     Type* returnType;
     const char* signatureStr;
@@ -551,8 +551,8 @@ public:
     //
     // returns size & alignment of the un-boxed value
     //
-    virtual uint32        getUnboxedSize(){assert(0); return 0;}
-    //virtual uint32        getUnboxedAlignment();
+    virtual U_32        getUnboxedSize(){assert(0); return 0;}
+    //virtual U_32        getUnboxedAlignment();
     void        print(::std::ostream& os);
 protected:
     UserValueType(Tag t,void* td,TypeManager& tm) : NamedType(t,td,tm) {}
@@ -606,13 +606,13 @@ public:
     //
     //  Returns size of the object
     //
-    uint32          getObjectSize();
+    U_32          getObjectSize();
     //
     // for boxed value types, returns byte offset of the un-boxed value
     //
 
     virtual bool    isUnresolvedArray() const {return false;}
-    uint32          getUnboxedOffset();
+    U_32          getUnboxedOffset();
     bool            isInterface();
     bool            isAbstract();
     virtual void    print(::std::ostream& os);
@@ -631,11 +631,11 @@ public:
     //
     // for array types, returns byte offset of the first element of the array
     //
-    uint32    getArrayElemOffset();
+    U_32    getArrayElemOffset();
     //
     // for array types, returns byte offset of the array's length field
     //
-    uint32    getArrayLengthOffset();
+    U_32    getArrayLengthOffset();
     virtual void    print(::std::ostream& os);
 protected:
     virtual bool    _isFinalClass() {
@@ -751,7 +751,7 @@ public:
 
     MethodPtrType*    getMethodPtrType(MethodDesc* methodDesc);
 
-    UnresolvedMethodPtrType*    getUnresolvedMethodPtrType(ObjectType* enclosingClass, uint32 cpIndex, MethodSignature* sig);
+    UnresolvedMethodPtrType*    getUnresolvedMethodPtrType(ObjectType* enclosingClass, U_32 cpIndex, MethodSignature* sig);
         
     MethodPtrType* getMethodPtrObjType(ValueName obj, MethodDesc* methodDesc);
         
@@ -866,7 +866,7 @@ public:
     MethodSignature(){}
     virtual ~MethodSignature(){}
 
-    virtual uint32 getNumParams() const = 0;
+    virtual U_32 getNumParams() const = 0;
     virtual Type** getParamTypes() const = 0;
     virtual Type* getRetType() const = 0;
     virtual const char* getSignatureString() const = 0;

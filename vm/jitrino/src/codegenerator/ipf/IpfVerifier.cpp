@@ -306,7 +306,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
         break;
     case INST_FCVT_XUF:
         if (IS_C(2)) return false;
-        for (uint32 i=0 ; IS_C(i) ; i++) {
+        for (U_32 i=0 ; IS_C(i) ; i++) {
             switch (C(i)) {
             case CMPLT_PC_SINGLE:  
             case CMPLT_PC_DOUBLE:  
@@ -323,7 +323,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
         if (IS_FR(1) && IS_FR(2)) return true;
         break;
     case INST_FMA:
-        for (uint32 i=0 ; IS_C(i) ; i++) {
+        for (U_32 i=0 ; IS_C(i) ; i++) {
             switch (C(i)) {
             case CMPLT_PC_SINGLE:  
             case CMPLT_PC_DOUBLE:  
@@ -347,7 +347,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
     case INST_FPMAX:
     case INST_FPAMIN:
     case INST_FPAMAX:
-        for (uint32 i=0 ; IS_C(i) ; i++) {
+        for (U_32 i=0 ; IS_C(i) ; i++) {
             switch (C(i)) {
             case CMPLT_SF0:
             case CMPLT_SF1:
@@ -361,7 +361,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
         if (IS_FR(1) && IS_FR(2) && IS_FR(3)) return true;
         break;
     case INST_FPCMP:
-        for (uint32 i=0 ; IS_C(i) ; i++) {
+        for (U_32 i=0 ; IS_C(i) ; i++) {
             switch (C(i)) {
             case CMPLT_SF0:
             case CMPLT_SF1:
@@ -395,7 +395,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
         if (IS_FR(1) && IS_FR(2) && !IS_O(3) && !IS_C(0)) return true;
         break;
     case INST_FNMA:
-        for ( uint32 i=0 ; IS_C(i) ; i++ ) {
+        for ( U_32 i=0 ; IS_C(i) ; i++ ) {
             switch(C(i)) {
             case CMPLT_PC_SINGLE:
             case CMPLT_PC_DOUBLE:
@@ -412,7 +412,7 @@ bool IpfVerifier::verifyInst(string * res, Inst * inst) {
         if (IS_FR(1) && IS_FR(2) && IS_FR(3) && IS_FR(4) && !IS_O(5)) return true;
         break;
     case INST_FNORM:
-        for ( uint32 i=0 ; IS_C(i) ; i++ ) {
+        for ( U_32 i=0 ; IS_C(i) ; i++ ) {
             switch(C(i)) {
             case CMPLT_PC_SINGLE:
             case CMPLT_PC_DOUBLE:
@@ -923,7 +923,7 @@ bool IpfVerifier::stx(string * res, Inst * inst, InstCode icode, OpndVector & op
 
 //----------------------------------------------------------------------------//
 bool IpfVerifier::ldx(string * res, Inst * inst, InstCode icode, OpndVector & opnds, CompVector & cmpls) {
-    for (uint32 i=0 ; IS_C(i) ; i++ ) {
+    for (U_32 i=0 ; IS_C(i) ; i++ ) {
         switch (C(i)) {
         case CMPLT_SZ_1:
         case CMPLT_SZ_2:
@@ -968,7 +968,7 @@ bool IpfVerifier::ldx(string * res, Inst * inst, InstCode icode, OpndVector & op
 
 //----------------------------------------------------------------------------//
 bool IpfVerifier::ldfx(string * res, Inst * inst, InstCode icode, OpndVector & opnds, CompVector & cmpls) {
-    for (uint32 i=0 ; IS_C(i) ; i++ ) {
+    for (U_32 i=0 ; IS_C(i) ; i++ ) {
         switch (C(i)) {
         case CMPLT_FSZ_E:
         case CMPLT_FSZ_S:
@@ -1012,7 +1012,7 @@ bool IpfVerifier::mov(string * res, Inst * inst, InstCode icode, OpndVector & op
     if (icode==INST_MOV && !IS_O(3) && ((IS_GR(1) && IS_BR(2)) || (IS_BR(1) && IS_GR(2))))
         return true;
     if ((icode==INST_MOV || icode==INST_MOV_RET) && IS_O(3) && IS_BR(1) && IS_GR(2) && IS_IMM13(3)) {
-        for (uint32 i=0 ; IS_C(i) ; i++){
+        for (U_32 i=0 ; IS_C(i) ; i++){
             switch (C(i)) {
             case CMPLT_IH_NOT_IMP:
             case CMPLT_IH_IMP:

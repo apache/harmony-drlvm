@@ -126,7 +126,7 @@ protected:
 
     void                 makeRootSetInfo(Uint32Vector&);
     void                 writeSpInfo(Uint32Vector&, uint64, RegOpndVector&);
-    int32                toInt32(RegOpnd*);
+    I_32                toInt32(RegOpnd*);
 
     SafePointVector      safePoints;       // after buildRootSet() vector contains all safe points
     MptrDefMap           mptr2def;         //

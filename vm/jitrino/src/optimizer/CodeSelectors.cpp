@@ -56,9 +56,9 @@ void _VarCodeSelector::genCode(Callback& callback) {
     }
 }
 
-uint32 _VarCodeSelector::getNumVarOpnds() {
+U_32 _VarCodeSelector::getNumVarOpnds() {
     VarOpnd* v0 = varOpnds;
-    uint32 numVars = 0;
+    U_32 numVars = 0;
     if (v0) {
         VarOpnd* v = v0;
         do {
@@ -410,19 +410,19 @@ JitHelperCallOp::Id _BlockCodeSelector::convertJitHelperId(JitHelperCallId callI
     return JitHelperCallOp::InitializeArray; // to keep compiler quiet
 }
     
-CG_OpndHandle ** _BlockCodeSelector::genCallArgs(Inst * call, uint32 arg0Pos) {
-    uint32 nSrc = call->getNumSrcOperands();
+CG_OpndHandle ** _BlockCodeSelector::genCallArgs(Inst * call, U_32 arg0Pos) {
+    U_32 nSrc = call->getNumSrcOperands();
     CG_OpndHandle ** args = new(memManager) CG_OpndHandle*[nSrc - arg0Pos];
-    for (uint32 i = arg0Pos; i < nSrc; i++)
+    for (U_32 i = arg0Pos; i < nSrc; i++)
         args[i - arg0Pos] = getCGInst(call->getSrc(i));
     return args;
 }
     
-CG_OpndHandle ** _BlockCodeSelector::genCallArgs(Opnd *extraArg, Inst * call, uint32 arg0Pos) {
-    uint32 nSrc = call->getNumSrcOperands();
+CG_OpndHandle ** _BlockCodeSelector::genCallArgs(Opnd *extraArg, Inst * call, U_32 arg0Pos) {
+    U_32 nSrc = call->getNumSrcOperands();
     CG_OpndHandle ** args = new(memManager) CG_OpndHandle*[nSrc - arg0Pos + 1];
     args[0] = getCGInst(extraArg);
-    for (uint32 i = arg0Pos; i < nSrc; i++)
+    for (U_32 i = arg0Pos; i < nSrc; i++)
         args[i - arg0Pos + 1] = getCGInst(call->getSrc(i));
     return args;
 }
@@ -637,7 +637,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 ConstInst *op1ci = op1->getInst()->asConstInst();
                 assert(op1ci);
                 assert(op1ci->getType() == Type::Int32);
-                int32 shiftby = op1ci->getValue().i4;
+                I_32 shiftby = op1ci->getValue().i4;
                 cgInst = instructionCallback.shladd(mapToIntegerOpType(inst),
                     getCGInst(inst->getSrc(0)),
                     shiftby,
@@ -783,7 +783,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 MethodCallInst * call = (MethodCallInst *)inst;
                 MethodDesc * methodDesc = call->getMethodDesc();
                 CG_OpndHandle ** args = genCallArgs(call,2); // omit tau operands
-                uint32 numArgs = inst->getNumSrcOperands()-2; // also omit from count
+                U_32 numArgs = inst->getNumSrcOperands()-2; // also omit from count
                 cgInst = 
                     instructionCallback.tau_call(numArgs,
                                                  args,
@@ -903,7 +903,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
         case Op_ThrowSystemException:
             {
                 TokenInst *tokenInst = (TokenInst *)inst;
-                uint32 token = tokenInst->getToken();
+                U_32 token = tokenInst->getToken();
                 CompilationInterface::SystemExceptionId id 
                     = (CompilationInterface::SystemExceptionId)token;
                 instructionCallback.throwSystemException(id);
@@ -913,8 +913,8 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             {
                 LinkingExcInst *linkExcInst = (LinkingExcInst *)inst;
                 Class_Handle encClass = linkExcInst->getEnclosingClass();
-                uint32 constPoolIndex = linkExcInst->getCPIndex();
-                uint32 opcode = linkExcInst->getOperation();
+                U_32 constPoolIndex = linkExcInst->getCPIndex();
+                U_32 opcode = linkExcInst->getOperation();
                 instructionCallback.throwLinkingException(encClass, constPoolIndex, opcode);
             }
             break;
@@ -987,7 +987,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 AutoCompressModifier acmod = inst->getAutoCompressModifier();
 
                 TokenInst *tokenInst = (TokenInst *)inst;
-                uint32 token = tokenInst->getToken();
+                U_32 token = tokenInst->getToken();
                 cgInst = instructionCallback.ldRef(inst->getDst()->getType(),
                     tokenInst->getEnclosingMethod(),
                     token, acmod==AutoCompress_Yes);
@@ -1588,9 +1588,9 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             {
                 Type * arrayType = inst->getDst()->getType();
                 assert(arrayType->isArrayType());
-                uint32 numDims = inst->getNumSrcOperands();
+                U_32 numDims = inst->getNumSrcOperands();
                 CG_OpndHandle ** dims = new(memManager) CG_OpndHandle*[numDims];
-                for (uint32 i = 0; i < numDims; i++) 
+                for (U_32 i = 0; i < numDims; i++) 
                     dims[i] = getCGInst(inst->getSrc(i));
                 cgInst = instructionCallback.newMultiArray((ArrayType*)arrayType,
                     numDims,
@@ -1806,7 +1806,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             {
                 Type* type = inst->asTypeInst()->getTypeInfo();
                 assert(type->isValueType());
-                uint32 size = ((UserValueType*) type)->getUnboxedSize();
+                U_32 size = ((UserValueType*) type)->getUnboxedSize();
                 instructionCallback.ldc_i4(size);
             }
             break;
@@ -1831,7 +1831,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 assert(inst->getNumSrcOperands() == 0);
                 if (!genConsts) break;
                 TokenInst *tokenInst = (TokenInst *)inst;
-                uint32 token = tokenInst->getToken();
+                U_32 token = tokenInst->getToken();
                 cgInst = instructionCallback.ldToken(inst->getDst()->getType(),
                     tokenInst->getEnclosingMethod(), token);
                 isConstant = true;
@@ -1871,7 +1871,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
         case Op_IncCounter:
             {
                 TokenInst *counterInst = (TokenInst *)inst;
-                uint32 counter = counterInst->getToken();
+                U_32 counter = counterInst->getToken();
                 instructionCallback.incCounter(irmanager.getTypeManager().getUInt32Type(), counter);
             }
             break;
@@ -1896,7 +1896,7 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             break;
         case Op_TauAnd:
             {
-                uint32 numSrcs = inst->getNumSrcOperands();
+                U_32 numSrcs = inst->getNumSrcOperands();
                 CG_OpndHandle **args = genCallArgs(inst, 0);
                 cgInst = instructionCallback.tauAnd(numSrcs, args);
             }
@@ -2048,7 +2048,7 @@ void _BlockCodeSelector::setCGInst(CG_OpndHandle* inst,Opnd* opnd) {
         callback->opndMaybeGlobal(inst);
 }
 
-uint32 _BlockCodeSelector::getVarHandle(VarOpnd *var) {
+U_32 _BlockCodeSelector::getVarHandle(VarOpnd *var) {
     return varIdMap[var->getId()];
 }
 
@@ -2066,7 +2066,7 @@ void _CFGCodeSelector::genCode(Callback& callback) {
     // node id returned by the code selector
     //
     StlVector<MethodDesc*> inlineEndMarkers(memManager);
-    uint32*    nodeMapTable = new (memManager) uint32[numNodes];
+    U_32*    nodeMapTable = new (memManager) U_32[numNodes];
     
     // Compute postorder list to get only reachable nodes.
     const Nodes& nodes = flowGraph->getNodesPostOrder();
@@ -2081,9 +2081,9 @@ void _CFGCodeSelector::genCode(Callback& callback) {
         //
         // Count in and out edges
         //
-        uint32 numOutEdges = node->getOutDegree();
-        uint32 numInEdges = node->getInDegree();
-        uint32 nodeId = MAX_UINT32;
+        U_32 numOutEdges = node->getOutDegree();
+        U_32 numInEdges = node->getInDegree();
+        U_32 nodeId = MAX_UINT32;
         double cnt = (hasEdgeProfile? node->getExecCount() : -1.0);
 
         if (node == exit) {
@@ -2140,18 +2140,18 @@ void _CFGCodeSelector::genCode(Callback& callback) {
     for(niter = nodes.rbegin(); niter != nodes.rend(); ++niter) {
         double    prob;
         Node* tailNode = *niter;
-        uint32 tailNodeId = nodeMapTable[tailNode->getDfNum()];
+        U_32 tailNodeId = nodeMapTable[tailNode->getDfNum()];
         if (((Inst*)tailNode->getLastInst())->isSwitch()) { 
             //
             //  Generate switch edges
             //
             SwitchInst* sw = (SwitchInst *)tailNode->getLastInst();
             Node *defaultNode = sw->getDefaultTarget()->getNode();
-            uint32 defaultNodeId = nodeMapTable[defaultNode->getDfNum()];
-            uint32 numTargets = sw->getNumTargets();
-            uint32 * targetNodeIds = new (memManager) uint32[numTargets];
+            U_32 defaultNodeId = nodeMapTable[defaultNode->getDfNum()];
+            U_32 numTargets = sw->getNumTargets();
+            U_32 * targetNodeIds = new (memManager) U_32[numTargets];
             double * targetProbs = new (memManager) double[numTargets];
-            uint32 i;
+            U_32 i;
             for (i = 0; i < numTargets; i++) {
                 Node *headNode = sw->getTarget(i)->getNode();
                 Edge *edge = (Edge *) tailNode->findTargetEdge(headNode);
@@ -2168,7 +2168,7 @@ void _CFGCodeSelector::genCode(Callback& callback) {
                 assert(0);
                 Node *succNode = throwEdge->getTargetNode();
                 assert(succNode->isDispatchNode());
-                uint32 headNodeId = nodeMapTable[succNode->getDfNum()];
+                U_32 headNodeId = nodeMapTable[succNode->getDfNum()];
                 prob = (hasEdgeProfile? throwEdge->getEdgeProb() : -1.0);
                 callback.genExceptionEdge(tailNodeId,headNodeId,prob);
             }
@@ -2183,7 +2183,7 @@ void _CFGCodeSelector::genCode(Callback& callback) {
                 Edge* edge = *eiter;
                 prob = (hasEdgeProfile? edge->getEdgeProb() : -1.0);
                 Node * headNode = edge->getTargetNode();
-                uint32 headNodeId = nodeMapTable[headNode->getDfNum()];
+                U_32 headNodeId = nodeMapTable[headNode->getDfNum()];
                 Edge::Kind edgeKind = edge->getKind();
                 switch (edgeKind) {
                     case Edge::Kind_Unconditional:
@@ -2223,8 +2223,8 @@ void _MethodCodeSelector::selectCode(Callback& callback) {
 
     callback.setMethodDesc(methodDesc);
 
-    uint32 *varIdMap = new (localMemManager) uint32[numVars];
-    uint32 i;
+    U_32 *varIdMap = new (localMemManager) U_32[numVars];
+    U_32 i;
     for (i = 0; i < numVars; i++) {
         varIdMap[i] = 0;
     }

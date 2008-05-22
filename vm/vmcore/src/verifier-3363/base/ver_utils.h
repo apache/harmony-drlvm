@@ -402,7 +402,7 @@ private:
         int idx = 0;
 
         for( ; idx < length - 3; idx += 4 ) {
-            if( *((uint32*) (key+idx) ) != *((uint32*) (h_key+idx) ) ) return false;
+            if( *((U_32*) (key+idx) ) != *((U_32*) (h_key+idx) ) ) return false;
         }
 
         for( ; idx < length; idx++) {
@@ -423,7 +423,7 @@ private:
         int idx = 0;
 
         for( ; idx < length - 3; idx += 4 ) {
-            result += *((uint32*) (key+idx) );
+            result += *((U_32*) (key+idx) );
         }
 
         for( ; idx < length; idx++) {

@@ -82,11 +82,11 @@ void ref_enqueue_shutdown(void)
     activate_ref_enqueue_thread(FALSE);
 }
 
-static uint32 atomic_inc32(volatile apr_uint32_t *mem)
-{  return (uint32)apr_atomic_inc32(mem); }
+static U_32 atomic_inc32(volatile apr_uint32_t *mem)
+{  return (U_32)apr_atomic_inc32(mem); }
 
-static uint32 atomic_dec32(volatile apr_uint32_t *mem)
-{  return (uint32)apr_atomic_dec32(mem); }
+static U_32 atomic_dec32(volatile apr_uint32_t *mem)
+{  return (U_32)apr_atomic_dec32(mem); }
 
 void wait_native_ref_thread_detached(void)
 {

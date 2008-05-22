@@ -41,18 +41,18 @@ struct OptimizerFlags {
     bool dumpdot;
 
     // Max number of nodes HIR would grow up to during various inlinings
-    uint32 hir_node_threshold;
+    U_32 hir_node_threshold;
     // A share of node limit inlining may use (in percents), the remaining share is for helper inlining
-    uint32 inline_node_quota;
+    U_32 inline_node_quota;
 
     bool cse_final;
 
-    uint32 hash_init_factor;
-    uint32 hash_resize_factor;
-    uint32 hash_resize_to;
-    uint32 hash_node_var_factor;
-    uint32 hash_node_tmp_factor;
-    uint32 hash_node_constant_factor;
+    U_32 hash_init_factor;
+    U_32 hash_resize_factor;
+    U_32 hash_resize_to;
+    U_32 hash_node_var_factor;
+    U_32 hash_node_tmp_factor;
+    U_32 hash_node_constant_factor;
 
     bool sink_constants;
     bool sink_constants1;
@@ -75,7 +75,7 @@ struct OptimizerFlags {
 
 
     //profiler flags
-    uint32 profile_threshold;
+    U_32 profile_threshold;
     bool use_average_threshold;
     bool use_minimum_threshold;
     bool use_fixed_threshold;

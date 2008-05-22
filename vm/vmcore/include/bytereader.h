@@ -67,28 +67,28 @@ public:
         return true;
     } // skip
 
-    bool parse_u4_be(uint32 * val)
+    bool parse_u4_be(U_32 * val)
     {
         if(!have(4)) return false;
 
-        uint32 result = 0;
+        U_32 result = 0;
         for (int i = 0; i < 4; i++) {
-            uint32 x = (uint32) * curr++;
+            U_32 x = (U_32) * curr++;
             result = (result << 8) + x;
         }
         *val = result;
         return true;
     } // parse_u4_be
 
-    bool parse_u4_le(uint32 * val)
+    bool parse_u4_le(U_32 * val)
     {
         if(!have(4)) return false;
 
-        uint32 result = 0;
+        U_32 result = 0;
         curr += 4;
         const uint8* curr_byte = curr;
         for (int i = 0; i < 4; i++) {
-            uint32 x = (uint32) * (--curr_byte);
+            U_32 x = (U_32) * (--curr_byte);
             result = (result << 8) + x;
         }
         *val = result;

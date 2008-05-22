@@ -31,7 +31,7 @@ static unsigned native_dec_instr(UnwindContext* context, void* addr, void** targ
     if (!native_is_in_code(context, addr))
         return 0;
 
-    uint32 len = DecoderBase::decode(addr, &inst);
+    U_32 len = DecoderBase::decode(addr, &inst);
 
     if (len == 0 ||
         inst.mn != Mnemonic_CALL ||
@@ -39,7 +39,7 @@ static unsigned native_dec_instr(UnwindContext* context, void* addr, void** targ
         return 0;
 
     if (target && inst.operands[0].is_imm())
-        *target = (void*)((uint32)addr + len + inst.operands[0].imm());
+        *target = (void*)((U_32)addr + len + inst.operands[0].imm());
 
     return len;
 }
@@ -97,9 +97,9 @@ bool native_unwind_stack_frame(UnwindContext* context, Registers* regs)
     if (native_is_in_stack(context, esp) &&
         (native_is_in_code(context, eip)))
     {
-        regs->ebp = (uint32)ebp;
-        regs->esp = (uint32)esp;
-        regs->eip = (uint32)eip;
+        regs->ebp = (U_32)ebp;
+        regs->esp = (U_32)esp;
+        regs->eip = (U_32)eip;
         return true;
     }
 
@@ -108,9 +108,9 @@ bool native_unwind_stack_frame(UnwindContext* context, Registers* regs)
 
 static bool fill_regs_from_sp(UnwindContext* context, Registers* regs, void** sp)
 {
-    regs->esp = (uint32)(sp + 1);
-    regs->eip = (uint32)*sp;
-    regs->ebp = native_is_in_stack(context, sp[-1]) ? (uint32)sp[-1] : regs->esp;
+    regs->esp = (U_32)(sp + 1);
+    regs->eip = (U_32)*sp;
+    regs->ebp = native_is_in_stack(context, sp[-1]) ? (U_32)sp[-1] : regs->esp;
     return true;
 }
 

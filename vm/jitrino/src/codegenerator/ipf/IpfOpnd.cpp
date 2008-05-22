@@ -79,7 +79,7 @@ uint16 SwitchConstant::getChoice(Edge *edge) {
 // Opnd
 //============================================================================//
 
-Opnd::Opnd(uint32 id, OpndKind opndKind, DataKind dataKind, int64 value) :
+Opnd::Opnd(U_32 id, OpndKind opndKind, DataKind dataKind, int64 value) :
     id(id), 
     opndKind(opndKind), 
     dataKind(dataKind), 
@@ -142,7 +142,7 @@ bool Opnd::isFoldableImm(int64 imm, int16 size) {
 // RegOpnd
 //============================================================================//
 
-RegOpnd::RegOpnd(MemoryManager &mm, uint32 id, OpndKind opndKind, DataKind dataKind, int32 value) : 
+RegOpnd::RegOpnd(MemoryManager &mm, U_32 id, OpndKind opndKind, DataKind dataKind, I_32 value) : 
     Opnd(id, opndKind, dataKind, value),
     spillCost(0),
     depOpnds(mm),

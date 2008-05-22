@@ -158,8 +158,8 @@ Node * JavaFlowGraphBuilder::edgesForBlock(Node* block) {
     case Op_Switch:
         {
             SwitchInst *sw = (SwitchInst*)last;
-            uint32 num = sw->getNumTargets();
-            for (uint32 i = 0; i < num; i++) {
+            U_32 num = sw->getNumTargets();
+            for (U_32 i = 0; i < num; i++) {
                 Node* target = sw->getTarget(i)->getNode();
                 // two switch values may go to the same block
                 if (!block->findTargetEdge(target)) {

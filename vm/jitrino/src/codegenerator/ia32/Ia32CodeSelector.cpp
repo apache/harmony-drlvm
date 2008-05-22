@@ -50,7 +50,7 @@ CfgCodeSelector::CfgCodeSelector(::Jitrino::SessionAction* sa,
                                  CompilationInterface&      compIntfc,
                                  MethodCodeSelector& methodCodeSel,
                                  MemoryManager&          codeSelectorMM, 
-                                 uint32                  nNodes, 
+                                 U_32                  nNodes, 
                                  IRManager&          irM
                                  )
     : numNodes(nNodes), nextNodeId(0), compilationInterface(compIntfc), methodCodeSelector(methodCodeSel),
@@ -60,7 +60,7 @@ CfgCodeSelector::CfgCodeSelector(::Jitrino::SessionAction* sa,
 {
     nextNodeId = 0;
     nodes = new (codeSelectorMemManager) Node*[numNodes];
-    uint32 i;
+    U_32 i;
     for (i = 0; i < numNodes; i++) 
         nodes[i] = NULL;
 
@@ -72,10 +72,10 @@ CfgCodeSelector::CfgCodeSelector(::Jitrino::SessionAction* sa,
 //_______________________________________________________________________________________________
 /**  Create an exception handling (dispatching) node */
 
-uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) 
+U_32 CfgCodeSelector::genDispatchNode(U_32 numInEdges,U_32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt) 
 {
     assert(nextNodeId < numNodes);
-    uint32 nodeId = nextNodeId++;
+    U_32 nodeId = nextNodeId++;
     Node* node = irManager.getFlowGraph()->createDispatchNode();
     node->setExecCount(cnt);
     nodes[nodeId] = node;
@@ -90,14 +90,14 @@ uint32 CfgCodeSelector::genDispatchNode(uint32 numInEdges,uint32 numOutEdges, co
 //_______________________________________________________________________________________________
 /**  Create a basic block */
 
-uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
-                                    uint32              numOutEdges,
+U_32 CfgCodeSelector::genBlock(U_32              numInEdges,
+                                    U_32              numOutEdges,
                                     BlockKind           blockKind,
                                     BlockCodeSelector&  codeSelector,
                                     double              cnt) 
 {
     assert(nextNodeId < numNodes);
-    uint32 nodeId = nextNodeId++;
+    U_32 nodeId = nextNodeId++;
     Node* bb = irManager.getFlowGraph()->createBlockNode();
     bb->setExecCount(cnt);
     nodes[nodeId] = bb;
@@ -130,7 +130,7 @@ uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
 
     if (instCodeSelector.endsWithSwitch()) {
         // Generate an additional node that contains switch dispatch
-        uint32      numTargets = instCodeSelector.getSwitchNumTargets(); 
+        U_32      numTargets = instCodeSelector.getSwitchNumTargets(); 
         Opnd * switchSrc = instCodeSelector.getSwitchSrc();
         genSwitchBlock(bb, numTargets, switchSrc);
     }
@@ -145,12 +145,12 @@ uint32 CfgCodeSelector::genBlock(uint32              numInEdges,
     We create it using code selector memory manager and insert it into its own CFG.
 */
 
-uint32  CfgCodeSelector::genUnwindNode(uint32 numInEdges, 
-                                          uint32 numOutEdges,
+U_32  CfgCodeSelector::genUnwindNode(U_32 numInEdges, 
+                                          U_32 numOutEdges,
                                           double cnt) 
 {
     assert(nextNodeId < numNodes);
-    uint32 nodeId = nextNodeId++;
+    U_32 nodeId = nextNodeId++;
     ControlFlowGraph* fg = irManager.getFlowGraph();
     Node* unwindNode = fg->createDispatchNode();
     fg->setUnwindNode(unwindNode);
@@ -162,10 +162,10 @@ uint32  CfgCodeSelector::genUnwindNode(uint32 numInEdges,
 //_______________________________________________________________________________________________
 /**  Create exit node */
 
-uint32 CfgCodeSelector::genExitNode(uint32 numInEdges, double cnt) 
+U_32 CfgCodeSelector::genExitNode(U_32 numInEdges, double cnt) 
 {
     assert(nextNodeId < numNodes);
-    uint32 nodeId = nextNodeId++;
+    U_32 nodeId = nextNodeId++;
     ControlFlowGraph* fg = irManager.getFlowGraph();
     Node* exitNode = fg->createExitNode();
     exitNode->setExecCount(cnt);
@@ -178,7 +178,7 @@ uint32 CfgCodeSelector::genExitNode(uint32 numInEdges, double cnt)
 /**  Create a block for a switch statement */
 
 void CfgCodeSelector::genSwitchBlock(Node *originalBlock,
-                                        uint32         numTargets, 
+                                        U_32         numTargets, 
                                         Opnd *      switchSrc) 
 {
     Node *bb = irManager.getFlowGraph()->createBlockNode();
@@ -194,7 +194,7 @@ void CfgCodeSelector::genSwitchBlock(Node *originalBlock,
 //_______________________________________________________________________________________________
 /**  Create true edge (i.e., edge that corresponds to a taken conditional branch) */
 
-void CfgCodeSelector::genTrueEdge(uint32 tailNodeId,uint32 headNodeId, double prob) 
+void CfgCodeSelector::genTrueEdge(U_32 tailNodeId,U_32 headNodeId, double prob) 
 {
     Node* tailNode= nodes[tailNodeId];
     Node * headNode = nodes[headNodeId];
@@ -215,7 +215,7 @@ void CfgCodeSelector::genTrueEdge(Node* tailNode, Node* headNode, double prob) {
 //_______________________________________________________________________________________________
 /**  Create false edge (i.e., edge that corresponds to a fallthrough after untaken conditional branch) */
 
-void CfgCodeSelector::genFalseEdge(uint32 tailNodeId,uint32 headNodeId, double prob) 
+void CfgCodeSelector::genFalseEdge(U_32 tailNodeId,U_32 headNodeId, double prob) 
 {
     Node* tailNode = nodes[tailNodeId];
     Node* headNode = nodes[headNodeId];
@@ -236,7 +236,7 @@ void CfgCodeSelector::genFalseEdge(Node* tailNode,Node* headNode, double prob) {
 //_______________________________________________________________________________________________
 /**  Create unconditional edge (i.e., edge that corresponds to fallthrough) */
 
-void CfgCodeSelector::genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, double prob) 
+void CfgCodeSelector::genUnconditionalEdge(U_32 tailNodeId,U_32 headNodeId, double prob) 
 {
     Node * tailNode = nodes[tailNodeId];
     Node * headNode = nodes[headNodeId];
@@ -255,9 +255,9 @@ void CfgCodeSelector::genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, 
 //_______________________________________________________________________________________________
 /**  Create switch edges */
 
-void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets, 
-                                        uint32 *targets, double *probs, 
-                                        uint32 defaultTarget) 
+void CfgCodeSelector::genSwitchEdges(U_32 tailNodeId, U_32 numTargets, 
+                                        U_32 *targets, double *probs, 
+                                        U_32 defaultTarget) 
 {
     // 
     //  Switch structure:
@@ -278,8 +278,8 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
 
     double    defaultEdgeProb = 1.0;
     defaultEdgeProb = 1.0;
-    for (uint32 i = 0; i < numTargets; i++) {
-        uint32 targetId = targets[i];
+    for (U_32 i = 0; i < numTargets; i++) {
+        U_32 targetId = targets[i];
         if ( targetId == defaultTarget) {
             defaultEdgeProb = probs[i];
             break;
@@ -301,7 +301,7 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
         origBlock->getOutEdges().front()->setEdgeProb(1.0 - defaultEdgeProb);
     }
     //  Generate edges from switchBlock to switch targets
-    for (uint32 i = 0; i < numTargets; i++) {
+    for (U_32 i = 0; i < numTargets; i++) {
         Node * targetNode = nodes[targets[i]];
         // Avoid generating duplicate edges. Jump table however needs all entries
         if (! switchBlock->isConnectedTo(true, targetNode)) {
@@ -314,7 +314,7 @@ void CfgCodeSelector::genSwitchEdges(uint32 tailNodeId, uint32 numTargets,
 //_______________________________________________________________________________________________
 /**  Create an edge to the exception dispatch node or unwind node  */
 
-void CfgCodeSelector::genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, double prob) 
+void CfgCodeSelector::genExceptionEdge(U_32 tailNodeId, U_32 headNodeId, double prob) 
 {
     Node * headNode = nodes[headNodeId];
     Node * tailNode = nodes[tailNodeId];
@@ -325,9 +325,9 @@ void CfgCodeSelector::genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, dou
 //_______________________________________________________________________________________________
 /**  Create catch edge */
 
-void CfgCodeSelector::genCatchEdge(uint32 tailNodeId, 
-                                      uint32 headNodeId,
-                                      uint32 priority,
+void CfgCodeSelector::genCatchEdge(U_32 tailNodeId, 
+                                      U_32 headNodeId,
+                                      U_32 priority,
                                       Type*  exceptionType, 
                                       double prob) 
 {
@@ -358,14 +358,14 @@ void CfgCodeSelector::methodHasCalls(bool nonExceptionCall)
 ///////////////////////////////////////////////////////////////////////////////////
 
 //_______________________________________________________________________________________________
-uint32 VarGenerator::defVar(Type* varType, bool isAddressTaken, bool isPinned) 
+U_32 VarGenerator::defVar(Type* varType, bool isAddressTaken, bool isPinned) 
 {
     Opnd * opnd=irManager.newOpnd(varType);
     return opnd->getId(); 
 }
 
 //_______________________________________________________________________________________________
-void VarGenerator::setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum) 
+void VarGenerator::setManagedPointerBase(U_32 managedPtrVarNum, U_32 baseVarNum) 
 {
 }
 
@@ -379,7 +379,7 @@ void VarGenerator::setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVar
 //_______________________________________________________________________________________________
 /**  Generate variable operands */
 
-void MethodCodeSelector::genVars(uint32           numVars, VarCodeSelector& varCodeSelector) 
+void MethodCodeSelector::genVars(U_32           numVars, VarCodeSelector& varCodeSelector) 
 {
     numVarOpnds = numVars;
     VarGenerator varCodeSelectorCallback(irManager,*this);
@@ -494,7 +494,7 @@ edgeProfile(NULL)
 }
 
 
-void MethodCodeSelector::genCFG(uint32 numNodes, CFGCodeSelector& codeSelector, 
+void MethodCodeSelector::genCFG(U_32 numNodes, CFGCodeSelector& codeSelector, 
                                    bool useEdgeProfile) 
 {
     ControlFlowGraph* fg = irManager.getFlowGraph();

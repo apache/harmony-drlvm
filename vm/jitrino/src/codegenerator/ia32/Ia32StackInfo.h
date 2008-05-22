@@ -39,12 +39,12 @@ namespace Ia32 {
      */
     
     struct StackDepthInfo {
-        uint32 calleeSaveRegs;
-        uint32 stackDepth;
-        uint32 callSize;
+        U_32 calleeSaveRegs;
+        U_32 stackDepth;
+        U_32 callSize;
 
-        StackDepthInfo(uint32 sd=0) : calleeSaveRegs(0), stackDepth(sd), callSize(0) {}
-        StackDepthInfo(uint32 e, uint32 sd=0, uint32 cz=0) : calleeSaveRegs(e), stackDepth(sd), callSize(cz) {}
+        StackDepthInfo(U_32 sd=0) : calleeSaveRegs(0), stackDepth(sd), callSize(0) {}
+        StackDepthInfo(U_32 e, U_32 sd=0, U_32 cz=0) : calleeSaveRegs(e), stackDepth(sd), callSize(cz) {}
     };
 
     struct DepthEntry {
@@ -149,29 +149,29 @@ public:
         return stackDepth;
     }
 
-    uint32 getFrameSize() const {return frameSize;}
+    U_32 getFrameSize() const {return frameSize;}
 
-    int32 getRetEIPOffset() const {return eipOffset;}
+    I_32 getRetEIPOffset() const {return eipOffset;}
     
-    uint32 getIntCalleeMask() const {return icalleeMask;}
+    U_32 getIntCalleeMask() const {return icalleeMask;}
     
-    int32 getIntCalleeOffset() const {return icalleeOffset;}
+    I_32 getIntCalleeOffset() const {return icalleeOffset;}
     
-    uint32 getFPCalleeMask() const {return fcallee;}
+    U_32 getFPCalleeMask() const {return fcallee;}
     
-    int32 getFPCalleeOffset() const {return foffset;}
+    I_32 getFPCalleeOffset() const {return foffset;}
 
-    uint32 getApplCalleeMask() const {return acallee;}
+    U_32 getApplCalleeMask() const {return acallee;}
     
-    int32 getApplCalleeOffset() const {return aoffset;}
+    I_32 getApplCalleeOffset() const {return aoffset;}
 
-    int32 getLocalOffset() const {return localOffset;}
+    I_32 getLocalOffset() const {return localOffset;}
 
-    uint32 getOffsetOfThis() const {return offsetOfThis;}
+    U_32 getOffsetOfThis() const {return offsetOfThis;}
 
-    uint32 getSOECheckAreaOffset() const {return soeCheckAreaOffset;}
+    U_32 getSOECheckAreaOffset() const {return soeCheckAreaOffset;}
 
-    void setSOECheckAreaOffset(uint32 v) {soeCheckAreaOffset = v;}
+    void setSOECheckAreaOffset(U_32 v) {soeCheckAreaOffset = v;}
 
     /** returns byte size of StackInfo data
     */
@@ -186,30 +186,30 @@ public:
 
 private:
     POINTER_SIZE_INT byteSize;
-    uint32  hashTableSize;
-    int32   frameSize;
+    U_32  hashTableSize;
+    I_32   frameSize;
     
     const char * itraceMethodExitString;
 
-    int32   eipOffset;
+    I_32   eipOffset;
 
-    uint32  icalleeMask;
-    int32   icalleeOffset;
+    U_32  icalleeMask;
+    I_32   icalleeOffset;
 
-    uint32  fcallee;
-    int32   foffset;
+    U_32  fcallee;
+    I_32   foffset;
 
-    uint32  acallee;
-    int32   aoffset;
+    U_32  acallee;
+    I_32   aoffset;
 
-    int32   localOffset;
+    I_32   localOffset;
     
     DepthMap * stackDepthInfo;
 
-    uint32 calleeSaveRegsMask;
-    int32  stackDepth;
-    uint32 offsetOfThis;
-    uint32 soeCheckAreaOffset;
+    U_32 calleeSaveRegsMask;
+    I_32  stackDepth;
+    U_32 offsetOfThis;
+    U_32 soeCheckAreaOffset;
 
     friend class StackLayouter;
 };

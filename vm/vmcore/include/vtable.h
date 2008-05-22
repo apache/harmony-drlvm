@@ -33,9 +33,9 @@ typedef struct {
 typedef struct Intfc_Table {
 #ifdef POINTER64
     // see INTFC_TABLE_OVERHEAD
-    uint32 dummy;   // padding
+    U_32 dummy;   // padding
 #endif
-    uint32 n_entries;
+    U_32 n_entries;
     Intfc_Table_Entry entry[1];
 } Intfc_Table;
 
@@ -70,7 +70,7 @@ typedef struct VTable {
     Class* clss;
 
     // See the masks in vm_for_gc.h.
-    uint32 class_properties;
+    U_32 class_properties;
 
     // Offset from the top by CLASS_ALLOCATED_SIZE_OFFSET
     // The number of bytes allocated for this object. It is the same as

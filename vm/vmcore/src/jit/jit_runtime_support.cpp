@@ -474,7 +474,7 @@ static Class* rth_aastore(Vector_Handle array, int idx, ManagedObject* elem)
     ManagedObject* null_ref = (ManagedObject*)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return env->java_lang_NullPointerException_Class;
-    } else if (((uint32)idx) >= (uint32)get_vector_length(array)) {
+    } else if (((U_32)idx) >= (U_32)get_vector_length(array)) {
         return env->java_lang_ArrayIndexOutOfBoundsException_Class;
     } else if (elem != null_ref) {
         assert(get_vector_vtable(array));
@@ -2348,7 +2348,7 @@ vm_rt_aastore(Vector_Handle array, int idx, ManagedObject *elem)
     ManagedObject *null_ref = (ManagedObject *)VM_Global_State::loader_env->managed_null;
     if (array == null_ref) {
         return env->java_lang_NullPointerException_Class;
-    } else if (((uint32)idx) >= (uint32)get_vector_length(array)) {
+    } else if (((U_32)idx) >= (U_32)get_vector_length(array)) {
         return env->java_lang_ArrayIndexOutOfBoundsException_Class;
     } else if (elem != null_ref) {
         Class *array_class = get_vector_vtable(array)->clss;

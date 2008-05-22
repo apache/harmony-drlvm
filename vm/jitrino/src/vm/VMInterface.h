@@ -76,17 +76,17 @@ public:
     static void*       getRuntimeClassHandle(void* vmTypeHandle);
     static void*       getAllocationHandle(void* vmTypeHandle);
     static bool        isSubClassOf(void* vmTypeHandle1,void* vmTypeHandle2);
-    static uint32      getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed);
-    static uint32      getArrayElemSize(void * vmTypeHandle);
-    static uint32      getObjectSize(void * vmTypeHandle);
-    static uint32      getArrayLengthOffset();
+    static U_32      getArrayElemOffset(void* vmElemTypeHandle,bool isUnboxed);
+    static U_32      getArrayElemSize(void * vmTypeHandle);
+    static U_32      getObjectSize(void * vmTypeHandle);
+    static U_32      getArrayLengthOffset();
 
     static void*       getTypeHandleFromAllocationHandle(void* vmAllocationHandle);
     static void*       getTypeHandleFromVTable(void* vtHandle);
 
-    static uint32      flagTLSSuspendRequestOffset();
-    static uint32      flagTLSThreadStateOffset();
-    static int32       getTLSBaseOffset();
+    static U_32      flagTLSSuspendRequestOffset();
+    static U_32      flagTLSThreadStateOffset();
+    static I_32       getTLSBaseOffset();
     static bool        useFastTLSAccess();
 
 
@@ -94,7 +94,7 @@ public:
     static bool          isVTableCompressed();
 
     // returns the offset of an object's virtual table
-    static uint32      getVTableOffset();
+    static U_32      getVTableOffset();
     // returns the base for all vtables (addend to compressed vtable pointer)
     static void*      getVTableBase();
 
@@ -126,11 +126,11 @@ protected:
 
 class TypeMemberDesc {
 public:
-    TypeMemberDesc(uint32 id, CompilationInterface* ci)
+    TypeMemberDesc(U_32 id, CompilationInterface* ci)
         : id(id), compilationInterface(ci) {}
     virtual ~TypeMemberDesc() {}
 
-    uint32      getId() const { return id; }
+    U_32      getId() const { return id; }
     NamedType*  getParentType();
     bool        isParentClassIsLikelyExceptionType() const;
 
@@ -144,7 +144,7 @@ public:
     virtual bool        isStatic() const          = 0;
 
 protected:
-    uint32 id;
+    U_32 id;
     CompilationInterface* compilationInterface;
 
 };
@@ -152,7 +152,7 @@ protected:
 ///Field representation for resolved fields
 class FieldDesc : public TypeMemberDesc {
 public:
-    FieldDesc(Field_Handle field, CompilationInterface* ci, uint32 id) 
+    FieldDesc(Field_Handle field, CompilationInterface* ci, U_32 id) 
         : TypeMemberDesc(id, ci), drlField(field) {} 
 
         const char*   getName() const;
@@ -171,7 +171,7 @@ public:
         bool          isVolatile() const;
         bool          isMagic() const;
         Type*         getFieldType();
-        uint32        getOffset() const; // for non-static fields
+        U_32        getOffset() const; // for non-static fields
         void*         getAddress() const; // for static fields
         Field_Handle  getFieldHandle() const  {return drlField; }
 
@@ -182,7 +182,7 @@ private:
 ///Method representation for resolved methods
 class MethodDesc : public TypeMemberDesc {
 public:
-    MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci = NULL, uint32 id = 0);
+    MethodDesc(Method_Handle m, JIT_Handle jit, CompilationInterface* ci = NULL, U_32 id = 0);
 
         const char*  getName() const;
         const char*  getSignatureString() const;
@@ -208,9 +208,9 @@ public:
         //
 
         const U_8*  getByteCodes() const;
-        uint32       getByteCodeSize() const;
+        U_32       getByteCodeSize() const;
         uint16       getMaxStack() const;
-        uint32       getNumHandlers() const;
+        U_32       getNumHandlers() const;
         void getHandlerInfo(unsigned short index, unsigned short* beginOffset, 
             unsigned short* endOffset, unsigned short* handlerOffset,
             unsigned short* handlerClassIndex) const;
@@ -220,9 +220,9 @@ public:
         // accessors for method info, code and data
         //
         U_8*     getInfoBlock() const;
-        uint32   getInfoBlockSize() const;
-        U_8*     getCodeBlockAddress(int32 id) const;
-        uint32   getCodeBlockSize(int32 id) const;
+        U_32   getInfoBlockSize() const;
+        U_8*     getCodeBlockAddress(I_32 id) const;
+        U_32   getCodeBlockSize(I_32 id) const;
 
         // sets and gets MethodSideEffect property for the compiled method
         Method_Side_Effects getSideEffect() const;
@@ -231,8 +231,8 @@ public:
         //
         //    Exception registration API. 
         //
-        void        setNumExceptionHandler(uint32 numHandlers);
-        void        setExceptionHandlerInfo(uint32 exceptionHandlerNumber,
+        void        setNumExceptionHandler(U_32 numHandlers);
+        void        setExceptionHandlerInfo(U_32 exceptionHandlerNumber,
             U_8* startAddr,
             U_8* endAddr,
             U_8* handlerAddr,
@@ -243,11 +243,11 @@ public:
         //
         // DRL kernel
         //
-        uint32       getOffset() const;
+        U_32       getOffset() const;
         void*        getIndirectAddress() const;
         void*        getNativeAddress() const;
 
-        uint32    getNumVars() const;
+        U_32    getNumVars() const;
 
         Method_Handle    getMethodHandle() const   {return drlMethod;}
 
@@ -256,8 +256,8 @@ public:
         void* getHandleMap() const {return handleMap;}
         void setHandleMap(void* hndMap) {handleMap = hndMap;}
 
-        uint32    getNumParams() const;
-        Type*     getParamType(uint32 paramIndex) const;
+        U_32    getNumParams() const;
+        Type*     getParamType(U_32 paramIndex) const;
         Type*     getReturnType() const;
 
 private:
@@ -305,26 +305,26 @@ public:
     void*       getRuntimeHelperAddressForType(VM_RT_SUPPORT, Type*);
     MethodDesc* getMagicHelper(VM_RT_SUPPORT);
 
-    Type*      getFieldType(Class_Handle enclClass, uint32 cpIndex);
+    Type*      getFieldType(Class_Handle enclClass, U_32 cpIndex);
 
-    NamedType* getNamedType(Class_Handle enclClass, uint32 cpIndex, ResolveNewCheck check = ResolveNewCheck_NoCheck);
+    NamedType* getNamedType(Class_Handle enclClass, U_32 cpIndex, ResolveNewCheck check = ResolveNewCheck_NoCheck);
     Type*      getTypeFromDescriptor(Class_Handle enclClass, const char* descriptor);
 
     //this method is obsolete and will be removed. Use getNamedType if unsure.
-    NamedType* resolveNamedType(Class_Handle enclClass, uint32 cpIndex);
+    NamedType* resolveNamedType(Class_Handle enclClass, U_32 cpIndex);
 
 
-    static const char* getMethodName(Class_Handle enclClass, uint32 cpIndex);
-    static const char* getMethodClassName(Class_Handle enclClass, uint32 cpIndex);
-    static const char* getFieldSignature(Class_Handle enclClass, uint32 cpIndex);
+    static const char* getMethodName(Class_Handle enclClass, U_32 cpIndex);
+    static const char* getMethodClassName(Class_Handle enclClass, U_32 cpIndex);
+    static const char* getFieldSignature(Class_Handle enclClass, U_32 cpIndex);
 
-    MethodDesc* getStaticMethod(Class_Handle enclClass, uint32 cpIndex);
-    MethodDesc* getVirtualMethod(Class_Handle enclClass, uint32 cpIndex);
-    MethodDesc* getSpecialMethod(Class_Handle enclClass, uint32 cpIndex);
-    MethodDesc* getInterfaceMethod(Class_Handle enclClass, uint32 cpIndex);
+    MethodDesc* getStaticMethod(Class_Handle enclClass, U_32 cpIndex);
+    MethodDesc* getVirtualMethod(Class_Handle enclClass, U_32 cpIndex);
+    MethodDesc* getSpecialMethod(Class_Handle enclClass, U_32 cpIndex);
+    MethodDesc* getInterfaceMethod(Class_Handle enclClass, U_32 cpIndex);
 
-    FieldDesc*  getNonStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
-    FieldDesc*  getStaticField(Class_Handle enclClass, uint32 cpIndex, bool putfield);
+    FieldDesc*  getNonStaticField(Class_Handle enclClass, U_32 cpIndex, bool putfield);
+    FieldDesc*  getStaticField(Class_Handle enclClass, U_32 cpIndex, bool putfield);
 
     FieldDesc*  getFieldByName(Class_Handle enclClass, const char* name);
     MethodDesc* getMethodByName(Class_Handle enclClass, const char* name);
@@ -349,15 +349,15 @@ public:
     MethodDesc* getOverridingMethod(NamedType *type, MethodDesc * methodDesc);
 
 
-    const void*  getStringInternAddr(MethodDesc* enclosingMethodDesc, uint32 stringToken);
-    Type*        getConstantType(MethodDesc* enclosingMethodDesc, uint32 constantToken);
-    const void*  getConstantValue(MethodDesc* enclosingMethodDesc, uint32 constantToken);
-    const char*  getSignatureString(MethodDesc* enclosingMethodDesc, uint32 methodToken);
+    const void*  getStringInternAddr(MethodDesc* enclosingMethodDesc, U_32 stringToken);
+    Type*        getConstantType(MethodDesc* enclosingMethodDesc, U_32 constantToken);
+    const void*  getConstantValue(MethodDesc* enclosingMethodDesc, U_32 constantToken);
+    const char*  getSignatureString(MethodDesc* enclosingMethodDesc, U_32 methodToken);
 
     // Memory allocation API
     // all of these are for the method being compiled
     U_8*   allocateCodeBlock(size_t size, size_t alignment, CodeBlockHeat heat, 
-        int32 id, bool simulate);
+        I_32 id, bool simulate);
 
     U_8*   allocateDataBlock(size_t size, size_t alignment);
 
@@ -411,7 +411,7 @@ public:
     }
 
     void    sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
-        uint32 codeSize, void* codeAddr, uint32 mapLength, 
+        U_32 codeSize, void* codeAddr, U_32 mapLength, 
         AddrLocation* addrLocationMap, void* compileInfo);
 
     OpenMethodExecutionParams& getCompilationParams() const { 
@@ -458,7 +458,7 @@ private:
     MethodDesc*                 methodToCompile;
     Compile_Handle              compileHandle;
     bool                        flushToZeroAllowed;
-    uint32                      nextMemberId;
+    U_32                      nextMemberId;
     OpenMethodExecutionParams&  compilation_params;
 };
 
@@ -469,7 +469,7 @@ public:
 
     virtual void enumerateRootReference(void** reference);
 
-    virtual void enumerateCompressedRootReference(uint32* reference);
+    virtual void enumerateCompressedRootReference(U_32* reference);
 
     virtual void enumerateRootManagedReference(void** slotReference, size_t slotOffset);
 
@@ -484,7 +484,7 @@ public:
 
     virtual void enumerateRootReference(void** reference);
 
-    virtual void enumerateCompressedRootReference(uint32* reference);
+    virtual void enumerateCompressedRootReference(U_32* reference);
 
     virtual void enumerateRootManagedReference(void** slotReference, size_t slotOffset);
 };
@@ -496,23 +496,23 @@ public:
 class PersistentInstructionId {
 public:
     PersistentInstructionId() 
-        : methodDesc(NULL), localInstructionId((uint32)-1) {}
+        : methodDesc(NULL), localInstructionId((U_32)-1) {}
 
-        PersistentInstructionId(MethodDesc* methodDesc, uint32 localInstructionId) 
+        PersistentInstructionId(MethodDesc* methodDesc, U_32 localInstructionId) 
             : methodDesc(methodDesc), localInstructionId(localInstructionId) {}
 
             bool isValid() const { return (methodDesc != NULL); }
 
             MethodDesc& getMethodDesc() const { return *methodDesc; }
-            uint32 getLocalInstructionId() const { return localInstructionId; }
+            U_32 getLocalInstructionId() const { return localInstructionId; }
 
             // For IPF codegen to store block ids into pid
-            bool hasValidLocalInstructionId() const { return localInstructionId != (uint32)-1; }
+            bool hasValidLocalInstructionId() const { return localInstructionId != (U_32)-1; }
 
             bool operator==(const PersistentInstructionId& pid) { return methodDesc == pid.methodDesc && localInstructionId == pid.localInstructionId; }
 private:
     MethodDesc* methodDesc;     // The source method at point the id was generated
-    uint32 localInstructionId;  // The persistent local instruction id
+    U_32 localInstructionId;  // The persistent local instruction id
 };
 
 inline ::std::ostream& operator<<(::std::ostream& os, const PersistentInstructionId& pid) { 

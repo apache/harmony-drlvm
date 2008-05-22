@@ -37,7 +37,7 @@ class Tree;
 class TreeNode {
     friend class Tree;
 public:
-    TreeNode() : child(NULL), siblings(NULL), parent(NULL), preNum((uint32) -1), postNum((uint32) -1) {}
+    TreeNode() : child(NULL), siblings(NULL), parent(NULL), preNum((U_32) -1), postNum((U_32) -1) {}
     void addChild(TreeNode* chd) {
         chd->parent = this;
         chd->siblings = child;
@@ -115,21 +115,21 @@ public:
         if(siblings) siblings->printIndentedNode(os, indentstr);
     }
 
-    uint32 getHeight() const {
-        uint32 i = 0;
+    U_32 getHeight() const {
+        U_32 i = 0;
         if(child != NULL) {
             i = child->getHeight();
 
             for (TreeNode *siblings = child->siblings; siblings!=NULL; siblings = siblings->siblings) {
-                uint32 j = siblings->getHeight();
+                U_32 j = siblings->getHeight();
                 if(j > i) i = j;
             }
         }
         return i + 1;
     }
 
-    uint32 getCount() const {
-        uint32 i = 1;
+    U_32 getCount() const {
+        U_32 i = 1;
         if(child != NULL)
             i += child->getCount();
         if(siblings != NULL)
@@ -138,12 +138,12 @@ public:
     }
     
     //return number of parents
-    uint32 getDepth() const {
+    U_32 getDepth() const {
         return parent != NULL ? parent->getDepth() + 1 : 0; 
     }
 
-    uint32 getPreNum() const { return preNum; }
-    uint32 getPostNum() const { return postNum; }
+    U_32 getPreNum() const { return preNum; }
+    U_32 getPostNum() const { return postNum; }
 
     // Return true if this is a proper ancestor of n.
     bool isAncestorOf(TreeNode* n) {
@@ -154,8 +154,8 @@ protected:
     TreeNode* child;
     TreeNode* siblings;
     TreeNode* parent;
-    uint32 preNum;
-    uint32 postNum;
+    U_32 preNum;
+    U_32 postNum;
 };
 
 
@@ -182,8 +182,8 @@ public:
         root->printIndentedNode(os, indentstr);
     }
 
-    uint32 getHeight() const { return root==NULL ? 0 : root->getHeight(); }
-    uint32 getCount() const { return root == NULL ? 0: root->getCount(); }
+    U_32 getHeight() const { return root==NULL ? 0 : root->getHeight(); }
+    U_32 getCount() const { return root == NULL ? 0: root->getCount(); }
 
     // Return true if n1 is a proper ancestor of n2.
     bool isAncestor(const TreeNode* n1, const TreeNode* n2) const {
@@ -192,13 +192,13 @@ public:
 
 protected:
     void computeOrder() {
-        uint32 preNum = 0;
-        uint32 postNum = 0;
+        U_32 preNum = 0;
+        U_32 postNum = 0;
         computeNodeOrder(root, preNum, postNum);
         assert(preNum == postNum);
     }
 
-    void computeNodeOrder(TreeNode* node, uint32& preNum, uint32& postNum) {
+    void computeNodeOrder(TreeNode* node, U_32& preNum, U_32& postNum) {
         node->preNum = preNum++;
         if(node->child != NULL)
             computeNodeOrder(node->child,preNum,postNum);

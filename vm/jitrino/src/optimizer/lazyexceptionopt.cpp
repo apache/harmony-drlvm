@@ -77,7 +77,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
 #endif
 
     level++;
-    uint32 opndId = 0;
+    U_32 opndId = 0;
     isArgCheckNull = false;
     isExceptionInit = md.isInstanceInitializer() && 
             md.getParentType()->isLikelyExceptionType();
@@ -161,8 +161,8 @@ LazyExceptionOpt::doLazyExceptionOpt() {
         Inst *headInst = (Inst*)node->getFirstInst();
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
-            uint32 nsrc = inst->getNumSrcOperands();
-            for (uint32 i=0; i<nsrc; i++) {
+            U_32 nsrc = inst->getNumSrcOperands();
+            for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands
                     continue;
                 if (excOpnds.getBit(opndId=opnd->getId())==0) 
@@ -231,7 +231,7 @@ level--;
  *         <code>false<code> if an exception object cannot be optimized.
  */
 bool 
-LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
+LazyExceptionOpt::addOptCandidates(U_32 id, Inst* inst) {
     OptCandidate* oc = NULL;
     ThrowInsts* thrinst = NULL;
     OptCandidates::iterator it;
@@ -286,7 +286,7 @@ LazyExceptionOpt::addOptCandidates(uint32 id, Inst* inst) {
                 inst->print(Log::out()); Log::out()  << std::endl;
             }
 #endif
-            uint32 nii_id=((Inst*)(inst->getNode()->getUnconditionalEdgeTarget()->getFirstInst()))->getId();
+            U_32 nii_id=((Inst*)(inst->getNode()->getUnconditionalEdgeTarget()->getFirstInst()))->getId();
             ThrowInsts::iterator it1;
             for (it1 = oc->throwInsts->begin(); it1 !=oc->throwInsts->end(); it1++) {
                 if ((*it1)->getId() != nii_id) {
@@ -449,7 +449,7 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
     MethodCallInst* iinst;
     Inst* tinst;
     Inst* tlinst;
-    uint32 opcount;
+    U_32 opcount;
     Opnd **opnds = NULL;
 
     if (optCandidates == NULL) {
@@ -496,7 +496,7 @@ LazyExceptionOpt::fixOptCandidates(BitSet* bs) {
             if (opcount >0) {
                 opnds = new (leMemManager) Opnd*[opcount];   //local mem should be used
                 opnds[0] = mpt;
-                for (uint32 i = 0; i < opcount-1; i++)
+                for (U_32 i = 0; i < opcount-1; i++)
                     opnds[i+1] = iinst->getSrc(i+3);
             }
             Inst* mptinst = irManager.getInstFactory().makeLdFunAddr(mpt,iinst->getMethodDesc());
@@ -597,11 +597,11 @@ LazyExceptionOpt::removeNode(Node* node) {
 
 void 
 LazyExceptionOpt::printInst1(::std::ostream& os, Inst* inst, std::string txt) {
-    uint32 nsrc = inst->getNumSrcOperands();
+    U_32 nsrc = inst->getNumSrcOperands();
     os << txt;
     inst->print(os);
     os << std::endl;
-    for (uint32 i=0; i<nsrc; i++) {
+    for (U_32 i=0; i<nsrc; i++) {
         printInst1(os, inst->getSrc(i)->getInst(),txt+"  ");
     }
 
@@ -615,7 +615,7 @@ LazyExceptionOpt::printInst1(::std::ostream& os, Inst* inst, std::string txt) {
  */
 bool 
 LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
-    uint32 opcode = inst->getOpcode();
+    U_32 opcode = inst->getOpcode();
     MethodDesc* cmd = NULL;
     Method_Side_Effects mse = MSE_Unknown;
 
@@ -739,7 +739,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
     }
 
     if (mse == MSE_True_Null_Param) {
-        uint32 nsrc=inst->getNumSrcOperands();
+        U_32 nsrc=inst->getNumSrcOperands();
         bool mayBeNull;
         if (nsrc>3) {
 #ifdef _DEBUG
@@ -749,7 +749,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
             }
 #endif
             mayBeNull=false;
-            for (uint32 i=3; i<nsrc; i++) {
+            for (U_32 i=3; i<nsrc; i++) {
                 if (inst->getSrc(i)->getType()->isReference()) {
                     if (mayBeNullArg(inst,i))
                         mayBeNull=true;
@@ -758,7 +758,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
             if (!mayBeNull)
                 return false;
 #ifdef _DEBUG
-            for (uint32 i=0; i<nsrc; i++) {
+            for (U_32 i=0; i<nsrc; i++) {
                 if (Log::isEnabled()) {
                     Log::out() << "        "<<i<<" isRef: "<<
                     inst->getSrc(i)->getType()->isReference()<<" "; 
@@ -789,7 +789,7 @@ LazyExceptionOpt::methodCallHasSideEffect(Inst* inst) {
  *         <code>false<code> if a callee method argument is not null
  */
 bool 
-LazyExceptionOpt::mayBeNullArg(Inst* call_inst, uint32 arg_n) {
+LazyExceptionOpt::mayBeNullArg(Inst* call_inst, U_32 arg_n) {
     Opnd* arg_opnd = call_inst->getSrc(arg_n);
     Inst* inst=arg_opnd->getInst();
 

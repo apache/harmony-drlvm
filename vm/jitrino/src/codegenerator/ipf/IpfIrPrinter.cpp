@@ -90,10 +90,10 @@ void IrPrinter::printCfgDot(char *logFile) {
     NodeVector &nodes = cfg.search(SEARCH_POST_ORDER);
 
     printHead();
-    for(uint32 i=0; i<nodes.size(); i++) {
+    for(U_32 i=0; i<nodes.size(); i++) {
         printNodeDot(nodes[i]);
         EdgeVector &edges = nodes[i]->getOutEdges();
-        for(uint32 j=0; j<edges.size(); j++) {
+        for(U_32 j=0; j<edges.size(); j++) {
             printEdgeDot(edges[j]);
         }
     }
@@ -157,7 +157,7 @@ void IrPrinter::printNodeDot(Node *node) {
 
     if(node->getNodeKind() == NODE_BB) {
         InstVector &insts = ((BbNode *)node)->getInsts();
-        for(uint32 i=0; i<insts.size(); i++) {
+        for(U_32 i=0; i<insts.size(); i++) {
             *ofs << "\\n" << insts[i]->getInstMnemonic();
             CompVector &compList = insts[i]->getComps();
             for(uint16 j=0; j<compList.size(); j++) *ofs << insts[i]->getCompMnemonic(compList[j]);
@@ -198,7 +198,7 @@ void IrPrinter::printNodeAsm(BbNode *node) {
     *os << ".L" << node->getId() << ":" << endl;
 
     InstVector &insts = ((BbNode *)node)->getInsts();
-    for(uint32 i=0; i<insts.size(); i++) *os << "  " << toString(insts[i]) << endl;
+    for(U_32 i=0; i<insts.size(); i++) *os << "  " << toString(insts[i]) << endl;
 }
 
 //----------------------------------------------------------------------------------------//
@@ -266,7 +266,7 @@ string IrPrinter::toString(Opnd *opnd) {
     // opnd is register 
     if(opnd->isReg()) {
         RegOpnd *reg = (RegOpnd *)opnd;
-        int32   num  = reg->getLocation();
+        I_32   num  = reg->getLocation();
 
         if (num == LOCATION_INVALID) {
             num = reg->getId();

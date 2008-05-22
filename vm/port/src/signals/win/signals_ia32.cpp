@@ -43,7 +43,7 @@ __asm { int 3 }
 
 
 extern "C" void port_longjump_stub(void);
-#define DIR_FLAG ((uint32)0x00000400)
+#define DIR_FLAG ((U_32)0x00000400)
 
 void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
 {
@@ -61,7 +61,7 @@ void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
     sp = sp - rcount - 1;
     *((Registers*)(sp + 1)) = *regs;
     *sp = (void*)(sp + 1);
-    regs->ebp = (uint32)sp;
+    regs->ebp = (U_32)sp;
 
     sp = sp - num - 1;
 
@@ -78,8 +78,8 @@ void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
     }
 
     *sp = (void*)&port_longjump_stub;
-    regs->esp = (uint32)sp;
-    regs->eip = (uint32)fn;
+    regs->esp = (U_32)sp;
+    regs->eip = (U_32)fn;
     regs->eflags = regs->eflags & ~DIR_FLAG;
 }
 
@@ -102,7 +102,7 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
     sp = sp - rcount - 1;
     *((Registers*)(sp + 1)) = regs;
     *sp = (void*)(sp + 1);
-    regs.ebp = (uint32)sp;
+    regs.ebp = (U_32)sp;
 
     sp = sp - num - 1;
 
@@ -119,8 +119,8 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
     }
 
     *sp = (void*)&port_longjump_stub;
-    regs.esp = (uint32)sp;
-    regs.eip = (uint32)fn;
+    regs.esp = (U_32)sp;
+    regs.eip = (U_32)fn;
     regs.eflags = regs.eflags & ~DIR_FLAG;
 
     port_transfer_to_regs(&regs);

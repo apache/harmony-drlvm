@@ -56,17 +56,17 @@ private:
 
 class EntryBackedgeMethodProfile : public MethodProfile {
 public:
-    EntryBackedgeMethodProfile(Method_Profile_Handle mph, MethodDesc& md, uint32* _entryCounter, uint32 *_backedgeCounter)
+    EntryBackedgeMethodProfile(Method_Profile_Handle mph, MethodDesc& md, U_32* _entryCounter, U_32 *_backedgeCounter)
         : MethodProfile(mph, ProfileType_EntryBackedge, md),  entryCounter(_entryCounter), backedgeCounter(_backedgeCounter){}
 
-        uint32 getEntryExecCount() const {return *entryCounter;}
-        uint32 getBackedgeExecCount() const {return *backedgeCounter;}
-        uint32* getEntryCounter() const {return entryCounter;}
-        uint32* getBackedgeCounter() const {return backedgeCounter;}
+        U_32 getEntryExecCount() const {return *entryCounter;}
+        U_32 getBackedgeExecCount() const {return *backedgeCounter;}
+        U_32* getEntryCounter() const {return entryCounter;}
+        U_32* getBackedgeCounter() const {return backedgeCounter;}
 
 private:
-    uint32* entryCounter;
-    uint32* backedgeCounter;
+    U_32* entryCounter;
+    U_32* backedgeCounter;
 };
 
 class EdgeMethodProfile : public MethodProfile {
@@ -74,10 +74,10 @@ public:
     EdgeMethodProfile (Method_Profile_Handle handle, MethodDesc& md,  EM_ProfileAccessInterface* _profileAccessInterface)
         : MethodProfile(handle, ProfileType_Edge, md), profileAccessInterface(_profileAccessInterface){}
 
-        uint32  getNumCounters() const;
-        uint32  getCheckSum() const;
-        uint32* getEntryCounter() const;
-        uint32* getCounter(uint32 key) const;
+        U_32  getNumCounters() const;
+        U_32  getCheckSum() const;
+        U_32* getEntryCounter() const;
+        U_32* getCounter(U_32 key) const;
 
 private:
     EM_ProfileAccessInterface* profileAccessInterface;
@@ -88,7 +88,7 @@ public:
     ValueMethodProfile (Method_Profile_Handle handle, MethodDesc& md,  EM_ProfileAccessInterface* _profileAccessInterface)
         : MethodProfile(handle, ProfileType_Value, md), profileAccessInterface(_profileAccessInterface){}
 
-        POINTER_SIZE_INT getTopValue(uint32 instructionKey) const;
+        POINTER_SIZE_INT getTopValue(U_32 instructionKey) const;
         void dumpValues(std::ostream& os) const;
 
 private:
@@ -114,7 +114,7 @@ public:
     bool isProfilingEnabled(ProfileType pcType, JITProfilingRole jitRole) const;
 
 
-    uint32 getProfileMethodCount(MethodDesc& md, JITProfilingRole role = JITProfilingRole_USE) const;
+    U_32 getProfileMethodCount(MethodDesc& md, JITProfilingRole role = JITProfilingRole_USE) const;
 
     EntryBackedgeMethodProfile* createEBMethodProfile(MemoryManager& mm, MethodDesc& md);
     bool isEBProfilerInSyncMode() const;
@@ -123,11 +123,11 @@ public:
     PC_Callback_Fn* getEBProfilerSyncModeCallback() const;
 
 
-    EdgeMethodProfile* createEdgeMethodProfile(MemoryManager& mm, MethodDesc& md, uint32 numEdgeCounters, uint32* counterKeys, uint32 checkSum);
+    EdgeMethodProfile* createEdgeMethodProfile(MemoryManager& mm, MethodDesc& md, U_32 numEdgeCounters, U_32* counterKeys, U_32 checkSum);
 
 
-    uint32 getMethodEntryThreshold() const;
-    uint32 getBackedgeThreshold() const;
+    U_32 getMethodEntryThreshold() const;
+    U_32 getBackedgeThreshold() const;
 
     EntryBackedgeMethodProfile* getEBMethodProfile(MemoryManager& mm, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const {
         return (EntryBackedgeMethodProfile*)getMethodProfile(mm, ProfileType_EntryBackedge, md, role);
@@ -139,7 +139,7 @@ public:
     
     
     // value profiler
-    ValueMethodProfile* createValueMethodProfile (MemoryManager& mm, MethodDesc& md, uint32 numKeys, uint32* Keys);
+    ValueMethodProfile* createValueMethodProfile (MemoryManager& mm, MethodDesc& md, U_32 numKeys, U_32* Keys);
     
     ValueMethodProfile* getValueMethodProfile(MemoryManager& mm, MethodDesc& md, JITProfilingRole role=JITProfilingRole_USE) const {
         return (ValueMethodProfile*)getMethodProfile(mm, ProfileType_Value, md, role);    

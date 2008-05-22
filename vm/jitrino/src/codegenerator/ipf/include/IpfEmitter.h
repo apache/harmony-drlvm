@@ -95,9 +95,9 @@ typedef vector<Opnd *> vectorconst;
  * tmpl  = template field encoding
  */
 struct BundleDescription {
-    uint32 slots;
-    uint32 stops;
-    uint32 tmpl;
+    U_32 slots;
+    U_32 stops;
+    U_32 tmpl;
 };
 
 //============================================================================//
@@ -127,12 +127,12 @@ typedef vector<RegistersBitset *> vectorregs;
 //============================================================================//
 class Bundle {
   public:
-    Bundle(Cfg& cfg, uint32 tmpl, Inst *, Inst *, Inst *);
+    Bundle(Cfg& cfg, U_32 tmpl, Inst *, Inst *, Inst *);
     
     Inst   * getSlot(int si) { return slot[si]; };
-    uint32   getTmplIndex() { return indxtmpl; };
-    uint32   getTmpl() { return BundleDesc[indxtmpl].tmpl; };
-    bool     hasStop() { uint32 t = getTmpl(); 
+    U_32   getTmplIndex() { return indxtmpl; };
+    U_32   getTmpl() { return BundleDesc[indxtmpl].tmpl; };
+    bool     hasStop() { U_32 t = getTmpl(); 
                          if (t%2==1 || t==0x2 || t==0xa) return true; return false; };
     void     emitBundleGeneral(void *);
     void     emitBundleExtended(void *);
@@ -145,7 +145,7 @@ class Bundle {
     static const BundleDescription BundleDesc[TEMPLATES_COUNT];
 
   protected:
-    uint32  indxtmpl;
+    U_32  indxtmpl;
     Inst   *slot[IPF_SLOTS_COUNT];
 };
 
@@ -157,7 +157,7 @@ class BundleVector : public vector<Bundle*> {
         branches=new(mm) vector<int>; 
     };
     
-    void addBundle(uint32 itmpl, Inst *i0, Inst *i1, Inst *i2) {
+    void addBundle(U_32 itmpl, Inst *i0, Inst *i1, Inst *i2) {
         push_back(new(mm) Bundle(cfg, itmpl, i0, i1, i2));
         if(Encoder::isBranchInst(i0) || Encoder::isBranchInst(i1) || Encoder::isBranchInst(i2)) {
             branches->push_back(size() - 1);

@@ -146,7 +146,7 @@ JavaByteCodeTranslator::JavaByteCodeTranslator(CompilationInterface& ci,
     //
     // load actual parameters into formal parameters
     //
-    for (uint32 i=0,j=0; i<numArgs; i++,j++) {
+    for (U_32 i=0,j=0; i<numArgs; i++,j++) {
         //
         // for Java this is the same as a local var!
         //
@@ -238,7 +238,7 @@ JavaByteCodeTranslator::initLocalVars() {
     numVars = methodToCompile.getNumVars();
     numStackVars = prepass.getStateTable()->getMaxStackOverflow()-numVars;
     stateInfo = &prepass.stateInfo;
-    for (uint32 k=0; k < numVars+numStackVars; k++) {
+    for (U_32 k=0; k < numVars+numStackVars; k++) {
         struct StateInfo::SlotInfo *slot = &stateInfo->stack[k];
         slot->type = NULL;
         slot->slotFlags = 0;
@@ -278,7 +278,7 @@ JavaByteCodeTranslator::initArgs() {
 // push the operand
 //
 Opnd* 
-JavaByteCodeTranslator::getVarOpndLdVar(JavaLabelPrepass::JavaVarType javaType,uint32 index) {
+JavaByteCodeTranslator::getVarOpndLdVar(JavaLabelPrepass::JavaVarType javaType,U_32 index) {
     if (index >= numVars+numStackVars)
         // error: invalid local variable id
         invalid();
@@ -292,7 +292,7 @@ JavaByteCodeTranslator::getVarOpndLdVar(JavaLabelPrepass::JavaVarType javaType,u
 
 VarOpnd* 
 JavaByteCodeTranslator::getVarOpndStVar(JavaLabelPrepass::JavaVarType javaType,
-                                        uint32 index, 
+                                        U_32 index, 
                                         Opnd* opnd) {
     if (index >= numVars+numStackVars)
         // error: invalid local variable id
@@ -377,14 +377,14 @@ JavaByteCodeTranslator::checkStack() {
 //-----------------------------------------------------------------------------
 
 const char*
-JavaByteCodeTranslator::methodSignatureString(uint32 cpIndex) {
+JavaByteCodeTranslator::methodSignatureString(U_32 cpIndex) {
     return compilationInterface.getSignatureString(&methodToCompile,cpIndex);
 }
 
-uint32 
-JavaByteCodeTranslator::labelId(uint32 offset) {
-    uint32 labelId = prepass.getLabelId(offset);
-    if (labelId == (uint32) -1)
+U_32 
+JavaByteCodeTranslator::labelId(U_32 offset) {
+    U_32 labelId = prepass.getLabelId(offset);
+    if (labelId == (U_32) -1)
         jitrino_assert(0);
     return labelId;
 }
@@ -406,7 +406,7 @@ JavaByteCodeTranslator::parseError() {
 }
 
 void 
-JavaByteCodeTranslator::offset(uint32 offset) {
+JavaByteCodeTranslator::offset(U_32 offset) {
 
     // set bc offset in ir builder
     irBuilder.setBcOffset(offset);
@@ -432,7 +432,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
         stateInfo->stack[i] = state->stack[i];
     assert(stateInfo != NULL);
     Type* handlerExceptionType = NULL;
-    uint32 lblId = getNextLabelId();
+    U_32 lblId = getNextLabelId();
     LabelInst* labelInst = getLabel(lblId);
 
     ::std::vector<LabelInst*> catchLabels;
@@ -518,7 +518,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
         //
         // Load var operands where current basic block begins
         //
-        for (uint32 k=numVars; k < (uint32)stateInfo->stackDepth; k++) {
+        for (U_32 k=numVars; k < (U_32)stateInfo->stackDepth; k++) {
             if(Log::isEnabled()) {
                 Log::out() << "STACK ";StateInfo::print(stateInfo->stack[k], Log::out());Log::out() << ::std::endl;
             }
@@ -531,7 +531,7 @@ JavaByteCodeTranslator::offset(uint32 offset) {
 }
 
 void 
-JavaByteCodeTranslator::offset_done(uint32 offset) {
+JavaByteCodeTranslator::offset_done(U_32 offset) {
     if (prepass.isSubroutineEntry(offset) ) {
         jsrEntryOffsets[offset] = irBuilder.getLastGeneratedInst();
     }
@@ -545,7 +545,7 @@ JavaByteCodeTranslator::parseDone()
 {
     OffsetToInstMap::const_iterator ret_i, ret_e;
     for (ret_i = retOffsets.begin(), ret_e = retOffsets.end(); ret_i != ret_e; ++ret_i) {
-        uint32 ret_offset = ret_i->first;
+        U_32 ret_offset = ret_i->first;
         Inst* ret_inst = ret_i->second;
         JavaLabelPrepass::RetToSubEntryMap* ret_to_entry_map = prepass.getRetToSubEntryMapPtr();
         JavaLabelPrepass::RetToSubEntryMap::const_iterator sub_i = ret_to_entry_map->find(ret_offset);
@@ -553,7 +553,7 @@ JavaByteCodeTranslator::parseDone()
         // jsr target should be found for each ret inst
         //
         assert(sub_i != ret_to_entry_map->end());
-        uint32 entry_offset = sub_i->second;
+        U_32 entry_offset = sub_i->second;
         OffsetToInstMap::const_iterator entry_inst_i = jsrEntryOffsets.find(entry_offset);
         assert(entry_inst_i != jsrEntryOffsets.end());
         Inst* entry_inst = entry_inst_i->second;
@@ -577,7 +577,7 @@ JavaByteCodeTranslator::aconst_null()     {
     pushOpnd(irBuilder.genLdNull());
 }
 void 
-JavaByteCodeTranslator::iconst(int32 val) {
+JavaByteCodeTranslator::iconst(I_32 val) {
     pushOpnd(irBuilder.genLdConstant(val));
 }
 void 
@@ -594,14 +594,14 @@ JavaByteCodeTranslator::dconst(double val){
 }
 void 
 JavaByteCodeTranslator::bipush(int8 val)  {
-    pushOpnd(irBuilder.genLdConstant((int32)val));
+    pushOpnd(irBuilder.genLdConstant((I_32)val));
 }
 void 
 JavaByteCodeTranslator::sipush(int16 val) {
-    pushOpnd(irBuilder.genLdConstant((int32)val));
+    pushOpnd(irBuilder.genLdConstant((I_32)val));
 }
 void 
-JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
+JavaByteCodeTranslator::ldc(U_32 constPoolIndex) {
     // load 32-bit quantity or string from constant pool
     Type* constantType = 
         compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
@@ -618,7 +618,7 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
         const void* constantAddress =
            compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
         if (constantType->isInt4()) {
-            int32 value = *(int32*)constantAddress;
+            I_32 value = *(I_32*)constantAddress;
             opnd = irBuilder.genLdConstant(value);
         } else if (constantType->isSingle()) {
             float value = *(float*)constantAddress;
@@ -632,7 +632,7 @@ JavaByteCodeTranslator::ldc(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::ldc2(uint32 constPoolIndex) {
+JavaByteCodeTranslator::ldc2(U_32 constPoolIndex) {
     // load 64-bit quantity from constant pool
     Type* constantType = 
         compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
@@ -677,30 +677,30 @@ JavaByteCodeTranslator::aload(uint16 varIndex) {
     genLdVar(varIndex,JavaLabelPrepass::A);
 }
 void 
-JavaByteCodeTranslator::istore(uint16 varIndex,uint32 off) {
+JavaByteCodeTranslator::istore(uint16 varIndex,U_32 off) {
     genStVar(varIndex,JavaLabelPrepass::I);
 }
 void 
-JavaByteCodeTranslator::lstore(uint16 varIndex,uint32 off) {
+JavaByteCodeTranslator::lstore(uint16 varIndex,U_32 off) {
     genStVar(varIndex,JavaLabelPrepass::L);
 }
 void 
-JavaByteCodeTranslator::fstore(uint16 varIndex,uint32 off) {
+JavaByteCodeTranslator::fstore(uint16 varIndex,U_32 off) {
     genStVar(varIndex,JavaLabelPrepass::F);
 }
 void 
-JavaByteCodeTranslator::dstore(uint16 varIndex,uint32 off) {
+JavaByteCodeTranslator::dstore(uint16 varIndex,U_32 off) {
     genStVar(varIndex,JavaLabelPrepass::D);
 }
 void 
-JavaByteCodeTranslator::astore(uint16 varIndex,uint32 off) {
+JavaByteCodeTranslator::astore(uint16 varIndex,U_32 off) {
     genTypeStVar(varIndex);
 }
 //-----------------------------------------------------------------------------
 // field access byte codes
 //-----------------------------------------------------------------------------
 Type* 
-JavaByteCodeTranslator::getFieldType(FieldDesc* field, uint32 constPoolIndex) {
+JavaByteCodeTranslator::getFieldType(FieldDesc* field, U_32 constPoolIndex) {
     Type* fieldType = field->getFieldType();
     if (!fieldType) {
         // some problem with fieldType class handle. Let's try the constant_pool.
@@ -713,7 +713,7 @@ JavaByteCodeTranslator::getFieldType(FieldDesc* field, uint32 constPoolIndex) {
 
 
 void 
-JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
+JavaByteCodeTranslator::getstatic(U_32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && field->isStatic()) {
         bool fieldValueInlined = false;
@@ -732,14 +732,14 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
                     case Type::Int8 :   constVal=irBuilder.genLdConstant(*(int8*)fieldAddr);break;
                     case Type::Int16:   constVal=irBuilder.genLdConstant(*(int16*)fieldAddr);break;
                     case Type::Char :   constVal=irBuilder.genLdConstant(*(uint16*)fieldAddr);break;
-                    case Type::Int32:   constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);break;
+                    case Type::Int32:   constVal=irBuilder.genLdConstant(*(I_32*)fieldAddr);break;
                     case Type::Int64:   constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
                     case Type::Single:  constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
                     case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
                     case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
                     case Type::UnmanagedPtr:  assert(fieldIsMagic); 
 #ifdef _IA32_
-                            constVal=irBuilder.genLdConstant(*(int32*)fieldAddr);
+                            constVal=irBuilder.genLdConstant(*(I_32*)fieldAddr);
 #else
                             assert(sizeof(void*)==8);
                             constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);
@@ -772,7 +772,7 @@ JavaByteCodeTranslator::getstatic(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
+JavaByteCodeTranslator::putstatic(U_32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getStaticField(methodToCompile.getParentHandle(), constPoolIndex, true);
     if (field && field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
@@ -798,7 +798,7 @@ JavaByteCodeTranslator::putstatic(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
+JavaByteCodeTranslator::getfield(U_32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getNonStaticField(methodToCompile.getParentHandle(), constPoolIndex, false);
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field, constPoolIndex);
@@ -822,7 +822,7 @@ JavaByteCodeTranslator::getfield(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::putfield(uint32 constPoolIndex) {
+JavaByteCodeTranslator::putfield(U_32 constPoolIndex) {
     FieldDesc *field = compilationInterface.getNonStaticField(methodToCompile.getParentHandle(), constPoolIndex, true);
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
@@ -1085,11 +1085,11 @@ JavaByteCodeTranslator::lushr(){
     genShr(typeManager.getInt64Type(),UnsignedOp, ShiftMask_Masked);
 }
 void 
-JavaByteCodeTranslator::iinc(uint16 varIndex,int32 amount) {
+JavaByteCodeTranslator::iinc(uint16 varIndex,I_32 amount) {
     VarOpnd* varOpnd = (VarOpnd*)getVarOpndLdVar(JavaLabelPrepass::I,varIndex);
     assert(varOpnd->isVarOpnd());
     Opnd* src1 = irBuilder.genLdVar(typeManager.getInt32Type(),varOpnd);
-    Opnd* src2 = irBuilder.genLdConstant((int32)amount);
+    Opnd* src2 = irBuilder.genLdConstant((I_32)amount);
     Opnd* result = irBuilder.genAdd(typeManager.getInt32Type(),Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
                                     src1,src2);
     irBuilder.genStVar(varOpnd,result);
@@ -1210,49 +1210,49 @@ void JavaByteCodeTranslator::dcmpg() {genThreeWayCmp(Type::Double,Cmp_GT_Un);}
 //-----------------------------------------------------------------------------
 // control transfer byte codes
 //-----------------------------------------------------------------------------
-void JavaByteCodeTranslator::ifeq(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifeq(U_32 targetOffset,U_32 nextOffset) {
     genIf1(Cmp_EQ,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifne(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifne(U_32 targetOffset,U_32 nextOffset) {
     genIf1(Cmp_NE_Un,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::iflt(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::iflt(U_32 targetOffset,U_32 nextOffset) {
     genIf1Commute(Cmp_GT,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifge(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifge(U_32 targetOffset,U_32 nextOffset) {
     genIf1(Cmp_GTE,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifgt(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifgt(U_32 targetOffset,U_32 nextOffset) {
     genIf1(Cmp_GT,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifle(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifle(U_32 targetOffset,U_32 nextOffset) {
     genIf1Commute(Cmp_GTE,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifnull(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifnull(U_32 targetOffset,U_32 nextOffset) {
     genIfNull(Cmp_Zero,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::ifnonnull(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::ifnonnull(U_32 targetOffset,U_32 nextOffset) {
     genIfNull(Cmp_NonZero,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmpeq(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmpeq(U_32 targetOffset,U_32 nextOffset) {
     genIf2(Cmp_EQ,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmpne(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmpne(U_32 targetOffset,U_32 nextOffset) {
     genIf2(Cmp_NE_Un,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmplt(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmplt(U_32 targetOffset,U_32 nextOffset) {
     genIf2Commute(Cmp_GT,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmpge(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmpge(U_32 targetOffset,U_32 nextOffset) {
     genIf2(Cmp_GTE,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmpgt(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmpgt(U_32 targetOffset,U_32 nextOffset) {
     genIf2(Cmp_GT,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_icmple(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_icmple(U_32 targetOffset,U_32 nextOffset) {
     genIf2Commute(Cmp_GTE,targetOffset,nextOffset);
 }
-void JavaByteCodeTranslator::if_acmpeq(uint32 targetOffset,uint32 nextOffset) {
+void JavaByteCodeTranslator::if_acmpeq(U_32 targetOffset,U_32 nextOffset) {
     Opnd*    src2 = popOpnd();
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
@@ -1267,7 +1267,7 @@ void JavaByteCodeTranslator::if_acmpeq(uint32 targetOffset,uint32 nextOffset) {
 }
 
 void 
-JavaByteCodeTranslator::if_acmpne(uint32 targetOffset,uint32 nextOffset) {
+JavaByteCodeTranslator::if_acmpne(U_32 targetOffset,U_32 nextOffset) {
     Opnd*    src2 = popOpnd();
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
@@ -1282,7 +1282,7 @@ JavaByteCodeTranslator::if_acmpne(uint32 targetOffset,uint32 nextOffset) {
 }
 
 void 
-JavaByteCodeTranslator::goto_(uint32 targetOffset,uint32 nextOffset) {
+JavaByteCodeTranslator::goto_(U_32 targetOffset,U_32 nextOffset) {
     if (targetOffset == nextOffset)
         return;
     if (targetOffset < nextOffset) {
@@ -1290,7 +1290,7 @@ JavaByteCodeTranslator::goto_(uint32 targetOffset,uint32 nextOffset) {
     }
     lastInstructionWasABranch = true;
     checkStack();
-    uint32 lid = labelId(targetOffset);
+    U_32 lid = labelId(targetOffset);
     LabelInst *target = getLabel(lid);
     irBuilder.genJump(target);
 }
@@ -1298,7 +1298,7 @@ JavaByteCodeTranslator::goto_(uint32 targetOffset,uint32 nextOffset) {
 // jsr & ret byte codes for finally statements
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::jsr(uint32 targetOffset, uint32 nextOffset) {
+JavaByteCodeTranslator::jsr(U_32 targetOffset, U_32 nextOffset) {
     if (targetOffset < nextOffset) {
         irBuilder.genPseudoThrow();
     }
@@ -1324,10 +1324,10 @@ JavaByteCodeTranslator::tableswitch(JavaSwitchTargetsIter* iter) {
     lastInstructionWasABranch = true;
     checkStack();
     // subtract the lower bound
-    Opnd* bias = irBuilder.genLdConstant((int32)iter->getLowValue());
+    Opnd* bias = irBuilder.genLdConstant((I_32)iter->getLowValue());
     Opnd* dst  = irBuilder.genSub(bias->getType(),Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),opnd,bias);
     LabelInst**    labels = new (memManager) LabelInst*[iter->getNumTargets()];
-    for (uint32 i=0; iter->hasNext(); i++) {
+    for (U_32 i=0; iter->hasNext(); i++) {
         labels[i] = getLabel(labelId(iter->getNextTarget()));
     }
     LabelInst * defaultLabel = getLabel(labelId(iter->getDefaultTarget()));
@@ -1341,10 +1341,10 @@ JavaByteCodeTranslator::lookupswitch(JavaLookupSwitchTargetsIter* iter) {
     checkStack();
     // generate a sequence of branches
     while (iter->hasNext()) {
-        uint32 key;
-        uint32 offset = iter->getNextTarget(&key);
+        U_32 key;
+        U_32 offset = iter->getNextTarget(&key);
         // load the key
-        Opnd* value = irBuilder.genLdConstant((int32)key);
+        Opnd* value = irBuilder.genLdConstant((I_32)key);
         LabelInst *target = getLabel(labelId(offset));
         irBuilder.genBranch(Type::Int32,Cmp_EQ,target,opnd,value);
         // break the basic block
@@ -1359,37 +1359,37 @@ JavaByteCodeTranslator::lookupswitch(JavaLookupSwitchTargetsIter* iter) {
 // method return byte codes
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::ireturn(uint32 off) {
+JavaByteCodeTranslator::ireturn(U_32 off) {
     genReturn(JavaLabelPrepass::I,off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
 }
 void 
-JavaByteCodeTranslator::lreturn(uint32 off) {
+JavaByteCodeTranslator::lreturn(U_32 off) {
     genReturn(JavaLabelPrepass::L,off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
 }
 void 
-JavaByteCodeTranslator::freturn(uint32 off) {
+JavaByteCodeTranslator::freturn(U_32 off) {
     genReturn(JavaLabelPrepass::F,off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
 }
 void 
-JavaByteCodeTranslator::dreturn(uint32 off) {
+JavaByteCodeTranslator::dreturn(U_32 off) {
     genReturn(JavaLabelPrepass::D,off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
 }
 void 
-JavaByteCodeTranslator::areturn(uint32 off) {
+JavaByteCodeTranslator::areturn(U_32 off) {
     genReturn(JavaLabelPrepass::A,off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
 }
 void 
-JavaByteCodeTranslator::return_(uint32 off) {
+JavaByteCodeTranslator::return_(U_32 off) {
     genReturn(off);
     LabelInst *label = irBuilder.createLabel();
     cfgBuilder.genBlockAfterCurrent(label);
@@ -1398,7 +1398,7 @@ JavaByteCodeTranslator::return_(uint32 off) {
 // LinkingException throw
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::linkingException(uint32 constPoolIndex, uint32 operation) {
+JavaByteCodeTranslator::linkingException(U_32 constPoolIndex, U_32 operation) {
     Class_Handle enclosingDrlVMClass = methodToCompile.getParentHandle();
     irBuilder.genThrowLinkingException(enclosingDrlVMClass, constPoolIndex, operation);
 }
@@ -1407,7 +1407,7 @@ JavaByteCodeTranslator::linkingException(uint32 constPoolIndex, uint32 operation
 //-----------------------------------------------------------------------------
 void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig) 
 {
-    uint32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig); 
+    U_32 numArgs = JavaLabelPrepass::getNumArgsBySignature(methodSig); 
 
     // pop numArgs items
     while (numArgs--) {
@@ -1427,7 +1427,7 @@ void JavaByteCodeTranslator::pseudoInvoke(const char* methodSig)
 // method invocation byte codes
 //-----------------------------------------------------------------------------
 Opnd** 
-JavaByteCodeTranslator::popArgs(uint32 numArgs) {
+JavaByteCodeTranslator::popArgs(U_32 numArgs) {
     // pop source operands
     Opnd** srcOpnds = new (memManager) Opnd*[numArgs];
     for (int i=numArgs-1; i>=0; i--) 
@@ -1444,14 +1444,14 @@ public:
         const char* sigSuffix = sigStr;
         if (nParams > 0) {
             paramTypes = new (mm) Type*[nParams];
-            uint32 i = 0;
+            U_32 i = 0;
             if (instanceMethod) {
                 paramTypes[0] = ci.getTypeManager().getUnresolvedObjectType();
                 i++;
             }
             sigSuffix++;
             for (; i < nParams; i++) {
-                uint32 len = 0;
+                U_32 len = 0;
                 Type* type = JavaLabelPrepass::getTypeByDescriptorString(ci, cl, sigSuffix, len);
                 assert(type!=NULL);
                 paramTypes[i] = type;
@@ -1464,12 +1464,12 @@ public:
     }
     
     virtual ~JavaMethodSignature(){};
-    virtual uint32 getNumParams() const { return nParams;}
+    virtual U_32 getNumParams() const { return nParams;}
     virtual Type** getParamTypes() const { return paramTypes;}
     virtual Type* getRetType() const {return retType;}
     virtual const char* getSignatureString() const {return signatureStr;}
 private:
-    uint32 nParams;
+    U_32 nParams;
     Type** paramTypes;
     Type* retType;
     const char* signatureStr;
@@ -1487,7 +1487,7 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
     assert(methodSig);
     JavaMethodSignature* sig = new (memManager) JavaMethodSignature(irBuilder.getIRManager()->getMemoryManager(), 
         compilationInterface, !isStatic, (Class_Handle)enclosingClass->getVMTypeHandle(), methodSig);
-    uint32 numArgs = sig->getNumParams();
+    U_32 numArgs = sig->getNumParams();
     assert(numArgs > 0 || isStatic);
 
     Opnd** args = popArgs(numArgs);
@@ -1522,7 +1522,7 @@ void JavaByteCodeTranslator::genCallWithResolve(JavaByteCodes bc, unsigned cpInd
 }
 
 void 
-JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
+JavaByteCodeTranslator::invokevirtual(U_32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getVirtualMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
         if (!typeManager.isLazyResolutionMode()) {
@@ -1532,7 +1532,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
         return;
     }
     jitrino_assert(methodDesc);
-    uint32 numArgs = methodDesc->getNumParams();
+    U_32 numArgs = methodDesc->getNumParams();
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
 
@@ -1584,7 +1584,7 @@ JavaByteCodeTranslator::invokevirtual(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
+JavaByteCodeTranslator::invokespecial(U_32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getSpecialMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
         if (!typeManager.isLazyResolutionMode()) {
@@ -1594,7 +1594,7 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
         return;
     }
     jitrino_assert(methodDesc);
-    uint32 numArgs = methodDesc->getNumParams();
+    U_32 numArgs = methodDesc->getNumParams();
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
     // invokespecial can throw a null pointer exception
@@ -1623,7 +1623,7 @@ JavaByteCodeTranslator::invokespecial(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
+JavaByteCodeTranslator::invokestatic(U_32 constPoolIndex) {
     MethodDesc* methodDesc = compilationInterface.getStaticMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
         if (!typeManager.isLazyResolutionMode()) {
@@ -1634,7 +1634,7 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
     }
 
     jitrino_assert(methodDesc);
-    uint32 numArgs = methodDesc->getNumParams();
+    U_32 numArgs = methodDesc->getNumParams();
     Opnd** srcOpnds = popArgs(numArgs);
     Type *returnType = methodDesc->getReturnType();
     if (returnType == NULL) {
@@ -1655,7 +1655,7 @@ JavaByteCodeTranslator::invokestatic(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
+JavaByteCodeTranslator::invokeinterface(U_32 constPoolIndex,U_32 count) {
     MethodDesc* methodDesc = compilationInterface.getInterfaceMethod(methodToCompile.getParentHandle(), constPoolIndex);
     if (!methodDesc) {
         if (!typeManager.isLazyResolutionMode()) {
@@ -1665,7 +1665,7 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
         return;
     }
     jitrino_assert(methodDesc);
-    uint32 numArgs = methodDesc->getNumParams();
+    U_32 numArgs = methodDesc->getNumParams();
     Opnd** srcOpnds = popArgs(numArgs);
     Type* returnType = methodDesc->getReturnType();
     // callintf can throw a null pointer exception
@@ -1706,7 +1706,7 @@ JavaByteCodeTranslator::invokeinterface(uint32 constPoolIndex,uint32 count) {
 // object allocation byte codes
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::new_(uint32 constPoolIndex) {
+JavaByteCodeTranslator::new_(U_32 constPoolIndex) {
     NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex, ResolveNewCheck_DoCheck);
     jitrino_assert(type);
     if (type->isUnresolvedObject()) {
@@ -1748,15 +1748,15 @@ JavaByteCodeTranslator::newarray(uint8 atype) {
     pushOpnd(arrayOpnd);
     if (translationFlags.optArrayInit) {
         const uint8* byteCodes = parser.getByteCodes();
-        const uint32 byteCodeLength = parser.getByteCodeLength();
-        uint32 offset = currentOffset + 2/*newarray length*/;
-        uint32 length = checkForArrayInitializer(arrayOpnd, byteCodes, offset, byteCodeLength);
+        const U_32 byteCodeLength = parser.getByteCodeLength();
+        U_32 offset = currentOffset + 2/*newarray length*/;
+        U_32 length = checkForArrayInitializer(arrayOpnd, byteCodes, offset, byteCodeLength);
         currentOffset += length;
     }
 }
 
 void 
-JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
+JavaByteCodeTranslator::anewarray(U_32 constPoolIndex) {
     NamedType* type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     Opnd* sizeOpnd = popOpnd();
     if (type->isUnresolvedType()) {
@@ -1771,7 +1771,7 @@ JavaByteCodeTranslator::anewarray(uint32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::multianewarray(uint32 constPoolIndex,uint8 dimensions) {
+JavaByteCodeTranslator::multianewarray(U_32 constPoolIndex,uint8 dimensions) {
     NamedType* arraytype = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     assert(arraytype->isArray());
     jitrino_assert(dimensions > 0);
@@ -1810,7 +1810,7 @@ JavaByteCodeTranslator::athrow() {
 // type checking byte codes
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
+JavaByteCodeTranslator::checkcast(U_32 constPoolIndex) {
     NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     Opnd* objOpnd = popOpnd();
     if (type->isUnresolvedType()) {
@@ -1824,7 +1824,7 @@ JavaByteCodeTranslator::checkcast(uint32 constPoolIndex) {
 }
 
 int  
-JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint32 off)   {
+JavaByteCodeTranslator::instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)   {
     NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     Opnd* src = popOpnd();
     Type* srcType = src->getType();
@@ -1866,7 +1866,7 @@ JavaByteCodeTranslator::instanceof(const uint8* bcp, uint32 constPoolIndex, uint
         // src is null, instanceOf returns 0
         irBuilder.genLabel(ObjIsNullLabel);
         cfgBuilder.genBlockAfterCurrent(ObjIsNullLabel);
-        Opnd * zero = irBuilder.genLdConstant((int32)0);
+        Opnd * zero = irBuilder.genLdConstant((I_32)0);
         irBuilder.genStVar(resVar, zero);
         irBuilder.genJump(Exit);
 
@@ -1907,7 +1907,7 @@ JavaByteCodeTranslator::monitorexit() {
 // variable access helpers
 //-----------------------------------------------------------------------------
 void 
-JavaByteCodeTranslator::genLdVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
+JavaByteCodeTranslator::genLdVar(U_32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
     Opnd *var = getVarOpndLdVar(javaType,varIndex);
     if (VMMagicUtils::isVMMagicClass(var->getType()->getName())) {
         var->setType(convertVMMagicType2HIR(typeManager, var->getType()));
@@ -1936,7 +1936,7 @@ JavaByteCodeTranslator::genTypeStVar(uint16 varIndex) {
 }
 
 void 
-JavaByteCodeTranslator::genStVar(uint32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
+JavaByteCodeTranslator::genStVar(U_32 varIndex,JavaLabelPrepass::JavaVarType javaType) {
     Opnd *src = popOpnd();
     VarOpnd *var = getVarOpndStVar(javaType,varIndex,src);
     if (var != NULL)
@@ -1947,7 +1947,7 @@ JavaByteCodeTranslator::genStVar(uint32 varIndex,JavaLabelPrepass::JavaVarType j
 // method return helpers
 //-----------------------------------------------------------------------------
 bool 
-JavaByteCodeTranslator::needsReturnLabel(uint32 off) {
+JavaByteCodeTranslator::needsReturnLabel(U_32 off) {
     if (!moreThanOneReturn && methodToCompile.getByteCodeSize()-1 != off) {
         if (!jumpToTheEnd) {
            // allocate one more label
@@ -1961,7 +1961,7 @@ JavaByteCodeTranslator::needsReturnLabel(uint32 off) {
 
 // for non-void returns
 void 
-JavaByteCodeTranslator::genReturn(JavaLabelPrepass::JavaVarType javaType, uint32 off) {
+JavaByteCodeTranslator::genReturn(JavaLabelPrepass::JavaVarType javaType, U_32 off) {
     Opnd *ret = popOpndStVar();
     if (methodToCompile.isSynchronized()) {
         // Create a new block to break exception region.  The monexit exception should
@@ -1980,7 +1980,7 @@ JavaByteCodeTranslator::genReturn(JavaLabelPrepass::JavaVarType javaType, uint32
 
 // for void returns
 void
-JavaByteCodeTranslator::genReturn(uint32 off) {
+JavaByteCodeTranslator::genReturn(U_32 off) {
     if (methodToCompile.isSynchronized()) {
         // Create a new block to break exception region. The monexit exception should
         // go to unwind.
@@ -2201,8 +2201,8 @@ JavaByteCodeTranslator::genTypeArrayStore() {
 //-----------------------------------------------------------------------------
 void 
 JavaByteCodeTranslator::genIf1(ComparisonModifier mod,
-                               int32 targetOffset,
-                               int32 nextOffset) {
+                               I_32 targetOffset,
+                               I_32 nextOffset) {
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
@@ -2212,14 +2212,14 @@ JavaByteCodeTranslator::genIf1(ComparisonModifier mod,
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
-    Opnd*    src2 = irBuilder.genLdConstant((int32)0);
+    Opnd*    src2 = irBuilder.genLdConstant((I_32)0);
     irBuilder.genBranch(Type::Int32,mod,target,src1,src2);
 }
 
 void 
 JavaByteCodeTranslator::genIf1Commute(ComparisonModifier mod,
-                                      int32 targetOffset,
-                                      int32 nextOffset) {
+                                      I_32 targetOffset,
+                                      I_32 nextOffset) {
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
@@ -2229,14 +2229,14 @@ JavaByteCodeTranslator::genIf1Commute(ComparisonModifier mod,
     lastInstructionWasABranch = true;
     checkStack();
     LabelInst *target = getLabel(labelId(targetOffset));
-    Opnd*    src2 = irBuilder.genLdConstant((int32)0);
+    Opnd*    src2 = irBuilder.genLdConstant((I_32)0);
     irBuilder.genBranch(Type::Int32,mod,target,src2,src1);
 }
 
 void 
 JavaByteCodeTranslator::genIf2(ComparisonModifier mod,
-                               int32 targetOffset,
-                               int32 nextOffset) {
+                               I_32 targetOffset,
+                               I_32 nextOffset) {
     Opnd*    src2 = popOpnd();
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
@@ -2252,8 +2252,8 @@ JavaByteCodeTranslator::genIf2(ComparisonModifier mod,
 
 void 
 JavaByteCodeTranslator::genIf2Commute(ComparisonModifier mod,
-                                      int32 targetOffset,
-                                      int32 nextOffset) {
+                                      I_32 targetOffset,
+                                      I_32 nextOffset) {
     Opnd*    src2 = popOpnd();
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
@@ -2269,8 +2269,8 @@ JavaByteCodeTranslator::genIf2Commute(ComparisonModifier mod,
 
 void 
 JavaByteCodeTranslator::genIfNull(ComparisonModifier mod,
-                                  int32 targetOffset,
-                                  int32 nextOffset) {
+                                  I_32 targetOffset,
+                                  I_32 nextOffset) {
     Opnd*    src1 = popOpnd();
     if (targetOffset == nextOffset)
         return;
@@ -2304,7 +2304,7 @@ JavaByteCodeTranslator::genThreeWayCmp(Type::Tag cmpType,
 
 void 
 JavaByteCodeTranslator::genInvokeStatic(MethodDesc * methodDesc,
-                                        uint32       numArgs,
+                                        U_32       numArgs,
                                         Opnd **      srcOpnds,
                                         Type *       returnType) {
     Opnd *dst;
@@ -2345,7 +2345,7 @@ JavaByteCodeTranslator::newFallthroughBlock() {
 
 bool
 JavaByteCodeTranslator::genMinMax(MethodDesc * methodDesc, 
-                                  uint32       numArgs,
+                                  U_32       numArgs,
                                   Opnd **      srcOpnds,
                                   Type *       returnType) {
 
@@ -2469,10 +2469,10 @@ JavaByteCodeTranslator::genMethodMonitorExit() {
     }
 }
 
-uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength)
+U_32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength)
 {
     assert(offset < byteCodeLength);
-    const uint32 MIN_NUMBER_OF_INIT_ELEMS = 2;
+    const U_32 MIN_NUMBER_OF_INIT_ELEMS = 2;
 
     const uint8 BYTE_JAVA_SIZE    = 1;
     const uint8 SHORT_JAVA_SIZE   = 2;
@@ -2486,7 +2486,7 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
     // Size of the array elements
     uint8 elem_size = 0;
     // Number of initialized array elements
-    uint32 elems = 0;
+    U_32 elems = 0;
 
     ArrayType* arrayType = arrayOpnd->getType()->asArrayType();
     assert(arrayType);
@@ -2506,8 +2506,8 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
     ::std::vector<uint64> array_data;
 
     // Current offset.
-    uint32 off = offset;
-    uint32 predoff = offset;
+    U_32 off = offset;
+    U_32 predoff = offset;
     // Array element indexes
     uint64 oldIndex = 0;
     uint64 newIndex = 0;
@@ -2515,7 +2515,7 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
     uint64 value = 0;
 
     bool exitScan = false;
-    uint32 tmpOff = 0;
+    U_32 tmpOff = 0;
 
     while (byteCodes[off++] == 0x59/*dup*/) {
         if (off >= byteCodeLength) break;
@@ -2570,10 +2570,10 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
 
     if (elems < MIN_NUMBER_OF_INIT_ELEMS) return 0;
 
-    const uint32 data_size = elems* elem_size;
+    const U_32 data_size = elems* elem_size;
     uint8* init_array_data = new uint8[data_size];
 
-    for (uint32 i = 0; i < elems; i++) {
+    for (U_32 i = 0; i < elems; i++) {
         switch (elem_size) {
             case BYTE_JAVA_SIZE:
                 init_array_data[i] = (uint8)(array_data[i]);
@@ -2582,7 +2582,7 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
                 *((uint16*)(init_array_data + (i * SHORT_JAVA_SIZE))) = (uint16)(array_data[i]);
                 break;
             case INT_JAVA_SIZE:
-                *((uint32*)(init_array_data + (i * INT_JAVA_SIZE))) = (uint32)(array_data[i]);
+                *((U_32*)(init_array_data + (i * INT_JAVA_SIZE))) = (U_32)(array_data[i]);
                 break;
             case LONG_JAVA_SIZE:
                 *((uint64*)(init_array_data + (i * LONG_JAVA_SIZE))) = (uint64)(array_data[i]);
@@ -2594,10 +2594,10 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
 
     Type* returnType = typeManager.getVoidType();
     Opnd* arrayDataOpnd = irBuilder.genLdConstant((POINTER_SIZE_SINT)init_array_data);
-    Opnd* arrayElemsOffset = irBuilder.genLdConstant((int32)(arrayType->getArrayElemOffset()));
-    Opnd* elemsOpnd = irBuilder.genLdConstant((int32)data_size);
+    Opnd* arrayElemsOffset = irBuilder.genLdConstant((I_32)(arrayType->getArrayElemOffset()));
+    Opnd* elemsOpnd = irBuilder.genLdConstant((I_32)data_size);
 
-    const uint32 numArgs = 4;
+    const U_32 numArgs = 4;
     Opnd* args[numArgs] = {arrayOpnd, arrayElemsOffset, arrayDataOpnd, elemsOpnd};
     irBuilder.genJitHelperCall(InitializeArray, returnType, numArgs, args);
 
@@ -2605,9 +2605,9 @@ uint32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const u
     return predoff - offset;
 }
 
-uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 offset, const uint32 byteCodeLength, uint64& value) {
+U_32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value) {
     assert(offset < byteCodeLength);
-    uint32 off = offset;
+    U_32 off = offset;
     switch (byteCodes[off++]) {
         case 0x02:        // iconst_m1
             value = (uint64)(-1);
@@ -2635,19 +2635,19 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
         case 0x0b:        // fconst_0
             {
                 float val = 0.0f;
-                value = (uint64)(*((uint32*)(&val)));
+                value = (uint64)(*((U_32*)(&val)));
             }
             break;
         case 0x0c:        // fconst_1
             {
                 float val = 1.0f;
-                value = (uint64)(*((uint32*)(&val)));
+                value = (uint64)(*((U_32*)(&val)));
             }
             break;
         case 0x0d:        // fconst_2
             {
                 float val = 2.0f;
-                value = (uint64)(*((uint32*)(&val)));
+                value = (uint64)(*((U_32*)(&val)));
             }
             break;
         case 0x0e:        // dconst_0
@@ -2674,7 +2674,7 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
         case 0x12:        // ldc
             {
                 if (off >= byteCodeLength) return 0;
-                uint32 constPoolIndex = su8(byteCodes + (off++));
+                U_32 constPoolIndex = su8(byteCodes + (off++));
                 // load 32-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
                 if ( !(constantType->isInt4() || constantType->isSingle()) ) {
@@ -2684,13 +2684,13 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
                 }
                 const void* constantAddress =
                     compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
-                value = *(uint32*)constantAddress;
+                value = *(U_32*)constantAddress;
             }
             break;
         case 0x13:        // ldc_w
             {
                 if ((off + 1) >= byteCodeLength) return 0;
-                uint32 constPoolIndex = su16(byteCodes + off);
+                U_32 constPoolIndex = su16(byteCodes + off);
                 // load 32-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
                 if ( !(constantType->isInt4() || constantType->isSingle()) ) {
@@ -2700,14 +2700,14 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
                 }
                 const void* constantAddress =
                     compilationInterface.getConstantValue(&methodToCompile,constPoolIndex);
-                value = *(uint32*)constantAddress;
+                value = *(U_32*)constantAddress;
             }
             off += 2;
             break;
         case 0x14:        // ldc2_w
             {
                 if ((off + 1) >= byteCodeLength) return 0;
-                uint32 constPoolIndex = su16(byteCodes + off);
+                U_32 constPoolIndex = su16(byteCodes + off);
                 // load 64-bit quantity from constant pool
                 Type* constantType = compilationInterface.getConstantType(&methodToCompile,constPoolIndex);
                 if ( !(constantType->isInt8() || constantType->isDouble()) ) {
@@ -2727,7 +2727,7 @@ uint32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, uint32 of
     return off - offset;
 }
 
-bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
+bool JavaByteCodeTranslator::genVMMagic(const char* mname, U_32 numArgs, Opnd **srcOpnds, Type *magicRetType) {
     Type* resType = convertVMMagicType2HIR(typeManager, magicRetType);
     Type* cmpResType = typeManager.getInt32Type();
     Opnd* tauSafe = irBuilder.genTauSafe();
@@ -2968,7 +2968,7 @@ bool JavaByteCodeTranslator::genVMMagic(const char* mname, uint32 numArgs, Opnd 
     return false;
 }
 
-bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd **srcOpnds, Type *returnType) {
+bool JavaByteCodeTranslator::genVMHelper(const char* mname, U_32 numArgs, Opnd **srcOpnds, Type *returnType) {
     Type* resType = VMMagicUtils::isVMMagicClass(returnType->getName()) ? convertVMMagicType2HIR(typeManager, returnType) : returnType;
 
 //VMHelper methods
@@ -3116,7 +3116,7 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, uint32 numArgs, Opnd
         assert(numArgs == 0);
         ObjectType* base = compilationInterface.findClassUsingBootstrapClassloader(VMHELPER_TYPE_NAME);
         int ready = base!=NULL && !base->needsInitialization() ? 1 : 0;
-        Opnd* res = irBuilder.genLdConstant((int32)ready);
+        Opnd* res = irBuilder.genLdConstant((I_32)ready);
         pushOpnd(res);
         return true;
     }

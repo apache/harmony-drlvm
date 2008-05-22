@@ -78,14 +78,14 @@ public:
     TbsEMClient() : nextTick(0) {}
     virtual ~TbsEMClient(){};
 
-    virtual uint32 getInitialTimeout() const  = 0;
-    virtual uint32 getTimeout() const = 0;
+    virtual U_32 getInitialTimeout() const  = 0;
+    virtual U_32 getTimeout() const = 0;
     virtual void onTimeout() = 0;
 
-    virtual uint32 getNextTick() const {return nextTick;}
-    virtual void setNextTick(uint32 n) {nextTick = n;}
+    virtual U_32 getNextTick() const {return nextTick;}
+    virtual void setNextTick(U_32 n) {nextTick = n;}
 private:
-    uint32 nextTick;
+    U_32 nextTick;
 };
 
 

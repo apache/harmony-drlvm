@@ -35,7 +35,7 @@ const Constraint Constraint::nullConstraint;
 const char * Constraint::parse(const char * str)
 {
     Constraint szc, kc;
-    for (uint32 i=0, j=0; i<0x100 && *str;){
+    for (U_32 i=0, j=0; i<0x100 && *str;){
         const char * tokenEnd=str; char token[0x100];
         for (j=0; j<0x100 && *tokenEnd && (isalpha(*tokenEnd)||isdigit(*tokenEnd)); tokenEnd++, j++)
             token[j]=*tokenEnd;
@@ -78,7 +78,7 @@ const char * Constraint::parse(const char * str)
 }
 
 //_________________________________________________________________________________________________
-OpndSize Constraint::getDefaultSize(uint32 k)
+OpndSize Constraint::getDefaultSize(U_32 k)
 {
     OpndKind regKind=(OpndKind)(k & OpndKind_Reg);
     if (regKind){
@@ -99,7 +99,7 @@ OpndSize Constraint::getDefaultSize(uint32 k)
 }
 
 //_________________________________________________________________________________________________
-Constraint Constraint::getAliasConstraint(OpndSize s, uint32 offset)const
+Constraint Constraint::getAliasConstraint(OpndSize s, U_32 offset)const
 {
     OpndSize sz=(OpndSize)size;
     if (s==OpndSize_Default){
@@ -112,8 +112,8 @@ Constraint Constraint::getAliasConstraint(OpndSize s, uint32 offset)const
     if (sz>s)
         return Constraint();
 
-    uint32 newKind=kind, newMask=0;
-    uint32 newRegKind=newKind & OpndKind_Reg;
+    U_32 newKind=kind, newMask=0;
+    U_32 newRegKind=newKind & OpndKind_Reg;
     OpndSize maxSubregisterSize =
 #ifdef _EM64T_
                                     OpndSize_32;
@@ -138,7 +138,7 @@ Constraint Constraint::getAliasConstraint(OpndSize s, uint32 offset)const
 }
 
 //_________________________________________________________________________________________________
-RegName Constraint::getAliasRegName(RegName regName, OpndSize sz, uint32 offset)
+RegName Constraint::getAliasRegName(RegName regName, OpndSize sz, U_32 offset)
 {
     if (regName==RegName_Null)
         return RegName_Null;
@@ -158,7 +158,7 @@ RegName Constraint::getAliasRegName(RegName regName, OpndSize sz, uint32 offset)
     if (regKind==OpndKind_GPReg){
 #ifndef _EM64T_
         if (sz==OpndSize_8 && (s==OpndSize_16 || s==OpndSize_32)){
-            uint32 idx=getRegIndex(regName);
+            U_32 idx=getRegIndex(regName);
             if (idx>4)
                 return RegName_Null;
             return getRegName(regKind, sz, idx);
@@ -178,7 +178,7 @@ RegName Constraint::getAliasRegName(RegName regName, OpndSize sz, uint32 offset)
 }
 
 //_________________________________________________________________________________________________
-RegName Constraint::getAliasRegName(RegName regName, uint32 offset)const
+RegName Constraint::getAliasRegName(RegName regName, U_32 offset)const
 {
     RegName rn=getAliasRegName(regName, (OpndSize)size, offset);
     return contains(rn)?rn:RegName_Null;

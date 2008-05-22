@@ -111,7 +111,7 @@ public:
      * @brief Address of helper that returns a pointer to 
         thread local struct.
      * @param none
-     * @return read-only pointer to an int32 flag.
+     * @return read-only pointer to an I_32 flag.
      */
     static char*        rt_helper_get_tls_base_ptr;
 

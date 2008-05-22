@@ -80,26 +80,26 @@ public:
     //
     CfgCodeSelector(::Jitrino::SessionAction* sa, CompilationInterface& compIntfc,
                          MethodCodeSelector& methodCodeSel, 
-                         MemoryManager& codeSelectorMM, uint32 nNodes, 
+                         MemoryManager& codeSelectorMM, U_32 nNodes, 
                          IRManager& irM);
 
-    uint32  genDispatchNode(uint32 numInEdges, uint32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt);
-    uint32  genBlock(uint32 numInEdges, uint32 numOutEdges, BlockKind blockKind,
+    U_32  genDispatchNode(U_32 numInEdges, U_32 numOutEdges, const StlVector<MethodDesc*>& inlineEndMarkers, double cnt);
+    U_32  genBlock(U_32 numInEdges, U_32 numOutEdges, BlockKind blockKind,
                      BlockCodeSelector& codeSelector, double cnt);
-    uint32  genUnwindNode(uint32 numInEdges, uint32 numOutEdges,double cnt);
-    uint32  genExitNode(uint32 numInEdges, double cnt);
-    void    genUnconditionalEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
-    void    genTrueEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
+    U_32  genUnwindNode(U_32 numInEdges, U_32 numOutEdges,double cnt);
+    U_32  genExitNode(U_32 numInEdges, double cnt);
+    void    genUnconditionalEdge(U_32 tailNodeId,U_32 headNodeId, double prob);
+    void    genTrueEdge(U_32 tailNodeId,U_32 headNodeId, double prob);
     void    genTrueEdge(Node* tailNode, Node* headNode, double prob);
-    void    genFalseEdge(uint32 tailNodeId,uint32 headNodeId, double prob);
+    void    genFalseEdge(U_32 tailNodeId,U_32 headNodeId, double prob);
     void    genFalseEdge(Node* tailNode, Node* headNode, double prob);
-    void    genSwitchEdges(uint32 tailNodeId, uint32 numTargets, uint32 *targets, 
-                           double *probs, uint32 defaultTarget);
-    void    genExceptionEdge(uint32 tailNodeId, uint32 headNodeId, double prob);
-    void    genCatchEdge(uint32 headNodeId,uint32 tailNodeId,
-                         uint32 priority,Type* exceptionType, double prob);
+    void    genSwitchEdges(U_32 tailNodeId, U_32 numTargets, U_32 *targets, 
+                           double *probs, U_32 defaultTarget);
+    void    genExceptionEdge(U_32 tailNodeId, U_32 headNodeId, double prob);
+    void    genCatchEdge(U_32 headNodeId,U_32 tailNodeId,
+                         U_32 priority,Type* exceptionType, double prob);
     
-    void    setPersistentId(uint32 nodeId, uint32 persistentId) {
+    void    setPersistentId(U_32 nodeId, U_32 persistentId) {
         ((CGNode*)nodes[nodeId])->setPersistentId(persistentId);
     }
 
@@ -127,7 +127,7 @@ private:
     //
     //    Methods
     //
-    void    genSwitchBlock(Node *originalBlock, uint32 numTargets, 
+    void    genSwitchBlock(Node *originalBlock, U_32 numTargets, 
                            Opnd *switchSrc);
     void    genEpilogNode();
     Inst *  findExceptionInst(Node* block);
@@ -136,8 +136,8 @@ private:
     //  Fields
     //
     Node**                  nodes;
-    uint32                  numNodes;
-    uint32                  nextNodeId;
+    U_32                  numNodes;
+    U_32                  nextNodeId;
     CompilationInterface&   compilationInterface;
     MethodCodeSelector&     methodCodeSelector;
     MemoryManager&          irMemManager;           // for data live after code selection
@@ -173,9 +173,9 @@ public:
                             IRManager&          irM);
      
 
-      void                genVars(uint32 numVars, ::Jitrino::VarCodeSelector& varCodeSelector);
+      void                genVars(U_32 numVars, ::Jitrino::VarCodeSelector& varCodeSelector);
     void                setMethodDesc(MethodDesc * desc) {methodDesc = desc;}
-    void                genCFG(uint32 numNodes, ::Jitrino::CFGCodeSelector& codeSelector, bool useDynamicProfile);
+    void                genCFG(U_32 numNodes, ::Jitrino::CFGCodeSelector& codeSelector, bool useDynamicProfile);
     
     MethodDesc *        getMethodDesc() {return methodDesc;}
 private:
@@ -220,10 +220,10 @@ public:
     VarGenerator(IRManager& irM, MethodCodeSelector& methodCodeSel) 
      : nextVarId(0), irManager(irM), methodCodeSelector(methodCodeSel) {
     }
-    uint32    defVar(Type* varType, bool isAddressTaken, bool isPinned);
-    void      setManagedPointerBase(uint32 managedPtrVarNum, uint32 baseVarNum);
+    U_32    defVar(Type* varType, bool isAddressTaken, bool isPinned);
+    void      setManagedPointerBase(U_32 managedPtrVarNum, U_32 baseVarNum);
 private:
-    uint32                  nextVarId;
+    U_32                  nextVarId;
     IRManager&              irManager;
     MethodCodeSelector&     methodCodeSelector;
 };

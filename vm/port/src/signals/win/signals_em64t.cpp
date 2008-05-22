@@ -21,7 +21,7 @@
 
 
 extern "C" void port_longjump_stub(void);
-#define DIR_FLAG ((uint32)0x00000400)
+#define DIR_FLAG ((U_32)0x00000400)
 
 void port_set_longjump_regs(void* fn, Registers* regs, int num, ...)
 {

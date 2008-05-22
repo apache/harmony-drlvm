@@ -144,7 +144,7 @@ void jvmti_jit_do_pop_frame(){
 #else // _IA32_ & _EM64T_
 
 // requires stack iterator and buffer to save intermediate information
-static void jvmti_jit_prepare_pop_frame(StackIterator* si, uint32* buf) {
+static void jvmti_jit_prepare_pop_frame(StackIterator* si, U_32* buf) {
     CTRACE(("Prepare PopFrame for JIT"));
     // pop native frame
     assert(si_is_native(si));
@@ -221,7 +221,7 @@ void jvmti_jit_prepare_pop_frame() {
     CTRACE(("PopFrame prepare for method IP: %p", si_get_ip(si) ));
 
     // prepare pop frame - find regs values
-    uint32 buf = 0;
+    U_32 buf = 0;
     jvmti_jit_prepare_pop_frame(si, &buf);
 
     // save regs value from jit context to m2n
@@ -309,7 +309,7 @@ void jvmti_jit_do_pop_frame() {
     si_transfer_all_preserved_registers(si);
 
     // prepare pop frame - find regs values
-    uint32 buf = 0;
+    U_32 buf = 0;
     jvmti_jit_prepare_pop_frame(si, &buf);
 
     // relocate single step breakpoints

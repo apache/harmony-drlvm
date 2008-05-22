@@ -130,7 +130,7 @@ void PrologEpilogGenerator::buildSets() {
 void PrologEpilogGenerator::reassignOutRegArgs() {
     
     // First out arg will have this location 
-    int32 outArgBase = G_INARG_BASE + opndManager->getLocRegSize();
+    I_32 outArgBase = G_INARG_BASE + opndManager->getLocRegSize();
     
     for(RegOpndSetIterator it=outRegArgs.begin(); it!=outRegArgs.end(); it++) {  
         setRegUsage(*it, false);                                     // mark old reg as free
@@ -140,7 +140,7 @@ void PrologEpilogGenerator::reassignOutRegArgs() {
 
         RegOpnd *arg = *it;
         IPF_LOG << "      " << IrPrinter::toString(arg) << " reassigned on ";
-        int32 outArgNum = G_OUTARG_BASE - arg->getValue();           // calculate real out arg number
+        I_32 outArgNum = G_OUTARG_BASE - arg->getValue();           // calculate real out arg number
         arg->setLocation(outArgBase + outArgNum);                    // calculate and assign new location
         setRegUsage(arg, true);                                      // mark new reg as used
         IPF_LOG << IrPrinter::toString(arg) << endl;  
@@ -289,9 +289,9 @@ void PrologEpilogGenerator::saveRestorePr() {
 
 void PrologEpilogGenerator::genAlloc() {
 
-    int32 locRegSize = calculateLocRegSize();                  // actual reg usage in local area
-    int32 inRegSize  = opndManager->getInRegSize();            // in regs number
-    int32 outRegSize = opndManager->getOutRegSize();           // out regs number
+    I_32 locRegSize = calculateLocRegSize();                  // actual reg usage in local area
+    I_32 inRegSize  = opndManager->getInRegSize();            // in regs number
+    I_32 outRegSize = opndManager->getOutRegSize();           // out regs number
 
     if (containCall==false && locRegSize<=inRegSize) return;   // method does not need "alloc" inst
 
@@ -462,7 +462,7 @@ void PrologEpilogGenerator::saveRestorePreservedBr() {
 void PrologEpilogGenerator::saveRestoreSp() {
     
     opndManager->initMemStackSize();
-    int32 memStackSize = opndManager->memStackSize;
+    I_32 memStackSize = opndManager->memStackSize;
     if (memStackSize <= S_SCRATCH_SIZE) return;    // method does not need to save SP
     
     Opnd *memStackSizeOpndNeg = opndManager->newImm(-memStackSize);
@@ -475,7 +475,7 @@ void PrologEpilogGenerator::saveRestoreSp() {
 
 RegOpnd* PrologEpilogGenerator::newStorage(DataKind dataKind, uint16 site) {
     
-    int32 location = LOCATION_INVALID;
+    I_32 location = LOCATION_INVALID;
     if (site==SITE_REG) location = opndManager->newLocation(OPND_G_REG, dataKind, usedGrMask, containCall);
     else                location = opndManager->newLocSlot(dataKind);
     
@@ -505,11 +505,11 @@ void PrologEpilogGenerator::setRegUsage(RegOpnd *opnd, bool flag) {
     
 //----------------------------------------------------------------------------------------//
 
-int32 PrologEpilogGenerator::calculateLocRegSize() {
+I_32 PrologEpilogGenerator::calculateLocRegSize() {
     
     uint16 first      = G_INARG_BASE;                             // first possible loc reg opnd location
     uint16 last       = NUM_G_REG - opndManager->getOutRegSize(); // last possible loc reg opnd location
-    int32  locRegSize = 0; 
+    I_32  locRegSize = 0; 
     
     // find last used gr in local area
     for(uint16 i=first; i<last; i++) {
