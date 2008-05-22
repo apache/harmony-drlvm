@@ -219,13 +219,13 @@ jvmtiGetExtensionFunctions(jvmtiEnv* env,
     return JVMTI_ERROR_NONE;
 }
 
-struct JvmtiExcensionEvent
+struct JvmtiExtensionEvent
 {
-    JvmtiExcensionEvent *next;
+    JvmtiExtensionEvent *next;
     jvmtiExtensionEventInfo info;
 };
 
-static JvmtiExcensionEvent *jvmti_exntension_event_list = NULL;
+static JvmtiExtensionEvent *jvmti_exntension_event_list = NULL;
 
 static const jint extensions_events_number = 0;
 
@@ -300,7 +300,7 @@ jvmtiGetExtensionEvents(jvmtiEnv* env,
 
     memset(array, 0, arr_size);
 
-    JvmtiExcensionEvent *ex = jvmti_exntension_event_list;
+    JvmtiExtensionEvent *ex = jvmti_exntension_event_list;
     for (int iii = 0; iii < extensions_events_number; iii++)
     {
         jvmtiExtensionEventInfo *info = &ex->info;
