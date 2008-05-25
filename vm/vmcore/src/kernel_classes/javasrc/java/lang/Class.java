@@ -81,7 +81,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     transient SoftReference<GACache> softCache;
     
     /** 
-     * Indicates where the following properties have been calculated;
+     * Indicates whether the following properties have been calculated;
      * isSerializable, isExternalizable, isPrimitive
      * 
      * @see #resolveProperties() 
