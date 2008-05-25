@@ -22,6 +22,7 @@ import static org.apache.harmony.vm.ClassFormat.ACC_ENUM;
 import static org.apache.harmony.vm.ClassFormat.ACC_INTERFACE;
 import static org.apache.harmony.vm.ClassFormat.ACC_SYNTHETIC;
 
+import java.io.Externalizable;
 import java.io.InputStream;
 import java.io.Serializable;
 import java.lang.annotation.Annotation;
@@ -78,6 +79,18 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     // TODO make it soft reference
     transient ReflectionData reflectionData;
     transient SoftReference<GACache> softCache;
+    
+    /** 
+     * Indicates where the following properties have been calculated;
+     * isSerializable, isExternalizable, isPrimitive
+     * 
+     * @see #resolveProperties() 
+     */
+    private transient volatile boolean arePropertiesResolved;
+    
+    private transient boolean isSerializable;
+    private transient boolean isExternalizable;
+    private transient boolean isPrimitive;
     
     private GACache getCache() {
         GACache cache = null;
@@ -601,10 +614,33 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return reflectionData.isArray;
     }
 
+    private void resolveProperties() {
+        if (arePropertiesResolved) {
+        	return;
+        }
+        isExternalizable = VMClassRegistry.isAssignableFrom(Externalizable.class, this);
+        isSerializable = VMClassRegistry.isAssignableFrom(Serializable.class, this);
+        isPrimitive = VMClassRegistry.isPrimitive(this);
+        arePropertiesResolved = true;
+    }
+    
     /**
      * @com.intel.drl.spec_ref
      */
     public boolean isAssignableFrom(Class<?> clazz) {
+        
+        if (Serializable.class.equals(this)) {
+            // assure that props have been resolved
+        	clazz.resolveProperties();
+            return clazz.isSerializable;
+        }
+        
+        if (Externalizable.class.equals(this)) {
+            // assure that props have been resolved
+        	clazz.resolveProperties();
+            return clazz.isExternalizable;
+        }
+        
         return VMClassRegistry.isAssignableFrom(this, clazz);
     }
 
@@ -626,7 +662,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public boolean isPrimitive() {
-        return VMClassRegistry.isPrimitive(this);
+    	// assure that props have been resolved
+        resolveProperties();
+        return isPrimitive;
     }
 
     /**
