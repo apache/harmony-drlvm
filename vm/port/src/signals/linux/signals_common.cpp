@@ -27,64 +27,45 @@
 #include "stack_dump.h"
 #include "../linux/include/gdb_crash_handler.h"
 #include "signals_internal.h"
+#include "port_thread_internal.h"
 
 
-port_tls_key_t port_tls_key;
+#define FLAG_CORE ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+#define FLAG_DBG  ((port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
 
-int init_private_tls_data()
+
+bool is_stack_overflow(port_tls_data_t* tlsdata, void* fault_addr)
 {
-    return (pthread_key_create(&port_tls_key, NULL) == 0) ? 0 : -1;
-}
+    if (!tlsdata || !fault_addr)
+        return false;
 
-int free_private_tls_data()
-{
-    return (pthread_key_delete(port_tls_key) == 0) ? 0 : -1;
-}
-
-
-// Because application can set up some protected area in stack region,
-// we need to re-enable access to this area because we need to operate
-// with the original stack of the thread
-// Application should take care of restoring this protected area after
-// signal processing
-// FIXME This is workaround only; it also can break crash processing for SIGSEGV
-// Ideally all the functionality on guard pages should be in Port.
-// Unfortunately, it can involve thread creation in Port, additional
-// thread wrapper, and moving general TLS operations to Port, so
-// it's postponed
-static void clear_stack_protection(Registers* regs, void* fault_addr)
-{
-    if (!fault_addr) // is not SO
-        return;
-
-    size_t fault = (size_t)fault_addr;
-    size_t sp = (size_t)regs->get_sp();
-    size_t diff = (fault > sp) ? (fault - sp) : (sp - fault);
-    size_t page_size = (size_t)sysconf(_SC_PAGE_SIZE);
-
-    if (diff > page_size)
-        return; // Most probably is not SO
-
-    size_t start = sp & ~(page_size - 1);
-    size_t size = page_size;
-
-    if (sp - start < 0x400)
+    if (tlsdata->guard_page_addr)
     {
-        start -= page_size;
-        size += page_size;
+        return (fault_addr >= tlsdata->guard_page_addr &&
+                (size_t)fault_addr < (size_t)tlsdata->guard_page_addr
+                                                + tlsdata->guard_page_size);
     }
 
-    int res = mprotect((void*)start, size, PROT_READ | PROT_WRITE);
+    size_t stack_top =
+        (size_t)tlsdata->stack_addr - tlsdata->stack_size + tlsdata->guard_page_size;
+
+    // Determine that fault is beyond stack top
+    return ((size_t)fault_addr < stack_top &&
+            (size_t)fault_addr > stack_top - tlsdata->stack_size);
 }
 
 static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
 { // this exception handler is executed *after* OS signal handler returned
     int result;
+    port_tls_data_t* tlsdata = get_private_tls_data();
 
     switch ((int)signum)
     {
     case SIGSEGV:
-        result = port_process_signal(PORT_SIGNAL_GPF, pregs, fault_addr, FALSE);
+        if (tlsdata->restore_guard_page)
+            result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, pregs, fault_addr, FALSE);
+        else
+            result = port_process_signal(PORT_SIGNAL_GPF, pregs, fault_addr, FALSE);
         break;
     case SIGFPE:
         result = port_process_signal(PORT_SIGNAL_ARITHMETIC, pregs, fault_addr, FALSE);
@@ -108,25 +89,35 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
     }
 
     if (result == 0)
+    {
+        // Restore guard page if needed
+        if (tlsdata->restore_guard_page)
+        {
+            port_thread_restore_guard_page();
+            tlsdata->restore_guard_page = FALSE;
+
+            if (port_thread_detach_temporary() == 0)
+                STD_FREE(tlsdata);
+        }
         return;
+    }
 
     // We've got a crash
+    if (signum == SIGSEGV)
+    {
+        port_thread_restore_guard_page(); // To catch SO again
+        tlsdata->restore_guard_page = FALSE;
+    }
+
     if (result > 0) // invoke debugger
     { // Prepare second catch of signal to attach GDB from signal handler
-        port_tls_data* tlsdata = get_private_tls_data();
-        if (!tlsdata)
-        {   // STD_MALLOC can be harmful here
-            tlsdata = (port_tls_data*)STD_MALLOC(sizeof(port_tls_data));
-            memset(tlsdata, 0, sizeof(port_tls_data));
-            set_private_tls_data(tlsdata);
-        }
-
+        //assert(tlsdata); // Should be attached - provided by general_signal_handler
         tlsdata->debugger = TRUE;
         return; // To produce signal again
     }
 
     // result < 0 - exit process
-    if ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+    if (FLAG_CORE)
     { // Return to the same place to produce the same crash and generate core
         signal(signum, SIG_DFL); // setup default handler
         return;
@@ -145,9 +136,10 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
 
     // Convert OS context to Registers
     port_thread_context_to_regs(&regs, (ucontext_t*)context);
+    void* fault_addr = info ? info->si_addr : NULL;
 
     // Check if SIGSEGV is produced by port_read/write_memory
-    port_tls_data* tlsdata = get_private_tls_data();
+    port_tls_data_t* tlsdata = get_private_tls_data();
     if (tlsdata && tlsdata->violation_flag)
     {
         tlsdata->violation_flag = 0;
@@ -155,25 +147,87 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
         return;
     }
 
-    if (tlsdata && tlsdata->debugger)
+    if (!tlsdata) // Tread is not attached - attach thread temporarily
+    {
+        int res;
+        tlsdata = (port_tls_data_t*)STD_MALLOC(sizeof(port_tls_data_t));
+
+        if (tlsdata) // Try to attach the thread
+            res = port_thread_attach_local(tlsdata, TRUE, TRUE, 0);
+
+        if (!tlsdata || res != 0)
+        { // Can't process correctly; perform default actions
+            if (FLAG_DBG)
+            {
+                bool result = gdb_crash_handler(&regs);
+                _exit(-1); // Exit process if not sucessful...
+            }
+
+            if (FLAG_CORE &&
+                signum != SIGABRT) // SIGABRT can't be rethrown
+            {
+                signal(signum, SIG_DFL); // setup default handler
+                return;
+            }
+
+            _exit(-1);
+        }
+
+        // SIGSEGV can represent SO which can't be processed out of signal handler
+        if (signum == SIGSEGV && // This can occur only when a user set an alternative stack
+            is_stack_overflow(tlsdata, fault_addr))
+        {
+            int result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
+
+            if (result == 0)
+            {
+                if (port_thread_detach_temporary() == 0)
+                    STD_FREE(tlsdata);
+                return;
+            }
+
+            if (result > 0)
+                tlsdata->debugger = TRUE;
+            else
+            {
+                if (FLAG_CORE)
+                { // Rethrow crash to generate core
+                    signal(signum, SIG_DFL); // setup default handler
+                    return;
+                }
+                _exit(-1);
+            }
+        }
+    }
+
+    if (tlsdata->debugger)
     {
         bool result = gdb_crash_handler(&regs);
         _exit(-1); // Exit process if not sucessful...
     }
 
     if (signum == SIGABRT && // SIGABRT can't be trown again from c_handler
-        (port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
+        FLAG_DBG)
     { // So attaching GDB right here
         bool result = gdb_crash_handler(&regs);
         _exit(-1); // Exit process if not sucessful...
     }
 
-    if (signum == SIGSEGV)
-        clear_stack_protection(&regs, info->si_addr);
+    if (signum == SIGSEGV &&
+        is_stack_overflow(tlsdata, fault_addr))
+    {
+        // Second SO while previous SO is not processed yet - is GPF
+        if (tlsdata->restore_guard_page)
+            tlsdata->restore_guard_page = FALSE;
+        else
+        { // To process signal on protected stack area
+            port_thread_clear_guard_page();
+            tlsdata->restore_guard_page = TRUE;
+        }
+    }
 
     // Prepare registers for transfering control out of signal handler
     void* callback = (void*)&c_handler;
-    void* fault_addr = info ? info->si_addr : NULL;
 
     port_set_longjump_regs(callback, &regs, 3,
                             &regs, (void*)(size_t)signum, fault_addr);
@@ -223,7 +277,8 @@ int initialize_signals()
 
     for (size_t i = 0; i < sizeof(signals_used)/sizeof(signals_used[0]); i++)
     {
-        if (!sd_is_handler_registered(signals_used[i].port_sig))
+        if (!sd_is_handler_registered(signals_used[i].port_sig) &&
+            signals_used[i].signal != SIGSEGV) // Sigsegv is needed for port_memaccess
             continue;
 
         sigemptyset(&sa.sa_mask);

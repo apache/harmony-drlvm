@@ -652,16 +652,16 @@ void exception_catch_callback() {
     // si_create_from_registers uses large stack space,
     // so guard page restored after its invoke.
     if (p_TLS_vmthread->restore_guard_page) {
-        bool result = set_guard_stack();
+        int res = port_thread_restore_guard_page();
 
-        if (result == false) {
+        if (res != 0) {
             Global_Env *env = VM_Global_State::loader_env;
 
             if (si_is_native(si)) {
                 m2n_set_last_frame(prev_m2n);
 
-                if ((interpreter_enabled() || (!prev_m2n) 
-                        || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
+                if ((interpreter_enabled() || (!prev_m2n) ||
+                        (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
                     exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 } else {
                     //si_free(si);
@@ -672,6 +672,8 @@ void exception_catch_callback() {
                 exn_throw_by_class(env->java_lang_StackOverflowError_Class);
             }
         }
+
+        p_TLS_vmthread->restore_guard_page = false;
     }
 
     si_transfer_control(si);
@@ -699,16 +701,16 @@ void jvmti_exception_catch_callback() {
     // but befor ti agent callback invokation, 
     // because it should work on protected page.
     if (p_TLS_vmthread->restore_guard_page) {
-        bool result = set_guard_stack();
+        int res = port_thread_restore_guard_page();
 
-        if (result == false) {
+        if (res != 0) {
             Global_Env *env = VM_Global_State::loader_env;
 
             if (si_is_native(si)) {
                 m2n_set_last_frame(prev_m2n);
 
-                if ((interpreter_enabled() || (!prev_m2n) 
-                        || (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
+                if ((interpreter_enabled() || (!prev_m2n) ||
+                        (m2n_get_frame_type(prev_m2n) & FRAME_NON_UNWINDABLE))) {
                     exn_raise_by_class(env->java_lang_StackOverflowError_Class);
                 } else {
                     //si_free(si);
@@ -719,6 +721,8 @@ void jvmti_exception_catch_callback() {
                 exn_throw_by_class(env->java_lang_StackOverflowError_Class);
             }
         }
+
+        p_TLS_vmthread->restore_guard_page = false;
     }
 
     if (!si_is_native(si))
@@ -732,6 +736,7 @@ void jvmti_exception_catch_callback() {
         *exn_obj = jvmti_jit_exception_catch_event_callback_call( *exn_obj,
                 catch_method_jit, catch_method, catch_method_location);
     }
+
     si_transfer_control(si);
 }
 

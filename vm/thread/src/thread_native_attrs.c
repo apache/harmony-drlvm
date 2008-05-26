@@ -38,7 +38,7 @@
  * @returns 0 on success or negative value on failure (priority wasn't changed)
  */
 IDATA VMCALL hythread_set_priority(hythread_t thread, UDATA priority) {
-    int r = os_thread_set_priority(thread->os_handle, priority);
+    int r = port_thread_set_priority(thread->os_handle, priority);
     if (r) return r;
     thread->priority = priority;
     return 0;

@@ -36,7 +36,7 @@ LONG __declspec(naked) NTAPI vectored_exception_handler(LPEXCEPTION_POINTERS nt_
     }
 }
 
-void __declspec(naked) __cdecl port_win_dbg_break()
+void __declspec(naked) PORT_CDECL port_win_dbg_break()
 {
 __asm { int 3 }
 }

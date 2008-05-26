@@ -27,6 +27,7 @@
 #include "port_crash_handler.h"
 #include "stack_dump.h"
 #include "signals_internal.h"
+#include "port_thread_internal.h"
 
 
 #if INSTRUMENTATION_BYTE == INSTRUMENTATION_BYTE_INT3
@@ -37,10 +38,11 @@
 #error Unknown value of INSTRUMENTATION_BYTE
 #endif
 
+#define FLAG_CORE ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+#define FLAG_DBG  ((port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
 
-port_tls_key_t port_tls_key = TLS_OUT_OF_INDEXES;
 
-typedef void (__cdecl *sigh_t)(int); // Signal handler type
+typedef void (PORT_CDECL *sigh_t)(int); // Signal handler type
 
 static PVOID veh = NULL;
 static sigh_t prev_sig = (sigh_t)SIG_ERR;
@@ -53,20 +55,22 @@ static _HFILE report_files[3];
 static bool asserts_disabled = false;
 
 
-int init_private_tls_data()
+static void show_debugger_dialog()
 {
-    DWORD key = TlsAlloc();
+    int result = MessageBox(NULL,
+                    "Crash handler has been requested to call the debugger\n\n"
+                    "Press Retry to attach to the debugger\n"
+                    "Press Cancel to terminate the application",
+                    "Crash Handler",
+                    MB_RETRYCANCEL | MB_ICONHAND | MB_SETFOREGROUND | MB_TASKMODAL);
 
-    if (key == TLS_OUT_OF_INDEXES)
-        return -1;
+    if (result == IDCANCEL)
+    {
+        _exit(3);
+        return;
+    }
 
-    port_tls_key = key;
-    return 0;
-}
-
-int free_private_tls_data()
-{
-    return TlsFree(port_tls_key) ? 0 : -1;
+    port_win_dbg_break(); // Call the debugger
 }
 
 
@@ -74,7 +78,6 @@ static void c_handler(Registers* pregs,
                         void* fault_addr, size_t code, size_t flags)
 { // this exception handler is executed *after* VEH handler returned
     int result;
-    Registers regs = *pregs;
     Boolean iscrash = (DWORD)flags == EXCEPTION_NONCONTINUABLE;
 
     switch ((DWORD)code)
@@ -99,69 +102,127 @@ static void c_handler(Registers* pregs,
         result = port_process_signal(PORT_SIGNAL_UNKNOWN, pregs, fault_addr, TRUE);
     }
 
-    if (result == 0)
-        return;
+    port_tls_data_t* tlsdata = get_private_tls_data();
 
-    if (result > 0 || // Assert dialog
-        (port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+    if (result == 0)
+    {
+        // Restore guard page if needed
+        if (tlsdata->restore_guard_page)
+        {
+            port_thread_restore_guard_page();
+            tlsdata->restore_guard_page = FALSE;
+
+            if (port_thread_detach_temporary() == 0)
+                STD_FREE(tlsdata);
+        }
+        return;
+    }
+
+    if (result > 0 /*Assert dialog*/|| FLAG_CORE)
     {
         // Prepare second catch of this exception to produce minidump (because
         // we've lost LPEXCEPTION_POINTERS structure) and/or show assert dialog
-        // FIXME: This will not work for stack overflow, because guard page
-        // is disabled automatically - need to restore it somehow
-        port_tls_data* tlsdata = get_private_tls_data();
-        if (!tlsdata)
-        {   // STD_MALLOC can be harmful here
-            tlsdata = (port_tls_data*)STD_MALLOC(sizeof(port_tls_data));
-            memset(tlsdata, 0, sizeof(port_tls_data));
-            set_private_tls_data(tlsdata);
-        }
-
-        if ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+        if (FLAG_CORE)
             tlsdata->produce_core = TRUE;
         if (result > 0)
             tlsdata->debugger = TRUE;
+        // To catch STACK_OVERFLOW
+        port_thread_restore_guard_page();
 
         return; // To produce exception again
     }
 
-    _exit(-1);
+    _exit(-1); // We need neither dump nor assert dialog
 }
 
 void prepare_assert_dialog(Registers* regs)
 {
+    // To catch STACK_OVERFLOW
+    port_thread_restore_guard_page();
     shutdown_signals();
 }
 
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
 {
+    DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
+    void* fault_addr = nt_exception->ExceptionRecord->ExceptionAddress;
+
     Registers regs;
     // Convert NT context to Registers
     port_thread_context_to_regs(&regs, nt_exception->ContextRecord);
 
     // Check if TLS structure is set - probably we should produce minidump
-    port_tls_data* tlsdata = get_private_tls_data();
+    port_tls_data_t* tlsdata = get_private_tls_data();
 
-    if (tlsdata)
+    if (!tlsdata) // Tread is not attached - attach thread temporarily
     {
-        if (tlsdata->produce_core)
-        {
-            tlsdata->produce_core = FALSE;
-            create_minidump(nt_exception);
-            if (!tlsdata->debugger)
+        int res;
+        tlsdata = (port_tls_data_t*)STD_MALLOC(sizeof(port_tls_data_t));
+
+        if (tlsdata) // Try to attach the thread
+            res = port_thread_attach_local(tlsdata, TRUE, TRUE, 0);
+
+        if (!tlsdata || res != 0)
+        { // Can't process correctly; perform default actions
+            if (FLAG_CORE)
+                create_minidump(nt_exception);
+
+            if (FLAG_DBG)
+            {
+                show_debugger_dialog(); // Workaround; EXCEPTION_CONTINUE_SEARCH does not work
                 _exit(-1);
+                return EXCEPTION_CONTINUE_SEARCH; // Assert dialog
+            }
+
+            _exit(-1);
         }
 
-        if (tlsdata->debugger)
+        // SO for alien thread can't be processed out of VEH
+        if (code == STATUS_STACK_OVERFLOW &&
+            sd_is_handler_registered(PORT_SIGNAL_STACK_OVERFLOW))
         {
-            // Go to handler to restore CRT/VEH settings and crash once again
-            port_set_longjump_regs(&prepare_assert_dialog, &regs, 1, &regs);
-            port_thread_regs_to_context(nt_exception->ContextRecord, &regs);
-            return EXCEPTION_CONTINUE_EXECUTION;
+            int result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
+
+            if (result == 0)
+            {
+                if (port_thread_detach_temporary() == 0)
+                    STD_FREE(tlsdata);
+                return EXCEPTION_CONTINUE_EXECUTION;
+            }
+
+            if (FLAG_CORE)
+                create_minidump(nt_exception);
+
+            if (result > 0)
+            {
+                show_debugger_dialog(); // Workaround; EXCEPTION_CONTINUE_SEARCH does not work
+                _exit(-1);
+                shutdown_signals();
+                return EXCEPTION_CONTINUE_SEARCH; // Assert dialog
+            }
+
+            _exit(-1);
         }
     }
 
-    switch (nt_exception->ExceptionRecord->ExceptionCode)
+    if (tlsdata->produce_core)
+    {
+        create_minidump(nt_exception);
+        if (!tlsdata->debugger)
+            _exit(-1);
+    }
+
+    if (tlsdata->debugger)
+    {
+        show_debugger_dialog(); // Workaround
+        _exit(-1);
+        // Go to handler to restore CRT/VEH settings and crash once again
+//        port_set_longjump_regs(&prepare_assert_dialog, &regs, 1, &regs);
+//        port_thread_regs_to_context(nt_exception->ContextRecord, &regs);
+//        return EXCEPTION_CONTINUE_EXECUTION;
+    }
+
+    switch (code)
     {
     case STATUS_STACK_OVERFLOW:
         if (!sd_is_handler_registered(PORT_SIGNAL_STACK_OVERFLOW))
@@ -185,6 +246,12 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         break;
     default:
         return EXCEPTION_CONTINUE_SEARCH;
+    }
+
+    if (code == STATUS_STACK_OVERFLOW)
+    {
+        if (!tlsdata->restore_guard_page)
+            tlsdata->restore_guard_page = TRUE;
     }
 
     // Prepare to transfering control out of VEH handler
@@ -258,25 +325,7 @@ static void restore_assert_dialogs()
 #endif // _DEBUG
 }
 
-static void show_debugger_dialog()
-{
-    int result = MessageBox(NULL,
-                    "ABORT handler has requested to call the debugger\n\n"
-                    "Press Retry to attach to the debugger\n"
-                    "Press Cancel to terminate the application",
-                    "Crash Handler",
-                    MB_RETRYCANCEL | MB_ICONHAND | MB_SETFOREGROUND | MB_TASKMODAL);
-
-    if (result == IDCANCEL)
-    {
-        _exit(3);
-        return;
-    }
-
-    port_win_dbg_break(); // Call the debugger
-}
-
-static void __cdecl sigabrt_handler(int signum)
+static void PORT_CDECL sigabrt_handler(int signum)
 {
     int result = port_process_signal(PORT_SIGNAL_ABORT, NULL, NULL, FALSE);
     // There no reason for checking for 0 - abort() will do _exit(3) anyway
@@ -291,7 +340,7 @@ static void __cdecl sigabrt_handler(int signum)
     _exit(3);
 }
 
-static void __cdecl final_sigabrt_handler(int signum)
+static void PORT_CDECL final_sigabrt_handler(int signum)
 {
     _exit(3);
 }

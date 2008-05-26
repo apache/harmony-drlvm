@@ -35,6 +35,7 @@
 #include "object_handles.h"
 #include "vm_arrays.h"
 #include "vm_strings.h"
+#include "port_thread.h"
 #include "cci.h"
 #include "ExpandableMemBlock.h"
 
@@ -120,15 +121,17 @@ void exn_clear()
     clear_exception_internal();
     tmn_suspend_enable_recursive();
 
-    // if quard stack should be restored - restores it
+    // This will restore quard stack if needed
     if (p_TLS_vmthread->restore_guard_page) {
-        bool result = set_guard_stack();
+        int res = port_thread_restore_guard_page();
 
         // if guard stack can't be restored raise SOE
-        if (result == false) {
+        if (res != 0) {
             Global_Env *env = VM_Global_State::loader_env;
             exn_raise_by_class(env->java_lang_StackOverflowError_Class);
         }
+
+        p_TLS_vmthread->restore_guard_page = false;
     }
 }
 

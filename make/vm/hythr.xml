@@ -47,8 +47,8 @@
 
             <linkerarg value="/DEF:${vm.home}/thread/src/hythr.def" if="is.windows"/>
 
-            <syslibset libs="stdc++,rt,pthread" if="is.linux"/>
-            <syslibset libs="stdc++,pthread" if="is.freebsd"/>
+            <syslibset type="shared" libs="stdc++,rt,pthread" if="is.linux"/>
+            <syslibset type="shared" libs="stdc++,pthread" if="is.freebsd"/>
             <linkerarg value="-Wl,-init" if="is.unix"/>
             <linkerarg value="-Wl,hythread_library_init" if="is.unix"/>
             <linkerarg value="-Wl,--version-script,${vm.home}/thread/src/hythr.exp" if="is.unix"/>

@@ -304,17 +304,7 @@ IDATA sem_wait_impl(hysem_t sem, I_64 ms, IDATA nano, IDATA interruptable);
 /*
  * portability functions, private for thread module
  */
-int os_thread_create(osthread_t* phandle, UDATA stacksize, UDATA priority,
-        hythread_wrapper_t func, void *data);
-int os_thread_set_priority(osthread_t thread, int priority);
-osthread_t os_thread_current();
-int os_thread_free(osthread_t os_thread);
-void os_thread_exit(IDATA status);
-int os_thread_join(osthread_t os_thread);
-int os_get_thread_times(osthread_t os_thread, int64* pkernel, int64* puser);
-
 int os_cond_timedwait(hycond_t *cond, osmutex_t *mutex, I_64 ms, IDATA nano);
-UDATA os_get_foreign_thread_stack_size();
 
 
 #ifdef __cplusplus

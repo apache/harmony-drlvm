@@ -26,17 +26,34 @@ int port_set_breakpoint(void* addr, unsigned char* prev)
     if (!addr || !prev)
         return -1;
 
+    unsigned char buf;
     unsigned char instr = INSTRUMENTATION_BYTE;
 
-    if (port_read_memory(addr, 1, prev) != 0)
+    int err = port_read_memory(addr, 1, &buf);
+    if (err != 0) return err;
+
+    if (buf == instr)
         return -1;
 
-    return port_write_memory(addr, 1, &instr);
+    err = port_write_memory(addr, 1, &instr);
+    if (err != 0) return err;
+
+    *prev = buf;
+    return 0;
 }
 
 int port_clear_breakpoint(void* addr, unsigned char prev)
 {
     if (!addr)
+        return -1;
+
+    unsigned char buf;
+    unsigned char instr = INSTRUMENTATION_BYTE;
+
+    int err = port_read_memory(addr, 1, &buf);
+    if (err != 0) return err;
+
+    if (buf != instr)
         return -1;
 
     return port_write_memory(addr, 1, &prev);

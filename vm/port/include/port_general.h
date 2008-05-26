@@ -58,5 +58,15 @@
 
 #endif /* __cplusplus */
 
+#ifdef _IA32_
+#ifdef WIN32
+#define PORT_CDECL __cdecl
+#else /* !WIN32 */
+#define PORT_CDECL __attribute__ ((cdecl))
+#endif /* WIN32 */
+#else /* _IA32_ */
+#define PORT_CDECL
+#endif /* _IA32_ */
+
 
 #endif /* _PORT_GENERAL_H_ */

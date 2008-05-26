@@ -21,23 +21,15 @@
 
 #include "open/platform_types.h"
 #include "port_crash_handler.h"
+#include "port_malloc.h"
 #include "stack_dump.h"
 #include "../linux/include/gdb_crash_handler.h"
 #include "signals_internal.h"
+#include "port_thread_internal.h"
 
 
-port_tls_key_t port_tls_key;
-
-int init_private_tls_data()
-{
-    return (pthread_key_create(&port_tls_key, NULL) == 0) ? 0 : -1;
-}
-
-int free_private_tls_data()
-{
-    return (pthread_key_delete(port_tls_key) == 0) ? 0 : -1;
-}
-
+#define FLAG_CORE ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+#define FLAG_DBG  ((port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
 
 /* Out-of-signal-handler signal processing is not implemented for IPF
 
@@ -46,12 +38,36 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
 }
 */
 
+bool is_stack_overflow(port_tls_data_t* tlsdata, void* fault_addr)
+{
+    if (!tlsdata || !fault_addr)
+        return false;
+
+    if (tlsdata->guard_page_addr)
+    {
+        return (fault_addr >= tlsdata->guard_page_addr &&
+                (size_t)fault_addr < (size_t)tlsdata->guard_page_addr
+                                                + tlsdata->guard_page_size);
+    }
+
+    size_t stack_top =
+        (size_t)tlsdata->stack_addr - tlsdata->stack_size + tlsdata->guard_page_size;
+
+    // Determine that fault is beyond stack top
+    return ((size_t)fault_addr < stack_top &&
+            (size_t)fault_addr > stack_top - tlsdata->stack_size);
+}
+
 static void general_signal_handler(int signum, siginfo_t* info, void* context)
 {
     Registers regs;
+    port_tls_data_t* tlsdata = get_private_tls_data();
+
+    if (!context)
+        return;
+
 /* Not implemented
     // Check if SIGSEGV is produced by port_read/write_memory
-    port_tls_data* tlsdata = get_private_tls_data();
     if (tlsdata && tlsdata->violation_flag)
     {
         tlsdata->violation_flag = 0;
@@ -63,6 +79,60 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
     port_thread_context_to_regs(&regs, (ucontext_t*)context);
 
     void* fault_addr = info ? info->si_addr : NULL;
+
+    if (!tlsdata) // Tread is not attached - attach thread temporarily
+    {
+        int res;
+        tlsdata = (port_tls_data_t*)STD_MALLOC(sizeof(port_tls_data_t));
+
+        if (tlsdata) // Try to attach the thread
+            res = port_thread_attach_local(tlsdata, TRUE, TRUE, 0);
+
+        if (!tlsdata || res != 0)
+        { // Can't process correctly; perform default actions
+            if (FLAG_DBG)
+            {
+                bool result = gdb_crash_handler(&regs);
+                _exit(-1); // Exit process if not sucessful...
+            }
+
+            if (FLAG_CORE &&
+                signum != SIGABRT) // SIGABRT can't be rethrown
+            {
+                signal(signum, SIG_DFL); // setup default handler
+                return;
+            }
+
+            _exit(-1);
+        }
+
+        // SIGSEGV can represent SO which can't be processed out of signal handler
+        if (signum == SIGSEGV && // This can occur only when a user set an alternative stack
+            is_stack_overflow(tlsdata, fault_addr))
+        {
+            int result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
+
+            if (result == 0)
+            {
+                if (port_thread_detach_temporary() == 0)
+                    STD_FREE(tlsdata);
+                return;
+            }
+
+            if (result > 0)
+                tlsdata->debugger = TRUE;
+            else
+            {
+                if (FLAG_CORE)
+                { // Rethrow crash to generate core
+                    signal(signum, SIG_DFL); // setup default handler
+                    return;
+                }
+                _exit(-1);
+            }
+        }
+    }
+
     int result;
 
     switch ((int)signum)
@@ -91,21 +161,26 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
         result = port_process_signal(PORT_SIGNAL_UNKNOWN, &regs, fault_addr, TRUE);
     }
 
-    if (result == 0)
+    // Convert Registers back to OS context
+    port_thread_regs_to_context((ucontext_t*)context, &regs);
+
+    if (result == 0) // Signal was processed - continue execution
+    {
+        if (port_thread_detach_temporary() == 0)
+            STD_FREE(tlsdata);
         return;
+    }
 
     // We've got a crash
     if (result > 0)
     { // result > 0 - invoke debugger
         bool result = gdb_crash_handler(&regs);
-        // Continue with exiting process if not sucessful...
+        // Continue with making core or exiting process if not successful...
     }
 
-    // Convert Registers back to OS context
-    port_thread_regs_to_context((ucontext_t*)context, &regs);
-
     // result < 0 - exit process
-    if ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
+    if (FLAG_CORE &&
+        signum != SIGABRT) // SIGABRT can't be rethrown
     { // Return to the same place to produce the same crash and generate core
         signal(signum, SIG_DFL); // setup default handler
         return;

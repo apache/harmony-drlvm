@@ -87,7 +87,6 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread,
     self = hythread_self();
     new_thread->library = self ? self->library : TM_LIBRARY;
     new_thread->priority = priority ? priority : HYTHREAD_PRIORITY_NORMAL;
-    new_thread->stacksize = stacksize ? stacksize : TM_DEFAULT_STACKSIZE;
     
     if (!wrapper) {
         hythread_start_proc_data_t start_proc_data;
@@ -112,9 +111,10 @@ IDATA VMCALL hythread_create_ex(hythread_t new_thread,
     }
 
     // Need to make sure thread will not register itself with a thread group
-    // until os_thread_create returned and initialized thread->os_handle properly.
+    // until port_thread_create returned and initialized thread->os_handle properly.
     hythread_global_lock();
-    result = os_thread_create(&new_thread->os_handle, new_thread->stacksize,
+    result = port_thread_create(&new_thread->os_handle,
+            stacksize ? stacksize : TM_DEFAULT_STACKSIZE,
             priority, wrapper, data);
     assert(/* error */ result || new_thread->os_handle /* or thread created ok */);
     hythread_global_unlock();
@@ -166,6 +166,7 @@ IDATA hythread_attach_ex(hythread_t new_thread,
                          hythread_library_t lib,
                          hythread_group_t group)
 {
+    int res;
     IDATA status;
     hythread_t self = hythread_self();
 
@@ -176,12 +177,18 @@ IDATA hythread_attach_ex(hythread_t new_thread,
 
     new_thread->library = TM_LIBRARY;
     if (self) {
-        // to avoid creating multiple OS handle
+        // to avoid creating multiple OS handles
         new_thread->os_handle = self->os_handle;
     } else {
-        new_thread->os_handle = os_thread_current();
+        new_thread->os_handle = port_thread_current();
     }
     assert(new_thread->os_handle);
+
+    res = port_thread_attach();
+    // It's OK to have an error here when Port shared library
+    // is not available yet; only signals/crash handling will
+    // not be available for the thread
+    //assert(res == 0);
 
     CTRACE(("TM: native attached: native: %p ", new_thread));
 
@@ -276,6 +283,9 @@ void VMCALL hythread_detach_ex(hythread_t thread)
 
     // Detach if thread is attached to group.
     hythread_remove_from_group(thread);
+
+    if (thread == hythread_self()) // Detach current thread only
+        port_thread_detach();
 
     // FIXME - uncomment after TM state transition complete
     // release thread data
@@ -525,7 +535,7 @@ void VMCALL hythread_cancel(hythread_t thread) {
     osthread_t os_handle = thread->os_handle;
     hythread_detach(thread);
     port_thread_cancel(os_handle);
-    os_thread_join(os_handle);
+    port_thread_join(os_handle);
 }
 
 /** 
@@ -679,7 +689,7 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
         hythread_monitor_t monitor;
 
         // release thread OS handle
-        result = os_thread_free(new_thread->os_handle);
+        result = port_thread_free_handle(new_thread->os_handle);
         assert(0 == result);
 
         resume = new_thread->resume_event;
@@ -697,7 +707,6 @@ IDATA VMCALL hythread_struct_init(hythread_t new_thread)
 
     new_thread->java_status = jstatus;
     new_thread->priority   = HYTHREAD_PRIORITY_NORMAL;
-    new_thread->stacksize = os_get_foreign_thread_stack_size();
 
     port_mutex_lock(&new_thread->mutex);
     new_thread->state = TM_THREAD_STATE_NEW;
@@ -754,7 +763,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
     start_proc = start_proc_data.proc;
 
     CTRACE(("TM: native thread started: native: %p tm: %p",
-        apr_os_thread_current(), thread));
+        port_thread_current(), thread));
 
     // check hythread library state
     if (hythread_lib_state() != TM_LIBRARY_STATUS_INITIALIZED) {
@@ -774,7 +783,7 @@ static int HYTHREAD_PROC hythread_wrapper_start_proc(void *arg) {
         hythread_set_self(NULL);
 
         CTRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
-            apr_os_thread_current(), thread));
+            port_thread_current(), thread));
 
         // release hythread global lock
         status = hythread_global_unlock();
@@ -832,7 +841,7 @@ hythread_exit (hythread_monitor_t monitor) {
         hythread_monitor_exit(monitor);
     }
     hythread_detach_ex(NULL);
-    os_thread_exit(0);
+    port_thread_exit(0);
     // unreachable statement
     abort();
 }
@@ -847,13 +856,9 @@ hythread_exit (hythread_monitor_t monitor) {
  * @returns     0 on success, system error code otherwise
  */
 UDATA hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser) {
-    return os_get_thread_times(thread->os_handle, pkernel, puser);
+    return port_get_thread_times(thread->os_handle, pkernel, puser);
 }
 
-
-UDATA hythread_get_thread_stacksize(hythread_t thread) {
-    return thread->stacksize;
-}
 
 IDATA VMCALL hythread_thread_lock(hythread_t thread) {
     assert(thread);

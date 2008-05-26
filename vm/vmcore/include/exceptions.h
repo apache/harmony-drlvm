@@ -269,10 +269,7 @@ void print_uncaught_exception_message(FILE *f, char* context_message, jthrowable
 void exn_rethrow();
 void exn_rethrow_if_pending();
 
-bool set_guard_stack();
 typedef struct VM_thread * vm_thread_t;
-void remove_guard_stack(vm_thread_t vm_thread);
-void init_stack_info();
 void* get_exception_catch_stack_addr(void* curr_ip);
 VMEXPORT size_t get_available_stack_size();
 VMEXPORT bool check_available_stack_size(size_t required_size);

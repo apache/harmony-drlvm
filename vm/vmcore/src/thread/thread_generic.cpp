@@ -189,8 +189,6 @@ jint vm_attach(JavaVM * java_vm, JNIEnv ** p_jni_env)
     jni_env->reserved0 = (void *) 0x1234abcd;
     *p_jni_env = jni_env;
 
-    init_stack_info();
-
     m2n_null_init(p_m2n);
     m2n_set_last_frame(p_m2n);
 
@@ -247,11 +245,6 @@ jint vm_detach(jobject java_thread)
         // FIXME - GC notify detach thread works for current thread only
         gc_thread_kill(&p_vm_thread->_gc_private_information);
     }
-
-#ifdef PLATFORM_POSIX
-    // Remove guard page on the stack on linux
-    remove_guard_stack(p_vm_thread);
-#endif // PLATFORM_POSIX
 
     if (ti_is_enabled())
     {

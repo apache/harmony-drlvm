@@ -58,9 +58,6 @@ Boolean port_init_crash_handler(
     if (port_mutex_create(&g_mutex, APR_THREAD_MUTEX_NESTED) != APR_SUCCESS)
         return FALSE;
 
-	if (init_private_tls_data() != 0)
-	    return FALSE;
-
     for (unsigned iii = 0; iii < count; iii++)
     {
         assert(registrations[iii].signum >= PORT_SIGNAL_MIN);
@@ -135,9 +132,6 @@ Boolean port_shutdown_crash_handler()
 {
     if (shutdown_signals() != 0)
         return FALSE;
-
-	if (free_private_tls_data() != 0)
-	    return FALSE;
 
     for (crash_additional_actions *a = crash_actions; NULL != a;)
     {

@@ -30,6 +30,7 @@
                 <include name="include" />
                 <include name="port/include" />
                 <include name="port/src/signals/include" />
+                <include name="port/src/thread/include" />
                 <include name="port/src/crash_handler/include" />
                 <include name="port/src/encoder/ia32_em64t" unless="is.ia64"/>
             </dirset>
@@ -42,14 +43,20 @@
             <include name="modules/linux/*.c" if="is.unix"/>
             <include name="modules/win/*.c" if="is.windows"/>
 
+            <include name="thread/linux/thread_os.c" if="is.unix"/>
+            <include name="thread/linux/port_thread_tls_os.c" if="is.unix"/>
             <include name="thread/linux/*ia32.c" if="is.unix.x86"/>
             <include name="thread/linux/*em64t.c" if="is.unix.x86_64"/>
             <include name="thread/linux/*ipf.c" if="is.unix.ia64"/>
+            <include name="thread/win/thread_os.c" if="is.windows"/>
+            <include name="thread/win/port_thread_tls_os.c" if="is.windows"/>
             <include name="thread/win/*ia32.c" if="is.windows.x86"/>
             <include name="thread/win/*em64t.c" if="is.windows.x86_64"/>
 
             <include name="misc/linux/execname.c" if="is.unix"/>
             <include name="misc/win/execname.c" if="is.windows"/>
+            <!-- port_atomic_casptr is inlined on all platforms except ia64 -->
+            <include name="atomic/linux_ipf/*.c" if="is.unix.ia64"/>
         </patternset>
 
         <patternset id="ch.src.cpp">

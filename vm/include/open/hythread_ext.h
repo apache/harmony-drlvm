@@ -346,11 +346,6 @@ typedef struct HyThread {
     char need_to_free;
 
     /**
-     * Size of thread's stack, set on creation
-     */
-    UDATA stacksize;
-
-    /**
      * Flag of interruption
      */
     U_32 interrupted;
@@ -445,7 +440,6 @@ IDATA VMCALL hythread_group_get_list(hythread_group_t **list, int* size);
 UDATA VMCALL hythread_tls_get_offset(hythread_tls_key_t key);
 UDATA VMCALL hythread_tls_get_request_offset();
 UDATA VMCALL hythread_get_thread_times(hythread_t thread, int64* pkernel, int64* puser);
-UDATA hythread_get_thread_stacksize(hythread_t thread);
 UDATA VMCALL hythread_uses_fast_tls(void);
 IDATA VMCALL hythread_get_hythread_offset_in_tls(void);
 IDATA VMCALL hythread_get_struct_size();

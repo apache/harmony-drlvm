@@ -24,9 +24,11 @@
 
 #include "port_general.h"
 #include "port_barriers.h"
+#include "port_malloc.h"
 
 #include "signals_internal.h"
 #include "port_memaccess.h"
+#include "port_thread_internal.h"
 
 
 extern "C" void port_memcpy_asm(void* dst, const void* src, size_t size,
@@ -35,22 +37,28 @@ extern "C" void port_memcpy_asm(void* dst, const void* src, size_t size,
 
 static int memcpy_internal(void* dst, const void* src, size_t size, int from)
 {
-    port_tls_data tlsdata;
+    int res;
+    port_tls_data_t* tlsdata = get_private_tls_data();
 
-    if (!get_private_tls_data())
+    if (!tlsdata)
     {
-        if (set_private_tls_data(&tlsdata) != 0)
-            return -1;
+        tlsdata = (port_tls_data_t*)STD_ALLOCA(sizeof(port_tls_data_t));
+
+        res = port_thread_attach_local(tlsdata, TRUE, TRUE, 0);
+
+        if (res != 0)
+            return res;
     }
 
-    tlsdata.violation_flag = 1;
+    tlsdata->violation_flag = 1;
 
     void* memcpyaddr = (void*)&memcpy;
-    port_memcpy_asm(dst, src, size, &tlsdata.restart_address, memcpyaddr);
+    port_memcpy_asm(dst, src, size, &tlsdata->restart_address, memcpyaddr);
 
-    if (tlsdata.violation_flag == 1)
+    if (tlsdata->violation_flag == 1)
     {
-        pthread_setspecific(port_tls_key, NULL);
+        tlsdata->violation_flag = 0;
+        port_thread_detach_temporary();
         return 0;
     }
 
@@ -76,14 +84,20 @@ static int memcpy_internal(void* dst, const void* src, size_t size, int from)
     }
 
     if (result != 0)
+    {
+        tlsdata->violation_flag = 0;
+        port_thread_detach_temporary();
         return -1;
+    }
 
-    tlsdata.violation_flag = 1;
+    tlsdata->violation_flag = 1;
 
-    port_memcpy_asm(dst, src, size, &tlsdata.restart_address, memcpyaddr);
+    port_memcpy_asm(dst, src, size, &tlsdata->restart_address, memcpyaddr);
 
-    pthread_setspecific(port_tls_key, NULL);
-    return (tlsdata.violation_flag == 1) ? 0 : -1;
+    res = (tlsdata->violation_flag == 1) ? 0 : -1;
+    tlsdata->violation_flag = 0;
+    port_thread_detach_temporary();
+    return res;
 }
 
 

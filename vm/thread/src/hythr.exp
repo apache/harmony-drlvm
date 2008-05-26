@@ -39,7 +39,6 @@ hythread_monitor_wait_timed;
 hythread_resume;
 hythread_monitor_notify;
 hythread_get_priority;
-hythread_get_thread_stacksize;
 hythread_tls_get;
 hythread_tls_get_request_offset;
 hythread_get_hythread_offset_in_tls;

@@ -58,8 +58,12 @@ static const char* vm_fmt_tbl[] = {
     "%s\n", // No signature no sourcefile
 };
 
-static void sd_print_vm_line(FILE* file, int count, port_stack_frame_info* fi)
+static void sd_print_vm_line(FILE* file, int count, Registers* regs, port_stack_frame_info* fi)
 {
+    static char pi_blanks[2*sizeof(void*) + 3];
+    static void* pi_blanks_set_res = memset(pi_blanks, ' ', sizeof(pi_blanks));
+    static char pi_blanks_zero_res = (pi_blanks[sizeof(pi_blanks) - 1] = 0);
+
     if (!fi->method_name)
         return;
 
@@ -67,6 +71,11 @@ static void sd_print_vm_line(FILE* file, int count, port_stack_frame_info* fi)
         fprintf(file, "%3d: ", count);
     else
         fprintf(file, "     "); // additional VM info - indent
+
+    if (regs)
+        fprintf(file, "0x%"W_PI_FMT"  ", regs->get_ip());
+    else
+        fprintf(file, "%s  ", pi_blanks); // additional VM info - indent
 
     const void* args[5] = {fi->method_class_name, fi->method_name,
                      fi->method_signature, fi->source_file_name,
@@ -93,13 +102,13 @@ static void sd_print_vm_line(FILE* file, int count, port_stack_frame_info* fi)
 }
 
 
-static void sd_print_c_line(FILE* file, int count, CFunInfo* cfi)
+static void sd_print_c_line(FILE* file, int count, Registers* regs, CFunInfo* cfi)
 {
     if (!cfi->name)
         return;
 
-    fprintf(file, "%3d: %s (%s:%d)\n",
-        count, cfi->name,
+    fprintf(file, "%3d: 0x%"W_PI_FMT"  %s (%s:%d)\n",
+        count, regs->get_ip(), cfi->name,
         cfi->filename ? cfi->filename : "??",
         cfi->line);
 }
@@ -124,6 +133,7 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
     fprintf(stderr, "\nStack trace:\n");
 
     Registers locregs = *regs;
+    Registers tmpregs = locregs;
     UnwindContext uwcontext;
     bool hasnative = false;
 
@@ -155,10 +165,11 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
         // Unwinding with VM callback
         if (unwind && uwresult == 0)
         {
-            sd_print_vm_line(stderr, framenum++, &uwinfo);
+            sd_print_vm_line(stderr, framenum++, &tmpregs, &uwinfo);
             // Cleanup frame info except 'iteration_state'
             memset(&uwinfo, 0, offsetof(port_stack_frame_info, iteration_state));
             // Try unwinding by the callback for next iteration
+            tmpregs = locregs;
             uwresult = unwind(&locregs, &uwinfo);
             continue;
         }
@@ -167,11 +178,11 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
         CFunInfo cfi = {0};
         native_module_t* module = port_find_module(uwcontext.modules, locregs.get_ip());
         sd_get_c_method_info(&cfi, module, locregs.get_ip());
-        sd_print_c_line(stderr, framenum++, &cfi);
+        sd_print_c_line(stderr, framenum++, &locregs, &cfi);
 
         if (unwind && uwresult < 0 && uwinfo.method_name)
         { // VM has not unwound but has provided additional frame info
-            sd_print_vm_line(stderr, -1, &uwinfo); // Print as additional info
+            sd_print_vm_line(stderr, -1, NULL, &uwinfo); // Print as additional info
         }
 
         if (!hasnative) // Native unwinding is not initialized
@@ -186,6 +197,7 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
         // Cleanup frame info except 'iteration_state'
         memset(&uwinfo, 0, offsetof(port_stack_frame_info, iteration_state));
         // Try unwinding by the callback for next iteration
+        tmpregs = locregs;
         uwresult = unwind(&locregs, &uwinfo);
     }
 

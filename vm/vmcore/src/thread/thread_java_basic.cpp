@@ -26,6 +26,7 @@
 #include "open/vm_properties.h"
 #include "jthread.h"
 #include "vm_threads.h"
+#include "port_thread.h"
 #include "jni.h"
 
 static jmethodID jthread_get_run_method(JNIEnv * env, jthread java_thread);
@@ -86,7 +87,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
         hythread_set_self(NULL);
 
         CTRACE(("TM: native thread terminated due to shutdown: native: %p tm: %p",
-            apr_os_thread_current(), native_thread));
+            port_thread_current(), native_thread));
 
         // FIXME - uncomment after TM state transition complete
         //STD_FREE(native_thread);
@@ -127,7 +128,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     vm_thread->daemon = start_proc_data.daemon;
 
     CTRACE(("TM: Java thread started: id=%d OS_handle=%p",
-           hythread_get_id(native_thread), apr_os_thread_current()));
+           hythread_get_id(native_thread), port_thread_current()));
 
     if (!vm_thread->daemon) {
         status = hythread_increase_nondaemon_threads_count(native_thread);
@@ -179,7 +180,7 @@ int HYTHREAD_PROC jthread_wrapper_start_proc(void *arg)
     assert(status == TM_ERROR_NONE);
 
     CTRACE(("TM: Java thread finished: id=%d OS_handle=%p",
-        hythread_get_id(native_thread), apr_os_thread_current()));
+        hythread_get_id(native_thread), port_thread_current()));
 
     hythread_detach_ex(native_thread);
 

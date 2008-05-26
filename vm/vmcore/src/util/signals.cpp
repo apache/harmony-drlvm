@@ -23,8 +23,163 @@
 #include "init.h"
 #include "vm_threads.h"
 #include "environment.h"
+#include "exceptions.h"
 #include "signals.h"
 
+
+#ifdef PLATFORM_POSIX
+
+#if defined(_EM64T_)
+#define RESTORE_STACK_SIZE 0x0400
+#elif defined (_IA32_)
+#define RESTORE_STACK_SIZE 0x0100
+#else // IPF
+#define RESTORE_STACK_SIZE 0x0200
+#endif
+
+#else // WINDOWS
+#define RESTORE_STACK_SIZE 0x0100
+#endif
+
+
+size_t get_available_stack_size()
+{
+    size_t stack_addr = (size_t)port_thread_get_stack_address();
+    size_t stack_size = port_thread_get_effective_stack_size();
+    size_t used_stack_size = stack_addr - (size_t)&stack_size;
+    size_t available_stack_size = stack_size - used_stack_size;
+
+    return (available_stack_size > 0) ? available_stack_size : 0;
+}
+
+bool check_available_stack_size(size_t required_size)
+{
+    size_t available_stack_size = get_available_stack_size();
+
+    if (available_stack_size < required_size)
+    {
+        port_thread_clear_guard_page();
+        p_TLS_vmthread->restore_guard_page = true;
+        Global_Env *env = VM_Global_State::loader_env;
+        exn_raise_by_class(env->java_lang_StackOverflowError_Class);
+        return false;
+    }
+
+    return true;
+}
+
+static inline size_t get_available_stack_size(void* sp) {
+    size_t stack_addr = (size_t)port_thread_get_stack_address();
+    size_t stack_size = port_thread_get_effective_stack_size();
+    size_t used_stack_size = stack_addr - (size_t)sp;
+    size_t available_stack_size = stack_size - used_stack_size;
+
+    return (available_stack_size > 0) ? available_stack_size : 0;
+}
+
+bool check_stack_size_enough_for_exception_catch(void* sp)
+{
+    size_t stack_addr = (size_t)port_thread_get_stack_address();
+    size_t stack_size = port_thread_get_effective_stack_size();
+    size_t used_stack_size = stack_addr - (size_t)sp;
+    size_t available_stack_size = stack_size - used_stack_size;
+
+    return RESTORE_STACK_SIZE < available_stack_size;
+}
+
+Boolean stack_overflow_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+{
+    TRACE2("signals", ("SOE detected at ip=%p, sp=%p",
+                            regs->get_ip(), regs->get_sp()));
+
+    vm_thread_t vmthread = get_thread_ptr();
+    Global_Env* env = VM_Global_State::loader_env;
+    void* saved_ip = regs->get_ip();
+    void* new_ip = NULL;
+
+    if (is_in_ti_handler(vmthread, saved_ip))
+    {
+        new_ip = vm_get_ip_from_regs(vmthread);
+        regs->set_ip(new_ip);
+    }
+
+    if (!vmthread || env == NULL)
+        return FALSE; // Crash
+
+    port_thread_postpone_guard_page();
+    vmthread->restore_guard_page = true;
+
+    // Pass exception to NCAI exception handler
+    bool is_handled = 0;
+    ncai_process_signal_event((NativeCodePtr)regs->get_ip(),
+                                (jint)signum, false, &is_handled);
+    if (is_handled)
+    {
+        if (new_ip)
+            regs->set_ip(saved_ip);
+        return TRUE;
+    }
+
+    Class* exn_class = env->java_lang_StackOverflowError_Class;
+
+    if (is_in_java(regs))
+    {
+        signal_throw_java_exception(regs, exn_class);
+    }
+    else if (is_unwindable())
+    {
+        if (hythread_is_suspend_enabled())
+            hythread_suspend_disable();
+        signal_throw_exception(regs, exn_class);
+    } else {
+        exn_raise_by_class(exn_class);
+    }
+
+    if (new_ip && regs->get_ip() == new_ip)
+        regs->set_ip(saved_ip);
+
+    return TRUE;
+}
+
+Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+{
+    TRACE2("signals", "NPE detected at " << regs->get_ip());
+
+    vm_thread_t vmthread = get_thread_ptr();
+    Global_Env* env = VM_Global_State::loader_env;
+    void* saved_ip = regs->get_ip();
+    void* new_ip = NULL;
+
+    if (is_in_ti_handler(vmthread, saved_ip))
+    {
+        new_ip = vm_get_ip_from_regs(vmthread);
+        regs->set_ip(new_ip);
+    }
+
+    if (!vmthread || env == NULL)
+        return FALSE; // Crash
+
+    if (!is_in_java(regs) || interpreter_enabled())
+        return FALSE; // Crash
+
+    // Pass exception to NCAI exception handler
+    bool is_handled = 0;
+    ncai_process_signal_event((NativeCodePtr)regs->get_ip(),
+                                (jint)signum, false, &is_handled);
+    if (is_handled)
+    {
+        if (new_ip)
+            regs->set_ip(saved_ip);
+        return TRUE;
+    }
+
+    signal_throw_java_exception(regs, env->java_lang_NullPointerException_Class);
+
+    if (new_ip && regs->get_ip() == new_ip)
+        regs->set_ip(saved_ip);
+
+    return TRUE;
+}
 
 Boolean abort_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* fault_addr)
 {
