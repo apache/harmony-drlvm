@@ -222,31 +222,35 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      */
     ClassLoader definingLoader;
     
-    // TODO make it soft reference
-    transient ReflectionData reflectionData;
     transient SoftReference<GACache> softCache;
+    
+    private transient volatile ReflectionData _reflectionData;
     
     private transient ProtectionDomain domain;
 
     /** It is required for synchronization in newInstance method. */
-    private boolean isDefaultConstructorInitialized;
-    
-    /** 
-     * Indicates whether the following properties have been calculated;
-     * isSerializable, isExternalizable, isPrimitive
-     * 
-     * @see #resolveProperties() 
-     */
-    private transient volatile boolean arePropertiesResolved;
-    
-    private transient boolean isSerializable;
-    private transient boolean isExternalizable;
-    private transient boolean isPrimitive;
+    private volatile boolean isDefaultConstructorInitialized;
 
     /**
      * Only VM can instantiate this class.
      */
     private Class() {
+    }
+
+    /**
+     * Accessor for the reflection data field, which needs to have
+     * minimal thread-safety for consistency; this method encapsulates
+     * that.
+     */
+    private ReflectionData getReflectionData() {
+        // read the volatile field once
+        final ReflectionData localData = _reflectionData;
+        if (localData == null){
+            // if null, construct, write to the field and return
+            return _reflectionData = new ReflectionData();
+        }
+        // else, just return the field
+        return localData;
     }
 
     private GACache getCache() {
@@ -322,9 +326,6 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * Java 1.5 API specification doesn't require this check.
      */
     public Class<?>[] getClasses() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
         Class<?> clss = this;
         ArrayList<Class<?>> classes = null;
@@ -371,11 +372,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     public Constructor<T> getConstructor(Class<?>... argumentTypes)
         throws NoSuchMethodException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
-        Constructor<T> ctors[] = reflectionData.getPublicConstructors(); 
+        Constructor<T> ctors[] = getReflectionData().getPublicConstructors(); 
         for (int i = 0; i < ctors.length; i++) {
             Constructor<T> c = ctors[i];
             try {
@@ -390,18 +388,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     @SuppressWarnings("unchecked")
     public Constructor[] getConstructors() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
-        return Reflection.copyConstructors(reflectionData.getPublicConstructors());
+        return Reflection.copyConstructors(getReflectionData().getPublicConstructors());
     }
 
     @SuppressWarnings("unchecked")
     public Class[] getDeclaredClasses() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
         return VMClassRegistry.getDeclaredClasses(this);
     }
@@ -409,9 +401,6 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     @SuppressWarnings("unchecked")
     public Constructor<T> getDeclaredConstructor(Class... argumentTypes)
         throws NoSuchMethodException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
         return Reflection
             .copyConstructor(getDeclaredConstructorInternal(argumentTypes));
@@ -419,26 +408,15 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     @SuppressWarnings("unchecked")
     public Constructor[] getDeclaredConstructors() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredConstructors == null) {
-            reflectionData.initDeclaredConstructors();
-        }
-        return Reflection.copyConstructors(reflectionData.declaredConstructors);
+        return Reflection.copyConstructors(getReflectionData().getDeclaredConstructors());
     }
 
     public Field getDeclaredField(String fieldName) throws NoSuchFieldException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredFields == null) {
-            reflectionData.initDeclaredFields();
-        }
-        for (int i = 0; i < reflectionData.declaredFields.length; i++) {
-            Field f = reflectionData.declaredFields[i];
+        final Field[] declaredFields = getReflectionData().getDeclaredFields();
+        for (int i = 0; i < declaredFields.length; i++) {
+            Field f = declaredFields[i];
             if (fieldName.equals(f.getName())) {
                 return Reflection.copyField(f);
             }
@@ -447,40 +425,22 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     public Field[] getDeclaredFields() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredFields == null) {
-            reflectionData.initDeclaredFields();
-        }
-        return Reflection.copyFields(reflectionData.declaredFields);
+        return Reflection.copyFields(getReflectionData().getDeclaredFields());
     }
 
     @SuppressWarnings("unchecked")
     public Method getDeclaredMethod(String methodName, Class... argumentTypes)
         throws NoSuchMethodException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredMethods == null) {
-            reflectionData.initDeclaredMethods();
-        }
         return Reflection
-            .copyMethod(findMatchingMethod(reflectionData.declaredMethods,
+            .copyMethod(findMatchingMethod(getReflectionData().getDeclaredMethods(),
                                            methodName, argumentTypes));
     }
 
     public Method[] getDeclaredMethods() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.DECLARED);
-        if (reflectionData.declaredMethods == null) {
-            reflectionData.initDeclaredMethods();
-        }
-        return Reflection.copyMethods(reflectionData.declaredMethods);
+        return Reflection.copyMethods(getReflectionData().getDeclaredMethods());
     }
 
     public Class<?> getDeclaringClass() {
@@ -488,12 +448,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     public Field getField(String fieldName) throws NoSuchFieldException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
-        Field[] ff = reflectionData.getPublicFields();
-        for (Field f : ff) {
+        final Field[] fields = getReflectionData().getPublicFields();
+        for (Field f : fields) {
             if (fieldName.equals(f.getName())) {
                 return Reflection.copyField(f);
             }
@@ -502,11 +459,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     public Field[] getFields() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
-        return Reflection.copyFields(reflectionData.getPublicFields());
+        return Reflection.copyFields(getReflectionData().getPublicFields());
     }
 
     @SuppressWarnings("unchecked")
@@ -517,39 +471,23 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     @SuppressWarnings("unchecked")
     public Method getMethod(String methodName, Class... argumentTypes)
         throws NoSuchMethodException {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
         return Reflection
-            .copyMethod(findMatchingMethod(reflectionData.getPublicMethods(),
+            .copyMethod(findMatchingMethod(getReflectionData().getPublicMethods(),
                                            methodName, argumentTypes));
     }
 
     public Method[] getMethods() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
         checkMemberAccess(Member.PUBLIC);
-        return Reflection.copyMethods(reflectionData.getPublicMethods());
+        return Reflection.copyMethods(getReflectionData().getPublicMethods());
     }
 
     public int getModifiers() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
-        int mods = reflectionData.modifiers;
-        if (mods == -1) {
-            mods = reflectionData.modifiers = VMClassRegistry.getModifiers(this); 
-        }
-        return mods;
+        return getReflectionData().getModifiers();
     }
 
     public String getName() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
-        return reflectionData.name;
+        return getReflectionData().name;
     }
 
     public Package getPackage() {
@@ -610,34 +548,17 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     public boolean isArray() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
-        return reflectionData.isArray;
-    }
-
-    private void resolveProperties() {
-        if (arePropertiesResolved) {
-            return;
-        }
-        isExternalizable = VMClassRegistry.isAssignableFrom(Externalizable.class, this);
-        isSerializable = VMClassRegistry.isAssignableFrom(Serializable.class, this);
-        isPrimitive = VMClassRegistry.isPrimitive(this);
-        arePropertiesResolved = true;
+        return getReflectionData().isArray;
     }
     
     public boolean isAssignableFrom(Class<?> clazz) {
         
         if (Serializable.class.equals(this)) {
-            // assure that props have been resolved
-            clazz.resolveProperties();
-            return clazz.isSerializable;
+            return clazz.getReflectionData().isSerializable();
         }
         
         if (Externalizable.class.equals(this)) {
-            // assure that props have been resolved
-            clazz.resolveProperties();
-            return clazz.isExternalizable;
+            return clazz.getReflectionData().isExternalizable();
         }
         
         return VMClassRegistry.isAssignableFrom(this, clazz);
@@ -652,21 +573,17 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     public boolean isPrimitive() {
-        // assure that props have been resolved
-        resolveProperties();
-        return isPrimitive;
+        return getReflectionData().isPrimitive;
     }
 
     public T newInstance() throws InstantiationException,
             IllegalAccessException {
         T newInstance = null;
-        if (reflectionData == null) {
-            initReflectionData();
-        }
+        final ReflectionData localReflectionData = getReflectionData();
         SecurityManager sc = System.getSecurityManager();
         if (sc != null) {
             sc.checkMemberAccess(this, Member.PUBLIC);
-            sc.checkPackageAccess(reflectionData.packageName);
+            sc.checkPackageAccess(localReflectionData.packageName);
         }
 
         /*
@@ -681,20 +598,19 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
          *   the access rights by mistake and IllegalAccessException happens
          */
         while (!isDefaultConstructorInitialized) {
-            synchronized (reflectionData) {
+            synchronized (localReflectionData) {
                 if (isDefaultConstructorInitialized) {
                     break; // non-first threads can be here - nothing to do
                 }
 
                 // only first thread can reach this point & do initialization
+                final Constructor<T> c;
                 try {
-                    reflectionData.initDefaultConstructor();
+                    c = localReflectionData.getDefaultConstructor();
                 } catch (NoSuchMethodException e) {
                     throw new InstantiationException(e.getMessage()
                             + " method not found");
                 }
-                final Constructor<T> c = reflectionData.defaultConstructor;
-
                 try {
                     AccessController.doPrivileged(new PrivilegedAction<Object>() {
                             public Object run() {
@@ -716,15 +632,21 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         }
 
         // initialization is done, threads may work from here in any order
+        final Constructor<T> defaultConstructor;
+        try {
+            defaultConstructor = localReflectionData.getDefaultConstructor();
+        } catch (NoSuchMethodException e){
+            throw new AssertionError(e);
+        }
         Reflection.checkMemberAccess(
                 VMStack.getCallerClass(0),
-                reflectionData.defaultConstructor.getDeclaringClass(),
-                reflectionData.defaultConstructor.getDeclaringClass(),
-                reflectionData.defaultConstructor.getModifiers()
+                defaultConstructor.getDeclaringClass(),
+                defaultConstructor.getDeclaringClass(),
+                defaultConstructor.getModifiers()
             );
 
         try {
-            newInstance = reflectionData.defaultConstructor.newInstance();
+            newInstance = defaultConstructor.newInstance();
         } catch (InvocationTargetException e) {
             System.rethrow(e.getCause());
         }
@@ -736,23 +658,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             : (isInterface() ? "interface " : "class ") + getName();
     }
 
-    /**
-     * This is not time consume operation so we can do syncrhronization on this
-     * class object. Note, this method has package private visibility in order
-     * to increase performance.
-     */
-    synchronized void initReflectionData() {
-        if (reflectionData == null) {
-            reflectionData = new ReflectionData();
-        }
-    }
-
-
     String getPackageName() {
-        if (reflectionData == null) {
-            initReflectionData();
-        }
-        return reflectionData.packageName;
+        return getReflectionData().packageName;
     }
 
     void setProtectionDomain(ProtectionDomain protectionDomain) {
@@ -763,7 +670,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         SecurityManager sc = System.getSecurityManager();
         if (sc != null) {
             sc.checkMemberAccess(this, accessType);
-            sc.checkPackageAccess(reflectionData.packageName);
+            sc.checkPackageAccess(getReflectionData().packageName);
         }
     }
 
@@ -780,11 +687,9 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     private Constructor<T> getDeclaredConstructorInternal(Class<?>[] argumentTypes)
         throws NoSuchMethodException {
-        if (reflectionData.declaredConstructors == null) {
-            reflectionData.initDeclaredConstructors();
-        }
-        for (int i = 0; i < reflectionData.declaredConstructors.length; i++) {
-            Constructor<T> c = reflectionData.declaredConstructors[i];
+        final Constructor<T>[] declaredConstructors = getReflectionData().getDeclaredConstructors();
+        for (int i = 0; i < declaredConstructors.length; i++) {
+            Constructor<T> c = declaredConstructors[i];
             if (isTypeMatches(argumentTypes, c.getParameterTypes())) {
                 return c;
             }
@@ -987,82 +892,116 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     }
 
     private final class ReflectionData {
+
+        final String packageName;
+        final String name;
+        final boolean isPrimitive;
+        final boolean isArray;
+
+        /*
+         * Do no access the following fields directly from enclosing class;
+         * use the accessor methods
+         */
+        private volatile int _modifiers;
+        private volatile Constructor<T>[] _declaredConstructors;
+        private volatile Field[] _declaredFields;
+        private volatile Method[] _declaredMethods;
+        private volatile Constructor<T> _defaultConstructor;
+        private volatile Constructor<T>[] _publicConstructors;
+        private volatile Field[] _publicFields;
+        private volatile Method[] _publicMethods;
         
-        String name;
+        private volatile boolean _serialPropsResolved;
+        private boolean _isExternalizable;
+        private boolean _isSerializable;
         
-        int modifiers = -1;
-        
-        boolean isArray;
-
-        Constructor<T>[] declaredConstructors;
-
-        Field[] declaredFields;
-
-        Method[] declaredMethods;
-
-        Constructor<T> defaultConstructor;
-        
-        String packageName;
-
-        Constructor<T>[] publicConstructors;
-
-        Field[] publicFields;
-
-        Method[] publicMethods;
-        
-        public ReflectionData() {
+        ReflectionData() {
             name = VMClassRegistry.getName(Class.this);
+            isPrimitive = VMClassRegistry.isPrimitive(Class.this);
             isArray = VMClassRegistry.isArray(Class.this);
             packageName = Class.getParentName(name);
+            _modifiers = -1;
         }
         
-        public void initDeclaredConstructors() {
-            if (declaredConstructors == null) {
-                declaredConstructors = VMClassRegistry
-                    .getDeclaredConstructors(Class.this);
+        boolean isSerializable(){
+            resolveSerialProps();
+            return _isSerializable;
+        }
+        
+        boolean isExternalizable() {
+            resolveSerialProps();
+            return _isExternalizable;
+        }
+        
+        private void resolveSerialProps() {
+            if (!_serialPropsResolved){
+                _isExternalizable = VMClassRegistry.isAssignableFrom(Externalizable.class, Class.this);
+                _isSerializable = VMClassRegistry.isAssignableFrom(Serializable.class, Class.this);
+                _serialPropsResolved = true;
             }
         }
+        
+        int getModifiers() {
+            final int localCopy = _modifiers;
+            if (localCopy != -1){
+                return localCopy;
+            }
+            return _modifiers = VMClassRegistry.getModifiers(Class.this); 
+        }
+        
+        Constructor<T>[] getDeclaredConstructors() {
+            final Constructor<T>[] localCopy = _declaredConstructors;
+            if (localCopy != null) {
+                return localCopy;
+            }
+            return _declaredConstructors = VMClassRegistry.getDeclaredConstructors(Class.this);
+        }
 
-        public void initDeclaredFields() {
-            if (declaredFields == null) {
-                declaredFields = VMClassRegistry
+        Field[] getDeclaredFields() {
+            final Field[] localCopy = _declaredFields;
+            if (localCopy == null) {
+                return _declaredFields = VMClassRegistry
                     .getDeclaredFields(Class.this);
+            } else {
+                return localCopy;
             }
+       }
+
+        Method[] getDeclaredMethods() {
+            final Method[] localCopy = _declaredMethods;
+            if (localCopy != null) {
+                return localCopy;
+            }
+            return _declaredMethods = VMClassRegistry.getDeclaredMethods(Class.this);
         }
 
-        public void initDeclaredMethods() {
-            if (declaredMethods == null) {
-                declaredMethods = VMClassRegistry
-                    .getDeclaredMethods(Class.this);
+        Constructor<T> getDefaultConstructor() throws NoSuchMethodException {
+            final Constructor<T> localCopy = _defaultConstructor;
+            if (localCopy != null) {
+                return localCopy;
             }
+            return _defaultConstructor = Class.this.getDeclaredConstructorInternal(null);
         }
 
-        public void initDefaultConstructor()
-            throws NoSuchMethodException {
-            if (defaultConstructor == null) {
-                defaultConstructor = Class.this
-                    .getDeclaredConstructorInternal(null);
+        Constructor<T>[] getPublicConstructors() {
+            final Constructor<T>[] localCopy = _publicConstructors;
+            if (localCopy != null) {
+                return localCopy;
             }
-        }
 
-        @SuppressWarnings("unchecked")
-        public synchronized Constructor<T>[] getPublicConstructors() {
-            if (publicConstructors != null) {
-                return publicConstructors;
-            }
-            if (declaredConstructors == null) {
-                initDeclaredConstructors();
-            }
-            ArrayList<Constructor<T>> constructors = 
-                new ArrayList<Constructor<T>>(declaredConstructors.length);
+            final Constructor<T>[] declaredConstructors = getDeclaredConstructors();
+            ArrayList<Constructor<T>> constructors = new ArrayList<Constructor<T>>(
+                    declaredConstructors.length);
             for (int i = 0; i < declaredConstructors.length; i++) {
                 Constructor<T> c = declaredConstructors[i];
                 if (Modifier.isPublic(c.getModifiers())) {
                     constructors.add(c);
                 }
             }
-            return publicConstructors = constructors.toArray(
-                    new Constructor[constructors.size()]);
+            final int size = constructors.size();
+            @SuppressWarnings("unchecked")
+            final Constructor<T>[] tempArray = (Constructor<T>[]) new Constructor[size];
+            return _publicConstructors = constructors.toArray(tempArray);
         }
 
         /**
@@ -1070,22 +1009,20 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
          * getField(name) method.
          */
         public synchronized Field[] getPublicFields() {
-            if (publicFields != null) {
-                return publicFields;
+            final Field[] localCopy = _publicFields;
+            if (localCopy != null) {
+                return localCopy;
             }
-            if (declaredFields == null) {
-                initDeclaredFields();
-            }
+            
+            final Field[] declaredFields = getDeclaredFields();
 
             // initialize public fields of the super class
             int size = declaredFields.length;
             Class<?> superClass = Class.this.getSuperclass();
             Field[] superFields = null;
             if (superClass != null) {
-                if (superClass.reflectionData == null) {
-                    superClass.initReflectionData();
-                }
-                superFields = superClass.reflectionData.getPublicFields();
+                final Class<?>.ReflectionData superClassRefData = superClass.getReflectionData();
+                superFields = superClassRefData.getPublicFields();
                 size += superFields.length;
             }
 
@@ -1100,10 +1037,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             // initialize and add fields of the super interfaces
             Class<?>[] interfaces = Class.this.getInterfaces();
             for (Class<?> ci : interfaces) {
-                if (ci.reflectionData == null) {
-                    ci.initReflectionData();
-                }
-                Field[] fi = ci.reflectionData.getPublicFields();
+                final Class<?>.ReflectionData ciRefData = ci.getReflectionData();
+                Field[] fi = ciRefData.getPublicFields();
                 for (Field f : fi) {
                     fields.add(f);
                 }
@@ -1118,28 +1053,24 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 }
             }
             
-            // maybe publicFields better be set atomically 
-            // instead of access synchronization? 
-            return publicFields = fields.toArray(new Field[fields.size()]);
+            return _publicFields = fields.toArray(new Field[fields.size()]);
         }
 
         public synchronized Method[] getPublicMethods() {
-            if (publicMethods != null) {
-                return publicMethods;
+            final Method[] localCopy = _publicMethods;
+            if (localCopy != null) {
+                return localCopy;
             }
-            if (declaredMethods == null) {
-                initDeclaredMethods();
-            }
+            
+            final Method[] declaredMethods = getDeclaredMethods();
             
             // initialize public methods of the super class
             int size = declaredMethods.length;
             Class<?> superClass = Class.this.getSuperclass();
             Method[] superPublic = null;
             if (superClass != null) {
-                if (superClass.reflectionData == null) {
-                    superClass.initReflectionData();
-                }
-                superPublic = superClass.reflectionData.getPublicMethods(); 
+                final Class<?>.ReflectionData superClassRefData = superClass.getReflectionData();
+                superPublic = superClassRefData.getPublicMethods(); 
                 size += superPublic.length;
             }
 
@@ -1150,16 +1081,12 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                 intf = new Method[interfaces.length][];
                 for (int i = 0; i < interfaces.length; i++) {
                     Class<?> ci = interfaces[i];
-                    if (ci.reflectionData == null) {
-                        ci.initReflectionData();
-                    }
-                    intf[i] = ci.reflectionData.getPublicMethods();
+                    final Class<?>.ReflectionData ciRefData = ci.getReflectionData();
+                    intf[i] = ciRefData.getPublicMethods();
                     size += intf[i].length; 
                 }
             }
-            // maybe publicMethods better be set atomically 
-            // instead of access synchronization? 
-            return publicMethods = Reflection.mergePublicMethods(declaredMethods, superPublic, intf, size);
+            return _publicMethods = Reflection.mergePublicMethods(declaredMethods, superPublic, intf, size);
         }        
     }
 
