@@ -84,7 +84,7 @@ public class LazyClassLoader extends ClassLoader {
             int readLength = is.read(buf);
             return defineClass(name, buf, 0, length);
         } catch (Throwable t) {
-            t.printStackTrace();
+            //t.printStackTrace();
             throw new ClassNotFoundException("Error while loading class: "+name ,t);
         }
     }
@@ -143,7 +143,7 @@ public class LazyClassLoader extends ClassLoader {
     }
 
     public void endTest() {
-       System.out.println("loaded:" +loadedInTest);
+       //System.out.println("loaded:" +loadedInTest);
     }
 
     public void assertNumLoads(int expected) {

@@ -18,8 +18,6 @@
 package org.apache.harmony.vm.test.lazyresolution.data;
 
 import org.apache.harmony.vm.test.lazyresolution.classloader.*;
-import java.io.*;
-import java.util.*;
 
 public class LazyTest {
     
@@ -33,7 +31,7 @@ public class LazyTest {
     }
 
     final void endTest() {
-        System.err.println(getClass());
+        //System.err.println(getClass());
         getLazyClassLoader().endTest();
     }
 
