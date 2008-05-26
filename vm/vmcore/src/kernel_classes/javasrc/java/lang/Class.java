@@ -66,7 +66,7 @@ import org.apache.harmony.vm.VMStack;
 public final class Class<T> implements Serializable, AnnotatedElement, GenericDeclaration, Type {
 
     /**
-     * Assertion status of this class
+     * Global/system assertion status
      * 
      * package private to access from the java.lang.ClassLoader class.
      */
