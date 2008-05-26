@@ -616,7 +616,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     private void resolveProperties() {
         if (arePropertiesResolved) {
-        	return;
+            return;
         }
         isExternalizable = VMClassRegistry.isAssignableFrom(Externalizable.class, this);
         isSerializable = VMClassRegistry.isAssignableFrom(Serializable.class, this);
@@ -631,13 +631,13 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         
         if (Serializable.class.equals(this)) {
             // assure that props have been resolved
-        	clazz.resolveProperties();
+            clazz.resolveProperties();
             return clazz.isSerializable;
         }
         
         if (Externalizable.class.equals(this)) {
             // assure that props have been resolved
-        	clazz.resolveProperties();
+            clazz.resolveProperties();
             return clazz.isExternalizable;
         }
         
@@ -662,7 +662,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * @com.intel.drl.spec_ref
      */
     public boolean isPrimitive() {
-    	// assure that props have been resolved
+        // assure that props have been resolved
         resolveProperties();
         return isPrimitive;
     }
