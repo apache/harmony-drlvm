@@ -553,7 +553,9 @@ void Method::method_was_overridden()
 // Notify the given JIT whenever this method is recompiled or initially compiled.
 // The callback_data pointer will be passed back to the JIT during the callback.  
 // The JIT's callback function is JIT_recompiled_method_callback.
-void Method::register_jit_recompiled_method_callback(JIT *jit_to_be_notified, void *callback_data)
+void Method::register_jit_recompiled_method_callback(JIT *jit_to_be_notified, 
+                                                     Method* caller,
+                                                     void *callback_data)
 {
     // Don't insert the same entry repeatedly on the _notify_recompiled_records list.
     Method_Change_Notification_Record *nr = _notify_recompiled_records;
@@ -567,13 +569,43 @@ void Method::register_jit_recompiled_method_callback(JIT *jit_to_be_notified, vo
     // Insert a new notification record.
     Method_Change_Notification_Record *new_nr = 
         (Method_Change_Notification_Record *)STD_MALLOC(sizeof(Method_Change_Notification_Record));
-    new_nr->method_of_interest = this;
+    new_nr->caller = caller;
     new_nr->jit                = jit_to_be_notified;
     new_nr->callback_data      = callback_data;
     new_nr->next               = _notify_recompiled_records;
     _notify_recompiled_records = new_nr;
+
+    // Record a callback in the caller method to let it unregister itself if unloaded.
+    ClassLoader* this_loader = get_class()->get_class_loader();
+    ClassLoader* caller_loader = caller->get_class()->get_class_loader();
+    if (this_loader == caller_loader || caller_loader->IsBootstrap()) return;
+
+    MethodSet *vec = caller->_recompilation_callbacks;
+    if (vec == NULL) {
+        vec = caller->_recompilation_callbacks = new MethodSet();
+    }
+    vec->push_back(this);
 } //Method::register_jit_recompiled_method_callback
 
+void Method::unregister_jit_recompiled_method_callbacks(const Method* caller) {
+    TRACE2("cu.debug", "unregister jit callback, caller=" << caller << " callee=" << this);
+    Method_Change_Notification_Record *nr,*prev = NULL;
+    for (nr = _notify_recompiled_records;  nr != NULL;  ) {
+        if (nr->caller == caller) {
+            if (prev) {
+                prev->next = nr->next;
+            } else {
+                _notify_recompiled_records = nr->next;
+            }
+            Method_Change_Notification_Record *next = nr->next;
+            STD_FREE(nr);
+            nr = next;
+        } else {
+            prev = nr;
+            nr = nr->next;
+        }
+    }
+}
 
 void Method::do_jit_recompiled_method_callbacks() 
 {

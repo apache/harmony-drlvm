@@ -106,6 +106,22 @@ bool ClassLoader::Initialize( ManagedObject* loader )
     return true;
 }
 
+void ClassLoader::NotifyUnloading() 
+{
+    Global_Env *env = VM_Global_State::loader_env;
+    env->em_interface->ClassloaderUnloadingCallback((Class_Loader_Handle)this);
+
+    ClassTable::iterator it;
+    ClassTable* LoadedClasses = GetLoadedClasses();
+    for (it = LoadedClasses->begin(); it != LoadedClasses->end(); it++)
+    {
+        Class* c;
+        c = it->second;
+        assert(c);
+        c->notify_unloading();
+    }
+}
+
 ClassLoader::~ClassLoader() 
 {
     Global_Env *env = VM_Global_State::loader_env;
@@ -147,7 +163,6 @@ ClassLoader::~ClassLoader()
         natives_unload_library(info->handle);        
     }
 
-    env->em_interface->ClassloaderUnloadingCallback((Class_Loader_Handle)this);
     delete CodeMemoryManager;
     CodeMemoryManager = NULL;
 
@@ -582,9 +597,15 @@ void ClassLoader::StartUnloading()
         unloadinglist.push_back(m_table[i]);
     }
 
+    vector<ClassLoader*>::reverse_iterator it;
+    for (it = unloadinglist.rbegin(); it != unloadinglist.rend(); it++)
+    {
+        (*it)->NotifyUnloading();
+    }
+
     // safely remove classloaders from m_table
-    vector<ClassLoader*>::iterator it;
-    for (it = unloadinglist.begin(); it != unloadinglist.end(); it++)
+    // iterate in reverse order to unload child loaders first
+    for (it = unloadinglist.rbegin(); it != unloadinglist.rend(); it++)
     {
         UnloadClassLoader(*it);
     }

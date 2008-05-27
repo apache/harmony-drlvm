@@ -1059,6 +1059,8 @@ public:
     /** Clears member variables within a class.*/
     void clear_internals();
 
+    void notify_unloading();
+
     /** Determines whether the given class has a super class.
      * @return <code>true</code> if the current class has a super class;
      *         otherwise <code>false</code>.*/

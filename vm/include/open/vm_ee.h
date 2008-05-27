@@ -198,8 +198,10 @@ DECLARE_OPEN(unsigned, method_get_info_block_size_jit, (Method_Handle method,
  * will be passed back to the JIT during the callback. The callback method is 
  * <code>JIT_recompiled_method_callback</code>.
  */
-DECLARE_OPEN(void, vm_register_jit_recompiled_method_callback, (JIT_Handle jit, Method_Handle method,
-                                                           void *callback_data));
+DECLARE_OPEN(void, vm_register_jit_recompiled_method_callback, (JIT_Handle jit, 
+                                Method_Handle method, 
+                                Method_Handle caller, 
+                                void *callback_data));
 
 /**
  * Called by a JIT to have the VM replace a section of executable code in a 

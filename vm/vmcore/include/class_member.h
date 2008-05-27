@@ -22,6 +22,8 @@
 #include "Class.h"
 #include "vm_java_support.h"
 
+typedef std::vector<Method*> MethodSet;
+
 struct String;
 class ByteReader;
 class JIT;
@@ -347,20 +349,11 @@ public:
 // Used to notify interested JITs whenever a method is changed: overwritten, recompiled,
 // or initially compiled.
 struct Method_Change_Notification_Record {
-    Method *method_of_interest;
+    Method *caller;
     JIT    *jit;
     void   *callback_data;
     Method_Change_Notification_Record *next;
 
-    bool equals(Method *method_of_interest_, JIT *jit_, void *callback_data_) {
-        if ((method_of_interest == method_of_interest_) &&
-            (jit == jit_) &&
-            (callback_data == callback_data_)) {
-            return true;
-        }
-        return false;
-    }
-    // Optimized equals method. Most callbacks know method of interest, so we could skip one check.
     inline bool equals(JIT *jit_, void *callback_data_) {
         if ((callback_data == callback_data_) &&
             (jit == jit_)) {
@@ -569,8 +562,9 @@ public:
     CodeChunkInfo *create_code_chunk_info_mt();
 
     // Notify JITs whenever this method is recompiled or initially compiled.
-    void register_jit_recompiled_method_callback(JIT *jit_to_be_notified, void *callback_data);
+    void register_jit_recompiled_method_callback(JIT *jit_to_be_notified, Method* caller, void *callback_data);
     void do_jit_recompiled_method_callbacks();
+    void unregister_jit_recompiled_method_callbacks(const Method* caller);
 
     Method_Side_Effects get_side_effects()         { return _side_effects; }
     void set_side_effects(Method_Side_Effects mse) { _side_effects = mse; }
@@ -606,6 +600,7 @@ public:
     // destructor should be instead of this function, but it's not allowed to use it because copy for Method class is
     // done with memcpy, and old value is destroyed with delete operator.
     void MethodClearInternals();
+    void NotifyUnloading();
 
     //
     // access modifiers
@@ -717,6 +712,9 @@ private:
 
     /** Information about methods inlined to this. */
     InlineInfo* _inline_info;
+    
+
+    MethodSet* _recompilation_callbacks;
 public:
 
     /**

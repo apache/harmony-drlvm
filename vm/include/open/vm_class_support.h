@@ -50,28 +50,6 @@
 void vm_patch_code_block(U_8* code_block, U_8* new_code, size_t size);
 
 /**
- * Called by a EE in order to be notified whenever the vtable entries for the given method 
- * are changed. This could happen, e.g., when a method is first compiled, or when it is 
- * recompiled.  The callback_data pointer will be passed back to the JIT during the callback.  
- * The callback method is JIT_recompiled_method_callback.
- */
-void vm_register_jit_recompiled_method_callback(JIT_Handle jit, Method_Handle method, void* callback_data);
-
-/**
- * Called by a JIT in order to be notified whenever the given method is overridden by a newly 
- * loaded class. The callback_data pointer will be passed back to the JIT during the callback.  
- * The callback function is JIT_overridden_method_callback.
- */
-void vm_register_jit_overridden_method_callback(JIT_Handle jit, Method_Handle method, void* callback_data);
-
-/**
- * Called by a JIT in order to be notified whenever the given class is extended.
- * The callback_data pointer will be passed back to the JIT during the callback. 
- * The callback function is JIT_extended_class_callback.
- */
-void vm_register_jit_extended_class_callback(JIT_Handle jit, Class_Handle clss, void* callback_data);
-
-/**
  * Called by a JIT to have the VM recompile a method using the specified JIT. After 
  * recompilation, the corresponding vtable entries will be updated, and the necessary 
  * callbacks to JIT_recompiled_method_callback will be made. It is a requirement that 

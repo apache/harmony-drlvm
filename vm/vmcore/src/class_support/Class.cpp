@@ -144,6 +144,13 @@ void Class::init_internals(const Global_Env* env, const String* name, ClassLoade
     m_verify_data = 0;
 }
 
+void Class::notify_unloading() {
+    if(m_methods != NULL) {
+        for (int i = 0; i < m_num_methods; i++){
+            m_methods[i].NotifyUnloading();
+        }
+    }
+}
 
 void Class::clear_internals() {
     if(m_fields != NULL)
@@ -615,6 +622,7 @@ Method::Method()
     _method_sig = 0;
 
     _notify_recompiled_records = NULL;
+    _recompilation_callbacks = NULL;
     _index = 0;
     _max_stack=_max_locals=_n_exceptions=_n_handlers=0;
     _exceptions = NULL;
@@ -639,6 +647,18 @@ Method::Method()
     _inline_info = NULL;
 } //Method::Method
 
+
+void Method::NotifyUnloading()
+{
+    if (_recompilation_callbacks != NULL) {
+        MethodSet::const_iterator it;
+        for (it = _recompilation_callbacks->begin(); it != _recompilation_callbacks->end(); it++)
+        {
+            (*it)->unregister_jit_recompiled_method_callbacks(this);
+        }
+    }
+}
+
 void Method::MethodClearInternals()
 {
     CodeChunkInfo *jit_info;
@@ -655,6 +675,10 @@ void Method::MethodClearInternals()
             jit_info->_target_exception_handlers[k] = NULL;
         }
         jit_info->_target_exception_handlers = NULL;
+    }
+    
+    if (_recompilation_callbacks != NULL) {
+        delete _recompilation_callbacks;
     }
 
     if (_notify_recompiled_records != NULL)

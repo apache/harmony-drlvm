@@ -1729,12 +1729,14 @@ Allocation_Handle class_get_allocation_handle(Class_Handle ch)
 // initially compiled. The callback_data pointer will be passed back to the JIT during the callback.
 // The callback method is JIT_recompiled_method_callback.
 void vm_register_jit_recompiled_method_callback(JIT_Handle jit, Method_Handle method,
+                                                Method_Handle caller,
                                                  void *callback_data)
 {
     assert(method);
+    assert(caller);
     JIT *jit_to_be_notified = (JIT *)jit;
     Method *m = (Method *)method;
-    m->register_jit_recompiled_method_callback(jit_to_be_notified, callback_data);
+    m->register_jit_recompiled_method_callback(jit_to_be_notified, caller, callback_data);
 } //vm_register_jit_recompiled_method_callback
 
 

@@ -240,6 +240,9 @@ public:
         STD_FREE(m_table);
         m_table = NULL;
     }
+
+    void NotifyUnloading();
+
     inline void* Alloc(size_t size) {
         assert(pool);
         Lock();

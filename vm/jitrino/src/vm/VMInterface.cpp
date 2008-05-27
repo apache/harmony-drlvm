@@ -1036,7 +1036,8 @@ CompilationInterface::getOverridingMethod(NamedType* type, MethodDesc *methodDes
 void         CompilationInterface::setNotifyWhenMethodIsRecompiled(MethodDesc * methodDesc, 
                                                                       void * callbackData) {
     Method_Handle drlMethod = methodDesc->getMethodHandle();
-    vm_register_jit_recompiled_method_callback(getJitHandle(),drlMethod,callbackData);
+    vm_register_jit_recompiled_method_callback(getJitHandle(),drlMethod, 
+        getMethodToCompile()->getMethodHandle(), callbackData);
 }
 
 void CompilationInterface::sendCompiledMethodLoadEvent(MethodDesc* methodDesc, MethodDesc* outerDesc,
