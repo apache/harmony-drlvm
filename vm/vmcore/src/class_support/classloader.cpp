@@ -67,7 +67,7 @@ Lock_Manager ClassLoader::m_tableLock;
 
 // external declaration; definition is in Class_File_Loader.cpp
 const String* class_extract_name(Global_Env* env,
-                                 uint8* buffer,
+                                 U_8* buffer,
                                  unsigned offset, unsigned length);
 
 
@@ -251,7 +251,7 @@ Class* ClassLoader::NewClass(const Global_Env* env, const String* name)
 }
 
 Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
-                                uint8* bytecode, unsigned offset, unsigned length,
+                                U_8* bytecode, unsigned offset, unsigned length,
                                 const String** res_name)
 {
     assert(!exn_raised());
@@ -288,7 +288,7 @@ Class* ClassLoader::DefineClass(Global_Env* env, const char* class_name,
     if((clss = WaitDefinition(env, className)) != NULL || exn_raised())
         return clss;
 
-    uint8 *redef_buf = NULL;
+    U_8 *redef_buf = NULL;
     int redef_buflen = 0;
     if(jvmti_should_report_event(JVMTI_EVENT_CLASS_FILE_LOAD_HOOK)) {
         jvmti_send_class_file_load_hook_event(env, this, class_name,

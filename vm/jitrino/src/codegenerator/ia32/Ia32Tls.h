@@ -47,7 +47,7 @@ Opnd* createTlsBaseLoadSequence(IRManager& irManager, Node* ctrlNode, Type* tlsB
 
 
 /**
- * Same as 3-args method, but presumes type for the TLS base as int8*.
+ * Same as 3-args method, but presumes type for the TLS base as I_8*.
  */
 Opnd* createTlsBaseLoadSequence(IRManager& irManager, Node* ctrlNode);
 

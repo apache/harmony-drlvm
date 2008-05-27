@@ -29,13 +29,13 @@ class ByteReader
 {
     unsigned offset;
     unsigned len;
-    const uint8* bytebuffer;
-    const uint8* start;
-    const uint8* end;
-    const uint8* curr;
+    const U_8* bytebuffer;
+    const U_8* start;
+    const U_8* end;
+    const U_8* curr;
     bool byte_array_owner;
 public:
-    ByteReader(const uint8* bytecode, unsigned _offset, unsigned _len)
+    ByteReader(const U_8* bytecode, unsigned _offset, unsigned _len)
         : offset(_offset), len(_len), bytebuffer(bytecode),
           start(bytecode + offset), end(start + len),
           curr(bytecode + offset), byte_array_owner(false) {}
@@ -86,7 +86,7 @@ public:
 
         U_32 result = 0;
         curr += 4;
-        const uint8* curr_byte = curr;
+        const U_8* curr_byte = curr;
         for (int i = 0; i < 4; i++) {
             U_32 x = (U_32) * (--curr_byte);
             result = (result << 8) + x;
@@ -114,7 +114,7 @@ public:
 
         uint16 result = 0;
         curr += 2;
-        const uint8* curr_byte = curr;
+        const U_8* curr_byte = curr;
         for (int i = 0; i < 2; i++) {
             uint16 x = (uint16) * (--curr_byte);
             result = (uint16) ((result << 8) + x);
@@ -123,7 +123,7 @@ public:
         return true;
     } // parse_u2_le
 
-    bool parse_u1(uint8 * val)
+    bool parse_u1(U_8 * val)
     {
         if(!have(1)) return false;
 
@@ -131,8 +131,8 @@ public:
         return true;
     } // parse_u1
 
-    const uint8* get_and_skip(unsigned len) {
-        const uint8* _curr = curr;
+    const U_8* get_and_skip(unsigned len) {
+        const U_8* _curr = curr;
         if(!skip(len)) return NULL;
         return _curr;
     } // get_and_skip

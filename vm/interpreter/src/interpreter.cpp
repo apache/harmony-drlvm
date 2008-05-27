@@ -105,28 +105,28 @@ static void interpreterInvokeSpecial(StackFrame& prevFrame, Method *method);
 /****************************************************/
 
 static inline int16
-read_uint8(uint8 *addr) {
+read_uint8(U_8 *addr) {
     return *addr;
 }
 
 static inline int16
-read_int8(uint8 *addr) {
-    return ((int8*)addr)[0];
+read_int8(U_8 *addr) {
+    return ((I_8*)addr)[0];
 }
 
 static inline int16
-read_int16(uint8 *addr) {
-    int res = (((int8*)addr)[0] << 8);
+read_int16(U_8 *addr) {
+    int res = (((I_8*)addr)[0] << 8);
     return (int16)(res + (int)addr[1]);
 }
 
 static inline uint16
-read_uint16(uint8 *addr) {
+read_uint16(U_8 *addr) {
     return (int16)((addr[0] << 8) + addr[1]);
 }
 
 static inline I_32
-read_int32(uint8 *addr) {
+read_int32(U_8 *addr) {
     U_32 res = (addr[0] << 24) + (addr[1] << 16) + (addr[2] << 8) + addr[3];
     return (I_32) res;
 }
@@ -688,7 +688,7 @@ DEF_OPCODE_MATH_64_TO_64(DNEG, res.d = -arg.d)     // Opcode_DNEG
 
 DEF_OPCODE_MATH_32_TO_32(I2F, res.f = (float) arg.i)     // Opcode_I2F
 //DEF_OPCODE_MATH_32_TO_32(F2I, res.i = (I_32) arg.f)     // Opcode_F2I
-DEF_OPCODE_MATH_32_TO_32(I2B, res.i = (int8) arg.i)      // Opcode_I2B
+DEF_OPCODE_MATH_32_TO_32(I2B, res.i = (I_8) arg.i)      // Opcode_I2B
 DEF_OPCODE_MATH_32_TO_32(I2S, res.i = (int16) arg.i)     // Opcode_I2S
 DEF_OPCODE_MATH_32_TO_32(I2C, res.i = (uint16) arg.i)    // Opcode_I2C
 
@@ -1287,7 +1287,7 @@ Opcode_SWAP(StackFrame& frame) {
     frame.stack.pick(0) = frame.stack.pick(1);
     frame.stack.pick(1) = tmp;
 
-    uint8 ref = frame.stack.ref(0);
+    U_8 ref = frame.stack.ref(0);
     frame.stack.ref(0) = frame.stack.ref(1);
     frame.stack.ref(1) = ref;
     frame.ip++;
@@ -1466,7 +1466,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
     frame.ip++;                                                                 \
 }
 
-DEF_OPCODE_XALOAD(BALOAD, int8, int8, i)
+DEF_OPCODE_XALOAD(BALOAD, int8, I_8, i)
 DEF_OPCODE_XALOAD(CALOAD, uint16, uint16, u)
 DEF_OPCODE_XALOAD(SALOAD, int16, int16, i)
 DEF_OPCODE_XALOAD(IALOAD, int32, I_32, i)
@@ -1569,7 +1569,7 @@ Opcode_ ## CODE(StackFrame& frame) {                                            
 #endif
 
 DEF_OPCODE_IASTORE(CASTORE, uint16, uint16, u)
-DEF_OPCODE_IASTORE(BASTORE, int8, int8, i)
+DEF_OPCODE_IASTORE(BASTORE, int8, I_8, i)
 DEF_OPCODE_IASTORE(SASTORE, int16, int16, i)
 DEF_OPCODE_IASTORE(IASTORE, int32, I_32, i)
 DEF_OPCODE_IASTORE(FASTORE, f32, float, f)
@@ -1644,7 +1644,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_INT8:
-            *(uint8*)addr = (uint8) frame.stack.pick().u;
+            *(U_8*)addr = (U_8) frame.stack.pick().u;
             frame.stack.pop();
             break;
 
@@ -1656,7 +1656,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
 
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
-            *(U_32*)addr = (uint8) frame.stack.pick().u;
+            *(U_32*)addr = (U_8) frame.stack.pick().u;
             frame.stack.pop();
             break;
         case VM_DATA_TYPE_CHAR:
@@ -1665,7 +1665,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
             break;
 
         case VM_DATA_TYPE_INT8:
-            *(I_32*)addr = (int8) frame.stack.pick().i;
+            *(I_32*)addr = (I_8) frame.stack.pick().i;
             frame.stack.pop();
             break;
         case VM_DATA_TYPE_INT16:
@@ -1732,11 +1732,11 @@ Opcode_GETSTATIC(StackFrame& frame) {
     switch (field->get_java_type()) {
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
-            frame.stack.pick().u = *(uint8*)addr;
+            frame.stack.pick().u = *(U_8*)addr;
             break;
 
         case VM_DATA_TYPE_INT8:
-            frame.stack.pick().i = *(int8*)addr;
+            frame.stack.pick().i = *(I_8*)addr;
             break;
 
         case VM_DATA_TYPE_CHAR:
@@ -1824,14 +1824,14 @@ Opcode_PUTFIELD(StackFrame& frame) {
     }
 
     ManagedObject *obj = UNCOMPRESS_INTERP(ref);
-    uint8* addr = ((uint8*)obj) + field->get_offset();
+    U_8* addr = ((U_8*)obj) + field->get_offset();
 
     switch (field->get_java_type()) {
 
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
         case VM_DATA_TYPE_INT8:
-            *(uint8*)addr = (uint8)frame.stack.pick(0).u;
+            *(U_8*)addr = (U_8)frame.stack.pick(0).u;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
@@ -1845,13 +1845,13 @@ Opcode_PUTFIELD(StackFrame& frame) {
 
 #else // ia32 not using compact fields
         case VM_DATA_TYPE_BOOLEAN:
-            *(U_32*)addr = (uint8)frame.stack.pick(0).u;
+            *(U_32*)addr = (U_8)frame.stack.pick(0).u;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
 
         case VM_DATA_TYPE_INT8:
-            *(I_32*)addr = (int8)frame.stack.pick(0).i;
+            *(I_32*)addr = (I_8)frame.stack.pick(0).i;
             frame.stack.ref(1) = FLAG_NONE;
             frame.stack.pop(2);
             break;
@@ -1923,18 +1923,18 @@ Opcode_GETFIELD(StackFrame& frame) {
         return;
     }
     ManagedObject *obj = UNCOMPRESS_INTERP(ref);
-    uint8 *addr = ((uint8*)obj) + field->get_offset();
+    U_8 *addr = ((U_8*)obj) + field->get_offset();
     frame.stack.ref() = FLAG_NONE;
 
     switch (field->get_java_type()) {
 
 #ifdef COMPACT_FIELDS // use compact fields on ipf
         case VM_DATA_TYPE_BOOLEAN:
-            frame.stack.pick(0).u = (U_32) *(uint8*)addr;
+            frame.stack.pick(0).u = (U_32) *(U_8*)addr;
             break;
 
         case VM_DATA_TYPE_INT8:
-            frame.stack.pick(0).i = (I_32) *(int8*)addr;
+            frame.stack.pick(0).i = (I_32) *(I_8*)addr;
             break;
 
         case VM_DATA_TYPE_CHAR:
@@ -2064,10 +2064,10 @@ Opcode_INVOKESPECIAL(StackFrame& frame) {
 
 static inline void
 Opcode_TABLESWITCH(StackFrame& frame) {
-    uint8* oldip = frame.ip;
-    uint8* ip = frame.ip + 1;
-    ip = ((ip - (uint8*)frame.method->get_byte_code_addr() + 3) & ~3)
-        + (uint8*)frame.method->get_byte_code_addr();
+    U_8* oldip = frame.ip;
+    U_8* ip = frame.ip + 1;
+    ip = ((ip - (U_8*)frame.method->get_byte_code_addr() + 3) & ~3)
+        + (U_8*)frame.method->get_byte_code_addr();
     I_32 deflt = read_int32(ip);
     I_32 low =   read_int32(ip+4);
     I_32 high =    read_int32(ip+8);
@@ -2085,10 +2085,10 @@ Opcode_TABLESWITCH(StackFrame& frame) {
 
 static inline void
 Opcode_LOOKUPSWITCH(StackFrame& frame) {
-    uint8* oldip = frame.ip;
-    uint8* ip = frame.ip + 1;
-    ip = ((ip - (uint8*)frame.method->get_byte_code_addr() + 3) & ~3)
-        + (uint8*)frame.method->get_byte_code_addr();
+    U_8* oldip = frame.ip;
+    U_8* ip = frame.ip + 1;
+    ip = ((ip - (U_8*)frame.method->get_byte_code_addr() + 3) & ~3)
+        + (U_8*)frame.method->get_byte_code_addr();
     I_32 deflt = read_int32(ip);
     I_32 num = read_int32(ip+4);
     I_32 val = frame.stack.pick().i;
@@ -2125,7 +2125,7 @@ Opcode_GOTO_W(StackFrame& frame) {
 static inline void
 Opcode_JSR(StackFrame& frame) {
     U_32 retAddr = (U_32)(frame.ip + 3 -
-        (uint8*)frame.method->get_byte_code_addr());
+        (U_8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
     frame.stack.ref() = FLAG_RET_ADDR;
@@ -2136,7 +2136,7 @@ Opcode_JSR(StackFrame& frame) {
 static inline void
 Opcode_JSR_W(StackFrame& frame) {
     U_32 retAddr = (U_32)(frame.ip + 5 -
-        (uint8*)frame.method->get_byte_code_addr());
+        (U_8*)frame.method->get_byte_code_addr());
     frame.stack.push();
     frame.stack.pick().u = retAddr;
     frame.stack.ref() = FLAG_RET_ADDR;
@@ -2149,14 +2149,14 @@ Opcode_RET(StackFrame& frame) {
     U_32 varNum = read_uint8(frame.ip + 1);
     U_32 retAddr = frame.locals(varNum).u;
     assert(frame.locals.ref(varNum) == FLAG_RET_ADDR);
-    frame.ip = retAddr + (uint8*)frame.method->get_byte_code_addr();
+    frame.ip = retAddr + (U_8*)frame.method->get_byte_code_addr();
 }
 
 static inline void
 Opcode_WIDE_RET(StackFrame& frame) {
     U_32 varNum = read_uint16(frame.ip + 2);
     U_32 retAddr = frame.locals(varNum).u;
-    frame.ip = retAddr + (uint8*)frame.method->get_byte_code_addr();
+    frame.ip = retAddr + (U_8*)frame.method->get_byte_code_addr();
 }
 
 static inline void
@@ -2271,7 +2271,7 @@ findExceptionHandler(StackFrame& frame, ManagedObject **exception, Handler **hh)
     DEBUG_BYTECODE("Searching for exception handler:");
     DEBUG_BYTECODE("   In " << m);
 
-    U_32 ip = (U_32)(frame.ip - (uint8*)m->get_byte_code_addr());
+    U_32 ip = (U_32)(frame.ip - (U_8*)m->get_byte_code_addr());
     DEBUG_BYTECODE("ip = " << (int)ip);
 
     // When VM is in shutdown stage we need to execute final block to
@@ -2330,7 +2330,7 @@ processExceptionHandler(StackFrame& frame, ManagedObject **exception) {
     if (findExceptionHandler(frame, exception, &h)){
         DEBUG_BYTECODE("Exception caught: " << (*exception));
         DEBUG_BYTECODE("Found handler!\n");
-        frame.ip = (uint8*)m->get_byte_code_addr() + h->get_handler_pc();
+        frame.ip = (U_8*)m->get_byte_code_addr() + h->get_handler_pc();
         return true;
     }
     return false;
@@ -2495,8 +2495,8 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
 
 void
 interpreter(StackFrame &frame) {
-    uint8 *first = NULL;
-    uint8 ip0 = 0;
+    U_8 *first = NULL;
+    U_8 ip0 = 0;
     bool breakpoint_processed = false;
     int stackLength = 0;
     size_t available;
@@ -2530,7 +2530,7 @@ interpreter(StackFrame &frame) {
         }
     }
 
-    frame.ip = (uint8*) frame.method->get_byte_code_addr();
+    frame.ip = (U_8*) frame.method->get_byte_code_addr();
 
     if (interpreter_ti_notification_mode
             & INTERPRETER_TI_METHOD_ENTRY_EVENT) {
@@ -2935,7 +2935,7 @@ restart:
 
             case OPCODE_WIDE:
             {
-                uint8* ip1 = frame.ip + 1;
+                U_8* ip1 = frame.ip + 1;
                 switch(*ip1) {
                     case OPCODE_ALOAD: Opcode_WIDE_ALOAD(frame); break;
                     case OPCODE_ILOAD: Opcode_WIDE_ILOAD(frame); break;

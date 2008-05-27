@@ -49,7 +49,7 @@ public:
     //
     // binary arithmetic/logical operations
     //
-    static bool fold8(Opcode,  int8 c1,  int8 c2,  I_32& result, bool is_signed);
+    static bool fold8(Opcode,  I_8 c1,  I_8 c2,  I_32& result, bool is_signed);
     static bool fold16(Opcode, int16 c1, int16 c2, I_32& result, bool is_signed);
     static bool fold32(Opcode, I_32 c1, I_32 c2, I_32& result, bool is_signed);
     static bool fold64(Opcode, int64 c1, int64 c2, int64& result, bool is_signed);
@@ -58,7 +58,7 @@ public:
     // 
     // unary arithmetic/logical operations
     //
-    static bool fold8(Opcode opc,  int8 c,  I_32& result);
+    static bool fold8(Opcode opc,  I_8 c,  I_32& result);
     static bool fold16(Opcode opc, int16 c, I_32& result);
     static bool fold32(Opcode opc, I_32 c, I_32& result);
     static bool fold64(Opcode opc, int64 c, int64& result);

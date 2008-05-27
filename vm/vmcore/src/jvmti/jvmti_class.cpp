@@ -365,13 +365,13 @@ jvmtiGetClassSignature( jvmtiEnv* env,
         GetClassSignature( klass, signature );
         TRACE2("jvmti-class", "Class signature = " << signature);
         // allocate memory for class UTF8 signature
-        len = get_utf8_length_of_8bit( (const uint8*)signature, sig_len);
+        len = get_utf8_length_of_8bit( (const U_8*)signature, sig_len);
         result = _allocate( len + 1, (unsigned char**)&pointer );
         if( result != JVMTI_ERROR_NONE ) {
             return result;
         }
         // copy class UTF8 signature
-        utf8_from_8bit( pointer, (const uint8*)signature, sig_len );
+        utf8_from_8bit( pointer, (const U_8*)signature, sig_len );
         // set class UTF8 signature
         *sig = pointer;
         // free memory for class signature

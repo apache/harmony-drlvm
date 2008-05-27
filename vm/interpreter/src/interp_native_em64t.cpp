@@ -43,7 +43,7 @@ typedef void* (*ObjFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef float (*FloatFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef I_32 (*IntFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef int16 (*ShortFuncPtr)(uword*,uword,word,GenericFunctionPointer);
-typedef int8 (*ByteFuncPtr)(uword*,uword,word,GenericFunctionPointer);
+typedef I_8 (*ByteFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 typedef uint16 (*CharFuncPtr)(uword*,uword,word,GenericFunctionPointer);
 
 DoubleFuncPtr invokeJNI_Double = (DoubleFuncPtr) invokeJNI;
@@ -457,7 +457,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_BOOLEAN:
         case JAVA_TYPE_BYTE:
             {
-                int8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
+                I_8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
@@ -736,7 +736,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_BOOLEAN:
         case JAVA_TYPE_BYTE:
             {
-                int8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
+                I_8 res = invokeJNI_Byte(out_args, n_fps, n_stacks, f);
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 

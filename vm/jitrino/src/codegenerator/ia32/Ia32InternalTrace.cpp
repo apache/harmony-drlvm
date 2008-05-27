@@ -70,7 +70,7 @@ void __stdcall methodEntry(const char * methodName, U_32 argInfoCount, CallingCo
     for (U_32 i=0; i<argInfoCount; i++){
         CallingConvention::OpndInfo & info=argInfos[i];
         U_32 cb=0;
-        uint8 arg[4*sizeof(U_32)]; 
+        U_8 arg[4*sizeof(U_32)]; 
         for (U_32 j=0; j<info.slotCount; j++){
             if (!info.isReg){
 #ifdef _EM64T_

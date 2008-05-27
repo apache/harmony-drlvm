@@ -121,7 +121,7 @@ isNonEssential(Inst* inst) {
     }
 }
 
-static uint8
+static U_8
 getBitWidth(Type::Tag tag)
 {
     switch (tag) {
@@ -143,12 +143,12 @@ getBitWidth(Type::Tag tag)
 
 // returns the number of bits of the given opnd_num which is used,
 // given that dst_bits of the dst are used
-static uint8
-usesBitsOfOpnd(uint8 dst_bits, Inst* inst, U_32 opnd_num) {
-    uint8 opwidth = getBitWidth(inst->getType());
+static U_8
+usesBitsOfOpnd(U_8 dst_bits, Inst* inst, U_32 opnd_num) {
+    U_8 opwidth = getBitWidth(inst->getType());
     Opnd *opnd = inst->getSrc(opnd_num);
-    uint8 opndwidth = getBitWidth(opnd->getType()->tag);
-    uint8 res = opndwidth;
+    U_8 opndwidth = getBitWidth(opnd->getType()->tag);
+    U_8 res = opndwidth;
     switch (inst->getOpcode()) {
     case Op_Add:   case Op_Mul:    case Op_Sub:
         res = ::std::min(dst_bits, opwidth); break;
@@ -178,7 +178,7 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, U_32 opnd_num) {
                         ConstantFolder::isConstant(shiftAmount->getInst(), 
                                                    shiftby);
                     if( !(isconst && (shiftby > 0)) ) assert(0);
-                    res = ::std::min(dst_bits, opwidth)-(uint8)shiftby;
+                    res = ::std::min(dst_bits, opwidth)-(U_8)shiftby;
                     break;
                 }
             case 1:
@@ -207,7 +207,7 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, U_32 opnd_num) {
                         = ConstantFolder::isConstant(shiftAmount->getInst(), 
                                                      shiftby);
                     if (isconst && shiftby > 0) {
-                        res = ::std::min(dst_bits, opwidth)-(uint8)shiftby;
+                        res = ::std::min(dst_bits, opwidth)-(U_8)shiftby;
                         break;
                     }
                 }
@@ -265,7 +265,7 @@ usesBitsOfOpnd(uint8 dst_bits, Inst* inst, U_32 opnd_num) {
             res = opndwidth;
         }
     }
-    uint8 res1 = ::std::min(res, opndwidth);
+    U_8 res1 = ::std::min(res, opndwidth);
     return res1;
 }
 
@@ -394,7 +394,7 @@ markLiveInst1(Inst* inst,
     assert(inst);
     assert(inst->getNode());
 
-    uint8 dstWidth = 255;
+    U_8 dstWidth = 255;
 
     if (Log::isEnabled()) {
         Log::out() << "Found dstwidth of " << (int) dstWidth
@@ -415,12 +415,12 @@ markLiveInst1(Inst* inst,
             assert(def != NULL);
 
             assert(def->getNode());
-            uint8 opndWidth = 255;
+            U_8 opndWidth = 255;
             U_32 defId = def->getId();
 
             if (usefulInstSet.setBit(defId-minInstId, true)) {
                 // was already marked as live, check old width.
-                uint8 oldOpndWidth = 255;
+                U_8 oldOpndWidth = 255;
 
                 if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) oldOpndWidth
@@ -553,7 +553,7 @@ markLiveInst(Inst* inst,
              InstDeque& workSet,
              BitSet& usefulInstSet,
              BitSet& usefulVarSet,
-             uint8 *usedInstWidth,
+             U_8 *usedInstWidth,
              U_32 minInstId,
              U_32 maxInstId) {
     //
@@ -564,7 +564,7 @@ markLiveInst(Inst* inst,
     U_32 instId = inst->getId();
     assert(usedInstWidth);
     assert((instId >= minInstId) && (instId < maxInstId));
-    uint8 dstWidth = usedInstWidth[instId-minInstId];
+    U_8 dstWidth = usedInstWidth[instId-minInstId];
 
     if (Log::isEnabled()) {
         Log::out() << "Found dstwidth of " << (int) dstWidth
@@ -584,7 +584,7 @@ markLiveInst(Inst* inst,
                 continue;
             assert(def != NULL);
 
-            uint8 opndWidth = usesBitsOfOpnd(dstWidth, inst, i);
+            U_8 opndWidth = usesBitsOfOpnd(dstWidth, inst, i);
             assert(def);
             assert(def->getNode());
             U_32 defId = def->getId();
@@ -599,7 +599,7 @@ markLiveInst(Inst* inst,
                 }
             } else if (usefulInstSet.setBit(defId-minInstId, true)) {
                 // was already marked as live, check old width.
-                uint8 oldOpndWidth = usedInstWidth[defId-minInstId];
+                U_8 oldOpndWidth = usedInstWidth[defId-minInstId];
 
                 if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) oldOpndWidth
@@ -653,7 +653,7 @@ DeadCodeEliminator::sweepInst(Node* node,
                               Inst* inst,
                               BitSet& usefulInstSet,
                               BitSet& usefulVarSet,
-                              uint8 *usedInstWidth,
+                              U_8 *usedInstWidth,
                               U_32 minInstId,
                               U_32 maxInstId,
                               bool canRemoveStvars) {
@@ -719,9 +719,9 @@ DeadCodeEliminator::sweepInst(Node* node,
                 if (!srcType->isInteger())
                     break;
         
-                uint8 convSize = getBitWidth(instType);
-                uint8 srcSize = getBitWidth(srcType->tag);
-                uint8 dstSize = getBitWidth(inst->getDst()->getType()->tag);
+                U_8 convSize = getBitWidth(instType);
+                U_8 srcSize = getBitWidth(srcType->tag);
+                U_8 dstSize = getBitWidth(inst->getDst()->getType()->tag);
 
                 if (dstSize != srcSize) {
                     // it's not just a sign-extension, we can't remove it
@@ -729,7 +729,7 @@ DeadCodeEliminator::sweepInst(Node* node,
                 }
 
                 assert((minInstId <= instId) && (instId < maxInstId));
-                uint8 usedDstSize = usedInstWidth[instId-minInstId];
+                U_8 usedDstSize = usedInstWidth[instId-minInstId];
 
                 if (Log::isEnabled()) {
                     Log::out() << "Found dstwidth of " << (int) usedDstSize
@@ -888,7 +888,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
     BitSet usefulInstSet(memManager,numInsts+1);
     BitSet usefulVarSet(memManager,numOpnds+1);
     const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
-    uint8 *usedInstWidth = optimizerFlags.dce2 ? new (memManager) uint8[numInsts] : 0;
+    U_8 *usedInstWidth = optimizerFlags.dce2 ? new (memManager) U_8[numInsts] : 0;
 
     {
         AutoTimer t(dcePhase1Timer); 
@@ -917,7 +917,7 @@ DeadCodeEliminator::eliminateDeadCode(bool keepEmptyNodes) {
                     U_32 instId = inst->getId();
                     usefulInstSet.setBit(instId-minInstId, true);
                     if (usedInstWidth) {
-                        uint8 usedWidth = getBitWidth(inst->getType());
+                        U_8 usedWidth = getBitWidth(inst->getType());
                         if (Log::isEnabled()) {
                             Log::out() << "Setting dstwidth to " << (int) usedWidth
                                        << " for inst ";

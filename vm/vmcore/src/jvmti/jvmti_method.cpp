@@ -442,36 +442,36 @@ jvmtiGetLocalVariableTable(jvmtiEnv* env,
             &(entry->slot),
             &name, &type, &generic_type);
         // allocate memory for name
-        len = get_utf8_length_of_8bit( (const uint8*)name->bytes, name->len);
+        len = get_utf8_length_of_8bit( (const U_8*)name->bytes, name->len);
         result = _allocate( len + 1, (unsigned char**)&pointer );
         if( result != JVMTI_ERROR_NONE ) {
             return result;
         }
         // copy variable name
-        utf8_from_8bit( pointer, (const uint8*)name->bytes, name->len);
+        utf8_from_8bit( pointer, (const U_8*)name->bytes, name->len);
         // set variable name
         entry->name = pointer;
         // allocate memory for signature
-        len = get_utf8_length_of_8bit( (const uint8*)type->bytes, type->len);
+        len = get_utf8_length_of_8bit( (const U_8*)type->bytes, type->len);
         result = _allocate( len + 1, (unsigned char**)&pointer );
         if( result != JVMTI_ERROR_NONE ) {
             return result;
         }
         // copy variable signature
-        utf8_from_8bit( pointer, (const uint8*)type->bytes, type->len);
+        utf8_from_8bit( pointer, (const U_8*)type->bytes, type->len);
         // set variable signature
         entry->signature = pointer;
         // set variable slot
 
         if (generic_type) {
             // allocate memory for generic_signature
-            len = get_utf8_length_of_8bit( (const uint8*)generic_type->bytes, generic_type->len);
+            len = get_utf8_length_of_8bit( (const U_8*)generic_type->bytes, generic_type->len);
             result = _allocate( len + 1, (unsigned char**)&pointer );
             if( result != JVMTI_ERROR_NONE ) {
                 return result;
             }
             // copy variable generic_signature
-            utf8_from_8bit( pointer, (const uint8*)generic_type->bytes, generic_type->len);
+            utf8_from_8bit( pointer, (const U_8*)generic_type->bytes, generic_type->len);
             // set variable generic_signature
             entry->generic_signature = pointer;
         } else {

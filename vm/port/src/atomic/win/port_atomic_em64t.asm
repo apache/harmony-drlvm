@@ -4,7 +4,7 @@ _TEXT	SEGMENT
 
 port_atomic_cas8 PROC
 
-;uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp)
+;U_8 port_atomic_cas8(volatile U_8 * data , U_8 value, U_8 comp)
 ;
 ;    rcx - *data - pointer to the byte which shoud be exchanged
 ;    rdx - value - new value

@@ -43,7 +43,7 @@ void BasicBlock::verify() {
 }
 
 void* BasicBlock::getCodeStartAddr() const  {
-    return (uint8*)irm.getCodeStartAddr()+getCodeOffset(); 
+    return (U_8*)irm.getCodeStartAddr()+getCodeOffset(); 
 }
 
 

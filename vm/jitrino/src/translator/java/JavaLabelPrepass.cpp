@@ -994,7 +994,7 @@ void JavaLabelPrepass::jsr(U_32 targetOffset, U_32 nextOffset) {
 
     getVisited()->setBit(targetOffset,false);
 }
-void JavaLabelPrepass::ret(uint16 varIndex, const uint8* byteCodes) { 
+void JavaLabelPrepass::ret(uint16 varIndex, const U_8* byteCodes) { 
     StateInfo::SlotInfo *slot = &stateInfo.stack[varIndex];
     VariableIncarnation* var = slot->vars->getVarIncarnation();
     assert(var);
@@ -1022,7 +1022,7 @@ void JavaLabelPrepass::ret(uint16 varIndex, const uint8* byteCodes) {
         //      to the instruction that follows the JSR
         //
         stateTable->setStateInfoFromFinally(&stateInfo, jsrNextOffset);
-        labelStack->push((uint8*)byteCodes + jsrNextOffset);
+        labelStack->push((U_8*)byteCodes + jsrNextOffset);
     }
 }
 
@@ -1057,7 +1057,7 @@ void JavaLabelPrepass::iconst(I_32 val)                   { pushType(int32Type);
 void JavaLabelPrepass::lconst(int64 val)                   { pushType(int64Type); }
 void JavaLabelPrepass::fconst(float val)                   { pushType(singleType); }
 void JavaLabelPrepass::dconst(double val)                  { pushType(doubleType); }
-void JavaLabelPrepass::bipush(int8 val)                    { pushType(int32Type); }
+void JavaLabelPrepass::bipush(I_8 val)                    { pushType(int32Type); }
 void JavaLabelPrepass::sipush(int16 val)                   { pushType(int32Type); }
 
 void JavaLabelPrepass::iload(uint16 varIndex)              { genLoad(int32Type,varIndex); }
@@ -1161,7 +1161,7 @@ void JavaLabelPrepass::new_(U_32 constPoolIndex)         {
     pushType(slot);
 }
 
-void JavaLabelPrepass::newarray(uint8 etype)                { 
+void JavaLabelPrepass::newarray(U_8 etype)                { 
     popAndCheck(int32Type);
     NamedType *elemType = NULL;
     switch (etype) {
@@ -1220,7 +1220,7 @@ void JavaLabelPrepass::checkcast(U_32 constPoolIndex)    {
     pushType(type);
 }
 
-int JavaLabelPrepass::instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)   {
+int JavaLabelPrepass::instanceof(const U_8* bcp, U_32 constPoolIndex, U_32 off)   {
     popType();
     pushType(int32Type);
     return 3;  // length of instanceof
@@ -1352,7 +1352,7 @@ void JavaLabelPrepass::invokeinterface(U_32 constPoolIndex,U_32 count) {
         pseudoInvoke(methodSig_string);
     }
 }
-void JavaLabelPrepass::multianewarray(U_32 constPoolIndex,uint8 dimensions) {
+void JavaLabelPrepass::multianewarray(U_32 constPoolIndex,U_8 dimensions) {
     for (int i =0; i < dimensions; i++) {
         popAndCheck(int32Type);
     }

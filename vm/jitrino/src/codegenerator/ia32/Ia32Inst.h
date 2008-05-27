@@ -775,7 +775,7 @@ public:
     virtual void verify() const { assert(node!=NULL);}
 
     /** Emits (encodes) the instruction into stream */
-    uint8 * emit(uint8* stream);
+    U_8 * emit(U_8* stream);
 
     void initFindInfo(Encoder::FindInfo& fi, Opnd::ConstraintKind opndConstraintKind)const;
 

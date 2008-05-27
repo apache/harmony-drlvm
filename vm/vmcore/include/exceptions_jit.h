@@ -28,7 +28,7 @@
 
 //**** Main exception propogation entry points
 void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
-    Method_Handle exn_constr, uint8* jit_exn_constr_args, jvalue* vm_exn_constr_args);
+    Method_Handle exn_constr, U_8* jit_exn_constr_args, jvalue* vm_exn_constr_args);
 
 // Throw an exception in the current thread.
 // Must be called with an M2nFrame on the top of the stack, and throws to the previous managed
@@ -36,7 +36,7 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
 // If exn_obj is nonnull then it is the exception, otherwise the exception is an instance of
 // exn_class created using the given constructor and arguments (a null exn_constr indicates the default constructor).
 // Does not return.
-void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class, Method_Handle exn_constr=NULL, uint8* exn_constr_args=NULL);
+void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class, Method_Handle exn_constr=NULL, U_8* exn_constr_args=NULL);
 
 // Throw an exception in the current thread.
 // Must be called with the current thread "suspended" in managed code and regs holds the suspended values.

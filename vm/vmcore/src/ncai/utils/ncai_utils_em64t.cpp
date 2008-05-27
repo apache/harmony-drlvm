@@ -191,7 +191,7 @@ bool ncai_get_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 
     memcpy(
         buf_ptr,
-        ((uint8*)&regs) + g_ncai_reg_table[reg_number].offset,
+        ((U_8*)&regs) + g_ncai_reg_table[reg_number].offset,
         g_ncai_reg_table[reg_number].size);
 
     return true;
@@ -209,7 +209,7 @@ bool ncai_set_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
     ncai_context_to_registers(&context, &regs);
 
     memcpy(
-        ((uint8*)&regs) + g_ncai_reg_table[reg_number].offset,
+        ((U_8*)&regs) + g_ncai_reg_table[reg_number].offset,
         buf_ptr,
         g_ncai_reg_table[reg_number].size);
 

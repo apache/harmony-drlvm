@@ -28,7 +28,7 @@
 extern "C" {
 #endif
 
-#define P_HASH_CONTENTION_BYTE(x) ( (uint8 *)(x->get_obj_info_addr()) )
+#define P_HASH_CONTENTION_BYTE(x) ( (U_8 *)(x->get_obj_info_addr()) )
 #define P_HASH_CONTENTION(x)      ((POINTER_SIZE_INT)P_HASH_CONTENTION_BYTE(x))
 
 /**

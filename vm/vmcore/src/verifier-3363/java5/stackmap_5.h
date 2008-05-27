@@ -289,7 +289,7 @@ static const short FF_ISWORKMAP = 1;
 struct SubroutineData {
     Address caller;         //first JSR instruction that called this subroutine
     short retCount;         //number of ret instructions for this subroutine
-    uint8  subrDataflowed;   // =1 if dataflow pass for the subroutine is over
+    U_8  subrDataflowed;   // =1 if dataflow pass for the subroutine is over
 };
 
 //Store various data for the given instruction. Possible data are: StackMap vector, WorkMap vector,

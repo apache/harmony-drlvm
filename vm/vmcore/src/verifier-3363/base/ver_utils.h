@@ -224,7 +224,7 @@ class Memory {
     MemoryPageHead *static_page;
     MemoryPageHead *current_page;
 
-    uint8           static_mem[STATICSZ + sizeof (MemoryPageHead) ];
+    U_8           static_mem[STATICSZ + sizeof (MemoryPageHead) ];
 
     size_t  page_size;
     size_t  used;
@@ -272,7 +272,7 @@ public:
             page_size = current_page->size;
         }
 
-        void *ret = (uint8*)current_page + sizeof(MemoryPageHead) + used;
+        void *ret = (U_8*)current_page + sizeof(MemoryPageHead) + used;
         used += sz;
         return ret;
     }
@@ -284,7 +284,7 @@ public:
     }
 
     void dealloc_last(void* ptr, size_t sz) {
-        assert( ((uint8*)ptr) + sz == (uint8*)current_page + sizeof(MemoryPageHead) + used );
+        assert( ((U_8*)ptr) + sz == (U_8*)current_page + sizeof(MemoryPageHead) + used );
         used -= sz;
     }
 };
@@ -430,7 +430,7 @@ private:
             result += *(key+idx);
         }
 
-        uint8 *bres = (uint8*) &result;
+        U_8 *bres = (U_8*) &result;
 
         return (bres[0] + bres[1] + bres[2] + bres[3]) & HASH_MASK;
     } // vf_Hash::HashFunc( key )

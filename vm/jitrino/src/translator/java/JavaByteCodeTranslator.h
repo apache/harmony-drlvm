@@ -77,7 +77,7 @@ public:
     void lconst(int64 val);
     void fconst(float val);
     void dconst(double val);
-    void bipush(int8 val);
+    void bipush(I_8 val);
     void sipush(int16 val);
     void ldc(U_32 constPoolIndex);
     void ldc2(U_32 constPoolIndex);
@@ -189,7 +189,7 @@ public:
     void if_acmpne(U_32 targetOffset,U_32 nextOffset);
     void goto_(U_32 targetOffset,U_32 nextOffset);
     void jsr(U_32 offset, U_32 nextOffset);
-    void ret(uint16 varIndex, const uint8* byteCodes);
+    void ret(uint16 varIndex, const U_8* byteCodes);
     void tableswitch(JavaSwitchTargetsIter*);
     void lookupswitch(JavaLookupSwitchTargetsIter*);
     void ireturn(U_32 off);
@@ -207,15 +207,15 @@ public:
     void invokestatic(U_32 constPoolIndex);
     void invokeinterface(U_32 constPoolIndex,U_32 count);
     void new_(U_32 constPoolIndex);
-    void newarray(uint8 type);
+    void newarray(U_8 type);
     void anewarray(U_32 constPoolIndex);
     void arraylength();
     void athrow();
     void checkcast(U_32 constPoolIndex);
-    int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off) ;
+    int  instanceof(const U_8* bcp, U_32 constPoolIndex, U_32 off) ;
     void monitorenter();
     void monitorexit();
-    void multianewarray(U_32 constPoolIndex,uint8 dimensions);
+    void multianewarray(U_32 constPoolIndex,U_8 dimensions);
     void ifnull(U_32 targetOffset,U_32 nextOffset);
     void ifnonnull(U_32 targetOffset,U_32 nextOffset);
 private:
@@ -333,10 +333,10 @@ private:
     // Method checks if following bytecodes are array initializers for newly created array.
     // If they are then substitute array initializers with jit helper array copy instruction.
     // Returns the length of bytecodes converted by this routine.
-    U_32 checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength);
+    U_32 checkForArrayInitializer(Opnd* arrayOpnd, const U_8* byteCodes, U_32 offset, const U_32 byteCodeLength);
     // Obtain the next numeric value from the bytecode in array initialization sequence
     // Returns number of bytes read from the byteCodes array.
-    U_32 getNumericValue(const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value);
+    U_32 getNumericValue(const U_8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value);
 
     //
     // private fields

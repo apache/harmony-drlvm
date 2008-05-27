@@ -323,7 +323,7 @@ protected:
     void lconst(int64)  {}
     void fconst(float)  {}
     void dconst(double)  {}
-    void bipush(int8)  {}
+    void bipush(I_8)  {}
     void sipush(int16)  {}
     void ldc(U_32)  {}
     void ldc2(U_32)  {}
@@ -435,7 +435,7 @@ protected:
     void if_acmpne(U_32 targetOffset,U_32 nextOffset)  {}
     void goto_(U_32 targetOffset,U_32 nextOffset)  {}
     void jsr(U_32 offset, U_32 nextOffset)  {}
-    void ret(uint16 varIndex,const uint8* byteCodes)  {}
+    void ret(uint16 varIndex,const U_8* byteCodes)  {}
     void tableswitch(JavaSwitchTargetsIter*)  {}
     void lookupswitch(JavaLookupSwitchTargetsIter*)  {}
     void ireturn(U_32 off)  {}
@@ -453,15 +453,15 @@ protected:
     void invokestatic(U_32 constPoolIndex)  { leaf = false; }
     void invokeinterface(U_32 constPoolIndex,U_32 count)  { leaf = false; }
     void new_(U_32 constPoolIndex)  {}
-    void newarray(uint8 type)  {}
+    void newarray(U_8 type)  {}
     void anewarray(U_32 constPoolIndex)  {}
     void arraylength()  {}
     void athrow()  {}
     void checkcast(U_32 constPoolIndex)  {}
-    int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)  {return 3;}
+    int  instanceof(const U_8* bcp, U_32 constPoolIndex, U_32 off)  {return 3;}
     void monitorenter()  {}
     void monitorexit()  {}
-    void multianewarray(U_32 constPoolIndex,uint8 dimensions)  {}
+    void multianewarray(U_32 constPoolIndex,U_8 dimensions)  {}
     void ifnull(U_32 targetOffset,U_32 nextOffset)  {}
     void ifnonnull(U_32 targetOffset,U_32 nextOffset) {}
 };

@@ -38,9 +38,9 @@
 int get_unicode_length_of_utf8(const char *utf8)
 {
     int len = 0;
-    uint8 ch;
-    uint8 ch2;
-    uint8 ch3;
+    U_8 ch;
+    U_8 ch2;
+    U_8 ch3;
     while((ch = *utf8++)) {
         len++;
         if(ch & 0x80) { // 2 or 3 byte encoding
@@ -80,7 +80,7 @@ unsigned get_utf8_length_of_unicode(const uint16 *unicode, unsigned unicode_leng
     return length;
 } //get_utf8_length_of_unicode
 
-unsigned get_utf8_length_of_8bit(const uint8* chars, size_t length)
+unsigned get_utf8_length_of_8bit(const U_8* chars, size_t length)
 {
     unsigned len = 0;
     for(unsigned i=0; i < length; i++)
@@ -118,7 +118,7 @@ void pack_utf8(char *utf8_string, const uint16 *unicode, unsigned unicode_length
     *s = 0;
 } //pack_utf8
 
-void utf8_from_8bit(char* utf8_string, const uint8* chars, size_t length)
+void utf8_from_8bit(char* utf8_string, const U_8* chars, size_t length)
 {
     char* s = utf8_string;
     for(unsigned i=0; i<length; i++) {
@@ -140,7 +140,7 @@ void utf8_from_8bit(char* utf8_string, const uint8* chars, size_t length)
 
 void unpack_utf8(uint16 *unicode, const char *utf8_string)
 {
-    const uint8 *utf8 = (const uint8 *)utf8_string;
+    const U_8 *utf8 = (const U_8 *)utf8_string;
     unsigned len = 0;
     uint16 ch;
     while((ch = (uint16)*utf8++)) {
@@ -175,7 +175,7 @@ void unpack_utf8(uint16 *unicode, const char *utf8_string)
 // otherwise the characters are stored as 16-bit and unicode points to the array.
 struct StringBuffer {
     uint16* unicode;
-    uint8* compressed;
+    U_8* compressed;
     bool is_compressed;
 };
 
@@ -277,7 +277,7 @@ static void string_create(unsigned unicode_length, bool eight_bit, ManagedObject
     *str = jls;
     buf->is_compressed = eight_bit;
     if (eight_bit)
-        buf->compressed = (uint8*)get_vector_element_address_int8(array, 0);
+        buf->compressed = (U_8*)get_vector_element_address_int8(array, 0);
     else
         buf->unicode = get_vector_element_address_uint16(array, 0);
 }
@@ -328,7 +328,7 @@ ManagedObject* string_create_from_unicode(const uint16* buf, unsigned length)
     }
     if (buf2.is_compressed) {
         for(unsigned i=0; i<length; i++)
-            buf2.compressed[i] = (uint8)buf[i];
+            buf2.compressed[i] = (U_8)buf[i];
     } else {
         memcpy(buf2.unicode, buf, sizeof(uint16) * length);
     }
@@ -424,7 +424,7 @@ static void string_get_buffer(ManagedObject* str, StringBuffer* buf)
     } else {
         buf->is_compressed = true;
         assert(f_value_byte_offset);
-        buf->compressed = (uint8*)get_vector_element_address_int8(*(Vector_Handle*)(str_raw+f_value_byte_offset), offset);
+        buf->compressed = (U_8*)get_vector_element_address_int8(*(Vector_Handle*)(str_raw+f_value_byte_offset), offset);
     }
 }
 

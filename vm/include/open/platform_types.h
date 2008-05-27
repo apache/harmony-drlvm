@@ -57,7 +57,7 @@
  * Various Numeric Types
  */
 
-// Boolean, uint8, int8, uint16, int16, uint64, int64,
+// Boolean, uint16, int16, uint64, int64,
 // POINTER_SIZE_INT
 
 // We can't use bool in non-C++ code
@@ -83,11 +83,9 @@ typedef unsigned Boolean;
 # endif
 
 #ifdef PLATFORM_POSIX
-typedef unsigned char uint8;
 typedef unsigned short uint16;
 typedef unsigned long long uint64;
 
-typedef   signed char  int8;
 typedef   signed short int16;
 typedef   signed long long int64;
 
@@ -95,15 +93,11 @@ typedef   signed long long int64;
 
 #ifndef __INSURE__
 // these give Insure++ problems:
-typedef unsigned __int8  uint8;
 typedef unsigned __int16 uint16;
-typedef   signed __int8  int8;
 typedef   signed __int16 int16;
 #else
 // so use these definitions instead with Insure++:
-typedef unsigned char uint8;
 typedef unsigned short uint16;
-typedef   signed char int8;
 typedef   signed short int16;
 #endif
 typedef unsigned __int64 uint64;

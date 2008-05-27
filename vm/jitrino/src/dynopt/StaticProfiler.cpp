@@ -523,7 +523,7 @@ static double opcodeHeuristic(const StaticProfilerContext* c) {
                 constValLEzero = val.i4 <= 0;
 #endif
                 break;
-            case Type::Int8:  constValLEzero = ((int8)val.i4) <= 0; break;
+            case Type::Int8:  constValLEzero = ((I_8)val.i4) <= 0; break;
             case Type::Int16: constValLEzero = ((int16)val.i4) <= 0; break;
             case Type::Int32: constValLEzero = val.i4 <= 0; break;
             case Type::Int64: constValLEzero = val.i8 <= 0; break;

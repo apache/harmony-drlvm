@@ -204,7 +204,7 @@ void Opnd::setDefiningInst(Inst * inst)
 void* Inst::operator new(size_t sz, MemoryManager& mm, U_32 opndCount)
 {   
     Inst * p = (Inst*)mm.alloc(sz + Inst::getOpndChunkSize(opndCount)); 
-    p->allocatedOpndCount = opndCount; p->opnds = (Opnd**)((uint8*)p + sz);
+    p->allocatedOpndCount = opndCount; p->opnds = (Opnd**)((U_8*)p + sz);
     return p; 
 }
 
@@ -425,9 +425,9 @@ void Inst::reverse(IRManager * irManager)
 }
 
 //_________________________________________________________________________________________________
-uint8* Inst::emit(uint8* stream)
+U_8* Inst::emit(U_8* stream)
 {
-    uint8 * instEnd = stream;
+    U_8 * instEnd = stream;
     if (!hasKind(Inst::Kind_PseudoInst)){
         assert(mnemonic!=Mnemonic_Null);
         assert(form==Form_Native);
@@ -587,7 +587,7 @@ void * Inst::getCodeStartAddr() const
         return (void*)(POINTER_SIZE_INT)0xDEADBEEF;
     }
     BasicBlock* bb = getBasicBlock();
-    return bb!=NULL?(uint8*)bb->getCodeStartAddr()+codeOffset:0;
+    return bb!=NULL?(U_8*)bb->getCodeStartAddr()+codeOffset:0;
 }
 
 

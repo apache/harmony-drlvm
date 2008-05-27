@@ -204,7 +204,7 @@ public:
     //     (updatingState == 1) when method profile is being updated to skip
     //         concurrent modifications.
     //     (updatingState == 0) when profile is open for modifications.
-    uint8* getUpdatingStatePtr() { return &updatingState; }
+    U_8* getUpdatingStatePtr() { return &updatingState; }
 private:
     ValueProfileCollector* getVPC() const;
 
@@ -214,7 +214,7 @@ private:
     // The lock and the atomically modified updatingState flag operate per
     // method to allow simultaneous updates for distinct methods.
     osmutex_t lock;
-    uint8 updatingState;
+    U_8 updatingState;
 };
 
 POINTER_SIZE_INT value_profiler_get_top_value (Method_Profile_Handle mph, U_32 instructionKey);

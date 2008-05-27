@@ -144,7 +144,7 @@ update_handler_address(NativeCodePtr new_handler_ip)
 static ManagedObject *create_lazy_exception(
     Class_Handle exn_class,
     Method_Handle exn_constr,
-    uint8 * exn_constr_args,
+    U_8 * exn_constr_args,
     jvalue* vm_exn_constr_args)
 {
     assert(!hythread_is_suspend_enabled());
@@ -194,7 +194,7 @@ static ManagedObject * exn_propagate_exception(
     ManagedObject ** exn_obj,
     Class_Handle exn_class,
     Method_Handle exn_constr,
-    uint8 * jit_exn_constr_args,
+    U_8 * jit_exn_constr_args,
     jvalue* vm_exn_constr_args)
 {
     assert(!hythread_is_suspend_enabled());
@@ -448,7 +448,7 @@ static bool UNUSED is_gc_frame_before_m2n_frame()
 
 // function can be safe point & should be called with disable reqursion = 1
 void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
-    Method_Handle exn_constr, uint8* jit_exn_constr_args, jvalue* vm_exn_constr_args)
+    Method_Handle exn_constr, U_8* jit_exn_constr_args, jvalue* vm_exn_constr_args)
 {
 /*
  * !!!! NO LOGGER IS ALLOWED IN THIS FUNCTION !!!
@@ -539,7 +539,7 @@ void exn_throw_for_JIT(ManagedObject* exn_obj, Class_Handle exn_class,
 
 // function can be safe point & should be called with disable reqursion = 1
 void exn_athrow(ManagedObject* exn_obj, Class_Handle exn_class,
-    Method_Handle exn_constr, uint8* exn_constr_args)
+    Method_Handle exn_constr, U_8* exn_constr_args)
 {
     assert(!hythread_is_suspend_enabled());
     BEGIN_RAISE_AREA;
@@ -789,7 +789,7 @@ static void rth_throw_lazy(Method * exn_constr)
 #if defined(_IPF_) || defined(_EM64T_)
     DIE(("Lazy exceptions are not supported on this platform"));
 #else
-    uint8 *args = (uint8 *) (m2n_get_args(m2n_get_last_frame()) + 1);   // +1 to skip constructor
+    U_8 *args = (U_8 *) (m2n_get_args(m2n_get_last_frame()) + 1);   // +1 to skip constructor
     if (NULL != exn_constr) {
         args += exn_constr->get_num_arg_slots() * 4 - 4;
     } else {

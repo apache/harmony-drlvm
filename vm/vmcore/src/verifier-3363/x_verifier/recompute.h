@@ -23,7 +23,7 @@
 #include "x_class_interface.h"
 
 
-vf_Result vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error, void* trustedPairs);
+vf_Result vf_recompute_stackmaptable(Method_Handle method, U_8** attrBytes, char** error, void* trustedPairs);
 
 //possible relations between verificaton types
 enum ConstraintType_Ex {
@@ -195,7 +195,7 @@ public:
         tc_free(parsedTrustedData);
     }
         
-    uint8* written_stackmap;
+    U_8* written_stackmap;
 
 protected:
     void writeStackMapFrame(Address instr);
@@ -218,10 +218,10 @@ protected:
 
         if( attrLen + 6 >= attrSz ) {
             attrSz += 4096;
-            written_stackmap = (uint8*) tc_realloc(written_stackmap, attrSz);
+            written_stackmap = (U_8*) tc_realloc(written_stackmap, attrSz);
         }
 
-        written_stackmap[attrLen + 6] = (uint8) byte;
+        written_stackmap[attrLen + 6] = (U_8) byte;
         attrLen++;
     }
 

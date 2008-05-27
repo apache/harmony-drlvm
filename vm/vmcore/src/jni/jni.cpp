@@ -656,7 +656,7 @@ jclass JNICALL DefineClass(JNIEnv *jenv,
     }
 
     const String* res_name;
-    Class* clss = cl->DefineClass(env, name, (uint8 *)buf, 0, len, &res_name);
+    Class* clss = cl->DefineClass(env, name, (U_8 *)buf, 0, len, &res_name);
 
     bool ld_result;
     if(clss != NULL)

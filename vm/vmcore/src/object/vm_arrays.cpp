@@ -488,7 +488,7 @@ ArrayCopyResult array_copy(ManagedObject *src, I_32 srcOffset, ManagedObject *ds
 #endif
         memmove(get_vector_element_address_int8(dst, dstOffset),
                 get_vector_element_address_int8(src, srcOffset),
-                length * sizeof(int8));
+                length * sizeof(I_8));
         break;
     case 'Z':
 #ifdef VM_STATS
@@ -496,7 +496,7 @@ ArrayCopyResult array_copy(ManagedObject *src, I_32 srcOffset, ManagedObject *ds
 #endif
         memmove(get_vector_element_address_bool(dst, dstOffset),
                 get_vector_element_address_bool(src, srcOffset),
-                length * sizeof(int8));
+                length * sizeof(I_8));
         break;
     case 'S':
 #ifdef VM_STATS

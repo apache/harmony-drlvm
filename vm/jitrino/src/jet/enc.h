@@ -955,7 +955,7 @@ public:
      */
     void lea(const Opnd& reg, const Opnd& mem);
     /**
-     * Generates sign extension of int8 from op1 into op0.
+     * Generates sign extension of I_8 from op1 into op0.
      */
     void sx1(const Opnd& op0, const Opnd& op1);
     /**
@@ -967,7 +967,7 @@ public:
      */
     void sx(const Opnd& op0, const Opnd& op1);
     /**
-     * Generates zero extension of uint8 from op1 into op0.
+     * Generates zero extension of U_8 from op1 into op0.
      */
     void zx1(const Opnd& op0, const Opnd& op1);
     /**

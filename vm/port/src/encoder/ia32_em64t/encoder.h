@@ -244,7 +244,7 @@ public:
 #ifndef NDEBUG
         switch (size) {
         case size_8:
-            assert(val == (int64)(int8)val);
+            assert(val == (int64)(I_8)val);
             break;
         case size_16:
             assert(val == (int64)(int16)val);
@@ -269,7 +269,7 @@ public:
 #ifndef NDEBUG
         switch (size) {
         case size_8:
-            assert((I_32)val == (I_32)(int8)val);
+            assert((I_32)val == (I_32)(I_8)val);
             break;
         case size_16:
             assert((I_32)val == (I_32)(int16)val);

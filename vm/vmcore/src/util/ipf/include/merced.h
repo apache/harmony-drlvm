@@ -724,9 +724,9 @@ private:
 struct Template_Descr {
    EM_Syllable_Type syl_type[ENC_N_SLOTS];
    // Slot number after stop, or ENC_N_SLOTS if no stop
-   uint8 stop_up;
+   U_8 stop_up;
    // Slot number after stop, or 0 if no stop
-   uint8 stop_down;
+   U_8 stop_down;
 };
 
 extern Template_Descr tmplt_descr[];

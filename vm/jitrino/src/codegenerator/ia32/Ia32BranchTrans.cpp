@@ -100,8 +100,8 @@ static Opnd * getMOVsChainSource(Inst* inst, Opnd * opnd) {
 static bool branchDirection (int64 v1, int64 v2, OpndSize sz,ConditionMnemonic mn) {
     switch (sz) {
         case OpndSize_8:
-            v1 = int64(int8(v1));
-            v2 = int64(int8(v2));
+            v1 = int64(I_8(v1));
+            v2 = int64(I_8(v2));
             break;
         case OpndSize_16:
             v1 = int64(int16(v1));

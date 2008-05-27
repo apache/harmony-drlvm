@@ -37,10 +37,10 @@ namespace Jitrino {
 //
 // big-endian ordering
 //
-int16    si16(const uint8* bcp);
-uint16   su16(const uint8* bcp);
-I_32    si32(const uint8* bcp);
-uint64   si64(const uint8* bcp);
+int16    si16(const U_8* bcp);
+uint16   su16(const U_8* bcp);
+I_32    si32(const U_8* bcp);
+uint64   si64(const U_8* bcp);
 
 class JavaSwitchTargetsIter;
 class JavaLookupSwitchTargetsIter;
@@ -66,10 +66,10 @@ public:
         visited = new (memManager) BitSet(memManager,byteCodeLength);
         bytecodevisited = new (memManager) BitSet(memManager,byteCodeLength);
         prepassVisited = NULL;
-        labelStack = new (memManager) Queue<uint8>(memManager);
+        labelStack = new (memManager) Queue<U_8>(memManager);
         noNeedToParse = false;
     }
-    bool parseByteCode(const uint8* byteCodes,U_32 byteCodeOffset);
+    bool parseByteCode(const U_8* byteCodes,U_32 byteCodeOffset);
     BitSet* getVisited()  { return visited; }
 protected:
     // the current byte codes offset
@@ -79,7 +79,7 @@ protected:
     BitSet*          visited;
     BitSet*          bytecodevisited;
     BitSet*          prepassVisited;
-    Queue<uint8>*    labelStack;
+    Queue<U_8>*    labelStack;
 
     // for example when some exception type can not be resolved
     bool noNeedToParse;
@@ -93,7 +93,7 @@ protected:
     virtual void lconst(int64) = 0;
     virtual void fconst(float) = 0;
     virtual void dconst(double) = 0;
-    virtual void bipush(int8) = 0;
+    virtual void bipush(I_8) = 0;
     virtual void sipush(int16) = 0;
     virtual void ldc(U_32) = 0;
     virtual void ldc2(U_32) = 0;
@@ -205,7 +205,7 @@ protected:
     virtual void if_acmpne(U_32 targetOffset,U_32 nextOffset) = 0;
     virtual void goto_(U_32 targetOffset,U_32 nextOffset) = 0;
     virtual void jsr(U_32 offset, U_32 nextOffset) = 0;
-    virtual void ret(uint16 varIndex, const uint8* byteCodes) = 0;
+    virtual void ret(uint16 varIndex, const U_8* byteCodes) = 0;
     virtual void tableswitch(JavaSwitchTargetsIter*) = 0;
     virtual void lookupswitch(JavaLookupSwitchTargetsIter*) = 0;
     virtual void ireturn(U_32 off) = 0;
@@ -223,15 +223,15 @@ protected:
     virtual void invokestatic(U_32 constPoolIndex) = 0;
     virtual void invokeinterface(U_32 constPoolIndex,U_32 count) = 0;
     virtual void new_(U_32 constPoolIndex) = 0;
-    virtual void newarray(uint8 type) = 0;
+    virtual void newarray(U_8 type) = 0;
     virtual void anewarray(U_32 constPoolIndex) = 0;
     virtual void arraylength() = 0;
     virtual void athrow() = 0;
     virtual void checkcast(U_32 constPoolIndex) = 0;
-    virtual int  instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off) = 0;
+    virtual int  instanceof(const U_8* bcp, U_32 constPoolIndex, U_32 off) = 0;
     virtual void monitorenter() = 0;
     virtual void monitorexit() = 0;
-    virtual void multianewarray(U_32 constPoolIndex,uint8 dimensions) = 0;
+    virtual void multianewarray(U_32 constPoolIndex,U_8 dimensions) = 0;
     virtual void ifnull(U_32 targetOffset,U_32 nextOffset) = 0;
     virtual void ifnonnull(U_32 targetOffset,U_32 nextOffset) = 0;
 
@@ -242,7 +242,7 @@ protected:
 
 class JavaSwitchTargetsIter {
 public:
-    JavaSwitchTargetsIter(const uint8* bcp,U_32 off) {
+    JavaSwitchTargetsIter(const U_8* bcp,U_32 off) {
         // skip over padding
         switchOffset = off;
         U_32 offset = ((off+4)&~3)-off;
@@ -271,8 +271,8 @@ public:
     U_32         getHighValue()       {return highValue;}
     U_32         getLowValue()        {return lowValue;}
 private:
-    const uint8*   nextByteCode;
-    const uint8*   nextTarget;
+    const U_8*   nextByteCode;
+    const U_8*   nextTarget;
     U_32         switchOffset;
     U_32         numTargets;
     U_32         length;
@@ -283,7 +283,7 @@ private:
 
 class JavaLookupSwitchTargetsIter {
 public:
-    JavaLookupSwitchTargetsIter(const uint8* bcp,U_32 off) {
+    JavaLookupSwitchTargetsIter(const U_8* bcp,U_32 off) {
         // skip over padding
         lookupOffset = off;
         U_32 offset = ((off+4)&~3)-off;
@@ -309,8 +309,8 @@ public:
     U_32    getLength()            {return length;}
     U_32    getDefaultTarget()    {return defaultTarget+lookupOffset;}
 private:
-    const uint8*    nextByteCode;
-    const uint8*    nextTarget;
+    const U_8*    nextByteCode;
+    const U_8*    nextTarget;
     U_32          lookupOffset;
     U_32          numTargets;
     U_32          length;

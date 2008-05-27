@@ -903,12 +903,12 @@ void    Type::print(::std::ostream& os) {
     case Boolean:          s = "bool"; break;
     case Char:             s = "char"; break;
     case IntPtr:           s = "intptr"; break;
-    case Int8:             s = "int8"; break;
+    case Int8:             s = "I_8"; break;
     case Int16:            s = "int16"; break;
     case Int32:            s = "I_32"; break;
     case Int64:            s = "int64"; break;
     case UIntPtr:          s = "uintptr"; break;
-    case UInt8:            s = "uint8"; break;
+    case UInt8:            s = "U_8"; break;
     case UInt16:           s = "uint16"; break;
     case UInt32:           s = "U_32"; break;
     case UInt64:           s = "uint64"; break;

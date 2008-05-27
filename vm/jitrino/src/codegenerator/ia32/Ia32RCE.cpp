@@ -48,7 +48,7 @@ namespace Ia32 {
  *      I29: t50.:I_32 (ID:v15(EFLGS):U_32) =AND .t28:I_32,t49(1):I_32 
  *      I30: (AD:v1:I_32) =CopyPseudoInst (AU:t48:I_32) 
  *      I31: (AD:v2:I_32) =CopyPseudoInst (AU:t25:I_32) 
- *      I32: (AD:v3:int8[]) =CopyPseudoInst (AU:t38:int8[]) 
+ *      I32: (AD:v3:I_8[]) =CopyPseudoInst (AU:t38:I_8[]) 
  *      I33: (ID:v15(EFLGS):U_32) =CMP .t50:I_32,t51(0):I_32 
  *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):U_32) 
  *
@@ -56,7 +56,7 @@ namespace Ia32 {
  *      I29: t50:I_32 (ID:v15(EFLGS):U_32) =AND .t28:I_32,t49(1):I_32 
  *      I30: (AD:v1:I_32) =CopyPseudoInst (AU:t48:I_32) 
  *      I31: (AD:v2:I_32) =CopyPseudoInst (AU:t25:I_32) 
- *      I32: (AD:v3:int8[]) =CopyPseudoInst (AU:t38:int8[]) 
+ *      I32: (AD:v3:I_8[]) =CopyPseudoInst (AU:t38:I_8[]) 
  *      I34: JNZ BB_12 t52(0):intptr (IU:v15(EFLGS):U_32) 
  *
  *  The implementation of this transformer is located in Ia32RCE.cpp

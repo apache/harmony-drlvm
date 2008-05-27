@@ -23,7 +23,7 @@
  * Recomputes StackMapTable attribute.
  */
 vf_Result
-vf_recompute_stackmaptable(Method_Handle method, uint8** attrBytes, char** error,
+vf_recompute_stackmaptable(Method_Handle method, U_8** attrBytes, char** error,
                            void* trustedPairs )
 {
     Class_Handle klass = method_get_class(method);
@@ -95,21 +95,21 @@ vf_Result vf_Context_5e::recompute_stackmaptable(Method_Handle method ) {
     }
 
     if( written_stackmap ) {
-        written_stackmap[7] = (uint8) entryNo & 0xFF;
+        written_stackmap[7] = (U_8) entryNo & 0xFF;
         entryNo >>= 8;
 
-        written_stackmap[6] = (uint8) entryNo & 0xFF;
+        written_stackmap[6] = (U_8) entryNo & 0xFF;
         ////////////
-        written_stackmap[5] = (uint8) attrLen & 0xFF;
+        written_stackmap[5] = (U_8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[4] = (uint8) attrLen & 0xFF;
+        written_stackmap[4] = (U_8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[3] = (uint8) attrLen & 0xFF;
+        written_stackmap[3] = (U_8) attrLen & 0xFF;
         attrLen >>= 8;
 
-        written_stackmap[2] = (uint8) attrLen & 0xFF;
+        written_stackmap[2] = (U_8) attrLen & 0xFF;
     }
 
     return VF_OK;

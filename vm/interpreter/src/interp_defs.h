@@ -236,7 +236,7 @@ class Stack {
 /** The stack element value.*/
     Value *data;
 /** The value to the object reference.*/
-    uint8 *refs;
+    U_8 *refs;
 /** The number of elements on the stack.*/
     I_32 index;
 /** The stack size.*/
@@ -270,7 +270,7 @@ class Stack {
  * @param[in] offset - the offset value
  * @return The value to the object reference.
  */
-    inline uint8& ref(int offset = 0);
+    inline U_8& ref(int offset = 0);
     
 /**
  * Only moves the stack pointer.
@@ -352,7 +352,7 @@ class Locals {
     // local variable value
     Value *vars;
     // references to the local variable type
-    uint8 *refs;
+    U_8 *refs;
     // locals size
     U_32 varNum;
 
@@ -403,7 +403,7 @@ class Locals {
  * @return The reference to the local variable type.
  * @sa     FLAG_NONE, FLAG_RET_ADDR, FLAG_OBJECT
  */
-    inline uint8& ref(U_32 id);
+    inline U_8& ref(U_32 id);
 
 /**
  * Returns the size of the allocated locals area by its size in elements.
@@ -453,7 +453,7 @@ struct MonitorList {
 struct StackFrame {
     public:
 /** The address of the bytecode being executed.*/
-    uint8 *ip;
+    U_8 *ip;
 /** The stack of this method.*/
     Stack stack;
 /** The local variables of this method.*/
@@ -476,7 +476,7 @@ struct StackFrame {
     bool dump_bytecodes;
 #endif
 #ifdef INTERPRETER_DEEP_DEBUG
-    uint8 last_bytecodes[8];
+    U_8 last_bytecodes[8];
     int n_last_bytecode;
 #endif
 /** The <code>Exception</code> object that has been thrown and for which
@@ -496,7 +496,7 @@ struct StackFrame {
  * The function for interpreter breakpoint processing.
  *
  * @param[in] frame - the method ID*/
-extern uint8 Opcode_BREAKPOINT(StackFrame& frame);
+extern U_8 Opcode_BREAKPOINT(StackFrame& frame);
 
 /**
  * Enumerates references associated with the thread.
@@ -662,7 +662,7 @@ static inline void setLastStackFrame(StackFrame *frame) {
 void
 Stack::init(void *ptr, int sz) {
     data = (Value*)ptr;
-    refs = (uint8*)(data + sz);
+    refs = (U_8*)(data + sz);
     size = sz;
     index = -1;
     for(int i = 0; i < size; i++) refs[i] = 0;
@@ -679,14 +679,14 @@ Locals::~Locals() {
 void
 Locals::init(void *ptr, U_32 size) {
     vars = (Value*) ptr;
-    refs = (uint8*)(vars + size);
+    refs = (U_8*)(vars + size);
     varNum = size;
     for(U_32 i = 0; i < varNum; i++) refs[i] = 0;
 }
 
 int
 Locals::getStorageSize(int size) {
-    return (size * (sizeof(Value) + sizeof(uint8)) + 7) & ~7;
+    return (size * (sizeof(Value) + sizeof(U_8)) + 7) & ~7;
 }
 
 Value&
@@ -717,7 +717,7 @@ Locals::getLong(int idx) {
     return val;
 }
 
-uint8&
+U_8&
 Locals::ref(U_32 id) {
     assert(id < varNum);
     return refs[id];
@@ -729,7 +729,7 @@ Stack::clear() {
     for(int i = 0; i < size; i++) refs[i] = 0;
 }
 
-uint8&
+U_8&
 Stack::ref(int offset) {
     assert(index - offset >= 0);
     return refs[index - offset];
@@ -785,7 +785,7 @@ Stack::push(int off) {
 
 int
 Stack::getStorageSize(int size) {
-    return (size * (sizeof(Value) + sizeof(uint8)) + 7) & ~7;
+    return (size * (sizeof(Value) + sizeof(U_8)) + 7) & ~7;
 }
 
 /** Sets up locals and stack on the C stack.*/

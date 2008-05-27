@@ -596,7 +596,7 @@ JavaByteCodeTranslator::dconst(double val){
     pushOpnd(irBuilder.genLdConstant(val));
 }
 void 
-JavaByteCodeTranslator::bipush(int8 val)  {
+JavaByteCodeTranslator::bipush(I_8 val)  {
     pushOpnd(irBuilder.genLdConstant((I_32)val));
 }
 void 
@@ -732,7 +732,7 @@ JavaByteCodeTranslator::getstatic(U_32 constPoolIndex) {
                 Opnd* constVal = NULL;
                 void* fieldAddr = field->getAddress();
                 switch(fieldType->tag) {
-                    case Type::Int8 :   constVal=irBuilder.genLdConstant(*(int8*)fieldAddr);break;
+                    case Type::Int8 :   constVal=irBuilder.genLdConstant(*(I_8*)fieldAddr);break;
                     case Type::Int16:   constVal=irBuilder.genLdConstant(*(int16*)fieldAddr);break;
                     case Type::Char :   constVal=irBuilder.genLdConstant(*(uint16*)fieldAddr);break;
                     case Type::Int32:   constVal=irBuilder.genLdConstant(*(I_32*)fieldAddr);break;
@@ -1311,7 +1311,7 @@ JavaByteCodeTranslator::jsr(U_32 targetOffset, U_32 nextOffset) {
 }
 
 void 
-JavaByteCodeTranslator::ret(uint16 varIndex, const uint8* byteCodes) {
+JavaByteCodeTranslator::ret(uint16 varIndex, const U_8* byteCodes) {
     lastInstructionWasABranch = true;
     checkStack();
     irBuilder.genRet(getVarOpndLdVar(JavaLabelPrepass::RET,varIndex));
@@ -1726,7 +1726,7 @@ JavaByteCodeTranslator::new_(U_32 constPoolIndex) {
     }
 }
 void 
-JavaByteCodeTranslator::newarray(uint8 atype) {
+JavaByteCodeTranslator::newarray(U_8 atype) {
     NamedType* type = NULL;
     switch (atype) {
     case 4:    // boolean
@@ -1750,7 +1750,7 @@ JavaByteCodeTranslator::newarray(uint8 atype) {
     Opnd* arrayOpnd = irBuilder.genNewArray(type,popOpnd());
     pushOpnd(arrayOpnd);
     if (translationFlags.optArrayInit) {
-        const uint8* byteCodes = parser.getByteCodes();
+        const U_8* byteCodes = parser.getByteCodes();
         const U_32 byteCodeLength = parser.getByteCodeLength();
         U_32 offset = currentOffset + 2/*newarray length*/;
         U_32 length = checkForArrayInitializer(arrayOpnd, byteCodes, offset, byteCodeLength);
@@ -1774,7 +1774,7 @@ JavaByteCodeTranslator::anewarray(U_32 constPoolIndex) {
 }
 
 void 
-JavaByteCodeTranslator::multianewarray(U_32 constPoolIndex,uint8 dimensions) {
+JavaByteCodeTranslator::multianewarray(U_32 constPoolIndex,U_8 dimensions) {
     NamedType* arraytype = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     assert(arraytype->isArray());
     jitrino_assert(dimensions > 0);
@@ -1827,7 +1827,7 @@ JavaByteCodeTranslator::checkcast(U_32 constPoolIndex) {
 }
 
 int  
-JavaByteCodeTranslator::instanceof(const uint8* bcp, U_32 constPoolIndex, U_32 off)   {
+JavaByteCodeTranslator::instanceof(const U_8* bcp, U_32 constPoolIndex, U_32 off)   {
     NamedType *type = compilationInterface.getNamedType(methodToCompile.getParentHandle(), constPoolIndex);
     Opnd* src = popOpnd();
     Type* srcType = src->getType();
@@ -2478,22 +2478,22 @@ JavaByteCodeTranslator::genMethodMonitorExit() {
     }
 }
 
-U_32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength)
+U_32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const U_8* byteCodes, U_32 offset, const U_32 byteCodeLength)
 {
     assert(offset < byteCodeLength);
     const U_32 MIN_NUMBER_OF_INIT_ELEMS = 2;
 
-    const uint8 BYTE_JAVA_SIZE    = 1;
-    const uint8 SHORT_JAVA_SIZE   = 2;
-    const uint8 INT_JAVA_SIZE     = 4;
-    const uint8 LONG_JAVA_SIZE    = 8;
+    const U_8 BYTE_JAVA_SIZE    = 1;
+    const U_8 SHORT_JAVA_SIZE   = 2;
+    const U_8 INT_JAVA_SIZE     = 4;
+    const U_8 LONG_JAVA_SIZE    = 8;
 
     // Skip short array initializers.
     // Average length of an array element initializer is 4.
     if ((byteCodeLength - offset)/4 < MIN_NUMBER_OF_INIT_ELEMS) return 0;
 
     // Size of the array elements
-    uint8 elem_size = 0;
+    U_8 elem_size = 0;
     // Number of initialized array elements
     U_32 elems = 0;
 
@@ -2580,12 +2580,12 @@ U_32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const uin
     if (elems < MIN_NUMBER_OF_INIT_ELEMS) return 0;
 
     const U_32 data_size = elems* elem_size;
-    uint8* init_array_data = new uint8[data_size];
+    U_8* init_array_data = new U_8[data_size];
 
     for (U_32 i = 0; i < elems; i++) {
         switch (elem_size) {
             case BYTE_JAVA_SIZE:
-                init_array_data[i] = (uint8)(array_data[i]);
+                init_array_data[i] = (U_8)(array_data[i]);
                 break;
             case SHORT_JAVA_SIZE:
                 *((uint16*)(init_array_data + (i * SHORT_JAVA_SIZE))) = (uint16)(array_data[i]);
@@ -2614,7 +2614,7 @@ U_32 JavaByteCodeTranslator::checkForArrayInitializer(Opnd* arrayOpnd, const uin
     return predoff - offset;
 }
 
-U_32 JavaByteCodeTranslator::getNumericValue(const uint8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value) {
+U_32 JavaByteCodeTranslator::getNumericValue(const U_8* byteCodes, U_32 offset, const U_32 byteCodeLength, uint64& value) {
     assert(offset < byteCodeLength);
     U_32 off = offset;
     switch (byteCodes[off++]) {

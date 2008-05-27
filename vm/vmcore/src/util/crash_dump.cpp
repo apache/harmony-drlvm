@@ -170,7 +170,7 @@ static int unwind_compiled_frame(Registers *regs, port_stack_frame_info *sfi)
         if (is_java)
         {
             Method* method = (Method*)interpreter.interpreter_get_frame_method(uwinfo->frame);
-            uint8* bc_ptr = interpreter.interpreter_get_frame_bytecode_ptr(uwinfo->frame);
+            U_8* bc_ptr = interpreter.interpreter_get_frame_bytecode_ptr(uwinfo->frame);
             cd_fill_java_method_info(method, (void*)bc_ptr, false, -1, sfi);
             uwinfo->frame = interpreter.interpreter_get_prev_frame(uwinfo->frame);
         }

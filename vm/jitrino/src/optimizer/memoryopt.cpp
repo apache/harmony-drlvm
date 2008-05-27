@@ -2406,7 +2406,7 @@ public:
     void applyToInst(Inst *inst);
 };
 
-static uint8
+static U_8
 getBitWidth(Type::Tag tag)
 {
     switch (tag) {

@@ -238,7 +238,7 @@ VMEXPORT void vm_notify_live_object_class(Class_Handle clss);
 /**
  * extract the recursion counter from object lockword.
  */
-#define P_RECURSION_BYTE(x)       ( (uint8 *)(((x)->get_obj_info_addr())) + 1 )  
+#define P_RECURSION_BYTE(x)       ( (U_8 *)(((x)->get_obj_info_addr())) + 1 )  
 
 #ifdef GC_PUBLIC_PRIVATE
 

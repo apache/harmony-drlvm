@@ -307,8 +307,8 @@ interpreter_ti_getStackTrace(
         if (m->is_native())
             frame_buffer[count].location = -1;
         else
-            frame_buffer[count].location = (jlocation)((uint8*)frame->ip -
-                    (uint8*)m->get_byte_code_addr());
+            frame_buffer[count].location = (jlocation)((U_8*)frame->ip -
+                    (U_8*)m->get_byte_code_addr());
 
         frame = frame->prev;
         count++;
@@ -338,18 +338,18 @@ interpreter_ti_getFrameLocation(
     if (m->is_native()) {
         *location_ptr = -1;
     } else {
-        *location_ptr = (jlocation)((uint8*)frame->ip -
-                (uint8*)frame->method->get_byte_code_addr());
+        *location_ptr = (jlocation)((U_8*)frame->ip -
+                (U_8*)frame->method->get_byte_code_addr());
     }
     return JVMTI_ERROR_NONE;
 }
 
-uint8
+U_8
 Opcode_BREAKPOINT(StackFrame& frame) {
     Method *m = frame.method;
-    jlocation l = frame.ip - (uint8*)m->get_byte_code_addr();
+    jlocation l = frame.ip - (U_8*)m->get_byte_code_addr();
     M2N_ALLOC_MACRO;
-    uint8 b = (uint8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
+    U_8 b = (U_8) (POINTER_SIZE_INT) jvmti_process_interpreter_breakpoint_event((jmethodID)m, l);
     if(b == OPCODE_COUNT) {
         // breakpoint was remove by another thread, get original opcode
         b = *(frame.ip);
@@ -360,15 +360,15 @@ Opcode_BREAKPOINT(StackFrame& frame) {
 
 jbyte interpreter_ti_set_breakpoint(jmethodID method, jlocation location) {
     Method *m = (Method*) method;
-    uint8 *bytecodes = (uint8*) m->get_byte_code_addr();
-    uint8 b = bytecodes[location];
+    U_8 *bytecodes = (U_8*) m->get_byte_code_addr();
+    U_8 b = bytecodes[location];
     bytecodes[location] = OPCODE_BREAKPOINT;
     return b;
 }
 
 void interpreter_ti_clear_breakpoint(jmethodID method, jlocation location, jbyte saved) {
     Method *m = (Method*) method;
-    uint8 *bytecodes = (uint8*) m->get_byte_code_addr();
+    U_8 *bytecodes = (U_8*) m->get_byte_code_addr();
     bytecodes[location] = saved;
 }
 
@@ -492,12 +492,12 @@ interpreter_ti_notify_frame_pop(jvmtiEnv* env,
 
 
 void single_step_callback(StackFrame &frame) {
-    uint8 ip0 = *frame.ip;
+    U_8 ip0 = *frame.ip;
     hythread_suspend_enable();
     Method *method = frame.method;
     
     jvmti_process_single_step_event((jmethodID) method,
-            frame.ip - (uint8*)method->get_byte_code_addr());
+            frame.ip - (U_8*)method->get_byte_code_addr());
 
     hythread_suspend_disable();
 }
@@ -522,7 +522,7 @@ Method_Handle interpreter_get_frame_method(FrameHandle* frame)
     return (Method_Handle)((StackFrame*)frame)->method;
 }
 
-uint8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame)
+U_8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame)
 {
     return ((StackFrame*)frame)->ip;
 }
@@ -548,7 +548,7 @@ static inline bool field_event_mask(Field *field, bool modify) {
 
 static inline void field_access_callback(Field *field, StackFrame& frame, ManagedObject *obj) {
     Method *method = frame.method;
-    jlocation pc = frame.ip - (uint8*)method->get_code_addr();
+    jlocation pc = frame.ip - (U_8*)method->get_code_addr();
 
     M2N_ALLOC_MACRO;
 
@@ -559,7 +559,7 @@ static inline void field_access_callback(Field *field, StackFrame& frame, Manage
 
 static inline void field_modification_callback(Field *field, StackFrame& frame, ManagedObject * obj, jvalue val) {
     Method *method = frame.method;
-    jlocation pc = frame.ip - (uint8*)method->get_code_addr();
+    jlocation pc = frame.ip - (U_8*)method->get_code_addr();
     jvmti_process_field_modification_event(field, (jmethodID) method, pc, obj, val);
 }
 
@@ -581,9 +581,9 @@ jvalue new_field_value(Field *field, StackFrame& frame) {
     jvalue val;
     val.l = 0;
     switch (field->get_java_type()) {
-        case VM_DATA_TYPE_BOOLEAN: val.z = (uint8) frame.stack.pick().u; break;
+        case VM_DATA_TYPE_BOOLEAN: val.z = (U_8) frame.stack.pick().u; break;
         case VM_DATA_TYPE_CHAR: val.c = (uint16) frame.stack.pick().u; break;
-        case VM_DATA_TYPE_INT8: val.b = (int8) frame.stack.pick().i; break;
+        case VM_DATA_TYPE_INT8: val.b = (I_8) frame.stack.pick().i; break;
         case VM_DATA_TYPE_INT16: val.s = (int16) frame.stack.pick().i; break;
         case VM_DATA_TYPE_INT32: val.i = frame.stack.pick().i; break;
         case VM_DATA_TYPE_INT64: val.j = frame.stack.getLong(0).i64; break;

@@ -158,7 +158,7 @@ public:
         return sm_get_const_existing("java/lang/Throwable", &const_throwable);
     }
 
-    //return SmConstant (known verification type) corresponding to uint8[]
+    //return SmConstant (known verification type) corresponding to U_8[]
     //returned value is cached
     SmConstant sm_get_const_arrayref_of_bb() {
         return sm_get_const_existing("[B", &const_arrayref_of_bb);
@@ -208,7 +208,7 @@ public:
 
     //return SmConstant represented array of specified type
     //the type is specified in the OP_NEWARRAY instruction. See the spec for possible types
-    SmConstant sm_get_const_arrayref(uint8 see_spec) {
+    SmConstant sm_get_const_arrayref(U_8 see_spec) {
         switch ( see_spec ) {
     case 4: //T_BOOLEAN
     case 8: //T_BYTE

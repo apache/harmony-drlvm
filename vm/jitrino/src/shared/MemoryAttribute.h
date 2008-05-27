@@ -223,7 +223,7 @@ public:
         };
     private:
         Context(Tag t, U_32 _size = 0)
-            : tag(t), size((uint8)_size) {
+            : tag(t), size((U_8)_size) {
             id.all = UnknownMemoryContextId;
             assert(_size <= 0xff);
         }
@@ -231,7 +231,7 @@ public:
             if (id.all != id1)
                 id.all = UnknownMemoryContextId;
         }
-        void unionSizes(uint8 size1) {
+        void unionSizes(U_8 size1) {
             if (size < size1)
                 size = size1;
         }
@@ -253,7 +253,7 @@ public:
             U_32       counterId;
             uint64       all;
         } id;
-        uint8    size; // size of accessed memory in bytes; used for stack locations
+        U_8    size; // size of accessed memory in bytes; used for stack locations
         static Info info[];
         friend class MemoryAttributeManager;
     };  // end class Context
@@ -321,7 +321,7 @@ public:
     MemoryAttribute::Context getStackContext(U_32 offset, U_32 size) {
         assert(size <= 0xff);
         MemoryAttribute::Context c(MemoryAttribute::Context::StackLocation,
-                                   (uint8)size);
+                                   (U_8)size);
         c.id.stackOffset = offset;
         return c;
     }
@@ -371,7 +371,7 @@ public:
         if (context.tag == MemoryAttribute::Context::StackLocation ||
             context.tag == MemoryAttribute::Context::StackIncomingArg) {
             assert(_size <= 0xff);
-            context.size = (uint8)_size;
+            context.size = (U_8)_size;
             if (context.id.all != UnknownMemoryContextId)
                 context.id.stackOffset += _offset;
         }

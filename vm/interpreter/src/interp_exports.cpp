@@ -83,7 +83,7 @@ extern void stack_dump(int fd, VM_thread *thread);
 extern FrameHandle* interpreter_get_last_frame(struct VM_thread *thread);
 extern FrameHandle* interpreter_get_prev_frame(FrameHandle* frame);
 extern Method_Handle interpreter_get_frame_method(FrameHandle* frame);
-extern uint8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame);
+extern U_8* interpreter_get_frame_bytecode_ptr(FrameHandle* frame);
 extern bool is_frame_in_native_frame(FrameHandle* frame, void* begin, void* end);
 
 void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name, vm_adaptor_t adaptor) {

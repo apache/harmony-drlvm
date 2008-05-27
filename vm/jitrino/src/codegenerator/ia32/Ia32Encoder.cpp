@@ -204,7 +204,7 @@ Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, b
 }
 
 //_________________________________________________________________________________________________
-uint8* Encoder::emit(uint8* stream, const Inst * inst)
+U_8* Encoder::emit(U_8* stream, const Inst * inst)
 {
     Mnemonic mnemonic=inst->getMnemonic();
     #define OPND EncoderBase::Operand
@@ -229,7 +229,7 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
             {
                 RegName segReg = p->getSegReg();
                 if (segReg == RegName_FS) {
-                    stream = (uint8*)EncoderBase::prefix((char*)stream,
+                    stream = (U_8*)EncoderBase::prefix((char*)stream,
                                                          InstPrefix_FS);
                 }
 
@@ -268,7 +268,7 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
                 // emitted alter, rather that to the hidden MOV inserted above
                 InstPrefix instPrefix = getInstPrefixFromSReg(p->getSegReg());
                 if (instPrefix != InstPrefix_Null) {
-                    stream = (uint8*)EncoderBase::prefix((char*)stream, instPrefix);
+                    stream = (U_8*)EncoderBase::prefix((char*)stream, instPrefix);
                 }
             }
             break;
@@ -288,9 +288,9 @@ uint8* Encoder::emit(uint8* stream, const Inst * inst)
 
     //emit inst prefix
     if (inst->getPrefix()!=InstPrefix_Null) {
-        stream = (uint8*)EncoderBase::prefix((char*)stream, inst->getPrefix());
+        stream = (U_8*)EncoderBase::prefix((char*)stream, inst->getPrefix());
     }
-    return (uint8*)EncoderBase::encode((char*)stream, mnemonic, args);
+    return (U_8*)EncoderBase::encode((char*)stream, mnemonic, args);
 }
 
 static Mutex opcodeGroupsLock;

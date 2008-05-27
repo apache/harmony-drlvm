@@ -58,7 +58,7 @@ extern "C" {
     double invokeJNI_Double(uword*,uword*,int64,int64,GenericFunctionPointer);
     I_32 invokeJNI_Int(uword*,uword*,int64,int64,GenericFunctionPointer);
     int16 invokeJNI_Short(uword*,uword*,int64,int64,GenericFunctionPointer);
-    int8 invokeJNI_Byte(uword*,uword*,int64,int64,GenericFunctionPointer);
+    I_8 invokeJNI_Byte(uword*,uword*,int64,int64,GenericFunctionPointer);
     uint16 invokeJNI_Char(uword*,uword*,int64,int64,GenericFunctionPointer);
 }
 
@@ -430,7 +430,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
         case JAVA_TYPE_BOOLEAN:
         case JAVA_TYPE_BYTE:
             {
-                int8 res = invokeJNI_Byte(args, fpargs, argId, frameSize, f);
+                I_8 res = invokeJNI_Byte(args, fpargs, argId, frameSize, f);
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 
@@ -698,7 +698,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
         case JAVA_TYPE_BOOLEAN:
         case JAVA_TYPE_BYTE:
             {
-                int8 res = invokeJNI_Byte(args, fpargs, argId, frameSize, f);
+                I_8 res = invokeJNI_Byte(args, fpargs, argId, frameSize, f);
                 hythread_suspend_disable();
                 prevFrame.stack.popClearRef(sz);
 

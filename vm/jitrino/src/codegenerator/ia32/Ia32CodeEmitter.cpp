@@ -458,7 +458,7 @@ void CodeEmitter::emitCode( void ) {
     const unsigned maxMethodSize = (irManager->getMaxInstId() + irManager->getFlowGraph()->getMaxNodeId())*MAX_NATIVE_INST_SIZE;
 
     //
-    uint8 * codeStreamStart = (uint8*)malloc( maxMethodSize );
+    U_8 * codeStreamStart = (U_8*)malloc( maxMethodSize );
     //+---- free() below
     //|
     //v
@@ -471,22 +471,22 @@ void CodeEmitter::emitCode( void ) {
     
     LoopTree * lt = irManager->getFlowGraph()->getLoopTree();
 
-    uint8 * ip = codeStreamStart;
+    U_8 * ip = codeStreamStart;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(); bb != NULL; bb=bb->getLayoutSucc()) {
 
         assert(bb->getFirstInst()!=NULL);
         if (alignment && lt->isLoopHeader(bb) && ((POINTER_SIZE_INT)ip & (alignment-1))) {
             unsigned align = alignment - (unsigned)((POINTER_SIZE_INT)ip & (alignment-1));
-            ip = (uint8*)EncoderBase::nops((char*)ip, align);
+            ip = (U_8*)EncoderBase::nops((char*)ip, align);
         }
 
-        uint8 * blockStartIp = ip;
+        U_8 * blockStartIp = ip;
         assert(fit32(blockStartIp-codeStreamStart));
         bb->setCodeOffset( (U_32)(blockStartIp-codeStreamStart) );
         for (Inst* inst = (Inst*)bb->getFirstInst(); inst!=NULL; inst = inst->getNextInst()) {
             if( inst->hasKind(Inst::Kind_PseudoInst)) {
                 
-                uint8 * instStartIp = ip;
+                U_8 * instStartIp = ip;
                 inst->setCodeOffset( (U_32)(instStartIp-blockStartIp) );
                 continue;
             }
@@ -511,16 +511,16 @@ void CodeEmitter::emitCode( void ) {
                     nopInst->setCodeOffset( (U_32)(ip-blockStartIp) );
                     ip = nopInst->emit(ip);
                     // the last two
-                    ip = (uint8*)EncoderBase::nops((char*)ip,2);
+                    ip = (U_8*)EncoderBase::nops((char*)ip,2);
                 }
 #ifdef _EM64T_
                     // these nops are required for call transformation from immediate into register form
                     // nops for MOV r11, callTarget (when !fit32(call_offset) ) <opcode + 8 byte address>
-                    ip = (uint8*)EncoderBase::nops((char*)ip, 10);
+                    ip = (U_8*)EncoderBase::nops((char*)ip, 10);
 #endif
             }
             
-            uint8 * instStartIp = ip;
+            U_8 * instStartIp = ip;
             assert(fit32(instStartIp-blockStartIp));
             inst->setCodeOffset( (U_32)(instStartIp-blockStartIp) );
             ip = inst->emit(ip);
@@ -543,7 +543,7 @@ void CodeEmitter::emitCode( void ) {
     unsigned codeSize = (unsigned)(ip-codeStreamStart);
     assert( codeSize < maxMethodSize );
 
-    uint8 * codeBlock = (uint8*)irManager->getCompilationInterface().allocateCodeBlock(
+    U_8 * codeBlock = (U_8*)irManager->getCompilationInterface().allocateCodeBlock(
             codeSize , JMP_TARGET_ALIGMENT, getCodeSectionHeat(0), 0, false );
     memcpy(codeBlock, codeStreamStart, codeSize); 
     irManager->setCodeStartAddr(codeBlock);
@@ -569,14 +569,14 @@ void CodeEmitter::packCode() {
                 else if (inst->hasKind(Inst::Kind_JmpInst))
                     bbTarget = (BasicBlock*)bb->getUnconditionalEdgeTarget();
                 if (bbTarget != NULL){
-                    uint8 * instCodeStartAddr = (uint8*)inst->getCodeStartAddr();
-                    uint8 * instCodeEndAddr = (uint8*)instCodeStartAddr+inst->getCodeSize();
-                    uint8 * targetCodeStartAddr = (uint8*)bbTarget->getCodeStartAddr();
+                    U_8 * instCodeStartAddr = (U_8*)inst->getCodeStartAddr();
+                    U_8 * instCodeEndAddr = (U_8*)instCodeStartAddr+inst->getCodeSize();
+                    U_8 * targetCodeStartAddr = (U_8*)bbTarget->getCodeStartAddr();
                     U_32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
                     int64 offset=targetCodeStartAddr-instCodeEndAddr;               
                     if (offset >= -128 && offset < 127 && inst->getOpnd(targetOpndIndex)->getSize() != OpndSize_8) {
                         inst->setOpnd(targetOpndIndex, irManager->newImmOpnd(irManager->getTypeFromTag(Type::Int8), offset));
-                        uint8 * newInstCodeEndAddr = inst->emit(instCodeStartAddr);
+                        U_8 * newInstCodeEndAddr = inst->emit(instCodeStartAddr);
                         bb->setCodeSize(bb->getCodeSize() + (U_32)(newInstCodeEndAddr - instCodeEndAddr));
                         newOpndsCreated = true;
                     } 
@@ -590,9 +590,9 @@ void CodeEmitter::packCode() {
                 int succCodeSize = succ->getCodeSize();
                 int bbDisplacement = succCodeOffset - bbCodeOffset - bbCodeSize;
                 if (bbDisplacement != 0){
-                    uint8 * ps = (uint8*)irManager->getCodeStartAddr() + succCodeOffset;
-                    uint8 * pd = ps - bbDisplacement;
-                    uint8 * pn = ps + succCodeSize; 
+                    U_8 * ps = (U_8*)irManager->getCodeStartAddr() + succCodeOffset;
+                    U_8 * pd = ps - bbDisplacement;
+                    U_8 * pn = ps + succCodeSize; 
                     while (ps < pn)
                         *pd++ = *ps++;
                     succ->setCodeOffset(succCodeOffset - bbDisplacement);
@@ -613,20 +613,20 @@ void CodeEmitter::postPass()
             if (inst->hasKind(Inst::Kind_ControlTransferInst) && 
                 ((ControlTransferInst*)inst)->isDirect()
             ){
-                uint8 * instCodeStartAddr=(uint8*)inst->getCodeStartAddr();
-                uint8 * instCodeEndAddr=(uint8*)instCodeStartAddr+inst->getCodeSize();
-                uint8 * targetCodeStartAddr=0;
+                U_8 * instCodeStartAddr=(U_8*)inst->getCodeStartAddr();
+                U_8 * instCodeEndAddr=(U_8*)instCodeStartAddr+inst->getCodeSize();
+                U_8 * targetCodeStartAddr=0;
                 U_32 targetOpndIndex = ((ControlTransferInst*)inst)->getTargetOpndIndex();
                 MethodDesc * md = NULL;
                 if (inst->hasKind(Inst::Kind_BranchInst)){
                     BasicBlock * bbTarget=(BasicBlock*)((BranchInst*)inst)->getTrueTarget();
-                    targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
+                    targetCodeStartAddr=(U_8*)bbTarget->getCodeStartAddr();
                 } else if (inst->hasKind(Inst::Kind_JmpInst)){
                     BasicBlock* bbTarget = (BasicBlock*)bb->getUnconditionalEdgeTarget();
-                    targetCodeStartAddr=(uint8*)bbTarget->getCodeStartAddr();
+                    targetCodeStartAddr=(U_8*)bbTarget->getCodeStartAddr();
                 } else if (inst->hasKind(Inst::Kind_CallInst)){
                     Opnd * targetOpnd=inst->getOpnd(targetOpndIndex);
-                    targetCodeStartAddr=(uint8*)(POINTER_SIZE_INT)targetOpnd->getImmValue();
+                    targetCodeStartAddr=(U_8*)(POINTER_SIZE_INT)targetOpnd->getImmValue();
                     Opnd::RuntimeInfo * ri=targetOpnd->getRuntimeInfo();
                     if ( ri && ri->getKind() == Opnd::RuntimeInfo::Kind_MethodDirectAddr ) {
                         md = (MethodDesc*)ri->getValue(0);
@@ -651,11 +651,11 @@ void CodeEmitter::postPass()
 
                     bb->prependInst(movInst,inst);
 
-                    uint8* blockStartIp = (uint8*)bb->getCodeStartAddr();
+                    U_8* blockStartIp = (U_8*)bb->getCodeStartAddr();
                     // 10 bytes are dumped with 'nops' ahead of the call especially for this MOV
-                    uint8* movAddr = instCodeStartAddr-10;
+                    U_8* movAddr = instCodeStartAddr-10;
                     movInst->setCodeOffset((U_32)(movAddr - blockStartIp));
-                    uint8* callAddr = movInst->emit(movAddr);
+                    U_8* callAddr = movInst->emit(movAddr);
                     assert(callAddr == instCodeStartAddr);
                     // then dump 2 bytes with nops to keep return ip the same for both
                     // immediate and register calls

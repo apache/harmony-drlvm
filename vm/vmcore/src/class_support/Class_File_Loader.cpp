@@ -290,7 +290,7 @@ parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
 {
     unsigned initial_offset = cfs.get_offset();
 
-    uint8 tag;
+    U_8 tag;
     if (!cfs.parse_u1(&tag)) {
         REPORT_FAILED_CLASS_FORMAT(clss,
             "truncated class file: failed to parse annotation value tag");
@@ -467,7 +467,7 @@ parse_annotation_table(AnnotationTable ** table, ByteReader& cfs, Class* clss)
 
 static U_32
 parse_parameter_annotations(AnnotationTable *** table,
-                                        uint8 num_annotations,
+                                        U_8 num_annotations,
                                         ByteReader& cfs, Class* clss)
 {
     unsigned initial_offset = cfs.get_offset();
@@ -1416,7 +1416,7 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
     //
     // allocate & parse code array
     //
-    _byte_codes = new uint8[_byte_code_length];
+    _byte_codes = new U_8[_byte_code_length];
     // ppervov: FIXME: should throw OOME
 
     unsigned i;
@@ -1587,7 +1587,7 @@ bool Method::_parse_code(Global_Env& env, ConstantPool& cp, unsigned code_attr_l
                 return false;
             }
 
-            m_stackmap = (uint8*)Method::Alloc(attr_len + 6);
+            m_stackmap = (U_8*)Method::Alloc(attr_len + 6);
             if(!cfs.skip(-6)) { // read once again attribute head
                 REPORT_FAILED_CLASS_CLASS(_class->get_class_loader(), _class, "java/lang/InternalError",
                     _class->get_name()->bytes << ": inernal error: unable to read beginning of an attribute");
@@ -2320,13 +2320,13 @@ static String* class_file_parse_utf8data(String_Pool& string_pool, ByteReader& c
     if(!cfs.have(len))
         return NULL;
     //define bytes of UTF8
-    const uint8 HIGH_NONZERO_BIT =          0x80; // 10000000
-    const uint8 HIGH_TWO_NONZERO_BITS =     0xc0; // 11000000
-    const uint8 HIGH_THREE_NONZERO_BITS =   0xe0; // 11100000
-    const uint8 HIGH_FOUR_NONZERO_BITS =    0xf0; // 11110000
+    const U_8 HIGH_NONZERO_BIT =          0x80; // 10000000
+    const U_8 HIGH_TWO_NONZERO_BITS =     0xc0; // 11000000
+    const U_8 HIGH_THREE_NONZERO_BITS =   0xe0; // 11100000
+    const U_8 HIGH_FOUR_NONZERO_BITS =    0xf0; // 11110000
     
     // get utf8 bytes and move buffer pointer
-    uint8* utf8data = (uint8*)cfs.get_and_skip(len);
+    U_8* utf8data = (U_8*)cfs.get_and_skip(len);
 
     // FIXME: decode 6-byte Java 1.5 encoding
     
@@ -2397,7 +2397,7 @@ bool ConstantPool::parse(Class* clss,
     cp_tags[0] = CONSTANT_Tags;
     for(unsigned i = 1; i < m_size; i++) {
         // parse tag into tag array
-        uint8 tag;
+        U_8 tag;
         if(!cfs.parse_u1(&tag)) {
             REPORT_FAILED_CLASS_FORMAT(clss, "truncated class file: failed to parse constant pool tag for index " << i);
             return false;
@@ -3329,7 +3329,7 @@ bool Class::parse(Global_Env* env,
 
 static bool const_pool_find_entry(ByteReader& cp, uint16 cp_count, uint16 index)
 {
-    uint8 tag;
+    U_8 tag;
     // cp must be at the beginning of constant pool
     for(uint16 cp_index = 1; cp_index < cp_count; cp_index++) {
         if(cp_index == index) return true;
@@ -3382,7 +3382,7 @@ static bool const_pool_find_entry(ByteReader& cp, uint16 cp_count, uint16 index)
 
 
 const String* class_extract_name(Global_Env* env,
-                                 uint8* buffer, unsigned offset, unsigned length)
+                                 U_8* buffer, unsigned offset, unsigned length)
 {
     ByteReader cfs(buffer, offset, length);
 
@@ -3401,7 +3401,7 @@ const String* class_extract_name(Global_Env* env,
         return NULL;
 
     // skip constant pool
-    uint8 tag;
+    U_8 tag;
     uint16 utf8_len;
     offset = cfs.get_offset(); // offset now contains the start of constant pool
     uint16 cp_index;

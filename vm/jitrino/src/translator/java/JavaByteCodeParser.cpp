@@ -286,19 +286,19 @@ static char bytecodelength[] = {
 //
 // big-endian ordering
 //
-int16    si16(const uint8* bcp)    {
+int16    si16(const U_8* bcp)    {
     return (((int16)(bcp)[0] << 8) | bcp[1]);
 }
-uint16    su16(const uint8* bcp)    {
+uint16    su16(const U_8* bcp)    {
     return (((uint16)(bcp)[0] << 8)| bcp[1]);
 }
-I_32    si32(const uint8* bcp)    {
+I_32    si32(const U_8* bcp)    {
     return (((U_32)(bcp)[0] << 24) | 
             ((U_32)(bcp)[1] << 16) |
             ((U_32)(bcp)[2] << 8)  |
             bcp[3]);
 }
-uint64    si64(const uint8* bcp)    {
+uint64    si64(const U_8* bcp)    {
     return (((uint64)bcp[0] << 56) |
             ((uint64)bcp[1] << 48) |
             ((uint64)bcp[2] << 40) |
@@ -313,14 +313,14 @@ uint64    si64(const uint8* bcp)    {
 //
 //
 bool 
-JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
+JavaByteCodeParserCallback::parseByteCode(const U_8* byteCodes,U_32 off) {
     bool linearPassEnd = false;
     currentOffset = off;
-    const uint8* bcp = byteCodes + off;
+    const U_8* bcp = byteCodes + off;
 
     // find length of the byte code instruction
     U_32 len = 0; 
-    const uint8  opcode = *bcp;
+    const U_8  opcode = *bcp;
     assert (opcode <= 0xc9);
     if (Log::isEnabled()) {
         Log::out()<<"---------------------PARSING BYTECODE: "<<opcode_names[opcode]<<"        bc-offset="<<off<<std::endl;
@@ -526,79 +526,79 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
     case 0x99:    
         ifeq(off+si16(bcp+1),off+3);        
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9a:    
         ifne(off+si16(bcp+1),off+3);        
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9b:    
         iflt(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9c:    
         ifge(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9d:    
         ifgt(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9e:    
         ifle(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0x9f:    
         if_icmpeq(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     // 0xa[0-f]    
     case 0xa0:    
         if_icmpne(off+si16(bcp+1),off+3);    
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa1:    
         if_icmplt(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa2:    
         if_icmpge(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa3:
         if_icmpgt(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa4:    
         if_icmple(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa5:    
         if_acmpeq(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa6:    
         if_acmpne(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa7:    
         goto_(off+si16(bcp+1),off+3);
         linearPassEnd = true;
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xa8:    
         jsr(off+si16(bcp+1),off+3);
@@ -606,8 +606,8 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
         if (labelStack != NULL) {
             // If labelStack is stack then the order of pushes should be reverted.
             // For now it is line. (labelStack is a Queue)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
-            labelStack->push((uint8*)byteCodes + off+3);
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+3);
         }
         break;
     case 0xa9:    
@@ -622,9 +622,9 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
         if (labelStack != NULL) {
             JavaSwitchTargetsIter switchIter2(bcp,off);
             while (switchIter2.hasNext()) {
-                labelStack->push((uint8*)byteCodes + switchIter2.getNextTarget());
+                labelStack->push((U_8*)byteCodes + switchIter2.getNextTarget());
             }
-            labelStack->push((uint8*)byteCodes + switchIter2.getDefaultTarget());
+            labelStack->push((U_8*)byteCodes + switchIter2.getDefaultTarget());
         }
         break;
     }
@@ -637,9 +637,9 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
             JavaLookupSwitchTargetsIter switchIter2(bcp,off);
             while (switchIter2.hasNext()) {
                 U_32 key;
-                labelStack->push((uint8*)byteCodes + switchIter2.getNextTarget(&key));
+                labelStack->push((U_8*)byteCodes + switchIter2.getNextTarget(&key));
             }
-            labelStack->push((uint8*)byteCodes + switchIter2.getDefaultTarget());
+            labelStack->push((U_8*)byteCodes + switchIter2.getDefaultTarget());
         }
         break;
     }
@@ -694,18 +694,18 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
     case 0xc6:    
         ifnull(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xc7:    
         ifnonnull(off+si16(bcp+1),off+3);
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si16(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si16(bcp+1));
         break;
     case 0xc8:    
         goto_(off+si32(bcp+1),off+5);
         linearPassEnd = true;
         if (labelStack != NULL)
-            labelStack->push((uint8*)byteCodes + off+si32(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+si32(bcp+1));
         break;
     case 0xc9:    
         jsr(off+si32(bcp+1),off+5);
@@ -713,8 +713,8 @@ JavaByteCodeParserCallback::parseByteCode(const uint8* byteCodes,U_32 off) {
         if (labelStack != NULL) {
             // If labelStack is stack then the order of pushes should be reverted.
             // For now it is line. (labelStack is a Queue)
-            labelStack->push((uint8*)byteCodes + off+si32(bcp+1));
-            labelStack->push((uint8*)byteCodes + off+5);
+            labelStack->push((U_8*)byteCodes + off+si32(bcp+1));
+            labelStack->push((U_8*)byteCodes + off+5);
         }
         break;
     default:

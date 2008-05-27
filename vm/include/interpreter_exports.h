@@ -94,7 +94,7 @@ typedef struct {
  *
  * @param frame - the pointer to the frame
  * @return The pointer to the bytecode.*/
-    uint8* (*interpreter_get_frame_bytecode_ptr) (FrameHandle* frame);
+    U_8* (*interpreter_get_frame_bytecode_ptr) (FrameHandle* frame);
     // 'end' is not inclusive
 
 /**

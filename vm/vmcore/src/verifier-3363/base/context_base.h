@@ -145,7 +145,7 @@ protected:
     /******* exception handling **********/
 
     //flag array. if a local var i was changed by the previous instruction ==> changed_locals[i]=1, otherwise it's 0
-    uint8 *changed_locals;
+    U_8 *changed_locals;
 
     //if there is at least one local changed
     int locals_changed;
@@ -191,7 +191,7 @@ protected:
         // initialize own parameters
         mem.init();
 
-        changed_locals = (uint8*)mem.malloc((m_stack_start & ~3) + 4);
+        changed_locals = (U_8*)mem.malloc((m_stack_start & ~3) + 4);
 
         //to correct it later
         return_type = SM_NONE;
@@ -229,7 +229,7 @@ protected:
     }
 
     //get the length of the given instruction or minimal length if unknown
-    static uint8 instr_get_minlen(ParseInfo &pi) {
+    static U_8 instr_get_minlen(ParseInfo &pi) {
         return pi.instr_min_len;
     }
 
@@ -264,7 +264,7 @@ protected:
     }
 
     //RET ?
-    static int instr_is_ret(OpCode opcode, uint8* code, Address instr) {
+    static int instr_is_ret(OpCode opcode, U_8* code, Address instr) {
         return opcode == OP_RET || opcode == OP_WIDE && code[instr + 1] == OP_RET;
     }
 

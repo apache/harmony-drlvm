@@ -110,8 +110,8 @@ void LilCguLabelAddresses::apply_patch(LilCguLabelAddress * label_adress, LilCgu
     switch (patch->type) {
     case LPT_Rel8:
         diff = (int64)((char *)label_adress->addr - ((char *)patch->addr + 1));
-        assert(diff == (int64)(int8)diff);
-        *(int8*)patch->addr = (int8)diff;
+        assert(diff == (int64)(I_8)diff);
+        *(I_8*)patch->addr = (I_8)diff;
         break;
     case LPT_Rel32:
         diff = (int64)((char *)label_adress->addr - (char *)((I_32 *)patch->addr + 1));

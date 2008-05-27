@@ -658,9 +658,9 @@ public:
     AnnotationValue * get_default_value() {return _default_value; }
 
 private:
-    uint8 _num_param_annotations;
+    U_8 _num_param_annotations;
     AnnotationTable ** _param_annotations;
-    uint8 _num_invisible_param_annotations;
+    U_8 _num_invisible_param_annotations;
     AnnotationTable ** _invisible_param_annotations; 
     
     AnnotationValue * _default_value;
@@ -800,9 +800,9 @@ public:
     }
 
 
-    uint8* m_stackmap;
+    U_8* m_stackmap;
 public:
-    uint8* get_stackmap() {
+    U_8* get_stackmap() {
         return m_stackmap;
     }
 

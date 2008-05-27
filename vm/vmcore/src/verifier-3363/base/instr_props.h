@@ -23,15 +23,15 @@
 //
 // instruction's possible characteristics (flags)
 //
-const uint8 PI_JUMP = 1;
-const uint8 PI_WIDEJUMP = 2;
-const uint8 PI_DIRECT = 4;
-const uint8 PI_SWITCH = 8;
-const uint8 PI_CANWIDE = 16;
+const U_8 PI_JUMP = 1;
+const U_8 PI_WIDEJUMP = 2;
+const U_8 PI_DIRECT = 4;
+const U_8 PI_SWITCH = 8;
+const U_8 PI_CANWIDE = 16;
 
 struct ParseInfo {
-    uint8 instr_min_len;   // length of the instruction with operands
-    uint8 flags;           // union of appropriate masks, see above 
+    U_8 instr_min_len;   // length of the instruction with operands
+    U_8 flags;           // union of appropriate masks, see above 
 };
 
 

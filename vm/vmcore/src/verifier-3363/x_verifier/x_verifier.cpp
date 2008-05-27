@@ -61,7 +61,7 @@ init_verification_context_for_method(Method_Handle method, verification_context 
  * @param context - class and method verification context
  * @return error code
  */
-vf_Result recompute_stackmaptable(uint8** attrBytes, Method_Handle method,
+vf_Result recompute_stackmaptable(U_8** attrBytes, Method_Handle method,
                                   verification_context context)
 {
     char* error_message;
@@ -78,7 +78,7 @@ vf_Result recompute_stackmaptable(uint8** attrBytes, Method_Handle method,
 /**
  * Frees memory allocated for a StackMapTable attribute
  */
-void free_stackmaptable(uint8 *attrBytes) {
+void free_stackmaptable(U_8 *attrBytes) {
     tc_free(attrBytes);
 }
 

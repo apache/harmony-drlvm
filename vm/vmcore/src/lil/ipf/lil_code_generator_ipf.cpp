@@ -1586,7 +1586,7 @@ public:
                     result = ~imm;
                     break;
                 case LO_Sx1:
-                    result = (int64) (int8) imm;
+                    result = (int64) (I_8) imm;
                     break;
                 case LO_Sx2:
                     result = (int64) (int16) imm;
@@ -1595,7 +1595,7 @@ public:
                     result = (int64) (I_32) imm;
                     break;
                 case LO_Zx1:
-                    result = (int64) (uint64) (uint8) imm;
+                    result = (int64) (uint64) (U_8) imm;
                     break;
                 case LO_Zx2:
                     result = (int64) (uint64) (uint16) imm;

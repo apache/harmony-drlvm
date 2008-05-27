@@ -395,7 +395,7 @@ void GCMap::checkObject(TypeManager& tm, const void* p)  {
     m_assert (!(p<(const void*)0x10000)); //(INVALID PTR)
     m_assert((((POINTER_SIZE_INT)p)&0x3)==0); // check for valid alignment
     POINTER_SIZE_INT vtableOffset = VMInterface::getVTableOffset();
-    void * allocationHandle=*(void**)(((uint8*)p)+vtableOffset);
+    void * allocationHandle=*(void**)(((U_8*)p)+vtableOffset);
     m_assert (!(allocationHandle<(void*)0x10000 || (((POINTER_SIZE_INT)allocationHandle)&0x3)!=0)); //INVALID VTABLE PTR
     ObjectType * type=tm.getObjectTypeFromAllocationHandle(allocationHandle);
     m_assert(type!=NULL); // UNRECOGNIZED VTABLE PTR;

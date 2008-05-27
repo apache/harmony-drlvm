@@ -273,7 +273,7 @@ template <typename uinttype> inline uinttype isqrt(uinttype n);
 template <> inline uint64 isqrt(uint64 n) { return isqrt_iter(n, (uint64) 65536); }
 template <> inline U_32 isqrt(U_32 n) { return isqrt_iter(n, (U_32) 256); }
 template <> inline uint16 isqrt(uint16 n) { return isqrt_iter(n, (uint16) 16); }
-template <> inline uint8 isqrt(uint8 n) { return isqrt_iter(n, (uint8) 4); }
+template <> inline U_8 isqrt(U_8 n) { return isqrt_iter(n, (U_8) 4); }
 
 } //namespace Jitrino 
 

@@ -173,7 +173,7 @@ void TNVTableFirstNManager::insert(TableT* where, TableT* clear_part,
 void TNVTableFirstNManager::addNewValue(ValueMethodProfile* methProfile,
             VPData* instProfile, ValueT curr_value)
 {
-    uint8* updating_ptr = methProfile->getUpdatingStatePtr();
+    U_8* updating_ptr = methProfile->getUpdatingStatePtr();
     if (updateStrategy == UPDATE_LOCKED) {
         methProfile->lockProfile();
     } else if (updateStrategy == UPDATE_FLAGGED_ALL) {

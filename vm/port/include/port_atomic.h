@@ -47,7 +47,7 @@ extern "C" {
 #if defined(_IPF_) || defined(DOXYGEN)
 
 /**
-* The atomic compare and exchange operation on <code>uint8</code>.
+* The atomic compare and exchange operation on <code>U_8</code>.
 * The function compares the current value of the specified <i>data</i>
 * with the <i>comp</i> value and if they match, swaps the <i>data</i>
 * with the <i>value</i>.
@@ -56,8 +56,8 @@ extern "C" {
 * @param[in] comp       - the value to compare with
 * @return The old value.
 */
-APR_DECLARE(uint8) port_atomic_cas8(volatile uint8 * data, 
-                                               uint8 value, uint8 comp);
+APR_DECLARE(U_8) port_atomic_cas8(volatile U_8 * data, 
+                                               U_8 value, U_8 comp);
 
 /**  
 * The atomic compare and exchange operation on uint16. 
@@ -101,7 +101,7 @@ APR_DECLARE(void *) port_atomic_casptr(volatile void ** data,
 
 #elif defined(_WIN32) && !defined(_WIN64)
 
-PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
+PORT_INLINE U_8 port_atomic_cas8(volatile U_8 * data , U_8 value, U_8 comp) {
     __asm {
         mov al,  comp
         mov dl,  value
@@ -152,8 +152,8 @@ PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const
 #pragma intrinsic(_InterlockedCompareExchange16)
 #pragma intrinsic(_InterlockedCompareExchange64)
 
-PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data, 
-                                               uint8 value, uint8 comp);
+PORT_INLINE U_8 port_atomic_cas8(volatile U_8 * data, 
+                                               U_8 value, U_8 comp);
 
 PORT_INLINE uint16 port_atomic_cas16(volatile uint16 * data, 
                                                  uint16 value, uint16 comp)
@@ -173,7 +173,7 @@ PORT_INLINE void * port_atomic_casptr(volatile void ** data, void * value, const
 
 #elif defined (PLATFORM_POSIX)  
 
-PORT_INLINE uint8 port_atomic_cas8(volatile uint8 * data , uint8 value, uint8 comp) {
+PORT_INLINE U_8 port_atomic_cas8(volatile U_8 * data , U_8 value, U_8 comp) {
 #if defined(_IA32_) || defined(_EM64T_)
     __asm__ __volatile__(
         "lock cmpxchgb %1, (%2)"

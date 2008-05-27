@@ -42,7 +42,7 @@ void JavaTranslator::translateMethod(CompilationInterface& ci, MethodDesc& metho
 
     JavaFlowGraphBuilder cfgBuilder(irBuilder.getInstFactory()->getMemManager(),irBuilder);
 
-    ByteCodeParser parser((const uint8*)byteCodes,byteCodeSize);
+    ByteCodeParser parser((const U_8*)byteCodes,byteCodeSize);
     // generate code
     JavaByteCodeTranslator translator(ci,
                               translatorMemManager,

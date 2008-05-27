@@ -126,7 +126,7 @@ JNIEXPORT jboolean compareAndSetBooleanField
     U_8* java_ref = (U_8*)h->object;
     jboolean* field_addr = (jboolean*)(java_ref + offset);
     bool result =
-        (port_atomic_cas8((uint8*)field_addr, (uint8)value, (uint8)expected) == (uint8)expected);
+        (port_atomic_cas8((U_8*)field_addr, (U_8)value, (U_8)expected) == (U_8)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);
@@ -221,7 +221,7 @@ JNIEXPORT jboolean compareAndSetBooleanArray
             index);
 
     bool result =
-        (port_atomic_cas8((uint8 *)field_addr, (uint8)value, (uint8)expected) == (uint8)expected);
+        (port_atomic_cas8((U_8 *)field_addr, (U_8)value, (U_8)expected) == (U_8)expected);
 
     tmn_suspend_enable();
     return (jboolean)(result?JNI_TRUE:JNI_FALSE);

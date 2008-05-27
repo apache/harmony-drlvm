@@ -198,9 +198,9 @@ double  __stdcall   remF8   (double v0, double v1)  {
     return jitrino_ieee754_fmod_double(v0,v1);
 } 
 
-void __stdcall initialize_array(uint8* array, U_32 elems_offset, uint8* data, U_32 num_elems) stdcall__;
-void __stdcall initialize_array(uint8* array, U_32 elems_offset, uint8* data, U_32 num_elems) {
-    uint8* array_data = array + elems_offset;
+void __stdcall initialize_array(U_8* array, U_32 elems_offset, U_8* data, U_32 num_elems) stdcall__;
+void __stdcall initialize_array(U_8* array, U_32 elems_offset, U_8* data, U_32 num_elems) {
+    U_8* array_data = array + elems_offset;
     for (U_32 i = 0; i < num_elems; i++) {
         array_data[i] = data[i];
     }

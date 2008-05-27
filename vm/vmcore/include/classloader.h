@@ -186,7 +186,7 @@ public:
     Class* NewClass(const Global_Env* env, const String* name);
     Package* ProvidePackage(Global_Env* env, const String *class_name, const char *jar);
     Class* DefineClass(Global_Env* env, const char* class_name,
-        uint8* bytecode, unsigned offset, unsigned length, const String** res_name = NULL);
+        U_8* bytecode, unsigned offset, unsigned length, const String** res_name = NULL);
     Class* LoadClass( Global_Env* UNREF env, const String* UNREF name);
     Class* LoadVerifyAndPrepareClass( Global_Env* env, const String* name);
     virtual void ReportException(const char* exn_name, std::stringstream& message_stream);

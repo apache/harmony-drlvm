@@ -54,16 +54,16 @@ inline void set_vector_length(Vector_Handle vector, I_32 length)
 
 
 
-inline int8 *get_vector_element_address_bool(Vector_Handle vector, I_32 idx)
+inline I_8 *get_vector_element_address_bool(Vector_Handle vector, I_32 idx)
 {
-    return (int8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int8)));
+    return (I_8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(I_8)));
 } //get_vector_element_address_bool
 
 
 
-inline int8 *get_vector_element_address_int8(Vector_Handle vector, I_32 idx)
+inline I_8 *get_vector_element_address_int8(Vector_Handle vector, I_32 idx)
 {
-    return (int8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(int8)));
+    return (I_8 *)((POINTER_SIZE_INT)vector + (POINTER_SIZE_INT)VM_VECTOR_FIRST_ELEM_OFFSET_1_2_4 + ((POINTER_SIZE_INT)idx * sizeof(I_8)));
 } //get_vector_element_address_int8
 
 

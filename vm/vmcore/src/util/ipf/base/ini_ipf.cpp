@@ -279,10 +279,10 @@ JIT_execute_method_default(JIT_Handle jh,
         *((uint16 *)return_value) = (uint16) int_result;
         break;
     case JAVA_TYPE_BYTE:
-        *((int8 *)return_value) = (int8) int_result;
+        *((I_8 *)return_value) = (I_8) int_result;
         break;
     case JAVA_TYPE_BOOLEAN:
-        *((uint8 *)return_value) = (uint8) int_result;
+        *((U_8 *)return_value) = (U_8) int_result;
         break;
     case JAVA_TYPE_DOUBLE:
         *((double *)return_value) = double_result;

@@ -31,7 +31,7 @@ void ByteReader::dump(unsigned num_bytes)
     int num_columns = 8;
     bool first_time = true;
     int curr_offset = get_offset();
-    const uint8* curr_byte = curr;
+    const U_8* curr_byte = curr;
     for(unsigned i = 0; i < num_bytes; i++, curr_offset++, curr_byte++) {
         if(first_time || !(curr_offset & (num_columns - 1))) {
             if(!first_time) {
@@ -46,7 +46,7 @@ void ByteReader::dump(unsigned num_bytes)
                 }
             }
         }
-        uint8 b = *curr_byte;
+        U_8 b = *curr_byte;
         printf("%02x", b);
         if(b >= 32 && b < 127) {
             printf(" '%c'  ", b);

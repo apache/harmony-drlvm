@@ -1807,7 +1807,7 @@ ManagedObject* class_alloc_new_object_and_run_default_constructor(Class* clss)
 ManagedObject*
 class_alloc_new_object_and_run_constructor(Class* clss,
                                            Method* constructor,
-                                           uint8* constructor_args)
+                                           U_8* constructor_args)
 {
     ASSERT_RAISE_AREA;
     assert(!hythread_is_suspend_enabled());
@@ -1832,7 +1832,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
     args[0].l = (jobject)obj;
 
     int arg_num = 1;
-    uint8* argp = constructor_args;
+    U_8* argp = constructor_args;
     Arg_List_Iterator iter = constructor->get_argument_list();
     Java_Type typ;
     while((typ = curr_arg(iter)) != JAVA_TYPE_END) {

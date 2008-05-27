@@ -1411,7 +1411,7 @@ void printRuntimeArgs(::std::ostream& os, U_32 opndCount, CallingConvention::Opn
     for (U_32 i=0; i<opndCount; i++){
         CallingConvention::OpndInfo & info=infos[i];
         U_32 cb=0;
-        uint8 arg[4*sizeof(U_32)]; 
+        U_8 arg[4*sizeof(U_32)]; 
         for (U_32 j=0; j<info.slotCount; j++){
             if (!info.isReg){
 #ifdef _EM64T_
@@ -1441,13 +1441,13 @@ void printRuntimeOpnd(::std::ostream& os, TypeManager & tm, Type::Tag typeTag, c
         os<<" ";
         switch (typeTag){
             case Type::Int8:
-                os<<*(int8*)p;
+                os<<*(I_8*)p;
                 break;
             case Type::UInt8:
-                os<<*(uint8*)p;
+                os<<*(U_8*)p;
                 break;
             case Type::Boolean:
-                os<<(*(int8*)p?true:false);
+                os<<(*(I_8*)p?true:false);
                 break;
             case Type::Int16:   
                 os<<*(int16*)p;
@@ -1505,7 +1505,7 @@ void printRuntimeObjectOpnd(::std::ostream& os, TypeManager & tm, const void * p
     POINTER_SIZE_INT vtableOffset = VMInterface::getVTableOffset();
 
     //  assume that vtable pointer in object head is allocation handle 
-    void * allocationHandle=*(void**)(((uint8*)p)+vtableOffset);
+    void * allocationHandle=*(void**)(((U_8*)p)+vtableOffset);
         
     if (allocationHandle<(void*)0x10000||allocationHandle>(void*)0x20000000||(((POINTER_SIZE_INT)allocationHandle)&0x3)!=0){
         os<<"(INVALID VTABLE PTR: "<<allocationHandle<<")";
@@ -1528,11 +1528,11 @@ void printRuntimeObjectContent_Array(::std::ostream& os, TypeManager & tm, Type 
 {
     ArrayType * arrayType=(ArrayType *)type;
     U_32 lengthOffset=arrayType->getArrayLengthOffset();
-    U_32 length=*(U_32*)(((uint8*)p)+lengthOffset);
+    U_32 length=*(U_32*)(((U_8*)p)+lengthOffset);
     os<<"{"<<length<<" elems: ";
     if (length>0){
         U_32 elemOffset=arrayType->getArrayElemOffset();
-        printRuntimeOpnd(os, tm, arrayType->getElementType()->tag, (const void*)(((uint8*)p)+elemOffset));
+        printRuntimeOpnd(os, tm, arrayType->getElementType()->tag, (const void*)(((U_8*)p)+elemOffset));
         if (length>1)
             os<<", ...";
     }
@@ -1552,11 +1552,11 @@ void printRuntimeObjectContent_String(::std::ostream& os, TypeManager & tm, Type
     U_32 bufferLengthOffset=8;
     U_32 bufferElemsOffset=12;
     
-    uint8 * string=(uint8*)p;
+    U_8 * string=(U_8*)p;
 
     U_32  stringLength=*(U_32*)(string+stringLengthOffset);
     U_32  stringOffset=*(U_32*)(string+stringOffsetOffset);
-    uint8 * buffer=*(uint8**)(string+stringBufferOffset);
+    U_8 * buffer=*(U_8**)(string+stringBufferOffset);
 
     if (buffer==NULL){
         if (stringLength==0)

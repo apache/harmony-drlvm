@@ -231,7 +231,7 @@ vf_Result vf_Context_6::load_stackmaptable() {
     for( unsigned entry = 0; entry < number_of_entries; entry++) {
         if( read_ptr + 1 > attribute_end ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
 
-        uint8 frame_type = (*read_ptr++);
+        U_8 frame_type = (*read_ptr++);
         unsigned offset;
         if( frame_type <= 63 ) { // 0-63
             //same locals as previous, stack is empty. offset calculated from frame_type
@@ -385,7 +385,7 @@ vf_Result vf_Context_6::read_types(U_8** attr, U_8* end, WorkmapElement_6* eleme
         //more elemens than max_locals or max_stack
         if( idx >= space_available ) return error(VF_ErrorStackmap, "corrupted StackMapTable");
 
-        uint8 tag = *((*attr)++);
+        U_8 tag = *((*attr)++);
         switch (tag) {
             case ITEM_TOP:
                 element[idx++].const_val = SmConstant(SM_BOGUS);

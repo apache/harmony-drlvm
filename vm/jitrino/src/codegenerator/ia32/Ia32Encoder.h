@@ -80,7 +80,7 @@ public:
     /**
      * Inserts the executable bytes into the byte stream.
      */
-    static uint8 * emit(uint8* stream, const Inst * inst);
+    static U_8 * emit(U_8* stream, const Inst * inst);
     /** 
      * struct MemOpndConstraints represents an element of an array of
      * special memory operands. This array is referenced by the Constraint.getMemoryConstraintIndex()

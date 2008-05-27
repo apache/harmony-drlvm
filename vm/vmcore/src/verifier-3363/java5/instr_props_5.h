@@ -24,7 +24,7 @@
 class InstrProps : public InstrPropsBase {
 private:
     //array of bit flags
-    uint8* packed_flags;
+    U_8* packed_flags;
 
     //returns flags for the instruction 'instr'. other bits are not necessary 0s
     int get_dirty_mask(Address instr) {
@@ -53,7 +53,7 @@ public:
     //initializes the class. this function is invoked once per method - removes old data in initializes storages.
     void init(Memory &mem, int code_len) {
         InstrPropsBase::init(mem, code_len);
-        packed_flags = (uint8*)mem.calloc( ((code_len/4) & ~3) + 4);
+        packed_flags = (U_8*)mem.calloc( ((code_len/4) & ~3) + 4);
     }
 
     //pass1: 00 - new (or dead code), 01 - parsed, 10 - middle of instruction, 11 - 'special' parsed (special == has stackmap)

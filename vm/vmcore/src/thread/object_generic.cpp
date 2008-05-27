@@ -43,7 +43,7 @@
 
 void set_hash_bits(ManagedObject *p_obj)
     {
-    uint8 hb = (uint8) (((POINTER_SIZE_INT)p_obj >> 3) & HASH_MASK)  ;
+    U_8 hb = (U_8) (((POINTER_SIZE_INT)p_obj >> 3) & HASH_MASK)  ;
     // lowest 3 bits are not random enough so get rid of them
 
     if (hb == 0)

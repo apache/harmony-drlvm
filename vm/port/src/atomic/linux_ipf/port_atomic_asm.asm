@@ -22,7 +22,7 @@
 	.global port_atomic_cas8#
 	.align 32
 port_atomic_cas8:
-	// r32 -- Destination (uint8 *)
+	// r32 -- Destination (U_8 *)
 	// r33 -- Exchange
 	// r34 -- Comperand
 	// r35 -- for save ar.pfs

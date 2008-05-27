@@ -47,7 +47,7 @@ void get_file_and_line(Method_Handle mh, void *ip, bool is_ip_past,
 
     *line = -1;
     if (interpreter_enabled()) {
-        int bc = (int)((uint8*)ip - (uint8*)method->get_byte_code_addr());
+        int bc = (int)((U_8*)ip - (U_8*)method->get_byte_code_addr());
         *line = method->get_line_number((uint16)bc);
         return;
     }

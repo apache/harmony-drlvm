@@ -426,7 +426,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_ALOAD_0: case OP_ALOAD_1: 
         case OP_ALOAD_2: case OP_ALOAD_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_ALOAD_0;
+            U_8 local_idx =  opcode - OP_ALOAD_0;
 
             //call macro
             CHECK_ALOAD( local_idx );
@@ -489,7 +489,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_ASTORE_0: case OP_ASTORE_1: 
         case OP_ASTORE_2: case OP_ASTORE_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_ASTORE_0;
+            U_8 local_idx =  opcode - OP_ASTORE_0;
 
             //call MACRO
             CHECK_ASTORE( local_idx );
@@ -667,7 +667,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_DLOAD_0: case OP_DLOAD_1: 
         case OP_DLOAD_2: case OP_DLOAD_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_DLOAD_0;
+            U_8 local_idx =  opcode - OP_DLOAD_0;
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_DOUBLE );
@@ -701,7 +701,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_DSTORE_0: case OP_DSTORE_1: 
         case OP_DSTORE_2: case OP_DSTORE_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_DSTORE_0;
+            U_8 local_idx =  opcode - OP_DSTORE_0;
 
             CHECK_xxSTORE( local_idx, SM_DOUBLE );
 
@@ -945,7 +945,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_FLOAD_0: case OP_FLOAD_1: 
         case OP_FLOAD_2: case OP_FLOAD_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_FLOAD_0;
+            U_8 local_idx =  opcode - OP_FLOAD_0;
 
             //call macro
             CHECK_xLOAD( local_idx, SM_FLOAT );
@@ -979,7 +979,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_FSTORE_0: case OP_FSTORE_1: 
         case OP_FSTORE_2: case OP_FSTORE_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_FSTORE_0;
+            U_8 local_idx =  opcode - OP_FSTORE_0;
 
             CHECK_xSTORE( local_idx, SM_FLOAT );
 
@@ -1135,7 +1135,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_ILOAD_0: case OP_ILOAD_1: 
         case OP_ILOAD_2: case OP_ILOAD_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_ILOAD_0;
+            U_8 local_idx =  opcode - OP_ILOAD_0;
 
             //call macro
             CHECK_xLOAD( local_idx, SM_INTEGER );
@@ -1181,7 +1181,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_ISTORE_0: case OP_ISTORE_1: 
         case OP_ISTORE_2: case OP_ISTORE_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_ISTORE_0;
+            U_8 local_idx =  opcode - OP_ISTORE_0;
 
             CHECK_xSTORE( local_idx, SM_INTEGER );
 
@@ -1316,7 +1316,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_LLOAD_0: case OP_LLOAD_1: 
         case OP_LLOAD_2: case OP_LLOAD_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_LLOAD_0;
+            U_8 local_idx =  opcode - OP_LLOAD_0;
 
             //call macro
             CHECK_xxLOAD( local_idx, SM_LONG );
@@ -1350,7 +1350,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_LSTORE_0: case OP_LSTORE_1: 
         case OP_LSTORE_2: case OP_LSTORE_3: {
             //get local index from opcode
-            uint8 local_idx =  opcode - OP_LSTORE_0;
+            U_8 local_idx =  opcode - OP_LSTORE_0;
 
             CHECK_xxSTORE( local_idx, SM_LONG );
 
@@ -1423,7 +1423,7 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
         case OP_NEWARRAY: {
             POP_x( SM_INTEGER );
 
-            uint8 array_type = m_bytecode[instr + 1];
+            U_8 array_type = m_bytecode[instr + 1];
             if( array_type < 4 || array_type > 11 ) return error(VF_ErrorInstruction, "bad array type");
 
             SmConstant ref = tpool.sm_get_const_arrayref(array_type);
@@ -1617,8 +1617,8 @@ vf_Result vf_Context_x<ActualClass, WorkmapElement, _WorkmapElement, StackmapEle
             if( opcode == OP_INVOKEINTERFACE ) {
                 //TODO: is verifier the right place for this check?
                 //check 'count' value for invokeinterface instruction
-                uint8 count = m_bytecode[instr + 3];
-                uint8 fourth = m_bytecode[instr + 4];
+                U_8 count = m_bytecode[instr + 3];
+                U_8 fourth = m_bytecode[instr + 4];
                 if( count != args_sz + 1 || fourth ) {
                     return error(VF_ErrorUnknown, "incorrect invokeinterface instruction");
                 }

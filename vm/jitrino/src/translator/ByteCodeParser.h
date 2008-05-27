@@ -36,7 +36,7 @@ public:
     // parses one byte code starting at given offset,
     // updates nextOffset to point at next byte code,
     // returns false if parsing should stop
-    virtual bool parseByteCode(const uint8* byteCodes,U_32 byteCodeOffset) = 0;
+    virtual bool parseByteCode(const U_8* byteCodes,U_32 byteCodeOffset) = 0;
     // called before the parsing starts
     virtual void parseInit() = 0;
     // called after the parsing ends, but not if an error occurs
@@ -56,7 +56,7 @@ public:
     //
     // creates a new ByteCodeParser
     //
-    ByteCodeParser(const uint8* bc, U_32 length)  {
+    ByteCodeParser(const U_8* bc, U_32 length)  {
         byteCodes = bc;    byteCodeLength = length; byteCodeOffset = 0;
     }
     //
@@ -77,11 +77,11 @@ public:
     }
 
     // Export these values to implement translator optimizations
-    const uint8* getByteCodes() {return byteCodes;}
+    const U_8* getByteCodes() {return byteCodes;}
     U_32 getByteCodeLength()  {return byteCodeLength;}
 
 private:
-    const uint8* byteCodes;
+    const U_8* byteCodes;
     U_32       byteCodeLength;
     U_32       byteCodeOffset;
 };
@@ -95,10 +95,10 @@ private:
 #define readU4Be(bytes) (((U_32)(bytes)[0]<<24) | ((U_32)(bytes)[1]<<16) | \
                          ((U_32)(bytes)[2]<<8)  | (bytes)[3])
 
-inline int8     si8(const uint8* bcp)    {return ((int8*)bcp)[0];}
-inline uint8    su8(const uint8* bcp)    {return bcp[0];}
-inline float    sr4(const uint8* bcp)    {return ((float*)bcp)[0];} 
-inline double   sr8(const uint8* bcp)    {return ((double*)bcp)[0];} 
+inline I_8     si8(const U_8* bcp)    {return ((I_8*)bcp)[0];}
+inline U_8    su8(const U_8* bcp)    {return bcp[0];}
+inline float    sr4(const U_8* bcp)    {return ((float*)bcp)[0];} 
+inline double   sr8(const U_8* bcp)    {return ((double*)bcp)[0];} 
 } //namespace Jitrino 
 
 #endif // _BYTECODEPARSER_H_

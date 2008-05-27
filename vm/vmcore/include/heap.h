@@ -184,6 +184,6 @@ ManagedObject *class_alloc_new_object_and_run_default_constructor(
  * @note XXX exception and out of memory semantics are not specified -salikh
  */
 ManagedObject *class_alloc_new_object_and_run_constructor(
-    Class * clss, Method * constructor, uint8 * constructor_args);
+    Class * clss, Method * constructor, U_8 * constructor_args);
 
 #endif /* #ifndef _HEAP_H */

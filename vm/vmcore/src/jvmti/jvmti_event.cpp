@@ -658,7 +658,7 @@ void jvmti_send_chunks_compiled_method_load_event(Method *method)
 
                     for (int i = 0; i < code_size; i++)
                     {
-                        NativeCodePtr ip = (NativeCodePtr) (((uint8*) code_addr) + i);
+                        NativeCodePtr ip = (NativeCodePtr) (((U_8*) code_addr) + i);
                         uint16 bc = 12345;
 
                         OpenExeJpdaError UNREF result =

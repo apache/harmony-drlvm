@@ -247,7 +247,7 @@ ConstantFolder::hasConstant(Inst* inst) {
 // Utilities for constant folding
 //-----------------------------------------------------------------------------
 bool
-ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, I_32& result, bool is_signed) {
+ConstantFolder::fold8(Opcode opc, I_8 c1, I_8 c2, I_32& result, bool is_signed) {
     switch (opc) {
     case Op_Add:    result = c1 + c2; return true;
     case Op_Sub:    result = c1 - c2; return true;
@@ -259,25 +259,25 @@ ConstantFolder::fold8(Opcode opc, int8 c1, int8 c2, I_32& result, bool is_signed
         if (is_signed) {
             result = c1 * c2; return true;
         } else {
-            result = CAST(I_32, CAST(U_32, (CAST(uint8, c1)*CAST(uint8, c2)))); return true;
+            result = CAST(I_32, CAST(U_32, (CAST(U_8, c1)*CAST(U_8, c2)))); return true;
         }
     // for div and rem, be careful c2 not be 0
     // also, need to handle signed/unsigned based on SignedModifier
     case Op_TauDiv:    
-        if (c2 == (int8)0) return false;
+        if (c2 == (I_8)0) return false;
         if (is_signed) {
             result = c1 / c2; return true;
         } else {
-            result = CAST(I_32, CAST(U_32, CAST(uint8, c1) / CAST(uint8, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(U_8, c1) / CAST(U_8, c2))); return true;
         }
     case Op_TauRem:
-        if (c2 == (int8)0) return false;
+        if (c2 == (I_8)0) return false;
         if (is_signed) {
             result = c1 % c2; return true;
         } else {
-            result = CAST(I_32, CAST(U_32, CAST(uint8, c1) % CAST(uint8, c2))); return true;
+            result = CAST(I_32, CAST(U_32, CAST(U_8, c1) % CAST(U_8, c2))); return true;
         }
-    case Op_MulHi:  result = (I_32)(int8)((((int16)c1) * ((int16)c2)) >> 8);
+    case Op_MulHi:  result = (I_32)(I_8)((((int16)c1) * ((int16)c2)) >> 8);
         return true;
     case Op_Min:
         result = ::std::min(c1,c2); return true;
@@ -481,7 +481,7 @@ ConstantFolder::foldDouble(Opcode opc, double c1, double c2, double& result) {
 }
 
 bool
-ConstantFolder::fold8(Opcode opc, int8 c, I_32& result) {
+ConstantFolder::fold8(Opcode opc, I_8 c, I_32& result) {
     switch (opc) {
     case Op_Not:    result = ~c; return true;
     case Op_Neg:    result = -c; return true;
@@ -889,7 +889,7 @@ ConstantFolder::foldConstant(Type::Tag type,
     
     switch (type) {
     case Type::Int8:
-    case Type::UInt8:  return fold8(opc, (int8)val1.i4, (int8)val2.i4, result.i4, is_signed);
+    case Type::UInt8:  return fold8(opc, (I_8)val1.i4, (I_8)val2.i4, result.i4, is_signed);
     case Type::Int16:
     case Type::UInt16: return fold16(opc, (int16)val1.i4, (int16)val2.i4, result.i4, is_signed);
     case Type::Int32:   
@@ -900,7 +900,7 @@ ConstantFolder::foldConstant(Type::Tag type,
     case Type::UIntPtr: {
         int psi = sizeof(POINTER_SIZE_INT);
         switch (psi) {
-        case 1: return fold8(opc, (int8)val1.i4, (int8)val2.i4, result.i4, is_signed);
+        case 1: return fold8(opc, (I_8)val1.i4, (I_8)val2.i4, result.i4, is_signed);
         case 2: return fold16(opc, (int16)val1.i4, (int16)val2.i4, result.i4, is_signed);
         case 4: return fold32(opc, val1.i4, val2.i4, result.i4, is_signed);
         case 8: return fold64(opc, val1.i8, val2.i8, result.i8, is_signed);
