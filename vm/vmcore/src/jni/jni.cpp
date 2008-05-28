@@ -1761,7 +1761,7 @@ void global_object_handles_init(JNIEnv* jni_env)
     gh_aodouble->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfDouble_Class);
     tmn_suspend_enable();    // -------------^^^
 
-    Class* jlboolean = vm_env->LoadCoreClass("java/lang/BOOLEAN");
+    Class* jlboolean = vm_env->LoadCoreClass("java/lang/Boolean");
     Class* jlbyte = vm_env->LoadCoreClass("java/lang/Byte");
     Class* jlchar = vm_env->LoadCoreClass("java/lang/Character");
     Class* jlshort = vm_env->LoadCoreClass("java/lang/Short");
