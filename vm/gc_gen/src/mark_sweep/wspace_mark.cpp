@@ -19,7 +19,7 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 
 static Wspace *wspace_in_marking;
-static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
+static FORCE_INLINE BOOLEAN obj_mark_gray(Partial_Reveal_Object *obj)
 {
   if(obj_belongs_to_space(obj, (Space*)wspace_in_marking))
     return obj_mark_gray_in_table(obj);
@@ -27,10 +27,10 @@ static FORCE_INLINE Boolean obj_mark_gray(Partial_Reveal_Object *obj)
     return obj_mark_in_vt(obj);
 }
 
-static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
+static FORCE_INLINE BOOLEAN obj_mark_black(Partial_Reveal_Object *obj)
 {
   if(obj_belongs_to_space(obj, (Space*)wspace_in_marking)){
-    Boolean marked_by_self = obj_mark_black_in_table(obj);
+    BOOLEAN marked_by_self = obj_mark_black_in_table(obj);
 
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
     /* When fallback happens, some objects in MOS have their fw bit set, which is actually their mark bit in the last minor gc.
@@ -55,7 +55,7 @@ static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
 
 
 /* The caller must be in places where alloc color and mark color haven't been flipped */
-Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj)
+BOOLEAN obj_is_marked_in_table(Partial_Reveal_Object *obj)
 {
   unsigned int index_in_word;
   volatile POINTER_SIZE_INT *p_color_word = get_color_word_in_table(obj, index_in_word);
@@ -64,7 +64,7 @@ Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj)
   POINTER_SIZE_INT color_word = *p_color_word;
   POINTER_SIZE_INT mark_color = cur_mark_gray_color << index_in_word;
   
-  return (Boolean)(color_word & mark_color);
+  return (BOOLEAN)(color_word & mark_color);
 }
 
 static FORCE_INLINE void scan_slot(Collector *collector, REF *p_ref)

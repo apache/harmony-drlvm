@@ -50,7 +50,7 @@ static osmutex_t g_mutex;
 static port_unwind_compiled_frame g_unwind_callback = NULL;
 
 
-Boolean port_init_crash_handler(
+BOOLEAN port_init_crash_handler(
     port_signal_handler_registration *registrations,
     unsigned count,
     port_unwind_compiled_frame unwind_callback)
@@ -115,7 +115,7 @@ unsigned port_crash_handler_get_flags()
     return crash_output_flags;
 }
 
-Boolean port_crash_handler_add_action(port_crash_handler_action action)
+BOOLEAN port_crash_handler_add_action(port_crash_handler_action action)
 {
     crash_additional_actions *a =
         (crash_additional_actions*)STD_MALLOC(sizeof(crash_additional_actions));
@@ -128,7 +128,7 @@ Boolean port_crash_handler_add_action(port_crash_handler_action action)
     return TRUE;
 }
 
-Boolean port_shutdown_crash_handler()
+BOOLEAN port_shutdown_crash_handler()
 {
     if (shutdown_signals() != 0)
         return FALSE;
@@ -150,7 +150,7 @@ Boolean port_shutdown_crash_handler()
 /* Returns 0  when execution should be continued with (updated) Registers
    Returns 1  when crash occured and process should invoke a debugger
    Returns -1 when crash occured and process should be terminated */
-int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, Boolean iscrash)
+int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, BOOLEAN iscrash)
 {
     if (!iscrash)
     {
@@ -160,7 +160,7 @@ int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, 
 
         if (signal_callbacks[signum] != NULL)
         {
-            Boolean cres =
+            BOOLEAN cres =
                 signal_callbacks[signum](signum, regs, fault_addr);
 
             if (cres) // signal was processed
@@ -188,7 +188,7 @@ int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, 
     return -1;
 }
 
-Boolean sd_is_handler_registered(port_sigtype signum)
+BOOLEAN sd_is_handler_registered(port_sigtype signum)
 {
     return signal_callbacks[signum] != NULL;
 }

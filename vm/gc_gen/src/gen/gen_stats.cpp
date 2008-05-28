@@ -22,7 +22,7 @@
 #include "gen.h"
 #include "gen_stats.h"
 
-Boolean gc_profile = FALSE;
+BOOLEAN gc_profile = FALSE;
 
 void gc_gen_stats_initialize(GC_Gen* gc)
 {
@@ -63,7 +63,7 @@ void gc_gen_stats_update_after_collection(GC_Gen* gc)
   Collector** collector = gc->collectors;
   GC_Gen_Stats* gc_gen_stats = gc->stats;
   GC_Gen_Collector_Stats* collector_stats;
-  Boolean is_los_collected = gc_gen_stats->is_los_collected;
+  BOOLEAN is_los_collected = gc_gen_stats->is_los_collected;
 
   if(collect_is_minor()) {
 
@@ -100,7 +100,7 @@ void gc_gen_stats_update_after_collection(GC_Gen* gc)
 void gc_gen_stats_verbose(GC_Gen* gc)
 {
   GC_Gen_Stats* stats = gc->stats;
-  Boolean is_los_collected = stats->is_los_collected;
+  BOOLEAN is_los_collected = stats->is_los_collected;
   if (collect_is_minor()){
     TRACE2("gc.space", "GC: NOS Collection stats: "
       <<"\nGC: " << (gc_is_gen_mode()?"generational":"nongenerational")
@@ -195,7 +195,7 @@ void gc_gen_collector_stats_verbose_major_collection(GC_Gen* gc)
   Collector** collector = gc->collectors;
   GC_Gen_Collector_Stats* stats;
 
-  Boolean is_los_collected = gc->stats->is_los_collected;
+  BOOLEAN is_los_collected = gc->stats->is_los_collected;
 
   /*variable used to accumulate each collector's stats when major collection*/
   unsigned int total_process_rootset_ref = 0;

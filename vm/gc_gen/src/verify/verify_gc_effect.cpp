@@ -145,7 +145,7 @@ void* verifier_copy_obj_information(Partial_Reveal_Object* p_obj)
   }
 }
 
-static Boolean fspace_object_was_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace, Heap_Verifier* heap_verifier)
+static BOOLEAN fspace_object_was_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace, Heap_Verifier* heap_verifier)
 {
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
   assert(obj_belongs_to_space(p_obj, (Space*)fspace));
@@ -217,7 +217,7 @@ void verifier_update_info_after_resurrect(Heap_Verifier* heap_verifier)
 }
 
 #ifdef USE_32BITS_HASHCODE
-inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_obj, Heap_Verifier* heap_verifier, Boolean is_before_gc)  
+inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_obj, Heap_Verifier* heap_verifier, BOOLEAN is_before_gc)  
 {
   hash_obj_distance ++;
   
@@ -264,7 +264,7 @@ inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_o
 }
 #else 
 #define GCGEN_HASH_MASK 0x1fc
-inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_obj, Heap_Verifier* heap_verifier, Boolean is_before_gc)  
+inline Object_Hashcode_Inform* verifier_copy_hashcode(Partial_Reveal_Object* p_obj, Heap_Verifier* heap_verifier, BOOLEAN is_before_gc)  
 {
   hash_obj_distance ++;
   
@@ -375,11 +375,11 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
 
 }
 
-Boolean compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_INT* obj_container2)
+BOOLEAN compare_live_obj_inform(POINTER_SIZE_INT* obj_container1,POINTER_SIZE_INT* obj_container2)
 {
   Live_Object_Inform* obj_inform_1 = (Live_Object_Inform*)*obj_container1;
   Live_Object_Inform* obj_inform_2 = (Live_Object_Inform*)*obj_container2;
-  Boolean ret=TRUE;
+  BOOLEAN ret=TRUE;
   
   if(((POINTER_SIZE_INT)obj_inform_1->vt_raw) == ((POINTER_SIZE_INT)obj_inform_2->vt_raw)){
     if(obj_inform_1->obj_info != obj_inform_2->obj_info) {
@@ -434,7 +434,7 @@ free_ref:
   return ret;
 }
 
-Boolean compare_obj_hash_inform(POINTER_SIZE_INT* container1,POINTER_SIZE_INT* container2)
+BOOLEAN compare_obj_hash_inform(POINTER_SIZE_INT* container1,POINTER_SIZE_INT* container2)
 {
   Object_Hashcode_Inform* obj_hash_1 = (Object_Hashcode_Inform*) *container1;
   Object_Hashcode_Inform* obj_hash_2 = (Object_Hashcode_Inform*) *container2;
@@ -457,7 +457,7 @@ void verify_gc_effect(Heap_Verifier* heap_verifier)
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   Pool* free_pool = verifier_metadata->free_set_pool;
 
-  Boolean passed = verifier_compare_objs_pools(verifier_metadata->objects_pool_before_gc, 
+  BOOLEAN passed = verifier_compare_objs_pools(verifier_metadata->objects_pool_before_gc, 
                     verifier_metadata->objects_pool_after_gc , free_pool, compare_live_obj_inform);
   if(!passed)     gc_verifier->is_verification_passed = FALSE;
 #ifndef BUILD_IN_REFERENT

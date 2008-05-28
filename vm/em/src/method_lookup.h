@@ -50,13 +50,13 @@ public:
 
     void add(Method_Handle method_handle, void *code_addr,
         size_t size, void *data);
-    Method_Handle find(void *ip, Boolean is_ip_past, void **code_addr, size_t *size,
+    Method_Handle find(void *ip, BOOLEAN is_ip_past, void **code_addr, size_t *size,
         void **data);
-    Boolean remove(void *code_addr);
+    BOOLEAN remove(void *code_addr);
 
 private:
     void add(Method_Code *m);
-    Method_Code *find(void *addr, Boolean is_ip_past);
+    Method_Code *find(void *addr, BOOLEAN is_ip_past);
 
     unsigned       size()           { return _next_free_entry; }
     Method_Code    *get(unsigned i);

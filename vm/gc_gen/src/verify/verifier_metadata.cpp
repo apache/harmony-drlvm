@@ -105,7 +105,7 @@ void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier)
   heap_verifier->heap_verifier_metadata = NULL;
 }
 
-Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool)
+Vector_Block* gc_verifier_metadata_extend(Pool* pool, BOOLEAN is_set_pool)
 {
   /*add a slot to pool point back to verifier_metadata, then we do not need the global var verifer_metadata*/
   lock(verifier_metadata->alloc_lock);
@@ -155,7 +155,7 @@ Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool)
   return block;
 }
 
-void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack)
+void verifier_clear_pool(Pool* working_pool, Pool* free_pool, BOOLEAN is_vector_stack)
 {
   Vector_Block* working_block = pool_get_entry(working_pool);
   while(working_block){
@@ -166,7 +166,7 @@ void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_
   }
 }
 
-void verifier_remove_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack)
+void verifier_remove_pool(Pool* working_pool, Pool* free_pool, BOOLEAN is_vector_stack)
 {
   verifier_clear_pool(working_pool, free_pool, is_vector_stack);
   sync_pool_destruct(working_pool);

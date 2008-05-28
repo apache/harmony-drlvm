@@ -160,7 +160,7 @@ void wait_mark_finish(GC* gc)
   return;
 }
 
-Boolean is_mark_finished(GC* gc)
+BOOLEAN is_mark_finished(GC* gc)
 {
   unsigned int num_active_marker = gc->num_active_markers;
   unsigned int i = 0;

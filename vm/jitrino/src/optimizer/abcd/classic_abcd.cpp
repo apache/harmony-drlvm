@@ -263,7 +263,7 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
     assert(inst);
 
     Type::Tag inst_type = inst->getType();
-    if ( !Type::isInteger(inst_type) && inst_type != Type::Boolean &&
+    if ( !Type::isInteger(inst_type) && inst_type != Type::BOOLEAN &&
          inst_type != Type::Char ) {
         // note: some operations of unsupported type can produce operands of
         // supported (int) types, for example,

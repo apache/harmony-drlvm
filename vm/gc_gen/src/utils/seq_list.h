@@ -54,7 +54,7 @@ inline void seq_list_destruct(Seq_List* seq_list)
   STD_FREE(seq_list); 
 }
 
-inline Boolean seq_list_add(Seq_List* seq_list, List_Node* node)
+inline BOOLEAN seq_list_add(Seq_List* seq_list, List_Node* node)
 {
 #ifdef _DEBUG
   seq_list->node_num ++;
@@ -85,7 +85,7 @@ inline List_Node* seq_list_iterate_next(Seq_List* seq_list)
   return NULL;
 }
 
-inline Boolean seq_list_has_next(Seq_List* seq_list)
+inline BOOLEAN seq_list_has_next(Seq_List* seq_list)
 {
   return seq_list->curr != seq_list->head;
 }
@@ -105,7 +105,7 @@ inline List_Node* seq_list_lookup_prev_node(Seq_List* seq_list, List_Node* node)
   return NULL;
 }
 
-inline Boolean seq_list_remove(Seq_List* seq_list, List_Node* node)
+inline BOOLEAN seq_list_remove(Seq_List* seq_list, List_Node* node)
 {
   List_Node* prev_node = seq_list_lookup_prev_node(seq_list, node);
   if(prev_node==NULL) return FALSE; //need assertion here.

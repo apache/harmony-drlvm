@@ -59,7 +59,7 @@ int port_clear_breakpoint(void* addr, unsigned char prev)
     return port_write_memory(addr, 1, &prev);
 }
 
-Boolean port_is_breakpoint_set(void* addr)
+BOOLEAN port_is_breakpoint_set(void* addr)
 {
     unsigned char byte;
 

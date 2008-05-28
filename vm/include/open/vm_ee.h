@@ -262,7 +262,7 @@ DECLARE_OPEN(void, method_set_target_handler_info, (Method_Handle method,
                                              void         *end_ip,
                                              void         *handler_ip,
                                              Class_Handle  catch_cl,
-                                             Boolean       exc_obj_is_dead));
+                                             BOOLEAN       exc_obj_is_dead));
 
 //-----------------------------------------------------------------------------
 // Constant pool resolution

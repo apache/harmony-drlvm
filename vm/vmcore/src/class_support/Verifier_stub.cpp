@@ -49,10 +49,10 @@ bool Class::verify(const Global_Env * env)
     /**
      * Get verifier enable status
      */
-    Boolean is_forced = env->verify_all;
-    Boolean is_strict = env->verify_strict;
-    Boolean is_bootstrap = m_class_loader->IsBootstrap();
-    Boolean is_enabled = env->verify;
+    BOOLEAN is_forced = env->verify_all;
+    BOOLEAN is_strict = env->verify_strict;
+    BOOLEAN is_bootstrap = m_class_loader->IsBootstrap();
+    BOOLEAN is_enabled = env->verify;
 
     /**
      * Verify class
@@ -108,7 +108,7 @@ bool Class::verify_constraints(const Global_Env * env)
         return true;
     }
     // get verifier enable status
-    Boolean is_strict = env->verify_strict;
+    BOOLEAN is_strict = env->verify_strict;
 
     // unlock a class before calling to verifier
     unlock();

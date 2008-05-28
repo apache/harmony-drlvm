@@ -167,7 +167,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
   return block;
 }
 
-static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
+static void gc_update_repointed_sets(GC* gc, Pool* pool, BOOLEAN double_fix)
 {
   GC_Metadata* metadata = gc->metadata;
   
@@ -221,7 +221,7 @@ static void gc_update_repointed_sets(GC* gc, Pool* pool, Boolean double_fix)
   return;
 }
 
-void gc_fix_rootset(Collector* collector, Boolean double_fix)
+void gc_fix_rootset(Collector* collector, BOOLEAN double_fix)
 {
   GC* gc = collector->gc;
 
@@ -457,8 +457,8 @@ void gc_clear_remset(GC* gc)
 
 //#include <hash_set>
 /* FIXME:: should better move to verifier dir */
-extern Boolean verify_live_heap;
-void gc_metadata_verify(GC* gc, Boolean is_before_gc)
+extern BOOLEAN verify_live_heap;
+void gc_metadata_verify(GC* gc, BOOLEAN is_before_gc)
 {
   GC_Metadata* metadata = gc->metadata;
   assert(pool_is_empty(metadata->gc_rootset_pool));
@@ -549,7 +549,7 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 }
 
 #ifdef _DEBUG
-Boolean obj_is_mark_black_in_table(Partial_Reveal_Object* p_obj);
+BOOLEAN obj_is_mark_black_in_table(Partial_Reveal_Object* p_obj);
 #endif
 
 void gc_reset_dirty_set(GC* gc)

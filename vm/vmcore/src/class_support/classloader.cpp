@@ -519,7 +519,7 @@ void ClassLoader::gc_enumerate()
     TRACE2("enumeration", "enumerating classes");
     LMAutoUnlock aulock( &(ClassLoader::m_tableLock) );
     
-    Boolean do_class_unloading = gc_supports_class_unloading();
+    BOOLEAN do_class_unloading = gc_supports_class_unloading();
     for(unsigned int i = 0; i < m_nextEntry; i++) {
         //assert (m_table[i]->m_loader);
         if (m_table[i]->m_markBit) {

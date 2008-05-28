@@ -739,7 +739,7 @@ JavaByteCodeTranslator::getstatic(U_32 constPoolIndex) {
                     case Type::Int64:   constVal=irBuilder.genLdConstant(*(int64*)fieldAddr);break;
                     case Type::Single:  constVal=irBuilder.genLdConstant(*(float*)fieldAddr);break;
                     case Type::Double:  constVal=irBuilder.genLdConstant(*(double*)fieldAddr);break;
-                    case Type::Boolean: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
+                    case Type::BOOLEAN: constVal=irBuilder.genLdConstant(*(bool*)fieldAddr);break;
                     case Type::UnmanagedPtr:  assert(fieldIsMagic); 
 #ifdef _IA32_
                             constVal=irBuilder.genLdConstant(*(I_32*)fieldAddr);

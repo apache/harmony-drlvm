@@ -263,7 +263,7 @@ public:
     static JavaVarType getJavaType(Type *type) {
         assert(type);
         switch(type->tag) {
-        case Type::Boolean:  case Type::Char:
+        case Type::BOOLEAN:  case Type::Char:
         case Type::Int8:     case Type::Int16:     case Type::Int32:
             return I;
         case Type::Int64:

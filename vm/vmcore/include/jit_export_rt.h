@@ -44,7 +44,7 @@ extern "C" {
 // The callback that corresponds to vm_register_jit_recompiled_method_callback.  
 // The JIT should return TRUE if any code was modified (consequently the VM will ensure 
 // correctness such as synchronizing I- and D-caches), and FALSE otherwise.
-JITEXPORT Boolean 
+JITEXPORT BOOLEAN 
 JIT_recompiled_method_callback(JIT_Handle jit,
                                Method_Handle  recompiled_method,
                                void          *callback_data); 
@@ -146,7 +146,7 @@ JIT_get_address_of_this(JIT_Handle               jit,
 // Returns TRUE if the JIT will compress references within objects and vector elements by representing 
 // them as offsets rather than raw pointers. The JIT should call the VM function vm_is_heap_compressed()
 // during initialization in order to decide whether it should compress references.
-JITEXPORT Boolean 
+JITEXPORT BOOLEAN 
 JIT_supports_compressed_references(JIT_Handle jit);
 
 // end compressed references

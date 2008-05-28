@@ -112,7 +112,7 @@ Type* TypeManager::getPrimitiveType(Type::Tag t)
     case Type::UIntPtr: return getUIntPtrType();
     case Type::Void: return getVoidType();
     case Type::Tau:     return getTauType();
-    case Type::Boolean: return getBooleanType();
+    case Type::BOOLEAN: return getBooleanType();
     case Type::Char:    return getCharType();
     default:            assert(0); return NULL;
     }
@@ -156,7 +156,7 @@ Type* TypeManager::toInternalType(Type* t)
     case Type::ArrayLength:
     case Type::ArrayElementType:
         return t;
-    case Type::Boolean:
+    case Type::BOOLEAN:
     case Type::Char:
     case Type::Int8:
     case Type::Int16:
@@ -229,7 +229,7 @@ bool TypeManager::isSubTypeOf(Type *type1, Type *type2) {
         return isSubTypeOf(toInternalType(type1->getNonValueSupertype()), type2);
     case Type::Tau:
     case Type::Void:
-    case Type::Boolean:
+    case Type::BOOLEAN:
     case Type::IntPtr:
     case Type::Int8:
     case Type::Int16:
@@ -414,7 +414,7 @@ TypeManager::init() {
 
     tauType = new (memManager) Type(Type::Tau);
     voidType = new (memManager) Type(Type::Void);
-    booleanType = initBuiltinType(Type::Boolean);
+    booleanType = initBuiltinType(Type::BOOLEAN);
     charType = initBuiltinType(Type::Char);
     intPtrType = initBuiltinType(Type::IntPtr);
     int8Type = initBuiltinType(Type::Int8);
@@ -866,7 +866,7 @@ Type::getName() {
     switch (tag) {
     case Type::Void:             s = "VSystem/Void";     break;
     case Type::Tau:              s = "VSystem/Tau";     break;
-    case Type::Boolean:          s = "VSystem/Boolean";  break;
+    case Type::BOOLEAN:          s = "VSystem/BOOLEAN";  break;
     case Type::Char:             s = "VSystem/Char";     break;
     case Type::IntPtr:           s = "VSystem/IntPtr";   break;
     case Type::Int8:             s = "VSystem/SByte";    break;
@@ -900,7 +900,7 @@ void    Type::print(::std::ostream& os) {
     switch (tag) {
     case Tau:              s = "tau"; break;
     case Void:             s = "void"; break;
-    case Boolean:          s = "bool"; break;
+    case BOOLEAN:          s = "bool"; break;
     case Char:             s = "char"; break;
     case IntPtr:           s = "intptr"; break;
     case Int8:             s = "I_8"; break;
@@ -1041,7 +1041,7 @@ Type::getPrintString(Tag t) {
     switch (t) {
     case Tau:             s = "tau"; break;
     case Void:            s = "v  "; break;
-    case Boolean:         s = "b  "; break;
+    case BOOLEAN:         s = "b  "; break;
     case Char:            s = "chr"; break;
     case IntPtr:          s = "i  "; break;
     case Int8:            s = "i1 "; break;
@@ -1115,7 +1115,7 @@ Type* TypeManager::convertToOldType(Type* t)
     switch (t->tag) {
     case Type::Tau:
     case Type::Void:
-    case Type::Boolean:
+    case Type::BOOLEAN:
     case Type::Char:
     case Type::IntPtr:
     case Type::Int8:
@@ -1230,7 +1230,7 @@ type_tag_names[] = {
 
     DECL_TAG_ITEM(Tau, "tau "),
     DECL_TAG_ITEM(Void, "v   "),
-    DECL_TAG_ITEM(Boolean, "b   "),
+    DECL_TAG_ITEM(BOOLEAN, "b   "),
     DECL_TAG_ITEM(Char, "chr "),
 
     DECL_TAG_ITEM(IntPtr, "i   "),

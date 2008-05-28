@@ -277,7 +277,7 @@ DECLARE_OPEN(void, method_set_num_target_handlers,
 DECLARE_OPEN(void, method_set_target_handler_info,
     (Method_Handle method, JIT_Handle j, unsigned eh_number,
      void* start_ip, void* end_ip, void* handler_ip,
-     Class_Handle catch_cl, Boolean exc_obj_is_dead));
+     Class_Handle catch_cl, BOOLEAN exc_obj_is_dead));
 
 /**
  * Returns the handle for an accessible method overriding <i>method</i> in <i>klass</i> 

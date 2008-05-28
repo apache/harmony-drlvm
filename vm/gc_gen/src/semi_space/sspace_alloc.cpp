@@ -17,7 +17,7 @@
 
 #include "sspace.h"
 
-Boolean sspace_alloc_block(Sspace* sspace, Allocator* allocator)
+BOOLEAN sspace_alloc_block(Sspace* sspace, Allocator* allocator)
 {    
   alloc_context_reset(allocator);
   

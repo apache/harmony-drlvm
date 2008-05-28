@@ -28,13 +28,13 @@ extern volatile POINTER_SIZE_INT cur_alloc_mask;
 extern volatile POINTER_SIZE_INT cur_mark_mask;
 
 
-inline Boolean slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
+inline BOOLEAN slot_is_alloc_in_table(POINTER_SIZE_INT *table, unsigned int slot_index)
 {
   unsigned int color_bits_index = slot_index * COLOR_BITS_PER_OBJ;
   unsigned int word_index = color_bits_index / BITS_PER_WORD;
   unsigned int index_in_word = color_bits_index % BITS_PER_WORD;
   
-  return (Boolean)(table[word_index] & (cur_alloc_color << index_in_word));
+  return (BOOLEAN)(table[word_index] & (cur_alloc_color << index_in_word));
 }
 
 inline unsigned int composed_slot_index(unsigned int word_index, unsigned int index_in_word)

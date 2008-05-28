@@ -110,7 +110,7 @@ extern "C" {
    * @return the handle of the method that occupies found code chunk. NULL if
    * no method is found.
    */
-        Method_Handle (*LookupCodeChunk) (void *addr, Boolean is_ip_past,
+        Method_Handle (*LookupCodeChunk) (void *addr, BOOLEAN is_ip_past,
             void **code_addr, size_t *size, void **data);
 
   /**
@@ -121,7 +121,7 @@ extern "C" {
    * @return <code>TRUE</code> if removal was successful, <code>FALSE</code>
    * otherwise, e.g. if code chunk was not found.
    */
-        Boolean (*UnregisterCodeChunk) (void *addr);
+        BOOLEAN (*UnregisterCodeChunk) (void *addr);
 
   /** 
    * The method is used to callback EM from the profiler thread supported

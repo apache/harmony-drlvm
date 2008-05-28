@@ -427,8 +427,8 @@ void Objects_To_Finalize::run_finalizers()
 
 int Objects_To_Finalize::do_finalization(int quantity) {
     /* BEGIN: added for NATIVE FINALIZER THREAD */
-    Boolean native_finalizer_thread_flag = get_native_finalizer_thread_flag();
-    Boolean native_finalizer_shutdown, native_finalizer_on_exit;
+    BOOLEAN native_finalizer_thread_flag = get_native_finalizer_thread_flag();
+    BOOLEAN native_finalizer_shutdown, native_finalizer_on_exit;
     /* END: added for NATIVE FINALIZER THREAD */
     
     //SetThreadPriority(GetCurrentThread(),THREAD_PRIORITY_HIGHEST);
@@ -448,8 +448,8 @@ int Objects_To_Finalize::do_finalization(int quantity) {
         check_fields_obtained();
         assert(shutdown);
         assert(on_exit);
-        native_finalizer_shutdown = (Boolean)*shutdown;
-        native_finalizer_on_exit = (Boolean)*on_exit;
+        native_finalizer_shutdown = (BOOLEAN)*shutdown;
+        native_finalizer_on_exit = (BOOLEAN)*on_exit;
     }
     /* END: modified for NATIVE FINALIZER THREAD */
 

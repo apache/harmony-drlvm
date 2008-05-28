@@ -33,7 +33,7 @@
 struct GC_Gen_Stats;
 #endif
 
-void gc_set_gen_mode(Boolean status);
+void gc_set_gen_mode(BOOLEAN status);
 
 /* some globals */
 extern POINTER_SIZE_INT NOS_SIZE;
@@ -62,7 +62,7 @@ typedef struct GC_Gen {
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
-  Boolean in_collection;
+  BOOLEAN in_collection;
   int64 time_collections;
   float survive_ratio;  
   
@@ -87,9 +87,9 @@ typedef struct GC_Gen {
   unsigned int collect_kind; /* MAJOR or MINOR */
   unsigned int last_collect_kind;
   unsigned int cause;/*GC_CAUSE_LOS_IS_FULL, GC_CAUSE_NOS_IS_FULL, or GC_CAUSE_RUNTIME_FORCE_GC*/  
-  Boolean collect_result; /* succeed or fail */
+  BOOLEAN collect_result; /* succeed or fail */
   
-  Boolean generate_barrier;
+  BOOLEAN generate_barrier;
 
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
@@ -119,9 +119,9 @@ typedef struct GC_Gen {
   Space *mos;
   Space *los;
       
-  Boolean next_collect_force_major;
+  BOOLEAN next_collect_force_major;
   Gen_Mode_Adaptor* gen_mode_adaptor;
-  Boolean force_gen_mode;
+  BOOLEAN force_gen_mode;
 
 #ifdef GC_GEN_STATS
   GC_Gen_Stats* stats; /*used to record stats when collection*/
@@ -168,7 +168,7 @@ void gc_set_nos(GC_Gen* gc, Space* nos);
 void gc_set_mos(GC_Gen* gc, Space* mos);
 void gc_set_los(GC_Gen* gc, Space* los);
 
-GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean has_los);
+GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, BOOLEAN has_los);
 void gc_gen_decide_collection_kind(GC_Gen* gc, unsigned int cause);
 
 void gc_gen_adapt(GC_Gen* gc, int64 pause_time);
@@ -191,7 +191,7 @@ void gc_gen_iterate_heap(GC_Gen *gc);
 
 void gc_gen_start_concurrent_mark(GC_Gen* gc);
 
-extern Boolean GEN_NONGEN_SWITCH ;
+extern BOOLEAN GEN_NONGEN_SWITCH ;
 
 POINTER_SIZE_INT mos_free_space_size(Space* mos);
 POINTER_SIZE_INT nos_free_space_size(Space* nos);

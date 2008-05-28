@@ -79,7 +79,7 @@ static Free_Chunk_List* wspace_get_free_chunk_list(Wspace* wspace)
   return free_chunk_list;
 }
 
-Boolean wspace_get_free_chunk_concurrent(Wspace *wspace, Free_Chunk* chunk)
+BOOLEAN wspace_get_free_chunk_concurrent(Wspace *wspace, Free_Chunk* chunk)
 {
   POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
   assert(!(chunk_size % CHUNK_GRANULARITY));

@@ -37,13 +37,13 @@ extern VTable *cached_object_array_vtable_ptr;
  * may be called from native code.
  */
 
-Boolean class_is_subtype(Class *sub, Class *super);
+BOOLEAN class_is_subtype(Class *sub, Class *super);
 
 /**
  * Like <code>class_is_subtype</code>, but <code>sub</code> must not be an 
  * interface class.
  */
-Boolean class_is_subtype_fast(VTable *sub, Class *super);
+BOOLEAN class_is_subtype_fast(VTable *sub, Class *super);
 
 
 #ifdef __cplusplus

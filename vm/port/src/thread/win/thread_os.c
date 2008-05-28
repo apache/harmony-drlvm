@@ -125,7 +125,7 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
     return res;
 }
 
-static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
+static int set_guard_page(port_tls_data_t* tlsdata, BOOLEAN set)
 {
     if (!tlsdata)
         tlsdata = get_private_tls_data();
@@ -257,7 +257,7 @@ static int find_stack_addr_size(void** paddr, size_t* psize)
     return 0;
 }
 
-static int init_stack(port_tls_data_t* tlsdata, size_t stack_size, Boolean temp)
+static int init_stack(port_tls_data_t* tlsdata, size_t stack_size, BOOLEAN temp)
 {
     int err;
     size_t stack_begin;
@@ -286,8 +286,8 @@ static int init_stack(port_tls_data_t* tlsdata, size_t stack_size, Boolean temp)
     return setup_stack(tlsdata);
 }
 
-int port_thread_attach_local(port_tls_data_t* tlsdata, Boolean temp,
-                                    Boolean foreign, size_t stack_size)
+int port_thread_attach_local(port_tls_data_t* tlsdata, BOOLEAN temp,
+                                    BOOLEAN foreign, size_t stack_size)
 {
     int res;
 

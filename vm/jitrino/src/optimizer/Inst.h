@@ -522,7 +522,7 @@ private:
     BranchInst(Opcode op, LabelInst* target)
         : Inst(op, Modifier(), Type::Void, OpndManager::getNullOpnd()), targetLabel(target) {};
     BranchInst(Opcode op, Opnd* src, LabelInst* target)
-        : Inst(op, Modifier(), Type::Boolean, OpndManager::getNullOpnd(), src), 
+        : Inst(op, Modifier(), Type::BOOLEAN, OpndManager::getNullOpnd(), src), 
           targetLabel(target) {}
     BranchInst(Opcode op,
                ComparisonModifier mod,

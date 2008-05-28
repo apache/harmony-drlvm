@@ -134,7 +134,7 @@ void  OpndManager::deleteVar(VarOpnd *var) {
 Type* 
 OpndManager::getOpndTypeFromLdType(Type* ldType) {
     switch (ldType->tag) {
-    case Type::Boolean:  case Type::Char:
+    case Type::BOOLEAN:  case Type::Char:
     case Type::Int8:     case Type::Int16:     case Type::Int32:
     case Type::UInt8:    case Type::UInt16:    case Type::UInt32:
         return typeManager.getInt32Type();

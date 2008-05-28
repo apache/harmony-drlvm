@@ -132,19 +132,19 @@ public:
         return (void *)_get_address_of_this(this, method, context);
     }
     
-    Boolean
+    BOOLEAN
         is_soe_area(Method_Handle            method,
         const JitFrameContext* context
         )
     {
         if (_is_soe_area != 0) {
-            return (Boolean)_is_soe_area(this, method, context);
+            return (BOOLEAN)_is_soe_area(this, method, context);
         }
         return 0;
         
     }
 
-    Boolean
+    BOOLEAN
     recompiled_method_callback(Method_Handle  recompiled_method,
                                void          *callback_data)
     {
@@ -154,7 +154,7 @@ public:
         return FALSE;
     }
 
-    Boolean 
+    BOOLEAN 
     supports_compressed_references()
     {
         if (_supports_compressed_references != NULL) {
@@ -272,18 +272,18 @@ private:
                             const JitFrameContext* context
                             );
 
-    Boolean
+    BOOLEAN
         (*_is_soe_area)(JIT_Handle              jit,
         Method_Handle                           method,
         const JitFrameContext*                  context
         );
 
-    Boolean
+    BOOLEAN
     (*_recompiled_method_callback)(JIT_Handle jit,
                                    Method_Handle  recompiled_method, 
                                    void          *callback_data);
 
-    Boolean 
+    BOOLEAN 
     (*_supports_compressed_references)(JIT_Handle jit);
 
     void

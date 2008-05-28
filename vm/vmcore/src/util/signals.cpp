@@ -87,7 +87,7 @@ bool check_stack_size_enough_for_exception_catch(void* sp)
     return RESTORE_STACK_SIZE < available_stack_size;
 }
 
-Boolean stack_overflow_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+BOOLEAN stack_overflow_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
     TRACE2("signals", ("SOE detected at ip=%p, sp=%p",
                             regs->get_ip(), regs->get_sp()));
@@ -141,7 +141,7 @@ Boolean stack_overflow_handler(port_sigtype UNREF signum, Registers* regs, void*
     return TRUE;
 }
 
-Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+BOOLEAN null_reference_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
     TRACE2("signals", "NPE detected at " << regs->get_ip());
 
@@ -181,28 +181,28 @@ Boolean null_reference_handler(port_sigtype UNREF signum, Registers* regs, void*
     return TRUE;
 }
 
-Boolean abort_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* fault_addr)
+BOOLEAN abort_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* fault_addr)
 {
     TRACE2("signals", "Abort detected at " << regs->get_ip());
     // Crash always
     return FALSE;
 }
 
-Boolean ctrl_backslash_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
+BOOLEAN ctrl_backslash_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
 {
     TRACE2("signals", "Ctrl+\\ pressed");
     vm_dump_handler();
     return TRUE;
 }
 
-Boolean ctrl_break_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
+BOOLEAN ctrl_break_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
 {
     TRACE2("signals", "Ctrl+Break pressed");
     vm_dump_handler();
     return TRUE;
 }
 
-Boolean ctrl_c_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
+BOOLEAN ctrl_c_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* UNREF fault_addr)
 {
     TRACE2("signals", "Ctrl+C pressed");
     vm_interrupt_handler();
@@ -211,7 +211,7 @@ Boolean ctrl_c_handler(port_sigtype UNREF signum, Registers* UNREF regs, void* U
     return TRUE;
 }
 
-Boolean native_breakpoint_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+BOOLEAN native_breakpoint_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
     TRACE2("signals", "Native breakpoint detected at " << regs->get_ip());
 #ifdef _IPF_
@@ -235,10 +235,10 @@ Boolean native_breakpoint_handler(port_sigtype UNREF signum, Registers* regs, vo
     if (is_handled)
         return TRUE;
 
-    return (Boolean)jvmti_jit_breakpoint_handler(regs);
+    return (BOOLEAN)jvmti_jit_breakpoint_handler(regs);
 }
 
-Boolean arithmetic_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
+BOOLEAN arithmetic_handler(port_sigtype UNREF signum, Registers* regs, void* fault_addr)
 {
     TRACE2("signals", "ArithmeticException detected at " << regs->get_ip());
 #ifdef _IPF_

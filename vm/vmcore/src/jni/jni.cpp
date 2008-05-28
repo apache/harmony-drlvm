@@ -729,7 +729,7 @@ jboolean JNICALL IsAssignableFrom(JNIEnv * UNREF jni_env,
     Class* clss1 = jclass_to_struct_Class(clazz1);
     Class* clss2 = jclass_to_struct_Class(clazz2);
 
-    Boolean isAssignable = class_is_subtype(clss1, clss2);
+    BOOLEAN isAssignable = class_is_subtype(clss1, clss2);
     if (isAssignable) {
         return JNI_TRUE;
     } else {
@@ -1141,7 +1141,7 @@ jboolean JNICALL IsInstanceOf(JNIEnv * jni_env,
     Class* clss = jclass_to_struct_Class(clazz);
     Class* obj_clss = jclass_to_struct_Class(obj_class);
 
-    Boolean isInstance = obj_clss->is_instanceof(clss);
+    BOOLEAN isInstance = obj_clss->is_instanceof(clss);
 
     return isInstance ? JNI_TRUE : JNI_FALSE;
 } //IsInstanceOf
@@ -1761,7 +1761,7 @@ void global_object_handles_init(JNIEnv* jni_env)
     gh_aodouble->object = struct_Class_to_java_lang_Class(vm_env->ArrayOfDouble_Class);
     tmn_suspend_enable();    // -------------^^^
 
-    Class* jlboolean = vm_env->LoadCoreClass("java/lang/Boolean");
+    Class* jlboolean = vm_env->LoadCoreClass("java/lang/BOOLEAN");
     Class* jlbyte = vm_env->LoadCoreClass("java/lang/Byte");
     Class* jlchar = vm_env->LoadCoreClass("java/lang/Character");
     Class* jlshort = vm_env->LoadCoreClass("java/lang/Short");

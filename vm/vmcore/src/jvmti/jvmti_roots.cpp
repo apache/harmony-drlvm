@@ -188,7 +188,7 @@ static void ti_enumerate_root(void* root, Managed_Object_Handle obj)
 
 static void ti_add_root_set_entry(
         Managed_Object_Handle *root, 
-        Boolean UNREF pinned)
+        BOOLEAN UNREF pinned)
 {
     TRACE2("ti.root", "ti root " << root << " -> " << *root);
     ti_enumerate_root(root, *root);
@@ -196,8 +196,8 @@ static void ti_add_root_set_entry(
 
 static void ti_add_weak_root_set_entry(
         Managed_Object_Handle *root,
-        Boolean UNREF pinned,
-        Boolean UNREF short_weak)
+        BOOLEAN UNREF pinned,
+        BOOLEAN UNREF short_weak)
 {
     TRACE2("ti.root", "ti root " << root << " -> " << *root);
     // XXX: should weak roots be enumerated?
@@ -207,7 +207,7 @@ static void ti_add_weak_root_set_entry(
 static void ti_add_root_set_entry_interior_pointer(
         void **slot, 
         int offset, 
-        Boolean UNREF pinned)
+        BOOLEAN UNREF pinned)
 {
     Managed_Object_Handle obj = (Managed_Object_Handle)
         ((UDATA)*slot - offset);
@@ -216,7 +216,7 @@ static void ti_add_root_set_entry_interior_pointer(
 
 static void ti_add_compressed_root_set_entry(
         U_32 *ref, 
-        Boolean UNREF pinned)
+        BOOLEAN UNREF pinned)
 {
     assert(REFS_IS_COMPRESSED_MODE);
 #ifndef REFS_USE_UNCOMPRESSED
@@ -341,13 +341,13 @@ void ti_enumerate_roots(TIEnv *ti_env, hythread_iterator_t iterator)
 
     // FIXME: weird function table manipulations
     void (*save_gc_add_root_set_entry)
-        (Managed_Object_Handle *ref, Boolean pinned);
+        (Managed_Object_Handle *ref, BOOLEAN pinned);
     void (*save_gc_add_weak_root_set_entry)
-        (Managed_Object_Handle *ref1, Boolean pinned, Boolean short_weak);
+        (Managed_Object_Handle *ref1, BOOLEAN pinned, BOOLEAN short_weak);
     void (*save_gc_add_root_set_entry_interior_pointer)
-        (void **slot, int offset, Boolean pinned);
+        (void **slot, int offset, BOOLEAN pinned);
     void (*save_gc_add_compressed_root_set_entry)
-        (U_32 *ref, Boolean pinned);
+        (U_32 *ref, BOOLEAN pinned);
 
     // save away old values
     save_gc_add_root_set_entry =

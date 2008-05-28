@@ -182,10 +182,10 @@ typedef union Chunk{
 } Chunk;
 */
 
-inline Boolean is_free_chunk_merged(Free_Chunk* free_chunk)
+inline BOOLEAN is_free_chunk_merged(Free_Chunk* free_chunk)
 {
   assert(free_chunk->status & CHUNK_FREE);
-  return (Boolean)(free_chunk->status & CHUNK_MERGED);
+  return (BOOLEAN)(free_chunk->status & CHUNK_MERGED);
 }
 
 inline void free_chunk_list_init(Free_Chunk_List *list)
@@ -375,7 +375,7 @@ typedef struct Size_Segment {
   unsigned int size_min;
   unsigned int size_max;
   unsigned int seg_index;
-  Boolean local_alloc;
+  BOOLEAN local_alloc;
   unsigned int chunk_num;
   unsigned int gran_shift_bits;
   POINTER_SIZE_INT granularity;
@@ -549,7 +549,7 @@ void wspace_put_free_chunk_to_tail(Wspace *wspace, Free_Chunk *chunk);
 
 extern Free_Chunk *wspace_get_normal_free_chunk(Wspace *wspace);
 extern Free_Chunk *wspace_get_abnormal_free_chunk(Wspace *wspace, unsigned int chunk_size);
-extern Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size, Boolean is_normal_chunk);
+extern Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size, BOOLEAN is_normal_chunk);
 
 extern void wspace_init_pfc_pool_iterator(Wspace *wspace);
 extern Pool *wspace_grab_next_pfc_pool(Wspace *wspace);
@@ -557,7 +557,7 @@ void wspace_exchange_pfc_pool(Wspace *wspace);
 
 extern Chunk_Header *wspace_steal_pfc(Wspace *wspace, unsigned int index);
 
-extern POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, Boolean show_chunk_info);
+extern POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, BOOLEAN show_chunk_info);
 
 extern void zeroing_free_chunk(Free_Chunk *chunk);
 

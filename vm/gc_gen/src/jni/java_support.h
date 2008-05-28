@@ -26,9 +26,9 @@
 #include "../common/gc_platform.h"
 
 extern Class_Handle GCHelper_clss;
-extern Boolean java_helper_inlined;
+extern BOOLEAN java_helper_inlined;
 
-void HelperClass_set_GenMode(Boolean status);
+void HelperClass_set_GenMode(BOOLEAN status);
 void HelperClass_set_NosBoundary(void* boundary);
 
 #endif /*_JAVA_SUPPORT_H_*/

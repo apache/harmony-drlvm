@@ -52,14 +52,14 @@ static void RegisterCodeChunk(Method_Handle method_handle, void *code_addr,
         size, data);
 }
 
-static Method_Handle LookupCodeChunk(void *addr, Boolean is_ip_past, void **code_addr,
+static Method_Handle LookupCodeChunk(void *addr, BOOLEAN is_ip_past, void **code_addr,
     size_t *size, void **data)
 {
     return DrlEMFactory::getEMInstance()->lookupCodeChunk(addr, is_ip_past,
         code_addr, size, data);
 }
 
-static Boolean UnregisterCodeChunk(void *addr)
+static BOOLEAN UnregisterCodeChunk(void *addr)
 {
     return DrlEMFactory::getEMInstance()->unregisterCodeChunk(addr);
 }

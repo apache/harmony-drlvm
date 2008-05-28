@@ -52,18 +52,18 @@ inline void vector_block_init(Vector_Block* block, unsigned int size)
 inline unsigned int vector_block_entry_count(Vector_Block* block)
 { return (unsigned int)(block->tail - block->head); }
 
-inline Boolean vector_block_is_full(Vector_Block* block)
+inline BOOLEAN vector_block_is_full(Vector_Block* block)
 { return block->tail == block->heap_end; }
 
 /*
-inline Boolean vector_block_is_empty(Vector_Block* block)
+inline BOOLEAN vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->head; }
 
-inline Boolean vector_block_is_full(Vector_Block* block)
+inline BOOLEAN vector_block_is_full(Vector_Block* block)
 { return (block->tail - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
 */
 
-inline Boolean vector_block_is_empty(Vector_Block* block)
+inline BOOLEAN vector_block_is_empty(Vector_Block* block)
 { return block->tail == block->head; }
 
 inline void vector_block_add_entry(Vector_Block* block, POINTER_SIZE_INT value)
@@ -107,17 +107,17 @@ inline POINTER_SIZE_INT vector_block_get_at_index(Vector_Block* block, unsigned 
 #define VECTOR_BLOCK_FULL_BIT  0x02
 #define VECTOR_BLOCK_SHARE_ID_SHIFT 0x05
 #define VECTOR_BLOCK_EXCLUSIVE_ID 0xFFff
-inline Boolean vector_block_is_shared(Vector_Block* block)
+inline BOOLEAN vector_block_is_shared(Vector_Block* block)
 {
-  return (Boolean)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_SHARE_BIT);
+  return (BOOLEAN)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_SHARE_BIT);
 }
 
-inline Boolean vector_block_is_set_full(Vector_Block* block)
+inline BOOLEAN vector_block_is_set_full(Vector_Block* block)
 {
-  return (Boolean)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_FULL_BIT);
+  return (BOOLEAN)((POINTER_SIZE_INT)block->next & VECTOR_BLOCK_FULL_BIT);
 }
 
-inline Boolean vector_block_set_full(Vector_Block* block)
+inline BOOLEAN vector_block_set_full(Vector_Block* block)
 {
   POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
   POINTER_SIZE_INT new_shared_var = old_shared_var | VECTOR_BLOCK_FULL_BIT;
@@ -133,7 +133,7 @@ inline Boolean vector_block_set_full(Vector_Block* block)
 
 }
 
-inline Boolean vector_block_set_shared(Vector_Block* block, unsigned int share_id)
+inline BOOLEAN vector_block_set_shared(Vector_Block* block, unsigned int share_id)
 {
   POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT)((share_id << VECTOR_BLOCK_SHARE_ID_SHIFT) | VECTOR_BLOCK_SHARE_BIT);
   POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
@@ -147,7 +147,7 @@ inline Boolean vector_block_set_shared(Vector_Block* block, unsigned int share_i
   }    
 }
 
-inline Boolean vector_block_not_full_set_unshared(Vector_Block* block)
+inline BOOLEAN vector_block_not_full_set_unshared(Vector_Block* block)
 {
   POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT) 0;
   POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
@@ -164,7 +164,7 @@ inline Boolean vector_block_not_full_set_unshared(Vector_Block* block)
   return FALSE;
 }
 
-inline Boolean vector_block_set_exclusive(Vector_Block* block)
+inline BOOLEAN vector_block_set_exclusive(Vector_Block* block)
 {
   POINTER_SIZE_INT new_shared_var = (POINTER_SIZE_INT)((VECTOR_BLOCK_EXCLUSIVE_ID << VECTOR_BLOCK_SHARE_ID_SHIFT) | VECTOR_BLOCK_SHARE_BIT);
   POINTER_SIZE_INT old_shared_var = (POINTER_SIZE_INT) block->next;
@@ -201,7 +201,7 @@ inline POINTER_SIZE_INT* vector_block_iterator_init(Vector_Block* block)
 inline POINTER_SIZE_INT* vector_block_iterator_advance(Vector_Block* block, POINTER_SIZE_INT* iter)
 {  return ++iter; }
 
-inline Boolean vector_block_iterator_end(Vector_Block* block, POINTER_SIZE_INT* iter)
+inline BOOLEAN vector_block_iterator_end(Vector_Block* block, POINTER_SIZE_INT* iter)
 {  return iter == block->tail; }
 
 inline POINTER_SIZE_INT* vector_block_get_last_entry(Vector_Block* block)
@@ -222,15 +222,15 @@ inline void vector_stack_clear(Vector_Block* block)
 #endif
 }
 
-inline Boolean vector_stack_is_empty(Vector_Block* block)
+inline BOOLEAN vector_stack_is_empty(Vector_Block* block)
 {  return (block->head == block->tail); }
 
 /*
-inline Boolean vector_stack_is_empty(Vector_Block* block)
+inline BOOLEAN vector_stack_is_empty(Vector_Block* block)
 { return (block->head - block->entries) == VECTOR_BLOCK_ENTRY_NUM; }
 */
 
-inline Boolean vector_stack_is_full(Vector_Block* block)
+inline BOOLEAN vector_stack_is_full(Vector_Block* block)
 {  return (block->head == block->entries); }
 
 inline void vector_stack_push(Vector_Block* block, POINTER_SIZE_INT value)

@@ -82,7 +82,7 @@ void blocked_space_shrink(Blocked_Space* space, unsigned int changed_size)
   POINTER_SIZE_INT decommit_size = (POINTER_SIZE_INT)old_end - (POINTER_SIZE_INT)decommit_base;
   assert(decommit_size && !(decommit_size%GC_BLOCK_SIZE_BYTES));
   
-  Boolean result = vm_decommit_mem(decommit_base, decommit_size);
+  BOOLEAN result = vm_decommit_mem(decommit_base, decommit_size);
   assert(result == TRUE);
 
   space->heap_end = decommit_base;

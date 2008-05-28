@@ -46,7 +46,7 @@ typedef struct Con_Collection_Scheduler {
 void con_collection_scheduler_initialize(GC* gc);
 void con_collection_scheduler_destruct(GC* gc);
 
-Boolean gc_sched_con_collection(GC* gc, unsigned int gc_cause);
+BOOLEAN gc_sched_con_collection(GC* gc, unsigned int gc_cause);
 void gc_update_con_collection_scheduler(GC* gc, int64 time_mutator, int64 time_collection);
 
 void gc_decide_cc_scheduler_kind(char* cc_scheduler);

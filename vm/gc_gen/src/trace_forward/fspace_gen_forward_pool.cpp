@@ -29,7 +29,7 @@
 #ifdef GC_GEN_STATS
 #include "../gen/gen_stats.h"
 #endif
-static FORCE_INLINE Boolean fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
+static FORCE_INLINE BOOLEAN fspace_object_to_be_forwarded(Partial_Reveal_Object *p_obj, Fspace *fspace)
 {
   assert(obj_belongs_to_nos(p_obj));  
   return forward_first_half? (p_obj < object_forwarding_boundary):(p_obj>=object_forwarding_boundary);

@@ -19,7 +19,7 @@
 #include "verify_gc_effect.h"
 #include "verify_mutator_effect.h"
 
-Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_after_gc, Pool* free_pool ,Object_Comparator object_comparator)
+BOOLEAN verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_after_gc, Pool* free_pool ,Object_Comparator object_comparator)
 {
   Vector_Block* objs_set_before_gc = pool_get_entry(objs_pool_before_gc);
   Vector_Block* objs_set_after_gc = pool_get_entry(objs_pool_after_gc);
@@ -55,7 +55,7 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
   }
 }
 
-Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
+BOOLEAN verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
 {
   Heap_Verifier_Metadata* verifier_metadata = heap_verifier->heap_verifier_metadata;
   GC_Verifier* gc_verifier = heap_verifier->gc_verifier;
@@ -81,7 +81,7 @@ Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier)
   return TRUE;
 }
 
-Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
+BOOLEAN verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
 {
   Partial_Reveal_Object* p_obj = read_slot(p_ref);
   assert(address_belongs_to_gc_heap(p_obj,heap_verifier->gc));
@@ -145,7 +145,7 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier* heap_verifier)
 }
 
 
-Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options)
+BOOLEAN verifier_parse_options(Heap_Verifier* heap_verifier, char* options)
 {
   char* verifier_options = options;
   char* option = NULL;

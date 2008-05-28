@@ -155,7 +155,7 @@ JIT_profile_notification_callback(JIT_Handle jit, PC_Handle pc, Method_Handle mh
 // recompiled
 // Returns TRUE if any code was modified and FALSE otherwise
 extern "C"
-JITEXPORT Boolean
+JITEXPORT BOOLEAN
 JIT_recompiled_method_callback(JIT_Handle jit,
                                Method_Handle recompiled_method,
                                void *callback_data)
@@ -387,7 +387,7 @@ JIT_fix_handler_context(JIT_Handle jit, Method_Handle method,
 }
 
 extern "C"
-JITEXPORT Boolean
+JITEXPORT BOOLEAN
 JIT_is_soe_area
 (JIT_Handle jit, Method_Handle method,
                         const ::JitFrameContext   *context)
@@ -418,7 +418,7 @@ JIT_get_address_of_this(JIT_Handle jit, Method_Handle method,
 }
 
 extern "C"
-JITEXPORT Boolean
+JITEXPORT BOOLEAN
 JIT_supports_compressed_references(JIT_Handle jit)
 {
 #ifdef _EM64T_

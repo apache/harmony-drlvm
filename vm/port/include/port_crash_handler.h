@@ -99,7 +99,7 @@ typedef enum
  * execution should continue. <code>FALSE</code> if signal is not handled
  * by the process and crash handler should execute crash sequence.
  */
-typedef Boolean (*port_signal_handler)(
+typedef BOOLEAN (*port_signal_handler)(
     port_sigtype signum,
     Registers *regs,
     void* fault_addr);
@@ -135,7 +135,7 @@ typedef struct
  * @return <code>TRUE</code> if initalization is successful.
  * <code>FALSE</code> if initialization failed.
  */
-VMEXPORT Boolean port_init_crash_handler(
+VMEXPORT BOOLEAN port_init_crash_handler(
     port_signal_handler_registration *registrations,
     unsigned count,
     port_unwind_compiled_frame unwind_callback);
@@ -243,7 +243,7 @@ typedef void (*port_crash_handler_action)(
  * <code>FALSE</code> if action was not added because no memory could
  * be allocated.
  */
-VMEXPORT Boolean port_crash_handler_add_action(port_crash_handler_action action);
+VMEXPORT BOOLEAN port_crash_handler_add_action(port_crash_handler_action action);
 
 /**
  * Shutdown signals and crash handler. All signals are assigned their
@@ -255,7 +255,7 @@ VMEXPORT Boolean port_crash_handler_add_action(port_crash_handler_action action)
  * @return <code>TRUE</code> if shutdown is
  * successful. <code>FALSE</code> if shutdown failed.
  */
-VMEXPORT Boolean port_shutdown_crash_handler();
+VMEXPORT BOOLEAN port_shutdown_crash_handler();
 
 
 /**
@@ -284,7 +284,7 @@ VMEXPORT int port_clear_breakpoint(void* addr, unsigned char prev);
 * @param [in] addr  - memory location to deinstrument.
 * @return <code>TRUE</code> if instrumented; FALSE otherwise.
 */
-VMEXPORT Boolean port_is_breakpoint_set(void* addr);
+VMEXPORT BOOLEAN port_is_breakpoint_set(void* addr);
 
 
 

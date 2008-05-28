@@ -119,7 +119,7 @@ inline Node* sync_stack_pop(Sync_Stack* stack)
   return 0;
 }
 
-inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
+inline BOOLEAN sync_stack_push(Sync_Stack* stack, Node* node)
 {
   Stack_Top cur_top = stack->top;
   node->next = stack_top_get_entry(cur_top);
@@ -142,7 +142,7 @@ inline Boolean sync_stack_push(Sync_Stack* stack, Node* node)
 
 /* it does not matter whether this is atomic or not, because
    it is only invoked when there is no contention or only for rough idea */
-inline Boolean sync_stack_is_empty(Sync_Stack* stack)
+inline BOOLEAN sync_stack_is_empty(Sync_Stack* stack)
 {
   return (stack_top_get_entry(stack->top) == NULL);
 }

@@ -21,7 +21,7 @@
 #include "verify_mutator_effect.h"
 
 char* GC_VERIFY = NULL;
-Boolean verify_live_heap;
+BOOLEAN verify_live_heap;
 
 Heap_Verifier* heap_verifier;
 
@@ -106,7 +106,7 @@ void verify_heap_after_gc(GC* gc)
   verifier_clear_gc_verification(heap_verifier);
 }
 
-void gc_verify_heap(GC* gc, Boolean is_before_gc)
+void gc_verify_heap(GC* gc, BOOLEAN is_before_gc)
 {
   heap_verifier->is_before_gc = is_before_gc;
 

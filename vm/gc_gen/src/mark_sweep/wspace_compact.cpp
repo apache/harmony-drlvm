@@ -61,7 +61,7 @@ static inline void sorted_chunk_bucket_add_entry(Chunk_Header **head, Chunk_Head
 }
 
 /* One assumption: pfc_pool is not empty */
-static Boolean pfc_pool_roughly_sort(Pool *pfc_pool, Chunk_Header **least_free_chunk, Chunk_Header **most_free_chunk)
+static BOOLEAN pfc_pool_roughly_sort(Pool *pfc_pool, Chunk_Header **least_free_chunk, Chunk_Header **most_free_chunk)
 {
   Chunk_Header *bucket_head[PFC_SORT_NUM];  /* Sorted chunk buckets' heads */
   Chunk_Header *bucket_tail[PFC_SORT_NUM];  /* Sorted chunk buckets' tails */
@@ -242,12 +242,12 @@ void wspace_compact(Collector *collector, Wspace *wspace)
   
   for(; pfc_pool; pfc_pool = wspace_grab_next_pfc_pool(wspace)){
     if(pool_is_empty(pfc_pool)) continue;
-    Boolean pfc_pool_need_compact = pfc_pool_roughly_sort(pfc_pool, &least_free_chunk, &most_free_chunk);
+    BOOLEAN pfc_pool_need_compact = pfc_pool_roughly_sort(pfc_pool, &least_free_chunk, &most_free_chunk);
     if(!pfc_pool_need_compact) continue;
     
     Chunk_Header *dest = get_least_free_chunk(&least_free_chunk, &most_free_chunk);
     Chunk_Header *src = get_most_free_chunk(&least_free_chunk, &most_free_chunk);
-    Boolean src_is_new = TRUE;
+    BOOLEAN src_is_new = TRUE;
     while(dest && src){
       if(src_is_new)
         src->slot_index = 0;

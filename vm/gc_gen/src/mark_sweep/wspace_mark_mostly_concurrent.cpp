@@ -19,9 +19,9 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../thread/marker.h"
 
-volatile Boolean need_terminate_mostly_con_mark;
+volatile BOOLEAN need_terminate_mostly_con_mark;
 
-Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj);
+BOOLEAN obj_is_marked_in_table(Partial_Reveal_Object *obj);
 
 static FORCE_INLINE void scan_slot(Collector* marker, REF *p_ref)
 {
@@ -93,7 +93,7 @@ void mostly_con_mark_terminate_reset()
 void terminate_mostly_con_mark()
 { need_terminate_mostly_con_mark = TRUE; }
 
-static Boolean concurrent_mark_need_terminating(GC* gc)
+static BOOLEAN concurrent_mark_need_terminating(GC* gc)
 {
   if(need_terminate_mostly_con_mark) return TRUE;
     

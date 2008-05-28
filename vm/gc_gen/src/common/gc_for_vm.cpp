@@ -41,11 +41,11 @@
 #endif
 
 static GC* p_global_gc = NULL;
-Boolean mutator_need_block;
+BOOLEAN mutator_need_block;
 
 void gc_tls_init();
 
-Boolean gc_requires_barriers() 
+BOOLEAN gc_requires_barriers() 
 {   return p_global_gc->generate_barrier; }
 
 static void gc_get_system_info(GC *gc)
@@ -163,7 +163,7 @@ void gc_wrapup()
   INFO2("gc.process", "GC: end of GC wrapup\n");
 }
 
-Boolean gc_supports_compressed_references()
+BOOLEAN gc_supports_compressed_references()
 {
 #ifdef COMPRESS_REFERENCE
   return TRUE;
@@ -173,7 +173,7 @@ Boolean gc_supports_compressed_references()
 }
 
 /* this interface need reconsidering. is_pinned is unused. */
-void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned) 
+void gc_add_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned) 
 {
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
   Partial_Reveal_Object* p_obj = *p_ref;
@@ -195,12 +195,12 @@ void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
   gc_rootset_add_entry(p_global_gc, p_ref);
 } 
 
-void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned) 
+void gc_add_root_set_entry_interior_pointer (void **slot, int offset, BOOLEAN is_pinned) 
 {  
   add_root_set_entry_interior_pointer(slot, offset, is_pinned); 
 }
 
-void gc_add_compressed_root_set_entry(REF* ref, Boolean is_pinned)
+void gc_add_compressed_root_set_entry(REF* ref, BOOLEAN is_pinned)
 {
   REF *p_ref = (REF *)ref;
   if(read_slot(p_ref) == NULL) return;
@@ -210,12 +210,12 @@ void gc_add_compressed_root_set_entry(REF* ref, Boolean is_pinned)
   gc_compressed_rootset_add_entry(p_global_gc, p_ref);
 }
 
-Boolean gc_supports_class_unloading()
+BOOLEAN gc_supports_class_unloading()
 {
   return TRACE_JLC_VIA_VTABLE;
 }
 
-void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, Boolean is_short_weak)
+void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned, BOOLEAN is_short_weak)
 {
   //assert(is_short_weak == FALSE); //Currently no need for short_weak_roots
   Partial_Reveal_Object** p_ref = (Partial_Reveal_Object**)ref;
@@ -233,7 +233,7 @@ void gc_add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned, B
   gc_weak_rootset_add_entry(p_global_gc, p_ref, is_short_weak);
 }
 
-extern Boolean IGNORE_FORCE_GC;
+extern BOOLEAN IGNORE_FORCE_GC;
 
 /* VM to force GC */
 void gc_force_gc() 
@@ -318,7 +318,7 @@ int64 gc_get_collection_time()
 void gc_vm_initialized()
 { return; }
 
-Boolean gc_is_object_pinned (Managed_Object_Handle obj)
+BOOLEAN gc_is_object_pinned (Managed_Object_Handle obj)
 {  return 0; }
 
 void gc_pin_object (Managed_Object_Handle* p_object) 
@@ -414,7 +414,7 @@ void gc_finalize_on_exit()
  * }
  */
 
-extern Boolean JVMTI_HEAP_ITERATION;
+extern BOOLEAN JVMTI_HEAP_ITERATION;
 void gc_iterate_heap() {
     // data structures in not consistent for heap iteration
     if (!JVMTI_HEAP_ITERATION) return;
@@ -431,14 +431,14 @@ void gc_iterate_heap() {
 void gc_set_mutator_block_flag()
 {  mutator_need_block = TRUE; }
 
-Boolean gc_clear_mutator_block_flag()
+BOOLEAN gc_clear_mutator_block_flag()
 {
-  Boolean old_flag = mutator_need_block;
+  BOOLEAN old_flag = mutator_need_block;
   mutator_need_block = FALSE;
   return old_flag;
 }
 
-Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
+BOOLEAN obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }

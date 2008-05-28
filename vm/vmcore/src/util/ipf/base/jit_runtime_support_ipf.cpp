@@ -257,7 +257,7 @@ static void get_vm_rt_new_with_thread_pointer_compactor(Merced_Code_Emitter &emi
                                                          void **slow_obj_alloc_proc,
                                                          bool inlining_allowed)
 {
-    Boolean use_inline_allocation_sequence = TRUE;
+    BOOLEAN use_inline_allocation_sequence = TRUE;
     size_t offset_gc_local = (U_8*)&(p_TLS_vmthread->_gc_private_information) - (U_8*)p_TLS_vmthread;
     unsigned current_offset = 1;
     unsigned limit_offset = 1;
@@ -711,7 +711,7 @@ static void emit_fast_type_check_without_vm_stats(Merced_Code_Emitter& emitter,
     emitter.set_target(call_label);
     int out0, save_pfs, save_b0, save_gp;
     const int num_in_args = 2, num_out_args = 2;
-    Boolean (*p_class_is_subtype)(Class *sub, Class *super);
+    BOOLEAN (*p_class_is_subtype)(Class *sub, Class *super);
     p_class_is_subtype = class_is_subtype;
     emit_alloc_for_single_call(emitter, num_in_args, num_out_args,
         (void **)p_class_is_subtype,
@@ -1022,7 +1022,7 @@ static void *get_vm_rt_aastore_test_address_compactor()
 } //get_vm_rt_aastore_test_address_compactor
 
 
-static Boolean is_class_initialized(Class *clss)
+static BOOLEAN is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_is_class_initialized++;
@@ -1062,7 +1062,7 @@ static void *get_vm_rt_initialize_class_compactor()
     //emitter.ipf_adds(SCRATCH_GENERAL_REG, (int)((U_8*)&dummy->state-(U_8*)dummy), IN_REG0);
     emitter.ipf_adds(SCRATCH_GENERAL_REG3, 0, 0);
 
-    Boolean (*p_is_class_initialized)(Class *clss);
+    BOOLEAN (*p_is_class_initialized)(Class *clss);
     p_is_class_initialized = is_class_initialized;
     emit_call_with_gp(emitter, (void**)p_is_class_initialized, false);
 

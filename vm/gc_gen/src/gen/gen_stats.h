@@ -20,7 +20,7 @@
 
 #include "gen.h"
 
-extern Boolean gc_profile;
+extern BOOLEAN gc_profile;
 
 typedef struct GC_Gen_Stats {
   unsigned int num_minor_collections;
@@ -49,7 +49,7 @@ typedef struct GC_Gen_Stats {
   int nos_mos_collection_algo_major;
 
   /*los related info when minor or major*/
-  Boolean is_los_collected; /*whether large obj space is collected or not*/
+  BOOLEAN is_los_collected; /*whether large obj space is collected or not*/
   unsigned int los_suviving_obj_num;
   POINTER_SIZE_INT los_suviving_obj_size;
   float los_surviving_ratio;
@@ -72,7 +72,7 @@ inline void gc_gen_stats_set_los_algo(GC_Gen* gc, int algo)
   gc->stats->los_collection_algo = algo;
 }
 
-inline void gc_gen_stats_set_los_collected_flag(GC_Gen* gc, Boolean flag)
+inline void gc_gen_stats_set_los_collected_flag(GC_Gen* gc, BOOLEAN flag)
 {
   gc->stats->is_los_collected = flag;
 }

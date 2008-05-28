@@ -75,7 +75,7 @@ void vm_monitor_exit_synchronized_method(StackIterator *si)
     }
     //SOE checking area is an area in the beginning of a method.
     //when unwinding from SOE EIP no need to call monexit -> no monenter was done
-    Boolean is_soe_area = jit->is_soe_area(method, si_get_jit_context(si));
+    BOOLEAN is_soe_area = jit->is_soe_area(method, si_get_jit_context(si));
     if (is_soe_area) {
         return;
     }
@@ -143,7 +143,7 @@ static U_32 vm_monitor_try_exit_default(ManagedObject *p_obj) {
 //
 //
 
-Boolean verify_object_header(void *ptr)
+BOOLEAN verify_object_header(void *ptr)
 {
         return FALSE;
     }

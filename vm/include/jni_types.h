@@ -318,7 +318,7 @@ typedef struct _jmethodID* jmethodID;
  */
 
 /*
- * Boolean constants
+ * BOOLEAN constants
  */
 /**
  * Constant which defines boolean truth in native Java functions. It

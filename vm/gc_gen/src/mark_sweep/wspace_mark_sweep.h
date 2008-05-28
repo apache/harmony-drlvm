@@ -24,7 +24,7 @@
 #define PFC_REUSABLE_RATIO 0.1
 #define WSPACE_COMPACT_RATIO 0.06
 
-inline Boolean chunk_is_reusable(Chunk_Header *chunk)
+inline BOOLEAN chunk_is_reusable(Chunk_Header *chunk)
 { return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
 
 #define OBJ_ALLOC_BIT_IN_TABLE  0x01
@@ -58,7 +58,7 @@ extern volatile POINTER_SIZE_INT cur_mark_black_color;
 extern volatile POINTER_SIZE_INT cur_alloc_mask;
 extern volatile POINTER_SIZE_INT cur_mark_mask;
 
-inline Boolean is_super_obj(Partial_Reveal_Object *obj)
+inline BOOLEAN is_super_obj(Partial_Reveal_Object *obj)
 {
   //return get_obj_info_raw(obj) & SUPER_OBJ_MASK;/*
   if(vm_object_size(obj) > SUPER_OBJ_THRESHOLD){
@@ -108,7 +108,7 @@ FORCE_INLINE POINTER_SIZE_INT *get_color_word_in_table(Partial_Reveal_Object *ob
 
 #if 0
 /* Accurate marking: TRUE stands for being marked by this collector, and FALSE for another collector */
-inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
+inline BOOLEAN obj_mark_in_table(Partial_Reveal_Object *obj)
 {
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -141,7 +141,7 @@ inline Boolean obj_mark_in_table(Partial_Reveal_Object *obj)
 
 #endif
 
-FORCE_INLINE Boolean obj_is_mark_gray_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_is_mark_gray_in_table(Partial_Reveal_Object *obj)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -155,9 +155,9 @@ FORCE_INLINE Boolean obj_is_mark_gray_in_table(Partial_Reveal_Object *obj)
     return FALSE;
 }
 
-Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj);
+BOOLEAN obj_is_mark_black_in_table(Partial_Reveal_Object *obj);
 
-FORCE_INLINE Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+FORCE_INLINE BOOLEAN obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -173,7 +173,7 @@ FORCE_INLINE Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsi
 }
 
 
-FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_mark_gray_in_table(Partial_Reveal_Object *obj)
 {
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -203,7 +203,7 @@ FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
-FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+FORCE_INLINE BOOLEAN obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
 {
   //assert(obj_is_mark_in_table(obj));
   volatile POINTER_SIZE_INT *p_color_word;
@@ -233,7 +233,7 @@ FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigne
 
 }
 
-FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_mark_black_in_table(Partial_Reveal_Object *obj)
 {
  // assert(obj_is_mark_in_table(obj));
   volatile POINTER_SIZE_INT *p_color_word;
@@ -262,7 +262,7 @@ FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
-FORCE_INLINE Boolean obj_dirty_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_dirty_in_table(Partial_Reveal_Object *obj)
 {
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -289,7 +289,7 @@ FORCE_INLINE Boolean obj_dirty_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
-FORCE_INLINE Boolean obj_is_dirty_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_is_dirty_in_table(Partial_Reveal_Object *obj)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -304,7 +304,7 @@ FORCE_INLINE Boolean obj_is_dirty_in_table(Partial_Reveal_Object *obj)
     return FALSE;
 }
 
-FORCE_INLINE Boolean obj_clear_mark_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_clear_mark_in_table(Partial_Reveal_Object *obj)
 {
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -333,7 +333,7 @@ FORCE_INLINE Boolean obj_clear_mark_in_table(Partial_Reveal_Object *obj)
 
 }
 
-FORCE_INLINE Boolean obj_clear_dirty_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_clear_dirty_in_table(Partial_Reveal_Object *obj)
 {
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -362,7 +362,7 @@ FORCE_INLINE Boolean obj_clear_dirty_in_table(Partial_Reveal_Object *obj)
 
 }
 
-FORCE_INLINE Boolean obj_is_alloc_in_color_table(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_is_alloc_in_color_table(Partial_Reveal_Object *obj)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -370,20 +370,20 @@ FORCE_INLINE Boolean obj_is_alloc_in_color_table(Partial_Reveal_Object *obj)
   POINTER_SIZE_INT current_word = *p_color_word;
   POINTER_SIZE_INT obj_alloc_color_bit_in_word = cur_alloc_color << index_in_word;
   
-  return (Boolean)(current_word & obj_alloc_color_bit_in_word);
+  return (BOOLEAN)(current_word & obj_alloc_color_bit_in_word);
 }
 
-FORCE_INLINE Boolean obj_need_take_snapshot(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_need_take_snapshot(Partial_Reveal_Object *obj)
 {
   return !obj_is_mark_black_in_table(obj) && !obj_is_dirty_in_table(obj); 
 }
 
-FORCE_INLINE Boolean obj_need_remember(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_need_remember(Partial_Reveal_Object *obj)
 {
   return (obj_is_mark_gray_in_table(obj) || obj_is_mark_black_in_table(obj)) && !obj_is_dirty_in_table(obj); 
 }
 
-FORCE_INLINE Boolean obj_need_remember_oldvar(Partial_Reveal_Object *obj)
+FORCE_INLINE BOOLEAN obj_need_remember_oldvar(Partial_Reveal_Object *obj)
 {
   return !obj_is_mark_gray_in_table(obj) && !obj_is_mark_black_in_table(obj); 
 }
@@ -431,7 +431,7 @@ extern void wspace_sweep(Collector *collector, Wspace *wspace);
 extern void wspace_compact(Collector *collector, Wspace *wspace);
 extern void wspace_merge_free_chunks(GC *gc, Wspace *wspace);
 extern void wspace_remerge_free_chunks(GC *gc, Wspace *wspace);
-extern Chunk_Header_Basic *wspace_grab_next_chunk(Wspace *wspace, Chunk_Header_Basic *volatile *shared_next_chunk, Boolean need_construct);
+extern Chunk_Header_Basic *wspace_grab_next_chunk(Wspace *wspace, Chunk_Header_Basic *volatile *shared_next_chunk, BOOLEAN need_construct);
 
 extern void pfc_set_slot_index(Chunk_Header *chunk, unsigned int first_free_word_index, POINTER_SIZE_INT alloc_color);
 extern void pfc_reset_slot_index(Chunk_Header *chunk);

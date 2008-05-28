@@ -49,7 +49,7 @@ void gc_identify_dead_weak_roots(GC *gc)
 }
 
 /* parameter pointer_addr_in_pool means it is p_ref or p_obj in pool */
-void gc_update_weak_roots(GC *gc, Boolean double_fix)
+void gc_update_weak_roots(GC *gc, BOOLEAN double_fix)
 {
   GC_Metadata* metadata = gc->metadata;
   Pool *weakroot_pool = metadata->weakroot_pool;

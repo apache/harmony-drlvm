@@ -36,7 +36,7 @@ unsigned int Cur_Mark_Bit = 0x1;
 unsigned int Cur_Forward_Bit = 0x2;
 
 unsigned int SPACE_ALLOC_UNIT;
-Boolean IGNORE_FORCE_GC = FALSE;
+BOOLEAN IGNORE_FORCE_GC = FALSE;
 
 void gc_assign_free_area_to_mutators(GC* gc)
 {

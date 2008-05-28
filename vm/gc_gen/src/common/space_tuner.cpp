@@ -443,7 +443,7 @@ void gc_compute_space_tune_size_after_marking(GC *gc)
   }
 
   /*If the tuning strategy give a bigger tuning_size than failure size, we just follow the strategy and set noforce.*/
-  Boolean doforce = TRUE;
+  BOOLEAN doforce = TRUE;
   POINTER_SIZE_INT failure_size = lspace_get_failure_size((Lspace*)lspace);  
   if( (tuner->kind == TRANS_FROM_MOS_TO_LOS) && (!tuner->reverse) && (tuner->tuning_size > failure_size) )
     doforce = FALSE;

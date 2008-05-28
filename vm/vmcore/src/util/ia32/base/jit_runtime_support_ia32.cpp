@@ -199,7 +199,7 @@ static void *getaddress__vm_instanceof()
 }
 
 
-static Boolean is_class_initialized(Class *clss)
+static BOOLEAN is_class_initialized(Class *clss)
 {
 #ifdef VM_STATS
     VM_Statistics::get_vm_stats().num_is_class_initialized++;

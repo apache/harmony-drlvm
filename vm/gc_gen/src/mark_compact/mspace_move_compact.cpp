@@ -36,7 +36,7 @@ Space* gc_get_nos(GC_Gen* gc);
 Space* gc_get_mos(GC_Gen* gc);
 Space* gc_get_los(GC_Gen* gc);
 
-extern Boolean verify_live_heap;
+extern BOOLEAN verify_live_heap;
 volatile unsigned int debug_num_compact_blocks;
 
 static void mspace_move_objects(Collector* collector, Mspace* mspace) 
@@ -46,7 +46,7 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
   Block_Header *local_last_dest = dest_block;
 
   void* dest_sector_addr = dest_block->base;
-  Boolean is_fallback = collect_is_fallback();
+  BOOLEAN is_fallback = collect_is_fallback();
   
 #ifdef USE_32BITS_HASHCODE
   Hashcode_Buf* old_hashcode_buf = NULL;
@@ -193,7 +193,7 @@ void move_compact_mspace(Collector* collector)
   Blocked_Space* nos = (Blocked_Space*)gc_get_nos((GC_Gen*)gc);
   
   unsigned int num_active_collectors = gc->num_active_collectors;
-  Boolean is_fallback = collect_is_fallback();
+  BOOLEAN is_fallback = collect_is_fallback();
   
   /* Pass 1: **************************************************
      mark all live objects in heap, and save all the slots that 

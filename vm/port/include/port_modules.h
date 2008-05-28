@@ -62,7 +62,7 @@ extern "C" {
 * @param count_ptr - count of modules in the returned list
 * @return <code>TRUE</code> if OK; FALSE if error occured.
 */
-VMEXPORT Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr);
+VMEXPORT BOOLEAN port_get_all_modules(native_module_t** list_ptr, int* count_ptr);
 
 /**
 * Dumps the list of modules loaded to the current process..

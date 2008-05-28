@@ -21,7 +21,7 @@
 
 #include "mspace.h"
 
-static Boolean mspace_alloc_block(Mspace* mspace, Allocator* allocator)
+static BOOLEAN mspace_alloc_block(Mspace* mspace, Allocator* allocator)
 {
   alloc_context_reset(allocator);
 
@@ -63,7 +63,7 @@ void* mspace_alloc(unsigned int size, Allocator* allocator)
   
   /* grab a new block */
    Mspace* mspace = (Mspace*)allocator->alloc_space;;
-   Boolean ok = mspace_alloc_block(mspace, allocator);
+   BOOLEAN ok = mspace_alloc_block(mspace, allocator);
   if(!ok) return NULL; 
   
   p_return = thread_local_alloc(size, allocator);

@@ -39,7 +39,7 @@ void gc_update_collection_scheduler(GC* gc, int64 time_mutator, int64 time_colle
   return;
 }
 
-Boolean gc_sched_collection(GC* gc, unsigned int gc_cause)
+BOOLEAN gc_sched_collection(GC* gc, unsigned int gc_cause)
 {
   /*collection scheduler only schedules concurrent collection now.*/
   if(GC_CAUSE_CONCURRENT_GC == gc_cause){

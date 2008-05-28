@@ -17,7 +17,7 @@
 
 #include "sspace.h"
 
-static Boolean semispace_alloc_block(Sspace* sspace, Allocator* allocator)
+static BOOLEAN semispace_alloc_block(Sspace* sspace, Allocator* allocator)
 {
   alloc_context_reset(allocator);
 
@@ -58,7 +58,7 @@ void* semispace_alloc(unsigned int size, Allocator* allocator)
   
   /* grab a new block */
   Sspace* sspace = (Sspace*)allocator->alloc_space;
-  Boolean ok = semispace_alloc_block(sspace, allocator);
+  BOOLEAN ok = semispace_alloc_block(sspace, allocator);
   if(!ok) return NULL; 
   
   p_return = thread_local_alloc(size, allocator);

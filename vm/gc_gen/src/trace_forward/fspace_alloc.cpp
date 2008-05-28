@@ -23,7 +23,7 @@
 #include "../common/gc_concurrent.h"
 #include "../common/collection_scheduler.h"
 
-Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator)
+BOOLEAN fspace_alloc_block(Fspace* fspace, Allocator* allocator)
 {    
   alloc_context_reset(allocator);
 

@@ -59,14 +59,14 @@ void print_reg_state(Registers* regs);
 /* Returns 0  when execution should be continued with (updated) Registers
    Returns 1  when crash occured and process should invoke a debugger
    Returns -1 when crash occured and process should be terminated */
-int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, Boolean iscrash);
+int port_process_signal(port_sigtype signum, Registers *regs, void* fault_addr, BOOLEAN iscrash);
 
 #ifdef WIN32
 void create_minidump(LPEXCEPTION_POINTERS exp);
 #endif
 
 
-Boolean sd_is_handler_registered(port_sigtype signum);
+BOOLEAN sd_is_handler_registered(port_sigtype signum);
 
 
 #ifdef __cplusplus

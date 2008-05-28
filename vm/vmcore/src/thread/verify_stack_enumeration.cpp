@@ -59,30 +59,30 @@ static void register_root(void** root)
     }
 }
 
-typedef void (*add_root_set_entry_func)(Managed_Object_Handle *, Boolean);
-static void add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned)
+typedef void (*add_root_set_entry_func)(Managed_Object_Handle *, BOOLEAN);
+static void add_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned)
 {
     TRACE2("verify.rse.root", "root " << *ref << " at " << ref);
     register_root(ref);
 }
 
 
-typedef void (*add_weak_root_set_entry_func)(Managed_Object_Handle *ref, Boolean is_pinned,Boolean is_short_weak);
-static void add_weak_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned,Boolean is_short_weak)
+typedef void (*add_weak_root_set_entry_func)(Managed_Object_Handle *ref, BOOLEAN is_pinned,BOOLEAN is_short_weak);
+static void add_weak_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned,BOOLEAN is_short_weak)
 {
     TRACE2("verify.rse.root", "weak root " << *ref << " at " << ref);
     register_root(ref);
 }
 
 
-typedef void (*add_compressed_root_set_entry_func)(U_32 *ref, Boolean is_pinned);
-static void add_compressed_root_set_entry(U_32 *ref, Boolean is_pinned)
+typedef void (*add_compressed_root_set_entry_func)(U_32 *ref, BOOLEAN is_pinned);
+static void add_compressed_root_set_entry(U_32 *ref, BOOLEAN is_pinned)
 {
     TRACE("compressed root " << *ref << " at " << ref << ", not verified");
 }
 
-typedef void (*add_root_set_entry_interior_pointer_func)(void **ref, int offset, Boolean is_pinned);
-static void add_root_set_entry_interior_pointer (void **ref, int offset, Boolean is_pinned)
+typedef void (*add_root_set_entry_interior_pointer_func)(void **ref, int offset, BOOLEAN is_pinned);
+static void add_root_set_entry_interior_pointer (void **ref, int offset, BOOLEAN is_pinned)
 {
     TRACE("interior root " << *ref << "(-" << offset << ") at " << ref);
     register_root(ref);

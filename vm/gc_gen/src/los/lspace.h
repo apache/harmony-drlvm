@@ -48,7 +48,7 @@ typedef struct Lspace{
   unsigned int collect_algorithm;  
   GC* gc;
   /*LOS_Shrink:This field stands for sliding compact to lspace */
-  Boolean move_object;
+  BOOLEAN move_object;
 
   Space_Statistics* space_statistic; 
 

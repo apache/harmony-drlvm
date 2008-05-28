@@ -545,7 +545,7 @@ unsigned class_number_inner_classes(Class_Handle ch)
     return ch->get_number_of_inner_classes();
 }
 
-Boolean class_is_inner_class_public(Class_Handle ch, unsigned idx)
+BOOLEAN class_is_inner_class_public(Class_Handle ch, unsigned idx)
 {
     assert(ch);
     return (ch->get_inner_class_access_flags(idx) & ACC_PUBLIC) != 0;
@@ -967,7 +967,7 @@ void method_set_target_handler_info(Method_Handle m,
                                     void         *end_ip,
                                     void         *handler_ip,
                                     Class_Handle  catch_cl,
-                                    Boolean       exc_obj_is_dead)
+                                    BOOLEAN       exc_obj_is_dead)
 {
     assert(m);
     ((Method *)m)->set_target_exception_handler_info((JIT *)j,
@@ -1085,7 +1085,7 @@ int vector_first_element_offset_class_handle(Class_Handle element_type)
     //return VM_VECTOR_FIRST_ELEM_OFFSET_REF;
 }
 
-Boolean method_is_java(Method_Handle mh)
+BOOLEAN method_is_java(Method_Handle mh)
 {
     assert(mh);
     return TRUE;
@@ -1386,7 +1386,7 @@ BOOLEAN field_is_magic(Field_Handle fh)
 } //field_is_magic
 
 
-Boolean field_is_enumerable_reference(Field_Handle fh)
+BOOLEAN field_is_enumerable_reference(Field_Handle fh)
 {
     assert((Field *)fh);
     return ((field_is_reference(fh) && !field_is_magic(fh)));
@@ -1891,7 +1891,7 @@ BOOLEAN vm_property_get_boolean(const char *property_name, BOOLEAN default_value
     {
         return default_value;
     }
-    Boolean return_value = default_value;
+    BOOLEAN return_value = default_value;
     if (0 == strcmp("no", value)
         || 0 == strcmp("off", value)
         || 0 == strcmp("false", value)

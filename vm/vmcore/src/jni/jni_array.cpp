@@ -347,7 +347,7 @@ jboolean *JNICALL GetBooleanArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -395,7 +395,7 @@ jbyte *JNICALL GetByteArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -443,7 +443,7 @@ jchar *JNICALL GetCharArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -491,7 +491,7 @@ jshort *JNICALL GetShortArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -538,7 +538,7 @@ jint *JNICALL GetIntArrayElements(JNIEnv * jni_env,
 
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -588,7 +588,7 @@ jlong *JNICALL GetLongArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -635,7 +635,7 @@ jfloat *JNICALL GetFloatArrayElements(JNIEnv * jni_env,
 
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {
@@ -685,7 +685,7 @@ jdouble *JNICALL GetDoubleArrayElements(JNIEnv * jni_env,
     tmn_suspend_disable();       //---------------------------------v
     Vector_Handle java_array = (Vector_Handle)h->object;
     int length = get_vector_length(java_array);
-    Boolean is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
+    BOOLEAN is_pinned = gc_is_object_pinned((ManagedObject *)java_array);
     tmn_suspend_enable();        //---------------------------------^
 
     if(is_pinned) {

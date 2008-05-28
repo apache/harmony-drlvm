@@ -42,7 +42,7 @@ typedef struct Wspace {
   float survive_ratio;
   unsigned int collect_algorithm;
   GC *gc;
-  Boolean move_object;
+  BOOLEAN move_object;
 
   Space_Statistics* space_statistic;
 
@@ -60,8 +60,8 @@ typedef struct Wspace {
 
   /* END of Space --> */
   
-  Boolean need_compact;
-  Boolean need_fix;   /* There are repointed ref needing fixing */
+  BOOLEAN need_compact;
+  BOOLEAN need_fix;   /* There are repointed ref needing fixing */
   Size_Segment **size_segments;
   Pool ***pfc_pools;
   Pool ***pfc_pools_backup;

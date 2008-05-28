@@ -67,7 +67,7 @@ DECLARE_OPEN(char**, vm_properties_get_keys_starting_with, (const char* prefix, 
 DECLARE_OPEN(void, vm_properties_destroy_keys, (char** keys));
 
 /**
- * Tries to interpret property value as <code>Boolean</code> and returns it. 
+ * Tries to interpret property value as <code>BOOLEAN</code> and returns it. 
  * In case of failure returns <code>default_value</code>.
  */
 DECLARE_OPEN(BOOLEAN, vm_property_get_boolean, (const char* property, BOOLEAN default_value, PropertyTable table_number));

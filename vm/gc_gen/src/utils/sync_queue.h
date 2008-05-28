@@ -96,7 +96,7 @@ inline void sync_queue_push(Sync_Queue* queue, unsigned int* value)
   return;
 }
 
-Boolean sync_queue_pull(Sync_Queue* queue, unsigned int * pvalue)
+BOOLEAN sync_queue_pull(Sync_Queue* queue, unsigned int * pvalue)
 {
   Queue_Link head, tail, next, tmp1, tmp2;
   while(TRUE){

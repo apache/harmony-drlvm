@@ -66,7 +66,7 @@ void verify_allocation_reset(Heap_Verifier* heap_verifier)
 
 }
 
-Boolean verify_new_object(New_Object* new_obj, Heap_Verifier* heap_verifier)
+BOOLEAN verify_new_object(New_Object* new_obj, Heap_Verifier* heap_verifier)
 {
   if(!heap_verifier->need_verify_allocation) return TRUE;
   

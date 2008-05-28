@@ -29,7 +29,7 @@
 
 static native_module_t* fill_module(MODULEENTRY32 src);
 
-Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
+BOOLEAN port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
 {
     HANDLE hModuleSnap = INVALID_HANDLE_VALUE; 
     MODULEENTRY32 module; 

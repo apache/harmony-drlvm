@@ -33,7 +33,7 @@ typedef struct Sspace{
   float survive_ratio;
   unsigned int collect_algorithm;
   GC* gc;
-  Boolean move_object;
+  BOOLEAN move_object;
 
   Space_Statistics* space_statistic;
 
@@ -76,7 +76,7 @@ Sspace *sspace_initialize(GC* gc, void* start, POINTER_SIZE_INT sspace_size, POI
 void sspace_destruct(Sspace *sspace);
 
 void* sspace_alloc(unsigned size, Allocator *allocator);
-Boolean sspace_alloc_block(Sspace* sspace, Allocator* allocator);
+BOOLEAN sspace_alloc_block(Sspace* sspace, Allocator* allocator);
 
 void sspace_collection(Sspace* sspace);
 void sspace_prepare_for_collection(Sspace* sspace);
@@ -90,28 +90,28 @@ void gen_ss_pool(Collector* collector);
 POINTER_SIZE_INT sspace_free_space_size(Sspace* nos);
 POINTER_SIZE_INT sspace_used_space_size(Sspace* nos);
 
-FORCE_INLINE Boolean sspace_has_free_block(Sspace* sspace)
+FORCE_INLINE BOOLEAN sspace_has_free_block(Sspace* sspace)
 {
   return (sspace->cur_free_block != NULL);
 }
 
-FORCE_INLINE Boolean obj_belongs_to_tospace(Partial_Reveal_Object* p_obj)
+FORCE_INLINE BOOLEAN obj_belongs_to_tospace(Partial_Reveal_Object* p_obj)
 {
   return ( p_obj >= tospace_start && p_obj < tospace_end );
 }
 
-FORCE_INLINE Boolean obj_belongs_to_survivor_area(Sspace* sspace, Partial_Reveal_Object* p_obj)
+FORCE_INLINE BOOLEAN obj_belongs_to_survivor_area(Sspace* sspace, Partial_Reveal_Object* p_obj)
 {
   return (p_obj >= sspace->survivor_area_start && 
                           p_obj < sspace->survivor_area_end);
 }
 
 /* to be forwarded to MOS or was forwarded by other thread */
-FORCE_INLINE Boolean obj_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_obj)
+FORCE_INLINE BOOLEAN obj_be_forwarded(Sspace* sspace, Partial_Reveal_Object* p_obj)
 {
   /* NOTE:: Tricky! When the thread checks, the oi could be set a forward address by another thread. */
   Obj_Info_Type oi = get_obj_info_raw(p_obj);
-  Boolean be_forwarded = (Boolean)(oi & (FORWARD_BIT|OBJ_AGE_BIT));
+  BOOLEAN be_forwarded = (BOOLEAN)(oi & (FORWARD_BIT|OBJ_AGE_BIT));
   assert( obj_belongs_to_survivor_area(sspace, p_obj)? be_forwarded:1);
     
   return be_forwarded;

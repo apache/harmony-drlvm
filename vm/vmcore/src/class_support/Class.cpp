@@ -663,7 +663,7 @@ void Method::MethodClearInternals()
 {
     CodeChunkInfo *jit_info;
     for (jit_info = _jits;  jit_info;  jit_info = jit_info->_next) {
-        Boolean result = VM_Global_State::loader_env->em_interface->UnregisterCodeChunk(
+        BOOLEAN result = VM_Global_State::loader_env->em_interface->UnregisterCodeChunk(
             jit_info->get_code_block_addr());
         assert(TRUE == result);
         // ensure that jit_info was deleted

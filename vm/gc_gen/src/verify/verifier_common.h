@@ -49,12 +49,12 @@ typedef struct Heap_Verifier{
   Allocation_Verifier* allocation_verifier;
   Heap_Verifier_Metadata* heap_verifier_metadata;
 
-  Boolean is_before_gc;
-  Boolean gc_is_gen_mode;
-  Boolean need_verify_gc;
-  Boolean need_verify_allocation;
-  Boolean need_verify_rootset;
-  Boolean need_verify_writebarrier;
+  BOOLEAN is_before_gc;
+  BOOLEAN gc_is_gen_mode;
+  BOOLEAN need_verify_gc;
+  BOOLEAN need_verify_allocation;
+  BOOLEAN need_verify_rootset;
+  BOOLEAN need_verify_writebarrier;
   
   Object_Scanner all_obj_scanner;
   Object_Scanner live_obj_scanner;
@@ -62,7 +62,7 @@ typedef struct Heap_Verifier{
 
 
 
-typedef Boolean (*Object_Comparator)(POINTER_SIZE_INT*, POINTER_SIZE_INT*);
+typedef BOOLEAN (*Object_Comparator)(POINTER_SIZE_INT*, POINTER_SIZE_INT*);
 
 extern Heap_Verifier* get_heap_verifier();
 
@@ -72,13 +72,13 @@ extern void verifier_init_object_scanner(Heap_Verifier* heap_verifier);
 extern void verifier_scan_los_objects(Space* space, Heap_Verifier* heap_verifier);
 
 
-Boolean verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier);
-Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_after_gc, Pool* free_pool ,Object_Comparator object_comparator);
-Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options);
+BOOLEAN verifier_copy_rootsets(GC* gc, Heap_Verifier* heap_verifier);
+BOOLEAN verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_after_gc, Pool* free_pool ,Object_Comparator object_comparator);
+BOOLEAN verifier_parse_options(Heap_Verifier* heap_verifier, char* options);
 void verifier_log_before_gc(Heap_Verifier* heap_verifier);
 void verifier_log_after_gc(Heap_Verifier* heap_verifier);
 void verifier_log_start(char* message);
-Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
+BOOLEAN verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
 
 
 
@@ -87,24 +87,24 @@ Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
 inline void verifier_set_gen_mode(Heap_Verifier* heap_verifier)
 {  heap_verifier->gc_is_gen_mode = gc_is_gen_mode();  }
 
-inline Boolean need_verify_gc_effect(Heap_Verifier* heap_verifier)
+inline BOOLEAN need_verify_gc_effect(Heap_Verifier* heap_verifier)
 {  return heap_verifier->need_verify_gc && !heap_verifier->is_before_gc; }
 
-inline Boolean need_scan_live_objs(Heap_Verifier* heap_verifier)
+inline BOOLEAN need_scan_live_objs(Heap_Verifier* heap_verifier)
 {
   if(heap_verifier->need_verify_gc) return TRUE;
   else if(heap_verifier->need_verify_writebarrier && !heap_verifier->is_before_gc) return TRUE;
   else return FALSE;
 }
 
-inline Boolean need_verify_mutator_effect(Heap_Verifier* heap_verifier)
+inline BOOLEAN need_verify_mutator_effect(Heap_Verifier* heap_verifier)
 {
   if(!heap_verifier->is_before_gc) return FALSE;
   return heap_verifier->need_verify_allocation || heap_verifier->need_verify_rootset 
                 || heap_verifier->need_verify_writebarrier;
 }
 
-inline Boolean need_scan_all_objs(Heap_Verifier* heap_verifier)
+inline BOOLEAN need_scan_all_objs(Heap_Verifier* heap_verifier)
 {
   if(!heap_verifier->is_before_gc) return FALSE;
   return heap_verifier->need_verify_allocation || heap_verifier->need_verify_writebarrier;
@@ -170,9 +170,9 @@ inline void wb_unmark_in_slot(REF* p_ref){
   *p_ref = (REF)((POINTER_SIZE_INT)ref & ~VERIFY_WB_MARK_BIT);
 }
 
-inline Boolean wb_is_marked_in_slot(REF* p_ref){
+inline BOOLEAN wb_is_marked_in_slot(REF* p_ref){
   REF ref = *p_ref;
-  return (Boolean)((POINTER_SIZE_INT)ref & VERIFY_WB_MARK_BIT);
+  return (BOOLEAN)((POINTER_SIZE_INT)ref & VERIFY_WB_MARK_BIT);
 }
 
 inline REF verifier_get_object_slot(REF* p_ref)
@@ -189,8 +189,8 @@ inline void tag_unreachable_obj(Partial_Reveal_Object* p_obj)
   obj_set_vt(p_obj, (VT)((POINTER_SIZE_INT)vt | UNREACHABLE_OBJ_MARK_IN_VT));
 }
 
-inline Boolean is_unreachable_obj(Partial_Reveal_Object* p_obj)
+inline BOOLEAN is_unreachable_obj(Partial_Reveal_Object* p_obj)
 {
-  return (Boolean)((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & UNREACHABLE_OBJ_MARK_IN_VT);
+  return (BOOLEAN)((POINTER_SIZE_INT)obj_get_vt_raw(p_obj) & UNREACHABLE_OBJ_MARK_IN_VT);
 }*/
 #endif 

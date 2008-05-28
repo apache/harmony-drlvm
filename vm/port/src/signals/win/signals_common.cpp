@@ -78,7 +78,7 @@ static void c_handler(Registers* pregs,
                         void* fault_addr, size_t code, size_t flags)
 { // this exception handler is executed *after* VEH handler returned
     int result;
-    Boolean iscrash = (DWORD)flags == EXCEPTION_NONCONTINUABLE;
+    BOOLEAN iscrash = (DWORD)flags == EXCEPTION_NONCONTINUABLE;
 
     switch ((DWORD)code)
     {

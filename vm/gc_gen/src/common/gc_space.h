@@ -47,7 +47,7 @@ typedef struct Space{
   float survive_ratio;
   unsigned int collect_algorithm;
   GC* gc;
-  Boolean move_object;
+  BOOLEAN move_object;
 
   Space_Statistics* space_statistic;
 
@@ -71,12 +71,12 @@ inline POINTER_SIZE_INT space_committed_size(Space* space){ return space ? space
 inline void* space_heap_start(Space* space){ return space->heap_start; }
 inline void* space_heap_end(Space* space){ return space->heap_end; }
 
-inline Boolean address_belongs_to_space(void* addr, Space* space) 
+inline BOOLEAN address_belongs_to_space(void* addr, Space* space) 
 {
   return (addr >= space_heap_start(space) && addr < space_heap_end(space));
 }
 
-inline Boolean obj_belongs_to_space(Partial_Reveal_Object *p_obj, Space* space)
+inline BOOLEAN obj_belongs_to_space(Partial_Reveal_Object *p_obj, Space* space)
 {
   return address_belongs_to_space((Partial_Reveal_Object*)p_obj, space);
 }
@@ -93,7 +93,7 @@ typedef struct Blocked_Space {
   float survive_ratio;
   unsigned int collect_algorithm;
   GC* gc;
-  Boolean move_object;
+  BOOLEAN move_object;
 
   Space_Statistics* space_statistic;
 
@@ -126,9 +126,9 @@ typedef struct Blocked_Space {
   /* END of Blocked_Space --> */
 }Blocked_Space;
 
-inline Boolean blocked_space_has_free_block(Blocked_Space *space){ return space->free_block_idx <= space->ceiling_block_idx; }
+inline BOOLEAN blocked_space_has_free_block(Blocked_Space *space){ return space->free_block_idx <= space->ceiling_block_idx; }
 inline unsigned int blocked_space_free_mem_size(Blocked_Space *space){ return (space->ceiling_block_idx - space->free_block_idx + 1) << GC_BLOCK_SHIFT_COUNT;  }
-inline Boolean blocked_space_used_mem_size(Blocked_Space *space){ return (space->free_block_idx - space->first_block_idx) << GC_BLOCK_SHIFT_COUNT; }
+inline BOOLEAN blocked_space_used_mem_size(Blocked_Space *space){ return (space->free_block_idx - space->first_block_idx) << GC_BLOCK_SHIFT_COUNT; }
 
 void space_init_blocks(Blocked_Space* space);
 void space_desturct_blocks(Blocked_Space* space);

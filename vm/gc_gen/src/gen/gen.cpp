@@ -42,11 +42,11 @@ POINTER_SIZE_INT INIT_LOS_SIZE = 0;
 POINTER_SIZE_INT MIN_NOS_SIZE = 0;
 POINTER_SIZE_INT MAX_NOS_SIZE = 0;
 
-Boolean GEN_NONGEN_SWITCH = FALSE;
+BOOLEAN GEN_NONGEN_SWITCH = FALSE;
 
-Boolean JVMTI_HEAP_ITERATION = true;
+BOOLEAN JVMTI_HEAP_ITERATION = true;
 
-Boolean LOS_ADJUST_BOUNDARY = FALSE;
+BOOLEAN LOS_ADJUST_BOUNDARY = FALSE;
 
 GC* gc_gen_create()
 {
@@ -56,7 +56,7 @@ GC* gc_gen_create()
   return gc;
 }
 
-void gc_set_gen_mode(Boolean status)
+void gc_set_gen_mode(BOOLEAN status)
 {
   if(status){
     gc_set_gen_flag(); 
@@ -445,9 +445,9 @@ void gc_los_destruct(GC_Gen *gc)
 }
 
 
-Boolean FORCE_FULL_COMPACT = FALSE;
-Boolean IGNORE_VTABLE_TRACING = FALSE;
-Boolean TRACE_JLC_VIA_VTABLE = FALSE;
+BOOLEAN FORCE_FULL_COMPACT = FALSE;
+BOOLEAN IGNORE_VTABLE_TRACING = FALSE;
+BOOLEAN TRACE_JLC_VIA_VTABLE = FALSE;
 
 void gc_gen_decide_collection_kind(GC_Gen* gc, unsigned int cause)
 {
@@ -464,7 +464,7 @@ void gc_gen_decide_collection_kind(GC_Gen* gc, unsigned int cause)
   return;
 }
 
-GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean has_los)
+GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, BOOLEAN has_los)
 {
   GC_PROP = ALGO_POOL_SHARE | ALGO_DEPTH_FIRST;
   
@@ -474,7 +474,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
   /* default is has LOS */
   GC_PROP |= ALGO_HAS_LOS;
   
-  Boolean use_default = FALSE;
+  BOOLEAN use_default = FALSE;
 
   if(minor_algo){
     string_to_upper(minor_algo);
@@ -522,9 +522,9 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
   return gc; 
 }
 
-static Boolean nos_alloc_block(Space* nos, Allocator* allocator)
+static BOOLEAN nos_alloc_block(Space* nos, Allocator* allocator)
 {
-  Boolean result;
+  BOOLEAN result;
   if(minor_is_semispace())
     result = sspace_alloc_block((Sspace*)nos, allocator); 
   else
@@ -546,7 +546,7 @@ void gc_gen_assign_free_area_to_mutators(GC_Gen* gc)
        because MOS takes all space after fallback or LOS extension.
        Allocator should be cleared. */
     Allocator *allocator = (Allocator *)gc_get_tls();   
-    Boolean ok = nos_alloc_block(gc->nos, allocator);
+    BOOLEAN ok = nos_alloc_block(gc->nos, allocator);
     /* we don't care about the return value. If no block available, that means,
        first allocation after mutator resumption will probably trigger OOME. */
   }

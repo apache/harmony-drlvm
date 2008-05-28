@@ -22,12 +22,12 @@
 #include "fspace.h"
 
 #ifdef PREFETCH_SUPPORTED
-Boolean mark_prefetch = FALSE;
+BOOLEAN mark_prefetch = FALSE;
 #endif
 
-Boolean NOS_PARTIAL_FORWARD = FALSE;
+BOOLEAN NOS_PARTIAL_FORWARD = FALSE;
 
-Boolean forward_first_half;
+BOOLEAN forward_first_half;
 void* object_forwarding_boundary=NULL;
 
 Fspace *fspace_initialize(GC* gc, void* start, POINTER_SIZE_INT fspace_size, POINTER_SIZE_INT commit_size) 
@@ -106,7 +106,7 @@ void fspace_reset_after_collection(Fspace* fspace)
   unsigned int first_idx = fspace->first_block_idx;
   unsigned int marked_start_idx = 0; //was for oi markbit reset, now useless
   unsigned int marked_last_idx = 0;
-  Boolean is_major_collection = collect_is_major();
+  BOOLEAN is_major_collection = collect_is_major();
   
   if(  is_major_collection || 
          NOS_PARTIAL_FORWARD == FALSE || !gc_is_gen_mode())            

@@ -287,7 +287,7 @@ FastArrayFillPass::_run(IRManager& irManager)
 #endif
         switch (((Type*)arrayRef->getType()->asArrayType()->getElementType())->tag) {
             case Type::Int8:
-            case Type::Boolean:
+            case Type::BOOLEAN:
             case Type::UInt8:
                 val |= (val << 8);
                 val |= (val << 16);

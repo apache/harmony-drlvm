@@ -103,7 +103,7 @@ extern ObjectHandle gh_aolong;      //[J
 extern ObjectHandle gh_aofloat;     //[F
 extern ObjectHandle gh_aodouble;    //[D
 
-extern ObjectHandle gh_jlboolean;   //java.lang.Boolean
+extern ObjectHandle gh_jlboolean;   //java.lang.BOOLEAN
 extern ObjectHandle gh_jlbyte;      //java.lang.Byte
 extern ObjectHandle gh_jlchar;      //java.lang.Character
 extern ObjectHandle gh_jlshort;     //java.lang.Short
@@ -112,7 +112,7 @@ extern ObjectHandle gh_jllong;      //java.lang.Long
 extern ObjectHandle gh_jlfloat;     //java.lang.Float
 extern ObjectHandle gh_jldouble;    //java.lang.Double
 
-extern jfieldID gid_boolean_value;  //java.lang.Boolean's field: value;
+extern jfieldID gid_boolean_value;  //java.lang.BOOLEAN's field: value;
 extern jfieldID gid_byte_value;     //java.lang.Byte's field: value;
 extern jfieldID gid_char_value;     //java.lang.Character's field: value;
 extern jfieldID gid_short_value;    //java.lang.Short's field: value;

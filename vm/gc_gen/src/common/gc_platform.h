@@ -83,7 +83,7 @@ extern char* large_page_hint;
 #endif
 
 #ifdef PREFETCH_SUPPORTED
-extern Boolean mark_prefetch;
+extern BOOLEAN mark_prefetch;
 #endif
 
 #define ABS_DIFF(x, y) (((x)>(y))?((x)-(y)):((y)-(x)))
@@ -219,7 +219,7 @@ inline void *vm_map_mem(void* start, POINTER_SIZE_INT size)
   return address;
 }
 
-inline Boolean vm_unmap_mem(void* start, POINTER_SIZE_INT size) 
+inline BOOLEAN vm_unmap_mem(void* start, POINTER_SIZE_INT size) 
 {
   unsigned int result;
 #ifdef _WINDOWS_
@@ -248,7 +248,7 @@ inline void *vm_alloc_mem(void* start, POINTER_SIZE_INT size)
   return address;
 }
 
-inline Boolean vm_free_mem(void* start, POINTER_SIZE_INT size) 
+inline BOOLEAN vm_free_mem(void* start, POINTER_SIZE_INT size) 
 {
   return vm_unmap_mem(start, size);
 }
@@ -271,7 +271,7 @@ inline void *vm_reserve_mem(void* start, POINTER_SIZE_INT size)
   return address;
 }
 
-inline Boolean vm_release_mem(void* start, POINTER_SIZE_INT size) 
+inline BOOLEAN vm_release_mem(void* start, POINTER_SIZE_INT size) 
 {
   return vm_unmap_mem(start, size);
 }
@@ -290,7 +290,7 @@ inline void *vm_commit_mem(void* start, POINTER_SIZE_INT size)
   return address;
 }
 
-inline Boolean vm_decommit_mem(void* start, POINTER_SIZE_INT size) 
+inline BOOLEAN vm_decommit_mem(void* start, POINTER_SIZE_INT size) 
 {
   unsigned int result;
 #ifdef _WINDOWS_

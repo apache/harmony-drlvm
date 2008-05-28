@@ -27,12 +27,12 @@
 #include "gc_concurrent.h"
 #include "../common/gc_for_barrier.h"
 
-volatile Boolean concurrent_in_marking  = FALSE;
-volatile Boolean concurrent_in_sweeping = FALSE;
-volatile Boolean mark_is_concurrent     = FALSE;
-volatile Boolean sweep_is_concurrent    = FALSE;
+volatile BOOLEAN concurrent_in_marking  = FALSE;
+volatile BOOLEAN concurrent_in_sweeping = FALSE;
+volatile BOOLEAN mark_is_concurrent     = FALSE;
+volatile BOOLEAN sweep_is_concurrent    = FALSE;
 
-volatile Boolean gc_sweep_global_normal_chunk = FALSE;
+volatile BOOLEAN gc_sweep_global_normal_chunk = FALSE;
 
 static void gc_check_con_mark(GC* gc)
 {
@@ -99,7 +99,7 @@ void gc_start_con_mark(GC* gc)
 void mostly_con_mark_terminate_reset();
 void terminate_mostly_con_mark();
 
-void gc_finish_con_mark(GC* gc, Boolean need_STW)
+void gc_finish_con_mark(GC* gc, BOOLEAN need_STW)
 {
   gc_check_con_mark(gc);
   

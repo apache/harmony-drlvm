@@ -117,7 +117,7 @@ void vm_enumerate_static_fields()
     TRACE2("enumeration", "vm_enumerate_static_fields()");
     assert(!hythread_is_suspend_enabled());
     GlobalClassLoaderIterator ClIterator;
-    Boolean do_class_unloading = gc_supports_class_unloading();
+    BOOLEAN do_class_unloading = gc_supports_class_unloading();
     ClassLoader *cl = ClIterator.first();
     while(cl) {
         GlobalClassLoaderIterator::ClassIterator itc;
@@ -176,7 +176,7 @@ vm_enumerate_root_reference(void **ref, BOOLEAN is_pinned)
     check_ref(ref);
 #endif // _DEBUG
 
-    gc_add_root_set_entry((Managed_Object_Handle *)ref, (Boolean)is_pinned);
+    gc_add_root_set_entry((Managed_Object_Handle *)ref, (BOOLEAN)is_pinned);
 } //vm_enumerate_root_reference
 
 
@@ -189,7 +189,7 @@ vm_enumerate_weak_root_reference(void **ref, BOOLEAN is_pinned)
     check_ref(ref);
 #endif // _DEBUG
 
-    gc_add_weak_root_set_entry((Managed_Object_Handle *)ref, (Boolean)is_pinned, FALSE);
+    gc_add_weak_root_set_entry((Managed_Object_Handle *)ref, (BOOLEAN)is_pinned, FALSE);
 } //vm_enumerate_weak_root_reference
 
 
@@ -210,7 +210,7 @@ VMEXPORT void vm_enumerate_compressed_root_reference(U_32 *ref, BOOLEAN is_pinne
 #endif // REFS_USE_UNCOMPRESSED
 #endif // _DEBUG
 
-    gc_add_compressed_root_set_entry(ref, (Boolean)is_pinned);
+    gc_add_compressed_root_set_entry(ref, (BOOLEAN)is_pinned);
 } //vm_enumerate_compressed_root_reference
 
 
@@ -221,7 +221,7 @@ void
 vm_enumerate_root_interior_pointer(void **slot, size_t offset, BOOLEAN is_pinned)
 {
     assert(((IDATA)offset)>=0);
-    gc_add_root_set_entry_interior_pointer(slot, (int)offset, (Boolean)is_pinned);
+    gc_add_root_set_entry_interior_pointer(slot, (int)offset, (BOOLEAN)is_pinned);
 } //vm_enumerate_root_interior_pointer
 
 void 

@@ -26,9 +26,9 @@ typedef struct GC_Verifier{
   Vector_Block* objects_set;
   Vector_Block* hashcode_set;
 
-  Boolean is_tracing_resurrect_obj;
+  BOOLEAN is_tracing_resurrect_obj;
   unsigned int collect_kind;
-  Boolean is_before_fallback_collection;
+  BOOLEAN is_before_fallback_collection;
   
   POINTER_SIZE_INT num_live_objects_before_gc;
   POINTER_SIZE_INT num_live_objects_after_gc;
@@ -51,7 +51,7 @@ typedef struct GC_Verifier{
   POINTER_SIZE_INT num_hash_after_gc;
 
  
-  Boolean is_verification_passed;
+  BOOLEAN is_verification_passed;
 }GC_Verifier;
 
 #define OBJ_INFO_MASK (~0x3ff)
@@ -95,12 +95,12 @@ void verifier_reset_hash_distance();
 inline void verifier_set_gc_collect_kind(GC_Verifier* gc_verifier, unsigned int collect_kind)
 {  gc_verifier->collect_kind = collect_kind;  }
 
-inline Boolean verifier_collect_is_minor(GC_Verifier* gc_verifier)
+inline BOOLEAN verifier_collect_is_minor(GC_Verifier* gc_verifier)
 {
   return (gc_verifier->collect_kind & ALGO_MAJOR) == 0; 
 }
 
-inline void verifier_set_fallback_collection(GC_Verifier* gc_verifier, Boolean is_before_fallback)
+inline void verifier_set_fallback_collection(GC_Verifier* gc_verifier, BOOLEAN is_before_fallback)
 {  gc_verifier->is_before_fallback_collection = is_before_fallback;  }
 
 #endif

@@ -88,7 +88,7 @@ typedef struct Collector{
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
 
-  Boolean collector_is_active;
+  BOOLEAN collector_is_active;
 
   /*for collect statistics info*/
 #ifdef GC_GEN_STATS
@@ -115,13 +115,13 @@ void collector_attach_hashcode(Collector *collector);
 void gc_gen_hook_for_collector_init(Collector *collector);
 #endif
 
-Boolean is_collector_finished(GC* gc);
+BOOLEAN is_collector_finished(GC* gc);
 void wait_collection_finish(GC* gc);
 int64 gc_get_collector_time(GC* gc);
 
-inline Boolean gc_collection_result(GC* gc)
+inline BOOLEAN gc_collection_result(GC* gc)
 {
-  Boolean result = TRUE;
+  BOOLEAN result = TRUE;
   for(unsigned i=0; i<gc->num_active_collectors; i++){
     Collector* collector = gc->collectors[i];
     result &= collector->result;

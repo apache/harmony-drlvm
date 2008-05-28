@@ -27,7 +27,7 @@ static volatile Block *mos_first_new_block = NULL;
 static volatile Block *nos_first_free_block = NULL;
 static volatile Block *first_block_to_move = NULL;
 
-Boolean mos_extended = FALSE;
+BOOLEAN mos_extended = FALSE;
 
 static void set_first_and_end_block_to_move(Collector *collector, unsigned int mem_changed_size)
 {
@@ -59,7 +59,7 @@ static POINTER_SIZE_INT nspace_shrink(Fspace *nspace)
   decommit_size = (POINTER_SIZE_INT)committed_nos_end - (POINTER_SIZE_INT)decommit_base;
   assert(decommit_size && !(decommit_size % SPACE_ALLOC_UNIT));
   
-  Boolean result = vm_decommit_mem(decommit_base, decommit_size);
+  BOOLEAN result = vm_decommit_mem(decommit_base, decommit_size);
   assert(result == TRUE);
   
   nspace->committed_heap_size = (POINTER_SIZE_INT)decommit_base - (POINTER_SIZE_INT)nspace->heap_start;

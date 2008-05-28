@@ -33,33 +33,33 @@ extern POINTER_SIZE_INT INIT_LOS_SIZE;
 extern POINTER_SIZE_INT TOSPACE_SIZE;
 extern POINTER_SIZE_INT MOS_RESERVE_SIZE;
 
-extern Boolean GEN_NONGEN_SWITCH;
+extern BOOLEAN GEN_NONGEN_SWITCH;
 
-extern Boolean FORCE_FULL_COMPACT;
+extern BOOLEAN FORCE_FULL_COMPACT;
 
 extern unsigned int NUM_MARKERS;
 extern unsigned int NUM_COLLECTORS;
 extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
 
-extern Boolean IGNORE_VTABLE_TRACING;
-extern Boolean IGNORE_FINREF;
+extern BOOLEAN IGNORE_VTABLE_TRACING;
+extern BOOLEAN IGNORE_FINREF;
 
-extern Boolean JVMTI_HEAP_ITERATION ;
-extern Boolean IGNORE_FORCE_GC;
+extern BOOLEAN JVMTI_HEAP_ITERATION ;
+extern BOOLEAN IGNORE_FORCE_GC;
 
 POINTER_SIZE_INT HEAP_SIZE_DEFAULT = 256 * MB;
 POINTER_SIZE_INT min_heap_size_bytes = 16 * MB;
 POINTER_SIZE_INT max_heap_size_bytes = 0;
 
-Boolean share_los_boundary = FALSE;
+BOOLEAN share_los_boundary = FALSE;
 
 unsigned int GC_PROP;
 
 GC* gc_mc_create();
 GC* gc_ms_create();
 
-static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
+static GC* gc_decide_collection_algo(char* unique_algo, BOOLEAN has_los)
 {
   /* if unique_algo is not set, gc_gen_decide_collection_algo is called. */
   assert(unique_algo);
@@ -70,7 +70,7 @@ static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
   if(has_los) 
     GC_PROP |= ALGO_HAS_LOS;
   
-  Boolean use_default = FALSE;
+  BOOLEAN use_default = FALSE;
 
   GC* gc;
   
@@ -123,8 +123,8 @@ static size_t vm_property_get_size(const char* property_name)
 }
 
 void gc_decide_con_algo(char* concurrent_algo);
-GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean has_los);
-void gc_set_gen_mode(Boolean status);
+GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, BOOLEAN has_los);
+void gc_set_gen_mode(BOOLEAN status);
 
 GC* gc_parse_options() 
 {
@@ -150,7 +150,7 @@ GC* gc_parse_options()
     unique_algo = vm_properties_get_value("gc.unique_algorithm", VM_PROPERTIES);
   }
 
-  Boolean has_los = FALSE;
+  BOOLEAN has_los = FALSE;
   if (vm_property_is_set("gc.has_los", VM_PROPERTIES) == 1) {
     has_los = vm_property_get_boolean("gc.has_los");
   }
@@ -168,7 +168,7 @@ GC* gc_parse_options()
   }
 
   if (vm_property_is_set("gc.gen_mode", VM_PROPERTIES) == 1) {
-    Boolean gen_mode = vm_property_get_boolean("gc.gen_mode");
+    BOOLEAN gen_mode = vm_property_get_boolean("gc.gen_mode");
     gc_set_gen_mode(gen_mode);
   }
 
@@ -187,7 +187,7 @@ GC* gc_parse_options()
   gc->generate_barrier = gc_is_gen_mode();
   
   if (vm_property_is_set("gc.generate_barrier", VM_PROPERTIES) == 1) {
-    Boolean generate_barrier = vm_property_get_boolean("gc.generate_barrier");
+    BOOLEAN generate_barrier = vm_property_get_boolean("gc.generate_barrier");
     gc->generate_barrier = (generate_barrier || gc->generate_barrier);
   }
   
@@ -311,7 +311,7 @@ GC* gc_parse_options()
   }
   
   if (vm_property_is_set("gc.concurrent_gc", VM_PROPERTIES) == 1){
-    Boolean use_all_concurrent_phase= vm_property_get_boolean("gc.concurrent_gc");
+    BOOLEAN use_all_concurrent_phase= vm_property_get_boolean("gc.concurrent_gc");
     if(use_all_concurrent_phase){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
       DIE(( "Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
@@ -324,7 +324,7 @@ GC* gc_parse_options()
   }
 
   if (vm_property_is_set("gc.concurrent_enumeration", VM_PROPERTIES) == 1){
-    Boolean USE_CONCURRENT_ENUMERATION = vm_property_get_boolean("gc.concurrent_enumeration");
+    BOOLEAN USE_CONCURRENT_ENUMERATION = vm_property_get_boolean("gc.concurrent_enumeration");
     if(USE_CONCURRENT_ENUMERATION){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
       DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
@@ -335,7 +335,7 @@ GC* gc_parse_options()
   }
 
   if (vm_property_is_set("gc.concurrent_mark", VM_PROPERTIES) == 1){
-    Boolean USE_CONCURRENT_MARK = vm_property_get_boolean("gc.concurrent_mark");
+    BOOLEAN USE_CONCURRENT_MARK = vm_property_get_boolean("gc.concurrent_mark");
     if(USE_CONCURRENT_MARK){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
       DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
@@ -347,7 +347,7 @@ GC* gc_parse_options()
   }
 
   if (vm_property_is_set("gc.concurrent_sweep", VM_PROPERTIES) == 1){
-    Boolean USE_CONCURRENT_SWEEP= vm_property_get_boolean("gc.concurrent_sweep");
+    BOOLEAN USE_CONCURRENT_SWEEP= vm_property_get_boolean("gc.concurrent_sweep");
     if(USE_CONCURRENT_SWEEP){
       /*currently, concurrent sweeping only starts after concurrent marking.*/
       assert(gc_is_specify_con_mark());

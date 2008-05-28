@@ -112,7 +112,7 @@ void gen_compare_to_managed_null(Merced_Code_Emitter &emitter,
 void gen_convert_class_arg(Merced_Code_Emitter &emitter, bool check_null);
 
 
-Boolean jit_clears_ccv_in_monitor_enter();
+BOOLEAN jit_clears_ccv_in_monitor_enter();
 
 // Add additional code that enforces calling conventions (most likely regarding
 // scratch registers) before calling/returing into managed code.

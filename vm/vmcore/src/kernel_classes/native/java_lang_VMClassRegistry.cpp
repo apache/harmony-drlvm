@@ -66,7 +66,7 @@ Class_Handle class_find_loaded(Class_Loader_Handle loader, const char* name)
     return ch;
 }
 
-Class_Handle class_find_class_from_loader(Class_Loader_Handle loader, const char* n, Boolean init)
+Class_Handle class_find_class_from_loader(Class_Loader_Handle loader, const char* n, BOOLEAN init)
 {
     ASSERT_RAISE_AREA;
     assert(hythread_is_suspend_enabled()); // -salikh

@@ -21,10 +21,10 @@
 static Wspace *wspace_in_fallback_marking;
 
 
-static FORCE_INLINE Boolean obj_mark_black(Partial_Reveal_Object *obj)
+static FORCE_INLINE BOOLEAN obj_mark_black(Partial_Reveal_Object *obj)
 {
   if(obj_belongs_to_space(obj, (Space*)wspace_in_fallback_marking)){
-    Boolean marked_by_self = obj_mark_black_in_table(obj);
+    BOOLEAN marked_by_self = obj_mark_black_in_table(obj);
 
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
     /* When fallback happens, some objects in MOS have their fw bit set, which is actually their mark bit in the last minor gc.

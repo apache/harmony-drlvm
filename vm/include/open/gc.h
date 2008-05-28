@@ -110,7 +110,7 @@ GCExport void gc_test_safepoint();
  * <code>*offset_of_limit</code> and the "limit" pointer. If not, then it should return
  * <code>FALSE</code>.
  */
-GCExport Boolean gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
+GCExport BOOLEAN gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
 
 /**
  * This API is used by the VM to notify the GC that the
@@ -149,13 +149,13 @@ GCExport void gc_wrapup();
 /**
  * Is called by the VM to enumerate the root reference.
  */
-GCExport void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
+GCExport void gc_add_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned);
 
 /**
  * Resembles <code>gc_add_root_set_entry()</code> but is passed the address of a slot
  * containing a compressed reference.
  */
-GCExport void gc_add_compressed_root_set_entry(U_32 *ref, Boolean is_pinned);
+GCExport void gc_add_compressed_root_set_entry(U_32 *ref, BOOLEAN is_pinned);
 
 /**
  * Is called by the VM to enumerate weak root reference.
@@ -167,7 +167,7 @@ GCExport void gc_add_compressed_root_set_entry(U_32 *ref, Boolean is_pinned);
  *                        before object becomes eligible for finalization
  */
 GCExport void gc_add_weak_root_set_entry(Managed_Object_Handle *slot, 
-    Boolean is_pinned, Boolean is_short_weak);
+    BOOLEAN is_pinned, BOOLEAN is_short_weak);
 
 /**
  * Enumerate a managed pointer.  
@@ -179,7 +179,7 @@ GCExport void gc_add_weak_root_set_entry(Managed_Object_Handle *slot,
  * @note Is this function needed for Java? -salikh
  */
 GCExport void gc_add_root_set_entry_managed_pointer(void **slot,
-                                                    Boolean is_pinned);
+                                                    BOOLEAN is_pinned);
 
 /**
  * Call from the VM to the gc to enumerate an interior pointer. <code>**ref</code> is a
@@ -199,7 +199,7 @@ GCExport void gc_add_root_set_entry_managed_pointer(void **slot,
  *
  * @note Optional function, never called by Java virtual machine.
  */
-GCExport void gc_add_root_set_entry_interior_pointer (void **slot, int offset, Boolean is_pinned);
+GCExport void gc_add_root_set_entry_interior_pointer (void **slot, int offset, BOOLEAN is_pinned);
  
 
 
@@ -328,7 +328,7 @@ GCExport Managed_Object_Handle gc_alloc_pinned(unsigned size, Allocation_Handle 
  * @return <code>TRUE</code> if the GC requires write barriers before every store to
  *         a field of a reference type.
  */
-GCExport Boolean gc_requires_barriers();
+GCExport BOOLEAN gc_requires_barriers();
 
 //@}
 /** @name Routines to support threads
@@ -500,7 +500,7 @@ GCExport int64 gc_free_memory();
  *
  * Routine to support the functionality required by JNI to see if an object is pinned.
  */
-GCExport Boolean gc_is_object_pinned (Managed_Object_Handle obj);
+GCExport BOOLEAN gc_is_object_pinned (Managed_Object_Handle obj);
 
 
 /*
@@ -559,19 +559,19 @@ GCExport int64 gc_get_collection_time();
  * garbage collector with virtual machine executable.
  */
 
-extern void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned);
-extern void (*gc_add_compressed_root_set_entry)(U_32 *ref, Boolean is_pinned);
-extern void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, Boolean is_pinned);
-extern void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref1, Boolean is_pinned,Boolean is_short_weak);
-extern void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned);
+extern void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, BOOLEAN is_pinned);
+extern void (*gc_add_compressed_root_set_entry)(U_32 *ref, BOOLEAN is_pinned);
+extern void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, BOOLEAN is_pinned);
+extern void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref1, BOOLEAN is_pinned,BOOLEAN is_short_weak);
+extern void (*gc_add_root_set_entry_managed_pointer)(void **slot, BOOLEAN is_pinned);
 extern void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth);
 extern int64 (*gc_get_collection_count)();
 extern int64 (*gc_get_collection_time)();
 VMEXPORT extern void (*gc_force_gc)();
 VMEXPORT extern int64 (*gc_free_memory)();
 extern int (*gc_init)();
-extern Boolean (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned *offset_of_limit);
-extern Boolean (*gc_is_object_pinned)(Managed_Object_Handle obj);
+extern BOOLEAN (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned *offset_of_limit);
+extern BOOLEAN (*gc_is_object_pinned)(Managed_Object_Handle obj);
 extern Managed_Object_Handle (*gc_alloc)(unsigned size, 
                                          Allocation_Handle type,
                                          void *thread_pointer);
@@ -585,7 +585,7 @@ extern void (*gc_thread_kill)(void *gc_information);
 VMEXPORT extern int64 (*gc_total_memory)();
 VMEXPORT extern int64 (*gc_max_memory)();
 extern void (*gc_wrapup)();
-extern Boolean (*gc_requires_barriers)();
+extern BOOLEAN (*gc_requires_barriers)();
 extern void (*gc_test_safepoint)();
 
 
@@ -597,7 +597,7 @@ extern Managed_Object_Handle (*gc_get_next_live_object)(void *iterator);
 extern void (*gc_iterate_heap)();
 extern void (*gc_finalize_on_exit)();
 extern void (*gc_set_mutator_block_flag)();
-extern Boolean (*gc_clear_mutator_block_flag)();
+extern BOOLEAN (*gc_clear_mutator_block_flag)();
 
 
 
@@ -634,7 +634,7 @@ extern Boolean (*gc_clear_mutator_block_flag)();
  * garbage collector with virtual machine executable.
  */
 
-extern Boolean (*gc_supports_compressed_references)();
+extern BOOLEAN (*gc_supports_compressed_references)();
 
 extern void (*gc_heap_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                  unsigned offset,
@@ -662,7 +662,7 @@ extern void (*gc_write_barrier)(Managed_Object_Handle p_base_of_obj_with_slot);
 VMEXPORT extern void * (*gc_heap_base_address)();
 VMEXPORT extern void * (*gc_heap_ceiling_address)();
 
-extern Boolean (*gc_supports_class_unloading)();
+extern BOOLEAN (*gc_supports_class_unloading)();
 
 #else // USE_GC_STATIC
 
@@ -675,7 +675,7 @@ extern Boolean (*gc_supports_class_unloading)();
  * @return <code>TRUE</code> if references within objects and vector 
  *         elements are to be treated as offsets rather than raw pointers.
  */
-GCExport Boolean gc_supports_compressed_references();
+GCExport BOOLEAN gc_supports_compressed_references();
 
 /**
  * These interfaces are marked for replacement for the IPF by the following
@@ -787,9 +787,9 @@ GCExport void gc_set_mutator_block_flag();
 /**
  * Clears the mutator need block flag when heavy finalizable object load lightens
  */
-GCExport Boolean gc_clear_mutator_block_flag();
+GCExport BOOLEAN gc_clear_mutator_block_flag();
 
-GCExport Boolean gc_supports_class_unloading();
+GCExport BOOLEAN gc_supports_class_unloading();
 
 // XXX move this elsewhere -salikh
 #ifdef JNIEXPORT

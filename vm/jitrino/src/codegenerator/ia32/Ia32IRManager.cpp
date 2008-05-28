@@ -1365,7 +1365,7 @@ Type * IRManager::getTypeFromTag(Type::Tag tag)const
         case Type::UInt64:  
         case Type::Single:  
         case Type::Double:  
-        case Type::Boolean:  
+        case Type::BOOLEAN:  
         case Type::Float:   return typeManager.getPrimitiveType(tag);
         default:            return new(memoryManager) Type(tag);
     }
@@ -1378,7 +1378,7 @@ OpndSize IRManager::getTypeSize(Type::Tag tag)
     switch (tag) {
         case Type::Int8:
         case Type::UInt8:
-        case Type::Boolean:
+        case Type::BOOLEAN:
             size = OpndSize_8;
             break;
         case Type::Int16:   
