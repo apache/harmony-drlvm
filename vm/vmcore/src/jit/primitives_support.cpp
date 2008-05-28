@@ -340,7 +340,7 @@ char is_wrapper_class(const char* name)
         case 'B':
             if (*(c_ptr+1) == 'o') {
                 _sig = 'Z';
-                type = "BOOLEAN";
+                type = "Boolean";
             }
             else {
                 _sig = 'B';
