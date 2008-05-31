@@ -51,61 +51,61 @@ typedef struct AddrLocation {
 */
 typedef struct OpenMethodExecutionParams {
     /** call corresponding VM helper upon entry to the managed method */
-    BOOLEAN  exe_notify_method_entry : 1;
+    Boolean  exe_notify_method_entry : 1;
 
     /** call corresponding VM helper upon exit from the managed method */
-    BOOLEAN  exe_notify_method_exit : 1;
+    Boolean  exe_notify_method_exit : 1;
 
     /** call corresponding VM helper upon reading a value of a field which has <field access mask> set */
-    BOOLEAN  exe_notify_field_access  : 1;
+    Boolean  exe_notify_field_access  : 1;
 
     /** call corresponding VM helper upon setting a value of a field which has <field modification mask> set */
-    BOOLEAN  exe_notify_field_modification : 1;
+    Boolean  exe_notify_field_modification : 1;
 
     /**
     * call corresponding VM helper upon exception throw,
     * if by default the throw code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_exception_throw : 1;
+    Boolean  exe_notify_exception_throw : 1;
 
     /**
     * call corresponding VM helper upon exception catch,
     * if by default the exception propagation code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_exception_catch : 1;
+    Boolean  exe_notify_exception_catch : 1;
 
     /**
     * call corresponding VM helper upon entering a monitor,
     * if by default the monitor enter code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_monitor_enter : 1;
+    Boolean  exe_notify_monitor_enter : 1;
 
     /**
     * call corresponding VM helper upon exiting a monitor,
     * if by default the monitor exit code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_monitor_exit : 1;
+    Boolean  exe_notify_monitor_exit : 1;
 
     /**
     * call corresponding VM helper upon entering a contended monitor,
     * if by default the contended monitor enter code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_contended_monitor_enter : 1;
+    Boolean  exe_notify_contended_monitor_enter : 1;
 
     /**
     * call corresponding VM helper upon exiting a contended monitor,
     * if by default the contended monitor exit code does not enter any VM helper
     * (for example, in case of JIT optimizations)
     */
-    BOOLEAN  exe_notify_contended_monitor_exit : 1;
+    Boolean  exe_notify_contended_monitor_exit : 1;
 
     /** perform method in-lining during compilation (JIT-specific) */
-    BOOLEAN  exe_do_method_inlining : 1;
+    Boolean  exe_do_method_inlining : 1;
 
     /**
     * Keep correspondence between bytecode offsets and native instruction IPs (JIT-specific).
@@ -113,7 +113,7 @@ typedef struct OpenMethodExecutionParams {
     * may hinder this mapping. It should also store the map after method compilation so that
     * later VM could use appropriate ExeJPDA interfaces to retrieve the mapping.
     */
-    BOOLEAN  exe_do_code_mapping : 1;
+    Boolean  exe_do_code_mapping : 1;
 
     /**
     * Keep correspondence between bytecode local variables and locations of the
@@ -122,28 +122,28 @@ typedef struct OpenMethodExecutionParams {
     * which may hinder this mapping. It should also store the map after method compilation
     * so that later VM could use appropriate ExeJPDA interfaces to retrieve the mapping.
     */
-    BOOLEAN  exe_do_local_var_mapping : 1;
+    Boolean  exe_do_local_var_mapping : 1;
 
     /** call corresponding VM helper upon setting a value of any field of reference type */
-    BOOLEAN  exe_insert_write_barriers : 1;
+    Boolean  exe_insert_write_barriers : 1;
 
     /**
     * Provide possibility to obtain reference to the current 'this' object by
     * means of get_address_of_this method. Used for JVMTI debug support.
     */
-    BOOLEAN  exe_provide_access_to_this : 1;
+    Boolean  exe_provide_access_to_this : 1;
 
     /**
     * Provide restoring of arguments in the stack after the call
     * of the unwind_frame method so that method could be called again
     * with the same arguments. Used for JVMTI debug support.
     */
-    BOOLEAN  exe_restore_context_after_unwind : 1;
+    Boolean  exe_restore_context_after_unwind : 1;
 
     /**
     * Sent CompileMethodLoad event when a method is compiled and loaded into memory 
     */
-    BOOLEAN  exe_notify_compiled_method_load : 1;
+    Boolean  exe_notify_compiled_method_load : 1;
 
 } OpenMethodExecutionParams;
 
@@ -166,7 +166,7 @@ typedef struct OpenMethodExecutionParams {
         uint64 *p_br[8];
         uint64 nats_lo;
         uint64 nats_hi;
-        BOOLEAN is_ip_past;
+        Boolean is_ip_past;
         uint64 ar_fpsr;
         uint64 ar_unat;
         uint64 ar_lc;
@@ -201,7 +201,7 @@ typedef struct OpenMethodExecutionParams {
         // To restore processor flags during transfer
         U_32 eflags;
 
-        BOOLEAN is_ip_past;
+        Boolean is_ip_past;
     } JitFrameContext;
 
 #else // "_IA32_"
@@ -225,7 +225,7 @@ typedef struct OpenMethodExecutionParams {
         // To restore processor flags during transfer
         U_32 eflags;
 
-        BOOLEAN is_ip_past;
+        Boolean is_ip_past;
     } JitFrameContext;
 
 #endif // "_IA32_"

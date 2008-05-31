@@ -35,7 +35,7 @@ static Chunk_Header_Basic *volatile next_chunk_for_fixing;
 
 
 /******************** General interfaces for Mark-Sweep-Compact ***********************/
-BOOLEAN obj_is_mark_black_in_table(Partial_Reveal_Object *obj)
+Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj)
 {
   POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
@@ -58,7 +58,7 @@ void gc_init_collector_free_chunk_list(Collector *collector)
 }
 
 /* Argument need_construct stands for whether or not the dual-directon list needs constructing */
-Chunk_Header_Basic *wspace_grab_next_chunk(Wspace *wspace, Chunk_Header_Basic *volatile *shared_next_chunk, BOOLEAN need_construct)
+Chunk_Header_Basic *wspace_grab_next_chunk(Wspace *wspace, Chunk_Header_Basic *volatile *shared_next_chunk, Boolean need_construct)
 {
   Chunk_Header_Basic *cur_chunk = *shared_next_chunk;
   
@@ -173,7 +173,7 @@ static inline void object_double_fix_ref_slots(Partial_Reveal_Object *p_obj)
 #endif
 }
 
-static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk, BOOLEAN double_fix)
+static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk, Boolean double_fix)
 {
   /* Init field slot_index and depad the last index word in table for fixing */
   chunk->slot_index = 0;
@@ -221,7 +221,7 @@ static void normal_chunk_fix_repointed_refs(Chunk_Header *chunk, BOOLEAN double_
   }
 }
 
-static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk, BOOLEAN double_fix)
+static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk, Boolean double_fix)
 {
   if(double_fix)
     object_double_fix_ref_slots((Partial_Reveal_Object*)chunk->base);
@@ -232,7 +232,7 @@ static void abnormal_chunk_fix_repointed_refs(Chunk_Header *chunk, BOOLEAN doubl
 #endif
 }
 
-static void wspace_fix_repointed_refs(Collector *collector, Wspace *wspace, BOOLEAN double_fix)
+static void wspace_fix_repointed_refs(Collector *collector, Wspace *wspace, Boolean double_fix)
 {
   Chunk_Header_Basic *chunk = wspace_grab_next_chunk(wspace, &next_chunk_for_fixing, TRUE);
   
@@ -369,7 +369,7 @@ void mark_sweep_wspace(Collector *collector)
      * we need double fix object slots,
      * because some objects are forwarded from nos to mos and compacted into another chunk afterwards.
      */
-    BOOLEAN double_fix = collect_is_major() && wspace->need_compact;
+    Boolean double_fix = collect_is_major() && wspace->need_compact;
     wspace_fix_repointed_refs(collector, wspace, double_fix);
     
     atomic_inc32(&num_fixing_collectors);
@@ -382,7 +382,7 @@ void mark_sweep_wspace(Collector *collector)
   /* Leftover: *************************************************/
   
   if(wspace->need_fix){
-    BOOLEAN double_fix = collect_is_major() && wspace->need_compact;
+    Boolean double_fix = collect_is_major() && wspace->need_compact;
     gc_fix_rootset(collector, double_fix);
 #ifdef SSPACE_TIME
     wspace_fix_time(FALSE);

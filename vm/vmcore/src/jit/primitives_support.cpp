@@ -162,7 +162,7 @@ jobject wrap_primitive(JNIEnv *env, jvalue value, char sig)
     {
         args[0].z = value.z;
 
-        // Allocate java/lang/BOOLEAN object:
+        // Allocate java/lang/Boolean object:
         clazz = (jclass)gh_jlboolean;
         static jmethodID init_Boolean;
         if(!init_Boolean) {
@@ -277,7 +277,7 @@ jvalue unwrap_primitive(JNIEnv *env, jobject wobj, char sig)
 
     switch (sig) { // Value argument signature
     case 'Z':
-        // Get the fieldID of the value field of a BOOLEAN object:
+        // Get the fieldID of the value field of a Boolean object:
         value_id = gid_boolean_value;
         value.z = GetBooleanField (env, wobj, value_id);
         break;

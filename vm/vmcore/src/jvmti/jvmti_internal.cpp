@@ -29,7 +29,7 @@
 #include "vtable.h"
 #include "jvmti_internal.h"
 
-static BOOLEAN is_valid_instance(jobject obj, Class* clss)
+static Boolean is_valid_instance(jobject obj, Class* clss)
 {
     if (NULL == obj)
         return false;
@@ -54,28 +54,28 @@ static BOOLEAN is_valid_instance(jobject obj, Class* clss)
     }
 
     Class* object_clss = mo->vt()->clss;
-    BOOLEAN result = object_clss->is_instanceof(clss);
+    Boolean result = object_clss->is_instanceof(clss);
     tmn_suspend_enable();        //---------------------------------^
 
     return result;
 }
 
-BOOLEAN is_valid_throwable_object(jobject exc)
+Boolean is_valid_throwable_object(jobject exc)
 {
     return is_valid_instance(exc, VM_Global_State::loader_env->java_lang_Throwable_Class);
 }
 
-BOOLEAN is_valid_thread_object(jthread thread)
+Boolean is_valid_thread_object(jthread thread)
 {
     return is_valid_instance(thread, VM_Global_State::loader_env->java_lang_Thread_Class);
 }
 
-BOOLEAN is_valid_thread_group_object(jthreadGroup group)
+Boolean is_valid_thread_group_object(jthreadGroup group)
 {
     return is_valid_instance(group, VM_Global_State::loader_env->java_lang_ThreadGroup_Class);
 }
 
-BOOLEAN is_valid_class_object(jclass klass)
+Boolean is_valid_class_object(jclass klass)
 {
     return is_valid_instance(klass, VM_Global_State::loader_env->JavaLangClass_Class);
 }

@@ -77,7 +77,7 @@ lib_handle(NULL)
     _next_command_line_argument = (void (*)(JIT_Handle, const char *, const char *)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_recompiled_method_callback");
-    _recompiled_method_callback = (BOOLEAN (*)(JIT_Handle, Method_Handle, void *)) fn;
+    _recompiled_method_callback = (Boolean (*)(JIT_Handle, Method_Handle, void *)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_get_inline_depth");
     _get_inline_depth = (U_32 (*)(JIT_Handle, InlineInfoPtr, U_32)) fn;
@@ -104,13 +104,13 @@ lib_handle(NULL)
     _get_address_of_this = (void * (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_is_soe_area");
-    _is_soe_area = (BOOLEAN (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
+    _is_soe_area = (Boolean (*)(JIT_Handle, Method_Handle, const JitFrameContext *)) fn;
 
     GET_FUNCTION(fn, handle, "JIT_compile_method_with_params");
     _compile_method_with_params = (JIT_Result (*)(JIT_Handle, Compile_Handle, Method_Handle, OpenMethodExecutionParams)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_supports_compressed_references");
-    _supports_compressed_references = (BOOLEAN (*)(JIT_Handle)) fn;
+    _supports_compressed_references = (Boolean (*)(JIT_Handle)) fn;
 
     GET_OPTIONAL_FUNCTION(fn, handle, "JIT_execute_method");
     _execute_method = (void(*)(JIT_Handle, jmethodID, jvalue*, jvalue*)) fn;

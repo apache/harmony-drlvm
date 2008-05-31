@@ -27,7 +27,7 @@ void collection_scheduler_initialize(GC* gc);
 void collection_scheduler_destruct(GC* gc);
 
 void gc_update_collection_scheduler(GC* gc, int64 time_mutator, int64 time_collection);
-BOOLEAN gc_sched_collection(GC* gc, unsigned int gc_cause);
+Boolean gc_sched_collection(GC* gc, unsigned int gc_cause);
 
 #endif
 

@@ -223,7 +223,7 @@ void sspace_reset_after_collection(Sspace* sspace)
 
   unsigned int sspace_first_idx = sspace->first_block_idx;
 
-  BOOLEAN is_major_collection = collect_is_major();
+  Boolean is_major_collection = collect_is_major();
 
   if( is_major_collection ){ 
     /* prepare for from-space, first half */

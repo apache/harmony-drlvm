@@ -612,7 +612,7 @@ void Method::do_jit_recompiled_method_callbacks()
     Method_Change_Notification_Record *nr;
     for (nr = _notify_recompiled_records;  nr != NULL;  nr = nr->next) {
         JIT *jit_to_be_notified = nr->jit;
-        BOOLEAN code_was_modified = 
+        Boolean code_was_modified = 
             jit_to_be_notified->recompiled_method_callback(this, nr->callback_data);
         if (code_was_modified) {
 #ifdef _IPF_

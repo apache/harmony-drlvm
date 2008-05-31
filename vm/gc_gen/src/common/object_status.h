@@ -24,7 +24,7 @@
 #include "../mark_sweep/wspace_mark_sweep.h"
 
 
-inline BOOLEAN obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
 {
   /*
    * The first condition is for supporting switch between nongen and gen minor collection.
@@ -37,38 +37,38 @@ inline BOOLEAN obj_is_dead_in_gen_minor_gc(Partial_Reveal_Object *p_obj)
   return obj_belongs_to_nos(p_obj) && !obj_is_fw_in_oi(p_obj);
 }
 
-inline BOOLEAN obj_is_dead_in_nongen_minor_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_nongen_minor_gc(Partial_Reveal_Object *p_obj)
 {
   return (obj_belongs_to_nos(p_obj) && !obj_is_fw_in_oi(p_obj))
           || (!obj_belongs_to_nos(p_obj) && !obj_is_marked_in_oi(p_obj));
 }
 
 /* The caller must be in places where alloc color and mark color haven't been flipped */
-inline BOOLEAN obj_is_dead_in_sweep_major_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_sweep_major_gc(Partial_Reveal_Object *p_obj)
 {
   return (obj_belongs_to_nos(p_obj) && !obj_is_marked_in_vt(p_obj))
           || (!obj_belongs_to_nos(p_obj) && !obj_is_mark_black_in_table(p_obj));
 }
 
-inline BOOLEAN obj_is_dead_in_compact_major_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_compact_major_gc(Partial_Reveal_Object *p_obj)
 {
   return !obj_is_marked_in_vt(p_obj);
 }
 
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
-inline BOOLEAN obj_is_dead_in_mark_sweep_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_mark_sweep_gc(Partial_Reveal_Object *p_obj)
 {
   return !obj_is_mark_black_in_table(p_obj);
 }
 #endif
 
 #ifdef USE_UNIQUE_MOVE_COMPACT_GC
-inline BOOLEAN obj_is_dead_in_move_compact_no_los_gc(Partial_Reveal_Object *p_obj)
+inline Boolean obj_is_dead_in_move_compact_no_los_gc(Partial_Reveal_Object *p_obj)
 {
   return !obj_is_marked_in_vt(p_obj);
 }
 #endif
-inline BOOLEAN gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
+inline Boolean gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
 {
   assert(p_obj);
 
@@ -92,11 +92,11 @@ inline BOOLEAN gc_obj_is_dead(GC *gc, Partial_Reveal_Object *p_obj)
   }
 }
 
-inline BOOLEAN fspace_obj_to_be_forwarded(Partial_Reveal_Object *p_obj)
+inline Boolean fspace_obj_to_be_forwarded(Partial_Reveal_Object *p_obj)
 {
   return forward_first_half ? (p_obj < object_forwarding_boundary) : (p_obj>=object_forwarding_boundary);
 }
-inline BOOLEAN obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
+inline Boolean obj_need_move(GC *gc, Partial_Reveal_Object *p_obj)
 {
   /* assert(!gc_obj_is_dead(gc, p_obj)); commented out for weakroot */
 

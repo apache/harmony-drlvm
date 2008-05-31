@@ -418,10 +418,10 @@ void jvmti_remove_single_step_breakpoints(DebugUtilsTI *ti, jvmti_thread_t jvmti
 jvmtiError JNICALL jvmtiGetNCAIEnvironment(jvmtiEnv* jvmti_env, ...);
 
 // Object check functions
-BOOLEAN is_valid_throwable_object(jthread thread);
-BOOLEAN is_valid_thread_object(jthread thread);
-BOOLEAN is_valid_thread_group_object(jthreadGroup group);
-BOOLEAN is_valid_class_object(jclass klass);
+Boolean is_valid_throwable_object(jthread thread);
+Boolean is_valid_thread_object(jthread thread);
+Boolean is_valid_thread_group_object(jthreadGroup group);
+Boolean is_valid_class_object(jclass klass);
 
 // JIT support
 jvmtiError jvmti_translate_jit_error(OpenExeJpdaError error);

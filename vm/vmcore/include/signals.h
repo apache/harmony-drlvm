@@ -31,14 +31,14 @@
 int vm_initialize_signals();
 int vm_shutdown_signals();
 
-BOOLEAN null_reference_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN stack_overflow_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN abort_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN ctrl_backslash_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN ctrl_break_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN ctrl_c_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN native_breakpoint_handler(port_sigtype signum, Registers* regs, void* fault_addr);
-BOOLEAN arithmetic_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean null_reference_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean stack_overflow_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean abort_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean ctrl_backslash_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean ctrl_break_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean ctrl_c_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean native_breakpoint_handler(port_sigtype signum, Registers* regs, void* fault_addr);
+Boolean arithmetic_handler(port_sigtype signum, Registers* regs, void* fault_addr);
 
 
 inline bool is_in_ti_handler(vm_thread_t vmthread, void* ip)

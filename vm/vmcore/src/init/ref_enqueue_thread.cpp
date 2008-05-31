@@ -28,14 +28,14 @@
 #include "jthread.h"
 
 
-static BOOLEAN native_ref_thread_flag = FALSE;
+static Boolean native_ref_thread_flag = FALSE;
 static Ref_Enqueue_Thread_Info *ref_thread_info = NULL;
 
 
-BOOLEAN get_native_ref_enqueue_thread_flag()
+Boolean get_native_ref_enqueue_thread_flag()
 {  return native_ref_thread_flag; }
 
-void set_native_ref_enqueue_thread_flag(BOOLEAN flag)
+void set_native_ref_enqueue_thread_flag(Boolean flag)
 {  native_ref_thread_flag = flag; }
 
 
@@ -115,7 +115,7 @@ static void wait_ref_enqueue_end(void)
     port_mutex_unlock(&ref_thread_info->end_mutex);
 }
 
-void activate_ref_enqueue_thread(BOOLEAN wait)
+void activate_ref_enqueue_thread(Boolean wait)
 {
     IDATA stat = hysem_set(ref_thread_info->pending_sem, ref_thread_info->thread_num);
     assert(stat == TM_ERROR_NONE);

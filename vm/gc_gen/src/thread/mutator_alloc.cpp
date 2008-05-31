@@ -31,7 +31,7 @@
 
 //#define GC_OBJ_SIZE_STATISTIC
 
-volatile BOOLEAN obj_alloced_live = FALSE;
+volatile Boolean obj_alloced_live = FALSE;
 
 #ifdef GC_OBJ_SIZE_STATISTIC
 #define GC_OBJ_SIZE_STA_MAX 256*KB
@@ -58,7 +58,7 @@ void gc_alloc_statistic_obj_distrubution(unsigned int size)
 }
 #endif
 
-extern BOOLEAN mutator_need_block;
+extern Boolean mutator_need_block;
 
 Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused_gc_tls) 
 {
@@ -71,7 +71,7 @@ Managed_Object_Handle gc_alloc(unsigned size, Allocation_Handle ah, void *unused
   size = (size & NEXT_TO_HIGH_BIT_CLEAR_MASK);
   
   Allocator* allocator = (Allocator*)gc_get_tls();
-  BOOLEAN type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)decode_vt((VT)ah));
+  Boolean type_has_fin = type_has_finalizer((Partial_Reveal_VTable*)decode_vt((VT)ah));
   
   if(type_has_fin && !IGNORE_FINREF && mutator_need_block)
     vm_heavy_finalizer_block_mutator();

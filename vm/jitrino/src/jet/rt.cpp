@@ -428,7 +428,7 @@ void rt_fix_handler_context(JIT_Handle jit, Method_Handle method,
     *psp = sp_val;
 }
 
-BOOLEAN rt_is_soe_area(JIT_Handle jit, Method_Handle method, const JitFrameContext * context) {
+Boolean rt_is_soe_area(JIT_Handle jit, Method_Handle method, const JitFrameContext * context) {
     char * pinfo = (char*)method_get_info_block_jit(method, jit);
 
     assert(MethodInfoBlock::is_valid_data(pinfo));

@@ -38,7 +38,7 @@ extern "C" {
     EXPORT extern void JIT_get_root_set_for_thread_dump(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *);
     EXPORT extern void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *);
     EXPORT extern void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *);
-    EXPORT extern BOOLEAN JIT_supports_compressed_references(JIT_Handle);
+    EXPORT extern Boolean JIT_supports_compressed_references(JIT_Handle);
     EXPORT extern void JIT_execute_method(JIT_Handle,jmethodID method, jvalue *return_value, jvalue *args);
 }
 
@@ -120,7 +120,7 @@ void EXPORT JIT_init(JIT_Handle UNREF h, const char* UNREF name, vm_adaptor_t ad
     interpreter->stack_dump = &stack_dump;
 }
 
-EXPORT BOOLEAN JIT_supports_compressed_references(JIT_Handle UNREF jh) {
+EXPORT Boolean JIT_supports_compressed_references(JIT_Handle UNREF jh) {
 #ifdef REFS_USE_UNCOMPRESSED
     return false;
 #else

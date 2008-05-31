@@ -202,7 +202,7 @@ void gen_compare_to_managed_null(Merced_Code_Emitter &emitter,
     }
 }
 
-BOOLEAN jit_clears_ccv_in_monitor_enter()
+Boolean jit_clears_ccv_in_monitor_enter()
 {
     return FALSE;
 }

@@ -292,7 +292,7 @@ static port_signal_handler_registration registrations[] =
 
 int vm_initialize_signals()
 {
-    BOOLEAN result = port_init_crash_handler(
+    Boolean result = port_init_crash_handler(
                         registrations,
                         sizeof(registrations)/sizeof(registrations[0]),
                         unwind_compiled_frame);
@@ -325,7 +325,7 @@ int vm_initialize_signals()
 
 int vm_shutdown_signals()
 {
-    BOOLEAN result = port_shutdown_crash_handler();
+    Boolean result = port_shutdown_crash_handler();
     if (!result)
         return -1;
 

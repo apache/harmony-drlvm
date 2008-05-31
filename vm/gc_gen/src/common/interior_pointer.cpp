@@ -23,7 +23,7 @@
 #include "interior_pointer.h"
 #include <vector>
 
-void gc_add_root_set_entry(Managed_Object_Handle *ref, BOOLEAN is_pinned);
+void gc_add_root_set_entry(Managed_Object_Handle *ref, Boolean is_pinned);
 
 typedef struct slot_offset_entry_struct{
   void** slot;
@@ -37,7 +37,7 @@ static const  int initial_vector_size = 100;
 static unsigned int interior_pointer_num_count = 0;
 
 
-void add_root_set_entry_interior_pointer(void **slot, int offset, BOOLEAN is_pinned)
+void add_root_set_entry_interior_pointer(void **slot, int offset, Boolean is_pinned)
 {
   //check size;
   if( interior_pointer_set.size() == interior_pointer_num_count ) 

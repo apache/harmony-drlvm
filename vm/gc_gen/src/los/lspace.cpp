@@ -22,7 +22,7 @@
 #include "lspace.h"
 
 void* los_boundary = NULL;
-BOOLEAN* p_global_lspace_move_obj;
+Boolean* p_global_lspace_move_obj;
 
 struct GC_Gen;
 void gc_set_los(GC_Gen* gc, Space* lspace);

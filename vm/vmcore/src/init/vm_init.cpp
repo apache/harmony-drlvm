@@ -311,8 +311,8 @@ static jint check_platform() {
  */
 static jint check_compression() {
         // Check for a mismatch between whether the various VM components all compress references or not.
-    BOOLEAN vm_compression = vm_is_heap_compressed();
-    BOOLEAN gc_compression = gc_supports_compressed_references();
+    Boolean vm_compression = vm_is_heap_compressed();
+    Boolean gc_compression = gc_supports_compressed_references();
     if (vm_compression) {
         if (!gc_compression) {
             LWARN(17, "VM component mismatch: the VM compresses references but the GC doesn't.");
@@ -323,7 +323,7 @@ static jint check_compression() {
         // always returns FALSE to the supports_compressed_references() call. 
         JIT **jit = &jit_compilers[0];
         if (!interpreter_enabled()) {
-            BOOLEAN jit_compression = (*jit)->supports_compressed_references();
+            Boolean jit_compression = (*jit)->supports_compressed_references();
             if (!jit_compression) {
                 LWARN(18, "VM component mismatch: the VM compresses references but a JIT doesn't");
                 return JNI_ERR;
@@ -336,7 +336,7 @@ static jint check_compression() {
         }
         JIT **jit = &jit_compilers[0];
         if (!interpreter_enabled()) {
-            BOOLEAN jit_compression = (*jit)->supports_compressed_references();
+            Boolean jit_compression = (*jit)->supports_compressed_references();
             if (jit_compression) {
                 LWARN(20, "VM component mismatch: the VM doesn't compress references but a JIT does");
                 return JNI_ERR;

@@ -328,7 +328,7 @@ jint initialize_properties(Global_Env * p_env)
  * Java properties are set as -Dkey[=value];
  * VM properties are set with the following syntax ("fully compatible" with RI):
  * - options are set with -XX:<option>=<string>
- * - BOOLEAN options may be turned on with -XX:+<option> and turned off with -XX:-<option>
+ * - Boolean options may be turned on with -XX:+<option> and turned off with -XX:-<option>
  * - Numeric options are set with -XX:<option>=<number>. 
  *   Numbers can include 'm' or 'M' for megabytes, 'k' or 'K' for kilobytes, and 'g' or
  *   'G' for gigabytes (for example, 32k is the same as 32768).

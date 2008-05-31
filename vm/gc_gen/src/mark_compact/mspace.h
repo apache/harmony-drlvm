@@ -36,7 +36,7 @@ typedef struct Mspace{
   float survive_ratio;
   unsigned int collect_algorithm;
   GC* gc;
-  BOOLEAN move_object;
+  Boolean move_object;
 
   Space_Statistics* space_statistic;
 

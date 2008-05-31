@@ -18,7 +18,7 @@
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../thread/marker.h"
 
-BOOLEAN obj_is_marked_in_table(Partial_Reveal_Object *obj);
+Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj);
 
 static FORCE_INLINE void scan_slot(Collector* marker, REF *p_ref)
 {
@@ -85,7 +85,7 @@ static void trace_object(Marker* marker, Partial_Reveal_Object *p_obj)
   }
 }
 
-static BOOLEAN concurrent_mark_need_terminating(GC* gc)
+static Boolean concurrent_mark_need_terminating(GC* gc)
 {
   GC_Metadata *metadata = gc->metadata;
   return gc_local_dirtyset_is_empty(gc) && pool_is_empty(metadata->gc_dirty_set_pool);

@@ -336,7 +336,7 @@ void collector_release_weakref_sets(GC* gc, unsigned int num_collectors)
   }
 }
 
-BOOLEAN is_collector_finished(GC* gc)
+Boolean is_collector_finished(GC* gc)
 {
   unsigned int num_active_collectors = gc->num_active_collectors;
   unsigned int i = 0;

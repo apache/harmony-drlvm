@@ -3193,7 +3193,7 @@ Inst& IpfInstCodeSelector::addNewInst(InstCode      instCode,
 DataKind IpfInstCodeSelector::toDataKind(Type::Tag tag) {
 
     switch(tag) {
-        case Type::BOOLEAN                : return DATA_U8;
+        case Type::Boolean                : return DATA_U8;
         case Type::Char                   : return DATA_U16;
         case Type::Int8                   : return DATA_I8;
         case Type::Int16                  : return DATA_I16;
@@ -3236,7 +3236,7 @@ OpndKind IpfInstCodeSelector::toOpndKind(Type::Tag tag) {
         case Type::NullObject   : return OPND_G_REG;
         case Type::SystemObject : return OPND_G_REG;
         case Type::SystemClass  : return OPND_G_REG;
-        case Type::BOOLEAN      : return OPND_G_REG;
+        case Type::Boolean      : return OPND_G_REG;
         case Type::Char         : return OPND_G_REG;
         case Type::Int8         : return OPND_G_REG;
         case Type::Int16        : return OPND_G_REG;

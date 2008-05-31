@@ -142,7 +142,7 @@ void gc_prepare_mutator_remset(GC* gc)
   return;
 }
 
-BOOLEAN gc_local_dirtyset_is_empty(GC* gc)
+Boolean gc_local_dirtyset_is_empty(GC* gc)
 {
   lock(gc->mutator_list_lock);
 
@@ -215,7 +215,7 @@ void mutator_register_new_obj_size(Mutator * mutator)
   size_new_obj_desturcted_mutator_alloced += mutator->new_obj_size;
 }
 
-POINTER_SIZE_INT gc_get_new_object_size(GC* gc, BOOLEAN need_reset)
+POINTER_SIZE_INT gc_get_new_object_size(GC* gc, Boolean need_reset)
 {
   POINTER_SIZE_INT new_obj_size = 0;
 

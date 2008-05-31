@@ -57,10 +57,10 @@ extern Heap_Verifier_Metadata* verifier_metadata;
 struct Heap_Verifier;
 void gc_verifier_metadata_initialize(Heap_Verifier* heap_verifier);
 void gc_verifier_metadata_destruct(Heap_Verifier* heap_verifier);
-Vector_Block* gc_verifier_metadata_extend(Pool* pool, BOOLEAN is_set_pool);
+Vector_Block* gc_verifier_metadata_extend(Pool* pool, Boolean is_set_pool);
 
-void verifier_clear_pool(Pool* working_pool, Pool* free_pool, BOOLEAN is_vector_stack);
-void verifier_remove_pool(Pool* working_pool, Pool* free_pool, BOOLEAN is_vector_stack);
+void verifier_clear_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack);
+void verifier_remove_pool(Pool* working_pool, Pool* free_pool, Boolean is_vector_stack);
 void verifier_copy_pool_reverse_order(Pool* dest_pool, Pool* source_pool);
 void verifier_copy_pool(Pool* dest_pool, Pool* source_pool);
 

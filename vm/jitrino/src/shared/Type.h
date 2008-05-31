@@ -61,7 +61,7 @@ public:
         //   (1.1) Built-in value types
         Tau,     // essentially a void type, used for 
         Void,    
-        BOOLEAN,
+        Boolean,
         Char,
         IntPtr,  // ptr-sized integer
         Int8,
@@ -159,7 +159,7 @@ public:
     bool    isUnmanagedPtr()   {return isUnmanagedPtr(tag); }
     bool    isFP()             {return isFloatingPoint(tag);}
     bool    isVoid()           {return (tag == Type::Void);        }
-    bool    isBoolean()        {return (tag == Type::BOOLEAN);     }
+    bool    isBoolean()        {return (tag == Type::Boolean);     }
     bool    isChar()           {return (tag == Type::Char);        }
     bool    isInt1()           {return (tag == Type::Int8);        }
     bool    isInt2()           {return (tag == Type::Int16);       }

@@ -79,7 +79,7 @@ static void *decompose_obj_addr(Obj_Addr obj_addr, POINTER_SIZE_INT card_index, 
   return (void*)(heap_offset + (POINTER_SIZE_INT)gc_heap_base(gc_in_verify));
 }
 
-static BOOLEAN obj_addr_overlapped(Obj_Addr addr1, Obj_Addr addr2)
+static Boolean obj_addr_overlapped(Obj_Addr addr1, Obj_Addr addr2)
 {
   unsigned int offset1 = addr1 & VERIFY_CARD_LOW_MASK;
   unsigned int size1 = (addr1 & VERIFY_CARD_HIGH_MASK) >> VERIFY_CARD_SIZE_BYTES_SHIFT;
@@ -144,7 +144,7 @@ void wspace_verify_alloc(void *addr, unsigned int size)
 }
 
 /* size is rounded up size */
-static BOOLEAN obj_position_is_correct(void *addr, unsigned int size)
+static Boolean obj_position_is_correct(void *addr, unsigned int size)
 {
   Chunk_Header *chunk = NULL;
   
@@ -214,7 +214,7 @@ void wspace_record_mark(void *addr, unsigned int size)
   mark_card_add_entry(addr, size);
 }
 
-static void verify_mark(void *addr, unsigned int size, BOOLEAN destructively)
+static void verify_mark(void *addr, unsigned int size, Boolean destructively)
 {
   assert(address_belongs_to_gc_heap(addr, gc_in_verify));
   
@@ -300,7 +300,7 @@ void wspace_verify_free_area(POINTER_SIZE_INT *start, POINTER_SIZE_INT size)
     assert(!*p_value++);
 }
 
-static POINTER_SIZE_INT wspace_live_obj_num(Wspace *wspace, BOOLEAN gc_finished)
+static POINTER_SIZE_INT wspace_live_obj_num(Wspace *wspace, Boolean gc_finished)
 {
   Chunk_Header *chunk = (Chunk_Header*)space_heap_start((Space*)wspace);
   Chunk_Header *wspace_ceiling = (Chunk_Header*)space_heap_end((Space*)wspace);
@@ -439,11 +439,11 @@ static Pool *trace_pool = NULL;
 static Vector_Block *trace_stack = NULL;
 POINTER_SIZE_INT live_obj_in_verify_marking = 0;
 
-static BOOLEAN obj_mark_in_vtable(GC *gc, Partial_Reveal_Object *obj)
+static Boolean obj_mark_in_vtable(GC *gc, Partial_Reveal_Object *obj)
 {
   assert(address_belongs_to_gc_heap(obj, gc));
   assert((vm_object_size(obj) <= SUPER_OBJ_THRESHOLD) || (get_obj_info_raw(obj) & SUPER_OBJ_MASK));
-  BOOLEAN marked = obj_mark_in_vt(obj);
+  Boolean marked = obj_mark_in_vt(obj);
 #ifdef SSPACE_VERIFY
   if(marked) live_obj_in_verify_marking++;
 #endif
@@ -594,7 +594,7 @@ static uint64 compact_start_time;
 static uint64 fix_start_time;
 static uint64 merge_start_time;
 
-void wspace_gc_time(GC *gc, BOOLEAN before_gc)
+void wspace_gc_time(GC *gc, Boolean before_gc)
 {
   if(before_gc){
     gc_start_time = tsc();
@@ -606,7 +606,7 @@ void wspace_gc_time(GC *gc, BOOLEAN before_gc)
   }
 }
 
-void wspace_mark_time(BOOLEAN before_mark)
+void wspace_mark_time(Boolean before_mark)
 {
   assert(before_mark == FALSE);
   if(before_mark){
@@ -619,7 +619,7 @@ void wspace_mark_time(BOOLEAN before_mark)
   }
 }
 
-void wspace_sweep_time(BOOLEAN before_sweep, BOOLEAN wspace_need_compact)
+void wspace_sweep_time(Boolean before_sweep, Boolean wspace_need_compact)
 {
   assert(before_sweep == FALSE);
   if(before_sweep){
@@ -635,7 +635,7 @@ void wspace_sweep_time(BOOLEAN before_sweep, BOOLEAN wspace_need_compact)
   }
 }
 
-void wspace_compact_time(BOOLEAN before_compact)
+void wspace_compact_time(Boolean before_compact)
 {
   assert(before_compact == FALSE);
   if(before_compact){
@@ -648,7 +648,7 @@ void wspace_compact_time(BOOLEAN before_compact)
   }
 }
 
-void wspace_fix_time(BOOLEAN before_fix)
+void wspace_fix_time(Boolean before_fix)
 {
   assert(before_fix == FALSE);
   if(before_fix){
@@ -661,7 +661,7 @@ void wspace_fix_time(BOOLEAN before_fix)
   }
 }
 
-void wspace_merge_time(BOOLEAN before_merge)
+void wspace_merge_time(Boolean before_merge)
 {
   assert(before_merge == FALSE);
   if(before_merge){

@@ -103,7 +103,7 @@ void Method_Lookup_Table::add(Method_Code *m)
 
 #define USE_METHOD_LOOKUP_CACHE
 
-BOOLEAN Method_Lookup_Table::remove(void *addr)
+Boolean Method_Lookup_Table::remove(void *addr)
 {
     if (addr == NULL) {
         return FALSE;
@@ -207,7 +207,7 @@ unsigned Method_Lookup_Table::find_index(void *addr)
 
 
 
-Method_Code *Method_Lookup_Table::find(void *addr, BOOLEAN is_ip_past)
+Method_Code *Method_Lookup_Table::find(void *addr, Boolean is_ip_past)
 {
     if (addr == NULL) {
         return NULL;
@@ -458,7 +458,7 @@ void Method_Lookup_Table::add(Method_Handle method_handle, void *code_addr,
     add(mc);
 }
 
-Method_Handle Method_Lookup_Table::find(void *ip, BOOLEAN is_ip_past,
+Method_Handle Method_Lookup_Table::find(void *ip, Boolean is_ip_past,
     void **code_addr, size_t *size, void **data)
 {
     Method_Code *mc = find(ip, is_ip_past);

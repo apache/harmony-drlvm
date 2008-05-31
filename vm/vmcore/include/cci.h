@@ -44,8 +44,8 @@ public:
     void set_id(int id) { _id = id; }
     int get_id() const { return _id; }
 
-    void set_relocatable(BOOLEAN r) { _relocatable = r; }
-    BOOLEAN get_relocatable() const { return _relocatable; }
+    void set_relocatable(Boolean r) { _relocatable = r; }
+    Boolean get_relocatable() const { return _relocatable; }
 
     void set_heat(unsigned heat) { _heat = heat; }
     unsigned get_heat() const { return _heat; }
@@ -59,7 +59,7 @@ public:
     int get_jit_index() const;
 
     // Note: _data_blocks can only be used for inline info for now
-    BOOLEAN has_inline_info() const { return _data_blocks != NULL; }
+    Boolean has_inline_info() const { return _data_blocks != NULL; }
     void* get_inline_info() const { return &_data_blocks->bytes[0]; }
 
     unsigned get_num_target_exception_handlers() const;

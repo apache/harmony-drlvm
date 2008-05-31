@@ -52,8 +52,8 @@ typedef struct Finref_Metadata{
   Vector_Block *finalizable_obj_set;            // buffer for finalizable_obj_pool
   Vector_Block *repset;                         // buffer for repset_pool
   
-  BOOLEAN pending_finalizers;                   // there are objects waiting to be finalized
-  BOOLEAN pending_weakrefs;                     // there are weak references waiting to be enqueued
+  Boolean pending_finalizers;                   // there are objects waiting to be finalized
+  Boolean pending_weakrefs;                     // there are weak references waiting to be enqueued
   
   unsigned int gc_referent_offset;              // the referent field's offset in Reference Class; it is a constant during VM's liftime
 }Finref_Metadata;
@@ -63,7 +63,7 @@ extern void set_gc_referent_offset(unsigned int offset);
 
 extern void gc_finref_metadata_initialize(GC *gc);
 extern void gc_finref_metadata_destruct(GC *gc);
-extern void gc_finref_metadata_verify(GC *gc, BOOLEAN is_before_gc);
+extern void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc);
 
 extern void gc_set_obj_with_fin(GC *gc);
 extern void collector_reset_weakref_sets(Collector *collector);
@@ -79,15 +79,15 @@ extern void collector_add_phanref(Collector *collector, Partial_Reveal_Object *r
 extern void finref_repset_add_entry(GC *gc, REF* ref);
 extern Vector_Block *finref_add_fallback_ref(GC *gc, Vector_Block *vector_block_in_use, Partial_Reveal_Object *p_ref);
 
-extern BOOLEAN obj_with_fin_pool_is_empty(GC *gc);
-extern BOOLEAN finalizable_obj_pool_is_empty(GC *gc);
-extern BOOLEAN softref_pool_is_empty(GC *gc);
-extern BOOLEAN weakref_pool_is_empty(GC *gc);
-extern BOOLEAN phanref_pool_is_empty(GC *gc);
-extern BOOLEAN finref_repset_pool_is_empty(GC *gc);
+extern Boolean obj_with_fin_pool_is_empty(GC *gc);
+extern Boolean finalizable_obj_pool_is_empty(GC *gc);
+extern Boolean softref_pool_is_empty(GC *gc);
+extern Boolean weakref_pool_is_empty(GC *gc);
+extern Boolean phanref_pool_is_empty(GC *gc);
+extern Boolean finref_repset_pool_is_empty(GC *gc);
 
 extern void finref_metadata_clear_pool(Pool *pool);
-extern BOOLEAN finref_copy_pool(Pool* src_pool, Pool* dest_pool, GC* gc);
+extern Boolean finref_copy_pool(Pool* src_pool, Pool* dest_pool, GC* gc);
 
 
 extern void gc_clear_weakref_pools(GC *gc);

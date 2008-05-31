@@ -23,7 +23,7 @@
 char* large_page_hint = NULL;
 
 #if defined (_WINDOWS_)
-BOOLEAN set_privilege(HANDLE process, LPCTSTR priv_name, BOOLEAN is_enable)
+Boolean set_privilege(HANDLE process, LPCTSTR priv_name, Boolean is_enable)
 {
   HANDLE token;
   TOKEN_PRIVILEGES tp;
@@ -48,13 +48,13 @@ BOOLEAN set_privilege(HANDLE process, LPCTSTR priv_name, BOOLEAN is_enable)
   return TRUE;
 }
 
-BOOLEAN obtain_lock_memory_priv()
+Boolean obtain_lock_memory_priv()
 {
   HANDLE process = GetCurrentProcess();
   return set_privilege(process, SE_LOCK_MEMORY_NAME, TRUE);
 }
 
-BOOLEAN release_lock_memory_priv()
+Boolean release_lock_memory_priv()
 {
   HANDLE process = GetCurrentProcess();
   return set_privilege(process, SE_LOCK_MEMORY_NAME, FALSE);

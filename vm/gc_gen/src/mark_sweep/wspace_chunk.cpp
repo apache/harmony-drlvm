@@ -23,14 +23,14 @@
 static Size_Segment *size_segments[SIZE_SEGMENT_NUM];
 static Pool **pfc_pools[SIZE_SEGMENT_NUM];
 static Pool **pfc_pools_backup[SIZE_SEGMENT_NUM];
-static BOOLEAN  *pfc_steal_flags[SIZE_SEGMENT_NUM];
+static Boolean  *pfc_steal_flags[SIZE_SEGMENT_NUM];
 
 static Free_Chunk_List  aligned_free_chunk_lists[NUM_ALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  unaligned_free_chunk_lists[NUM_UNALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  hyper_free_chunk_list;
 
 
-static void init_size_segment(Size_Segment *seg, unsigned int size_min, unsigned int size_max, unsigned int gran_shift_bits, BOOLEAN local_alloc)
+static void init_size_segment(Size_Segment *seg, unsigned int size_min, unsigned int size_max, unsigned int gran_shift_bits, Boolean local_alloc)
 {
   seg->size_min = size_min;
   seg->size_max = size_max;
@@ -60,7 +60,7 @@ void wspace_init_chunks(Wspace *wspace)
   for(i = SIZE_SEGMENT_NUM; i--;){
     pfc_pools[i] = (Pool**)STD_MALLOC(sizeof(Pool*) * size_segments[i]->chunk_num);
     pfc_pools_backup[i] = (Pool**)STD_MALLOC(sizeof(Pool*) * size_segments[i]->chunk_num);
-    pfc_steal_flags[i] = (BOOLEAN*)STD_MALLOC(sizeof(BOOLEAN) * size_segments[i]->chunk_num);
+    pfc_steal_flags[i] = (Boolean*)STD_MALLOC(sizeof(Boolean) * size_segments[i]->chunk_num);
     for(j=size_segments[i]->chunk_num; j--;){
       pfc_pools[i][j] = sync_pool_create();
       pfc_pools_backup[i][j] = sync_pool_create();
@@ -97,7 +97,7 @@ void wspace_init_chunks(Wspace *wspace)
   wspace_put_free_chunk(wspace, free_chunk);
 }
 
-static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, BOOLEAN &steal_flag)
+static void pfc_pool_set_steal_flag(Pool *pool, unsigned int steal_threshold, Boolean &steal_flag)
 {
   Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pool);
   while(chunk){
@@ -466,7 +466,7 @@ Free_Chunk *wspace_get_abnormal_free_chunk(Wspace *wspace, unsigned int chunk_si
   return chunk;
 }
 
-Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size, BOOLEAN is_normal_chunk)
+Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size, Boolean is_normal_chunk)
 {
   assert(chunk_size >= CHUNK_GRANULARITY);
   assert(!(chunk_size % CHUNK_GRANULARITY));
@@ -597,7 +597,7 @@ Chunk_Header *wspace_steal_pfc(Wspace *wspace, unsigned int seg_index, unsigned 
   return NULL;
 }
 
-static POINTER_SIZE_INT free_mem_in_used_chunk_list(Wspace *wspace, BOOLEAN show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_used_chunk_list(Wspace *wspace, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT used_chunk_size = 0;
   POINTER_SIZE_INT used_chunk_num  = 0;
@@ -622,7 +622,7 @@ static POINTER_SIZE_INT free_mem_in_used_chunk_list(Wspace *wspace, BOOLEAN show
   return free_mem_size;
 }
 
-static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, BOOLEAN show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, Boolean show_chunk_info)
 {
   Size_Segment **size_segs = wspace->size_segments;
   Pool ***pfc_pools = wspace->pfc_pools;
@@ -666,7 +666,7 @@ static POINTER_SIZE_INT free_mem_in_pfc_pools(Wspace *wspace, BOOLEAN show_chunk
   return free_mem_size;
 }
 
-static POINTER_SIZE_INT free_mem_in_free_lists(Wspace *wspace, Free_Chunk_List *lists, unsigned int list_num, BOOLEAN show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_free_lists(Wspace *wspace, Free_Chunk_List *lists, unsigned int list_num, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
   
@@ -697,7 +697,7 @@ static POINTER_SIZE_INT free_mem_in_free_lists(Wspace *wspace, Free_Chunk_List *
   return free_mem_size;
 }
 
-static POINTER_SIZE_INT free_mem_in_hyper_free_list(Wspace *wspace, BOOLEAN show_chunk_info)
+static POINTER_SIZE_INT free_mem_in_hyper_free_list(Wspace *wspace, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
   
@@ -721,7 +721,7 @@ static POINTER_SIZE_INT free_mem_in_hyper_free_list(Wspace *wspace, BOOLEAN show
   return free_mem_size;
 }
 
-POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, BOOLEAN show_chunk_info)
+POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, Boolean show_chunk_info)
 {
   POINTER_SIZE_INT free_mem_size = 0;
 
@@ -754,7 +754,7 @@ POINTER_SIZE_INT free_mem_in_wspace(Wspace *wspace, BOOLEAN show_chunk_info)
 
 
 #ifdef SSPACE_CHUNK_INFO
-void wspace_chunks_info(Wspace *wspace, BOOLEAN show_info)
+void wspace_chunks_info(Wspace *wspace, Boolean show_info)
 {
   if(!show_info) return;
   

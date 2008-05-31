@@ -33,7 +33,7 @@ typedef struct GC_MS {
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
-  BOOLEAN in_collection;
+  Boolean in_collection;
   int64 time_collections;
   float survive_ratio;
   
@@ -58,9 +58,9 @@ typedef struct GC_MS {
   unsigned int collect_kind; /* MAJOR or MINOR */
   unsigned int last_collect_kind;
   unsigned int cause; /*GC_CAUSE_LOS_IS_FULL, GC_CAUSE_NOS_IS_FULL, or GC_CAUSE_RUNTIME_FORCE_GC*/
-  BOOLEAN collect_result; /* succeed or fail */
+  Boolean collect_result; /* succeed or fail */
   
-  BOOLEAN generate_barrier;
+  Boolean generate_barrier;
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block *root_set;

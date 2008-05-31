@@ -105,7 +105,7 @@ static FORCE_INLINE void forward_object(Collector *collector, REF *p_ref)
   if(!obj_belongs_to_nos(p_obj) || obj_belongs_to_tospace(p_obj)) return; 
 
   Partial_Reveal_Object* p_target_obj = NULL;
-  BOOLEAN to_rem_slot = FALSE;
+  Boolean to_rem_slot = FALSE;
 
   /* Fastpath: object has already been forwarded, update the ref slot */
   if(obj_is_fw_in_oi(p_obj)){

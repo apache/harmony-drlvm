@@ -155,7 +155,7 @@ enum safepoint_state {
  * 
  * Used for debugging.
  */
-VMEXPORT BOOLEAN verify_object_header(void *ptr);
+VMEXPORT Boolean verify_object_header(void *ptr);
 
 /**
  *  Routines to support lifecycle management of resources associated
@@ -187,7 +187,7 @@ VMEXPORT void vm_reclaim_native_objs();
  */
 VMEXPORT void vm_finalize_object(Managed_Object_Handle p_obj);
 
-VMEXPORT void set_native_finalizer_thread_flag(BOOLEAN flag);
+VMEXPORT void set_native_finalizer_thread_flag(Boolean flag);
 
 VMEXPORT void vm_heavy_finalizer_block_mutator(void);
 //@}
@@ -198,7 +198,7 @@ VMEXPORT void vm_heavy_finalizer_block_mutator(void);
  */
 VMEXPORT void vm_enqueue_reference(Managed_Object_Handle p_obj);
 
-VMEXPORT void set_native_ref_enqueue_thread_flag(BOOLEAN flag);
+VMEXPORT void set_native_ref_enqueue_thread_flag(Boolean flag);
 
 /*
  * Returns handle of a class for a specified vtable

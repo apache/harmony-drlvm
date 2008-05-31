@@ -41,20 +41,20 @@ typedef struct Allocation_Verifier{
   
   Vector_Block* new_objects_set;
   
-  BOOLEAN is_verification_passed;  
+  Boolean is_verification_passed;  
 }Allocation_Verifier;
 
 typedef struct WriteBarrier_Verifier{
   POINTER_SIZE_INT num_slots_in_remset;
   POINTER_SIZE_INT num_ref_wb_in_remset;
   POINTER_SIZE_INT num_ref_wb_after_scanning;
-  BOOLEAN is_verification_passed;
+  Boolean is_verification_passed;
 }WriteBarrier_Verifier;
 
 typedef struct RootSet_Verifier{
   POINTER_SIZE_INT num_slots_in_rootset;
   POINTER_SIZE_INT num_error_slots;
-  BOOLEAN is_verification_passed;
+  Boolean is_verification_passed;
 }RootSet_Verifier;
 
 

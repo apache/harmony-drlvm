@@ -92,9 +92,9 @@ enum GC_Property{
   ALGO_CON_MASK         = 0x70000000,
 };
 
-FORCE_INLINE BOOLEAN gc_is_kind(unsigned int kind)
+FORCE_INLINE Boolean gc_is_kind(unsigned int kind)
 {
-  return (BOOLEAN)((GC_PROP & kind) == kind);
+  return (Boolean)((GC_PROP & kind) == kind);
 }
 
 FORCE_INLINE void gc_set_gen_flag()
@@ -107,32 +107,32 @@ FORCE_INLINE void gc_clear_gen_flag()
   GC_PROP &= ~ALGO_IS_GEN;  
 }
 
-FORCE_INLINE BOOLEAN gc_is_gen_mode()
+FORCE_INLINE Boolean gc_is_gen_mode()
 {
   return gc_is_kind(ALGO_IS_GEN);
 }
 
-FORCE_INLINE BOOLEAN gc_has_los()
+FORCE_INLINE Boolean gc_has_los()
 {
   return gc_is_kind(ALGO_HAS_LOS);
 }
 
-FORCE_INLINE BOOLEAN gc_has_nos()
+FORCE_INLINE Boolean gc_has_nos()
 {
   return gc_is_kind(ALGO_HAS_NOS);
 }
 
-FORCE_INLINE BOOLEAN collect_is_major()
+FORCE_INLINE Boolean collect_is_major()
 {
   return gc_is_kind(ALGO_MAJOR);
 }
 
-FORCE_INLINE BOOLEAN collect_is_minor()
+FORCE_INLINE Boolean collect_is_minor()
 {
   return gc_has_nos() && !collect_is_major();
 }
 
-FORCE_INLINE BOOLEAN collect_is_major_normal()
+FORCE_INLINE Boolean collect_is_major_normal()
 {
   return gc_is_kind(ALGO_MAJOR_NORMAL);
 }
@@ -149,17 +149,17 @@ FORCE_INLINE void collect_set_minor()
   GC_PROP &= ~ALGO_MAJOR_MASK;
 }
 
-FORCE_INLINE BOOLEAN collect_is_fallback()
+FORCE_INLINE Boolean collect_is_fallback()
 {
   return gc_is_kind(ALGO_MAJOR_FALLBACK);
 }
 
-FORCE_INLINE BOOLEAN major_is_marksweep()
+FORCE_INLINE Boolean major_is_marksweep()
 {
   return gc_is_kind(ALGO_MARKSWEEP|ALGO_HAS_NOS);
 }
 
-FORCE_INLINE BOOLEAN major_is_compact_move()
+FORCE_INLINE Boolean major_is_compact_move()
 {
   return gc_is_kind(ALGO_COMPACT_MOVE|ALGO_HAS_NOS);
 }
@@ -170,7 +170,7 @@ FORCE_INLINE void major_set_compact_move()
   GC_PROP |= ALGO_COMPACT_MOVE;  
 }
 
-FORCE_INLINE BOOLEAN major_is_compact_slide()
+FORCE_INLINE Boolean major_is_compact_slide()
 {
   return gc_is_kind(ALGO_COMPACT_SLIDE|ALGO_HAS_NOS);
 }
@@ -181,17 +181,17 @@ FORCE_INLINE void major_set_compact_slide()
   GC_PROP |= ALGO_COMPACT_SLIDE;  
 }
 
-FORCE_INLINE BOOLEAN minor_is_semispace()
+FORCE_INLINE Boolean minor_is_semispace()
 {
   return gc_is_kind(ALGO_COPY_SEMISPACE|ALGO_HAS_NOS);  
 }
 
-FORCE_INLINE BOOLEAN minor_is_forward()
+FORCE_INLINE Boolean minor_is_forward()
 {
   return gc_is_kind(ALGO_COPY_FORWARD|ALGO_HAS_NOS);  
 }
 
-FORCE_INLINE BOOLEAN collect_move_object()
+FORCE_INLINE Boolean collect_move_object()
 {
  if(gc_has_nos())
    return collect_is_minor() || 
@@ -200,7 +200,7 @@ FORCE_INLINE BOOLEAN collect_move_object()
    return !gc_is_kind(ALGO_MS_NORMAL);  
 }
 
-FORCE_INLINE BOOLEAN collect_is_compact_move()
+FORCE_INLINE Boolean collect_is_compact_move()
 {
   if(gc_has_nos())
     return collect_is_major() && gc_is_kind(ALGO_COMPACT_MOVE);
@@ -208,7 +208,7 @@ FORCE_INLINE BOOLEAN collect_is_compact_move()
     return gc_is_kind(ALGO_COMPACT_MOVE);    
 }
 
-FORCE_INLINE BOOLEAN collect_is_ms_compact()
+FORCE_INLINE Boolean collect_is_ms_compact()
 {
   if(gc_has_nos())
     return collect_is_major() && gc_is_kind(ALGO_MS_COMPACT);
@@ -226,7 +226,7 @@ FORCE_INLINE void collect_set_ms_normal()
 /* This is to distinct from the case of non-moving or trace-moving, where root slots
    either are updated on-the-fly, or need not updating. The kind below needs to update
    root slots after collection in an extra phase. i.e., collect_mark_and_move */
-FORCE_INLINE BOOLEAN collect_need_update_repset()
+FORCE_INLINE Boolean collect_need_update_repset()
 {
   return (gc_is_kind(ALGO_MAJOR) || gc_is_kind(ALGO_MS_COMPACT) || !gc_has_nos());
 }

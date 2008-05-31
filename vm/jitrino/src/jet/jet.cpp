@@ -823,7 +823,7 @@ OpenMethodExecutionParams JIT_get_exe_capabilities(JIT_Handle jit)
  * Noop in Jitrino.JET.
  * @return FALSE
  */
-extern "C" JITEXPORT BOOLEAN JIT_recompiled_method_callback(
+extern "C" JITEXPORT Boolean JIT_recompiled_method_callback(
         JIT_Handle jit, Method_Handle  method, void * callback_data)
 {
     return FALSE;
@@ -908,7 +908,7 @@ uint16 JIT_get_inlined_bc(JIT_Handle jit, InlineInfoPtr ptr,
  * platform.
  */
 extern "C" JITEXPORT
-BOOLEAN JIT_supports_compressed_references(JIT_Handle jit)
+Boolean JIT_supports_compressed_references(JIT_Handle jit)
 {
     return ::Jitrino::Jet::supports_compresed_refs();
 }

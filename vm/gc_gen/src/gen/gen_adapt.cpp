@@ -220,7 +220,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
       else gc->next_collect_force_major = FALSE;
       
       /*If major is caused by LOS, or collection kind is ALGO_MAJOR_EXTEND, all survive ratio is not updated.*/
-      extern BOOLEAN mos_extended;
+      extern Boolean mos_extended;
       if((gc->cause != GC_CAUSE_LOS_IS_FULL) && !mos_extended ){
         survive_ratio = (float)mos->period_surviving_size/(float)mos->committed_heap_size;
         mos->survive_ratio = survive_ratio;
@@ -299,7 +299,7 @@ static void gc_decide_next_collect(GC_Gen* gc, int64 pause_time)
 /* FIXME:: In this algorithm, it assumes NOS is a full forward space. 
    Semispace GC's NOS has survivor_area. Need careful rethinking. 
    But this algorithm so far can be a good approximation. */
-BOOLEAN gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTER_SIZE_INT* nos_size)
+Boolean gc_compute_new_space_size(GC_Gen* gc, POINTER_SIZE_INT* mos_size, POINTER_SIZE_INT* nos_size)
 {
   Blocked_Space* nos = (Blocked_Space*)gc->nos;
   Blocked_Space* mos = (Blocked_Space*)gc->mos;
@@ -394,7 +394,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT new_nos_size;
   POINTER_SIZE_INT new_mos_size;
 
-  BOOLEAN result = gc_compute_new_space_size(gc, &new_mos_size, &new_nos_size);
+  Boolean result = gc_compute_new_space_size(gc, &new_mos_size, &new_nos_size);
 
   if(!result) return;
 
@@ -456,7 +456,7 @@ void gc_gen_adapt(GC_Gen* gc, int64 pause_time)
   POINTER_SIZE_INT new_nos_size;
   POINTER_SIZE_INT new_mos_size;
 
-  BOOLEAN result = gc_compute_new_space_size(gc, &new_mos_size, &new_nos_size);
+  Boolean result = gc_compute_new_space_size(gc, &new_mos_size, &new_nos_size);
 
   if(!result) return;
 

@@ -52,7 +52,7 @@ interp_si_get_ip(StackIterator_interp* si) {
     return si->ip;
 }
 
-static inline BOOLEAN
+static inline Boolean
 interp_si_method_is_native(Method_Handle m) {
     assert(m);
     Method *meth = (Method *)m;

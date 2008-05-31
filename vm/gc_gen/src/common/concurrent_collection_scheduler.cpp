@@ -47,10 +47,10 @@ void gc_enable_time_scheduler()
 void gc_enable_space_scheduler()
 { cc_scheduler_kind |= SPACE_BASED_SCHEDULER; }
 
-BOOLEAN gc_use_time_scheduler()
+Boolean gc_use_time_scheduler()
 { return cc_scheduler_kind & TIME_BASED_SCHEDULER; }
 
-BOOLEAN gc_use_space_scheduler()
+Boolean gc_use_space_scheduler()
 { return cc_scheduler_kind & SPACE_BASED_SCHEDULER; }
 
 static int64 time_delay_to_start_mark = MAX_DELAY_TIME;
@@ -93,7 +93,7 @@ void gc_set_default_cc_scheduler_kind()
   gc_enable_time_scheduler();
 }
 
-static BOOLEAN time_to_start_mark(GC* gc)
+static Boolean time_to_start_mark(GC* gc)
 {
   if(!gc_use_time_scheduler()) return FALSE;
   
@@ -101,7 +101,7 @@ static BOOLEAN time_to_start_mark(GC* gc)
   return (time_current - get_collection_end_time()) > time_delay_to_start_mark;
 }
 
-static BOOLEAN space_to_start_mark(GC* gc)
+static Boolean space_to_start_mark(GC* gc)
 {
   if(!gc_use_space_scheduler()) return FALSE;
 
@@ -109,7 +109,7 @@ static BOOLEAN space_to_start_mark(GC* gc)
   return (size_new_obj > space_threshold_to_start_mark); 
 }
 
-static BOOLEAN gc_need_start_con_mark(GC* gc)
+static Boolean gc_need_start_con_mark(GC* gc)
 {
   if(!gc_is_specify_con_mark() || gc_mark_is_concurrent()) return FALSE;
   
@@ -119,7 +119,7 @@ static BOOLEAN gc_need_start_con_mark(GC* gc)
     return FALSE;
 }
 
-static BOOLEAN gc_need_start_con_sweep(GC* gc)
+static Boolean gc_need_start_con_sweep(GC* gc)
 {
   if(!gc_is_specify_con_sweep() || gc_sweep_is_concurrent()) return FALSE;
 
@@ -130,7 +130,7 @@ static BOOLEAN gc_need_start_con_sweep(GC* gc)
     return FALSE;
 }
 
-static BOOLEAN gc_need_reset_after_con_collect(GC* gc)
+static Boolean gc_need_reset_after_con_collect(GC* gc)
 {
   if(gc_sweep_is_concurrent() && !gc_con_is_in_sweeping(gc))
     return TRUE;
@@ -138,7 +138,7 @@ static BOOLEAN gc_need_reset_after_con_collect(GC* gc)
     return FALSE;
 }
 
-static BOOLEAN gc_need_start_con_enum(GC* gc)
+static Boolean gc_need_start_con_enum(GC* gc)
 {
   /*TODO: support on-the-fly root set enumeration.*/
   return FALSE;
@@ -285,7 +285,7 @@ void gc_update_con_collection_scheduler(GC* gc, int64 time_mutator, int64 time_c
   return;
 }
 
-BOOLEAN gc_sched_con_collection(GC* gc, unsigned int gc_cause)
+Boolean gc_sched_con_collection(GC* gc, unsigned int gc_cause)
 {
   if(!try_lock(gc->lock_collect_sched)) return FALSE;
   vm_gc_lock_enum();    

@@ -30,7 +30,7 @@
 #include "jni_utils.h"
 #include "slot.h"
 
-static BOOLEAN native_fin_thread_flag = FALSE;
+static Boolean native_fin_thread_flag = FALSE;
 static Fin_Thread_Info *fin_thread_info = NULL;
 unsigned int cpu_num_bits;
 
@@ -40,16 +40,16 @@ static U_32 atomic_inc32(volatile apr_uint32_t *mem)
 static U_32 atomic_dec32(volatile apr_uint32_t *mem)
 {  return (U_32)apr_atomic_dec32(mem); }
 
-BOOLEAN get_native_finalizer_thread_flag()
+Boolean get_native_finalizer_thread_flag()
 {  return native_fin_thread_flag; }
 
-void set_native_finalizer_thread_flag(BOOLEAN flag)
+void set_native_finalizer_thread_flag(Boolean flag)
 {  native_fin_thread_flag = flag; }
 
-BOOLEAN get_finalizer_shutdown_flag()
+Boolean get_finalizer_shutdown_flag()
 {  return fin_thread_info->shutdown; }
 
-BOOLEAN get_finalizer_on_exit_flag()
+Boolean get_finalizer_on_exit_flag()
 {  return fin_thread_info->on_exit; }
 
 static unsigned int coarse_log(unsigned int num)
@@ -120,7 +120,7 @@ void finalizer_threads_init(JavaVM *java_vm, JNIEnv *jni_env)
     }    
 }
 
-void finalizer_shutdown(BOOLEAN start_finalization_on_exit)
+void finalizer_shutdown(Boolean start_finalization_on_exit)
 {
     if(start_finalization_on_exit){
         gc_force_gc();
@@ -156,7 +156,7 @@ static unsigned int restrict_wait_time(unsigned int wait_time, unsigned int max_
     return wait_time;
 }
 
-static void wait_finalization_end(BOOLEAN must_wait)
+static void wait_finalization_end(Boolean must_wait)
 {
     port_mutex_lock(&fin_thread_info->end_mutex);
     unsigned int fin_obj_num = vm_get_finalizable_objects_quantity();
@@ -177,7 +177,7 @@ static void wait_finalization_end(BOOLEAN must_wait)
     port_mutex_unlock(&fin_thread_info->end_mutex);
 }
 
-void activate_finalizer_threads(BOOLEAN wait)
+void activate_finalizer_threads(Boolean wait)
 {
     IDATA stat = hysem_set(fin_thread_info->pending_sem, fin_thread_info->thread_num);
     assert(stat == TM_ERROR_NONE);
@@ -252,7 +252,7 @@ static IDATA finalizer_thread_func(void **args)
  * Now we use hythread
  * p_TLS_vmthread->finalize_thread_flags = thread_id;
  */
-static BOOLEAN self_is_finalizer_thread(void)
+static Boolean self_is_finalizer_thread(void)
 {
     hythread_t self = hythread_self();
     

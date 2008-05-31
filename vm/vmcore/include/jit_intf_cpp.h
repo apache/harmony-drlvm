@@ -176,7 +176,7 @@ public:
     // - context  -- The register context.
     //
 
-    virtual BOOLEAN
+    virtual Boolean
         is_soe_area(Method_Handle            method,  // in
         const JitFrameContext   *context              // in
         ) = 0;
@@ -188,14 +188,14 @@ public:
                         void * UNREF addr1,
                         void * UNREF addr2){ };
 
-    virtual BOOLEAN
+    virtual Boolean
     recompiled_method_callback(Method_Handle   UNREF recompiled_method,
                                void          * UNREF callback_data) { return FALSE; };
 
     // Returns TRUE if the JIT will compress references within objects and vector elements by representing 
     // them as offsets rather than raw pointers. The JIT should call the VM function vm_is_heap_compressed()
     // during initialization in order to decide whether it should compress references.
-    virtual BOOLEAN 
+    virtual Boolean 
     supports_compressed_references() = 0;
 
     /**

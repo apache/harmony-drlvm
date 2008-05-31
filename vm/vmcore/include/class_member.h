@@ -227,10 +227,10 @@ public:
     TypeDesc* get_field_type_desc() { return _field_type_desc; }
     void set_field_type_desc(TypeDesc* td) { _field_type_desc = td; }
 
-    BOOLEAN is_injected() {return _is_injected;}
+    Boolean is_injected() {return _is_injected;}
     void set_injected() { _is_injected = 1; }
 
-    BOOLEAN is_magic_type()    {return  _is_magic_type;}
+    Boolean is_magic_type()    {return  _is_magic_type;}
     
     void set_track_access(bool value) {
         track_access = value ? 1 : 0 ;
@@ -616,7 +616,7 @@ public:
     bool is_clinit()        {return _flags.is_clinit?true:false;}
     bool is_finalize()      {return _flags.is_finalize?true:false;}
     bool is_overridden()    {return _flags.is_overridden?true:false;}
-    BOOLEAN  is_nop()       {return _flags.is_nop;}
+    Boolean  is_nop()       {return _flags.is_nop;}
 
     unsigned get_index()    {return _index;}
 

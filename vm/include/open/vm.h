@@ -130,7 +130,7 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
 /**
  * @return <code>TRUE</code> if an inner class is public.
  */ 
- VMEXPORT BOOLEAN class_is_inner_class_public(Class_Handle ch, unsigned idx);
+ VMEXPORT Boolean class_is_inner_class_public(Class_Handle ch, unsigned idx);
 
 /**
  * @return an inner class
@@ -158,7 +158,7 @@ VMEXPORT Field_Handle class_get_instance_field_recursive(Class_Handle ch, unsign
  *
  * FIXME: move to internal headers
  */
- VMEXPORT BOOLEAN field_is_enumerable_reference(Field_Handle fh);
+ VMEXPORT Boolean field_is_enumerable_reference(Field_Handle fh);
 
 ////
 // end field-related functions.

@@ -165,10 +165,10 @@ inline int* object_ref_iterator_next(int* iterator)
 
 /****************************************/
 
-inline BOOLEAN obj_is_marked_in_vt(Partial_Reveal_Object *obj) 
+inline Boolean obj_is_marked_in_vt(Partial_Reveal_Object *obj) 
 {  return (((VT_SIZE_INT)obj_get_vt_raw(obj) & CONST_MARK_BIT) != 0); }
 
-inline BOOLEAN obj_mark_in_vt(Partial_Reveal_Object *obj) 
+inline Boolean obj_mark_in_vt(Partial_Reveal_Object *obj) 
 {  
   VT vt = obj_get_vt_raw(obj);
   if((VT_SIZE_INT)vt & CONST_MARK_BIT) return FALSE;
@@ -187,7 +187,7 @@ inline void obj_clear_dual_bits_in_vt(Partial_Reveal_Object* p_obj){
   obj_set_vt(p_obj,(VT)((VT_SIZE_INT)vt & DUAL_MARKBITS_MASK));
 }
 
-inline BOOLEAN obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)
+inline Boolean obj_is_marked_or_fw_in_oi(Partial_Reveal_Object *obj)
 { return ((get_obj_info_raw(obj) & DUAL_MARKBITS) != 0); }
 
 
@@ -206,8 +206,8 @@ inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj)
   return (Partial_Reveal_Object*)(ref_to_obj_ptr((REF)(get_obj_info_raw(obj) & ~CONST_FORWARD_BIT)));
 }
 
-inline BOOLEAN obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
-{  return (BOOLEAN)(get_obj_info_raw(obj) & CONST_FORWARD_BIT); }
+inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
+{  return (Boolean)(get_obj_info_raw(obj) & CONST_FORWARD_BIT); }
 
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 {  
@@ -217,10 +217,10 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj,void *dest)
 }
 
 
-inline BOOLEAN obj_is_marked_in_oi(Partial_Reveal_Object *obj) 
+inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object *obj) 
 {  return ((get_obj_info_raw(obj) & CONST_MARK_BIT) != 0); }
 
-FORCE_INLINE BOOLEAN obj_mark_in_oi(Partial_Reveal_Object *obj) 
+FORCE_INLINE Boolean obj_mark_in_oi(Partial_Reveal_Object *obj) 
 {  
   Obj_Info_Type info = get_obj_info_raw(obj);
   if ( info & CONST_MARK_BIT ) return FALSE;
@@ -251,7 +251,7 @@ inline Partial_Reveal_Object *obj_get_fw_in_oi(Partial_Reveal_Object *obj)
   return (Partial_Reveal_Object*) ( ref_to_obj_ptr( (REF)get_obj_info(obj) ) );
 }
 
-inline BOOLEAN obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
+inline Boolean obj_is_fw_in_oi(Partial_Reveal_Object *obj) 
 {  return ((get_obj_info_raw(obj) & FLIP_FORWARD_BIT) != 0); }
 
 inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
@@ -268,7 +268,7 @@ inline void obj_set_fw_in_oi(Partial_Reveal_Object *obj, void *dest)
   set_obj_info(obj, dst | FLIP_FORWARD_BIT); 
 }
 
-inline BOOLEAN obj_mark_in_oi(Partial_Reveal_Object* p_obj)
+inline Boolean obj_mark_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
   assert((info & DUAL_MARKBITS ) != DUAL_MARKBITS);
@@ -280,7 +280,7 @@ inline BOOLEAN obj_mark_in_oi(Partial_Reveal_Object* p_obj)
   return TRUE;
 }
 
-inline BOOLEAN obj_unmark_in_oi(Partial_Reveal_Object* p_obj)
+inline Boolean obj_unmark_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
   info = info & ~FLIP_MARK_BIT;
@@ -288,7 +288,7 @@ inline BOOLEAN obj_unmark_in_oi(Partial_Reveal_Object* p_obj)
   return TRUE;
 }
 
-inline BOOLEAN obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
+inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
   return ((info & FLIP_MARK_BIT) != 0);
@@ -297,13 +297,13 @@ inline BOOLEAN obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 #endif /* MARK_BIT_FLIPPING */
 
 /********************* for concurrent GC *******************************/
-inline BOOLEAN obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
+inline Boolean obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
   return ((info & OBJ_DIRTY_BIT) != 0);
 }
 
-inline BOOLEAN obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
+inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
 {
   Obj_Info_Type info = get_obj_info_raw(p_obj);
   if( info & OBJ_DIRTY_BIT ) return FALSE;
@@ -317,8 +317,8 @@ inline BOOLEAN obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
   return TRUE;
 }
 
-extern volatile BOOLEAN obj_alloced_live;
-inline BOOLEAN is_obj_alloced_live()
+extern volatile Boolean obj_alloced_live;
+inline Boolean is_obj_alloced_live()
 { return obj_alloced_live;  }
 
 inline void gc_enable_alloc_obj_live()
@@ -333,9 +333,9 @@ inline void gc_disable_alloc_obj_live()
 
 /***************************************************************/
 
-inline BOOLEAN obj_is_survivor(Partial_Reveal_Object* p_obj)
+inline Boolean obj_is_survivor(Partial_Reveal_Object* p_obj)
 {
-  return (BOOLEAN)(get_obj_info_raw(p_obj) & OBJ_AGE_BIT);
+  return (Boolean)(get_obj_info_raw(p_obj) & OBJ_AGE_BIT);
 }
 
 inline void obj_set_age_bit(Partial_Reveal_Object* p_obj)
@@ -352,9 +352,9 @@ inline void obj_clear_age_bit(Partial_Reveal_Object* p_obj)
 
 /***************************************************************/
 
-inline BOOLEAN obj_is_remembered(Partial_Reveal_Object* p_obj)
+inline Boolean obj_is_remembered(Partial_Reveal_Object* p_obj)
 {
-  return (BOOLEAN)(get_obj_info_raw(p_obj) & OBJ_REM_BIT);
+  return (Boolean)(get_obj_info_raw(p_obj) & OBJ_REM_BIT);
 }
 
 inline void obj_set_rem_bit(Partial_Reveal_Object* p_obj)
@@ -388,7 +388,7 @@ typedef struct GC{
   POINTER_SIZE_INT reserved_heap_size;
   POINTER_SIZE_INT committed_heap_size;
   unsigned int num_collections;
-  BOOLEAN in_collection;
+  Boolean in_collection;
   int64 time_collections;
   float survive_ratio;
   
@@ -413,9 +413,9 @@ typedef struct GC{
   unsigned int collect_kind; /* MAJOR or MINOR */
   unsigned int last_collect_kind;
   unsigned int cause;/*GC_CAUSE_LOS_IS_FULL, GC_CAUSE_NOS_IS_FULL, or GC_CAUSE_RUNTIME_FORCE_GC*/
-  BOOLEAN collect_result; /* succeed or fail */
+  Boolean collect_result; /* succeed or fail */
 
-  BOOLEAN generate_barrier;
+  Boolean generate_barrier;
   
   /* FIXME:: this is wrong! root_set belongs to mutator */
   Vector_Block* root_set;
@@ -440,9 +440,9 @@ typedef struct GC{
 }GC;
 
 
-inline BOOLEAN collect_last_is_minor(GC* gc)
+inline Boolean collect_last_is_minor(GC* gc)
 {
-  return (BOOLEAN)((gc->last_collect_kind & ALGO_MAJOR) == 0);
+  return (Boolean)((gc->last_collect_kind & ALGO_MAJOR) == 0);
 }
 
 /* ============================================================================ */
@@ -456,12 +456,12 @@ inline void mark_scan_heap(Collector* collector)
 
 inline void* gc_heap_base(GC* gc){ return gc->heap_start; }
 inline void* gc_heap_ceiling(GC* gc){ return gc->heap_end; }
-inline BOOLEAN address_belongs_to_gc_heap(void* addr, GC* gc)
+inline Boolean address_belongs_to_gc_heap(void* addr, GC* gc)
 {
   return (addr >= gc_heap_base(gc) && addr < gc_heap_ceiling(gc));
 }
 
-BOOLEAN obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj);
+Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj);
 
 inline void gc_reset_collector_state(GC* gc){ gc->num_active_collectors = 0;}
 
@@ -477,7 +477,7 @@ void set_collection_end_time();
 
 /* generational GC related */
 
-extern BOOLEAN NOS_PARTIAL_FORWARD;
+extern Boolean NOS_PARTIAL_FORWARD;
 
 //#define STATIC_NOS_MAPPING
 #ifdef STATIC_NOS_MAPPING
@@ -490,8 +490,8 @@ extern BOOLEAN NOS_PARTIAL_FORWARD;
 #else /* STATIC_NOS_MAPPING */
 
         extern void* nos_boundary;
-    extern BOOLEAN share_los_boundary;
-    extern BOOLEAN LOS_ADJUST_BOUNDARY;
+    extern Boolean share_los_boundary;
+    extern Boolean LOS_ADJUST_BOUNDARY;
 #endif /* STATIC_NOS_MAPPING */
 
 void gc_init_collector_alloc(GC* gc, Collector* collector);
@@ -499,10 +499,10 @@ void gc_reset_collector_alloc(GC* gc, Collector* collector);
 void gc_destruct_collector_alloc(GC* gc, Collector* collector);
 void gc_decide_collection_kind(GC* gc, unsigned int cause);
 
-FORCE_INLINE BOOLEAN addr_belongs_to_nos(void* addr)
+FORCE_INLINE Boolean addr_belongs_to_nos(void* addr)
 { return addr >= nos_boundary; }
 
-FORCE_INLINE BOOLEAN obj_belongs_to_nos(Partial_Reveal_Object* p_obj)
+FORCE_INLINE Boolean obj_belongs_to_nos(Partial_Reveal_Object* p_obj)
 { return addr_belongs_to_nos(p_obj); }
 
 extern void* los_boundary;
@@ -510,10 +510,10 @@ extern void* los_boundary;
 /*This flag indicate whether lspace is using a sliding compaction
  *Fixme: check if the performance is a problem with this global flag.
  */
-extern BOOLEAN* p_global_lspace_move_obj;
-inline BOOLEAN obj_is_moved(Partial_Reveal_Object* p_obj)
+extern Boolean* p_global_lspace_move_obj;
+inline Boolean obj_is_moved(Partial_Reveal_Object* p_obj)
 {  return ((p_obj >= los_boundary) || (*p_global_lspace_move_obj)); }
 
-extern BOOLEAN TRACE_JLC_VIA_VTABLE;
+extern Boolean TRACE_JLC_VIA_VTABLE;
 
 #endif //_GC_COMMON_H_

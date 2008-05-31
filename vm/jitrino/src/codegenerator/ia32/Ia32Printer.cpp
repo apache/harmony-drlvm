@@ -1446,7 +1446,7 @@ void printRuntimeOpnd(::std::ostream& os, TypeManager & tm, Type::Tag typeTag, c
             case Type::UInt8:
                 os<<*(U_8*)p;
                 break;
-            case Type::BOOLEAN:
+            case Type::Boolean:
                 os<<(*(I_8*)p?true:false);
                 break;
             case Type::Int16:   

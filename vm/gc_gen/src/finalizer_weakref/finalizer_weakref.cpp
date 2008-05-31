@@ -33,8 +33,8 @@
 #include "../common/object_status.h"
 #include "../common/gc_concurrent.h"
 
-BOOLEAN IGNORE_FINREF = FALSE;
-BOOLEAN DURING_RESURRECTION = FALSE;
+Boolean IGNORE_FINREF = FALSE;
+Boolean DURING_RESURRECTION = FALSE;
 
 static void finref_add_repset_from_pool(GC *gc, Pool *pool)
 {
@@ -727,7 +727,7 @@ static inline void move_compaction_update_ref(GC *gc, REF *p_ref)
  * 1. ms with compaction
  * 2. ms as a mos collection algorithm
  */
-static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref, BOOLEAN double_fix)
+static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref, Boolean double_fix)
 {
   /* There are only two kinds of p_ref being added into finref_repset_pool:
    * 1. p_ref is in a vector block from one finref pool;
@@ -771,7 +771,7 @@ static inline void moving_mark_sweep_update_ref(GC *gc, REF *p_ref, BOOLEAN doub
 }
 
 /* only called in non-minor collection. parameter pointer_addr_in_pool means it is p_ref or p_obj in pool*/
-static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, BOOLEAN pointer_addr_in_pool, BOOLEAN double_fix)
+static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, Boolean pointer_addr_in_pool, Boolean double_fix)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
   REF *p_ref;
@@ -803,7 +803,7 @@ static void nondestructively_fix_finref_pool(GC *gc, Pool *pool, BOOLEAN pointer
   }
 }
 
-void gc_update_finref_repointed_refs(GC *gc, BOOLEAN double_fix)
+void gc_update_finref_repointed_refs(GC *gc, Boolean double_fix)
 {
   assert(!collect_is_minor());
   

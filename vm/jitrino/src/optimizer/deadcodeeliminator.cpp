@@ -126,7 +126,7 @@ getBitWidth(Type::Tag tag)
 {
     switch (tag) {
     case Type::Void: return 0;
-    case Type::BOOLEAN: return 1;
+    case Type::Boolean: return 1;
     case Type::Char: return 16;
     case Type::Int8: return 8;
     case Type::Int16: return 16;

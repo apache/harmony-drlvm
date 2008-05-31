@@ -107,7 +107,7 @@ void gc_finref_metadata_destruct(GC *gc)
   gc->finref_metadata = NULL;
 }
 
-void gc_finref_metadata_verify(GC *gc, BOOLEAN is_before_gc)
+void gc_finref_metadata_verify(GC *gc, Boolean is_before_gc)
 {
   Finref_Metadata *metadata = gc->finref_metadata;
   
@@ -362,7 +362,7 @@ Vector_Block *finref_add_fallback_ref(GC *gc, Vector_Block *vector_block_in_use,
   return finref_metadata_add_entry(gc, vector_block_in_use, metadata->fallback_ref_pool, (POINTER_SIZE_INT)obj_ptr_to_ref(p_obj));
 }
 
-static BOOLEAN pool_has_no_ref(Pool *pool)
+static Boolean pool_has_no_ref(Pool *pool)
 {
   if(pool_is_empty(pool))
     return TRUE;
@@ -381,32 +381,32 @@ static BOOLEAN pool_has_no_ref(Pool *pool)
   return TRUE;
 }
 
-BOOLEAN obj_with_fin_pool_is_empty(GC *gc)
+Boolean obj_with_fin_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->obj_with_fin_pool);
 }
 
-BOOLEAN finalizable_obj_pool_is_empty(GC *gc)
+Boolean finalizable_obj_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->finalizable_obj_pool);
 }
 
-BOOLEAN softref_pool_is_empty(GC *gc)
+Boolean softref_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->softref_pool);
 }
 
-BOOLEAN weakref_pool_is_empty(GC *gc)
+Boolean weakref_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->weakref_pool);
 }
 
-BOOLEAN phanref_pool_is_empty(GC *gc)
+Boolean phanref_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->phanref_pool);
 }
 
-BOOLEAN finref_repset_pool_is_empty(GC *gc)
+Boolean finref_repset_pool_is_empty(GC *gc)
 {
   return pool_has_no_ref(gc->finref_metadata->repset_pool);
 }
@@ -431,7 +431,7 @@ void gc_clear_finref_repset_pool(GC* gc)
   finref_metadata_clear_pool(gc->finref_metadata->repset_pool);
 }
 
-BOOLEAN finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
+Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
 {
   Vector_Block *dest_block = finref_get_free_block(gc);
   pool_iterator_init(src_pool);

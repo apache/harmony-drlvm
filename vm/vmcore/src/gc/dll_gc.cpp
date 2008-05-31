@@ -37,11 +37,11 @@ static Managed_Object_Handle default_gc_get_next_live_object(void*);
 static void default_gc_iterate_heap();
 static void default_gc_finalize_on_exit();
 static void default_gc_set_mutator_block_flag();
-static BOOLEAN default_gc_clear_mutator_block_flag();
+static Boolean default_gc_clear_mutator_block_flag();
 static int64 default_gc_max_memory();
 static void default_gc_wrapup();
-static BOOLEAN default_gc_requires_barriers();
-static BOOLEAN default_gc_supports_compressed_references();
+static Boolean default_gc_requires_barriers();
+static Boolean default_gc_supports_compressed_references();
 static void default_gc_heap_slot_write_ref(Managed_Object_Handle p_base_of_object_with_slot,
                                            Managed_Object_Handle *p_slot,
                                            Managed_Object_Handle value);
@@ -55,24 +55,24 @@ static void default_gc_heap_write_global_slot_compressed(U_32 *p_slot,
 static void default_gc_heap_wrote_object(Managed_Object_Handle p_base_of_object_just_written);
 static void default_gc_add_compressed_root_set_entry(U_32 *ref);
 static void default_gc_add_root_set_entry_managed_pointer(void **slot,
-                                                          BOOLEAN is_pinned);
+                                                          Boolean is_pinned);
 static void *default_gc_heap_base_address();
 static void *default_gc_heap_ceiling_address();
 static void default_gc_test_safepoint();
 /* $$$ GMJ static I_32 default_gc_get_hashcode(Managed_Object_Handle); */
 
-static BOOLEAN default_gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
+static Boolean default_gc_supports_frontier_allocation(unsigned *offset_of_current, unsigned *offset_of_limit);
 static void default_gc_add_weak_root_set_entry(
-        Managed_Object_Handle*, BOOLEAN, BOOLEAN);
+        Managed_Object_Handle*, Boolean, Boolean);
 
-static BOOLEAN default_gc_supports_class_unloading();
+static Boolean default_gc_supports_class_unloading();
 
-BOOLEAN (*gc_supports_compressed_references)() = 0;
-void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, BOOLEAN is_pinned) = 0;
-void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref, BOOLEAN is_pinned,BOOLEAN is_short_weak) = 0;
-void (*gc_add_compressed_root_set_entry)(U_32 *ref, BOOLEAN is_pinned) = 0;
-void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, BOOLEAN is_pinned) = 0;
-void (*gc_add_root_set_entry_managed_pointer)(void **slot, BOOLEAN is_pinned) = 0;
+Boolean (*gc_supports_compressed_references)() = 0;
+void (*gc_add_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned) = 0;
+void (*gc_add_weak_root_set_entry)(Managed_Object_Handle *ref, Boolean is_pinned,Boolean is_short_weak) = 0;
+void (*gc_add_compressed_root_set_entry)(U_32 *ref, Boolean is_pinned) = 0;
+void (*gc_add_root_set_entry_interior_pointer)(void **slot, int offset, Boolean is_pinned) = 0;
+void (*gc_add_root_set_entry_managed_pointer)(void **slot, Boolean is_pinned) = 0;
 void (*gc_class_prepared)(Class_Handle ch, VTable_Handle vth) = 0;
 int64 (*gc_get_collection_count)() = 0;
 int64 (*gc_get_collection_time)() = 0;
@@ -93,7 +93,7 @@ void (*gc_heap_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                  Managed_Object_Handle value) = 0;
 void (*gc_heap_wrote_object)(Managed_Object_Handle p_base_of_object_just_written) = 0;
 int (*gc_init)() = 0;
-BOOLEAN (*gc_is_object_pinned)(Managed_Object_Handle obj) = 0;
+Boolean (*gc_is_object_pinned)(Managed_Object_Handle obj) = 0;
 
 Managed_Object_Handle (*gc_alloc)(unsigned size, 
                                   Allocation_Handle p_vtable,
@@ -103,7 +103,7 @@ Managed_Object_Handle (*gc_alloc_fast)(unsigned size,
                                        void *thread_pointer) = 0;
 
 void (*gc_vm_initialized)() = 0;
-BOOLEAN (*gc_requires_barriers)() = default_gc_requires_barriers;
+Boolean (*gc_requires_barriers)() = default_gc_requires_barriers;
 void (*gc_thread_init)(void *gc_information) = 0;
 void (*gc_thread_kill)(void *gc_information) = 0;
 unsigned int (*gc_time_since_last_gc)()      = 0;
@@ -115,7 +115,7 @@ void   (*gc_test_safepoint)()                = 0;
 
 void (*gc_wrapup)() = default_gc_wrapup;
 void (*gc_write_barrier)(Managed_Object_Handle p_base_of_obj_with_slot) = 0;
-BOOLEAN (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned *offset_of_limit) = 0;
+Boolean (*gc_supports_frontier_allocation)(unsigned *offset_of_current, unsigned *offset_of_limit) = 0;
 
 void (*gc_pin_object)(Managed_Object_Handle* p_object) = 0;
 void (*gc_unpin_object)(Managed_Object_Handle* p_object) = 0;
@@ -126,9 +126,9 @@ void (*gc_iterate_heap)() = 0;
 
 void (*gc_finalize_on_exit)() = 0;
 void (*gc_set_mutator_block_flag)() = 0;
-BOOLEAN (*gc_clear_mutator_block_flag)() = 0;
+Boolean (*gc_clear_mutator_block_flag)() = 0;
 
-BOOLEAN (*gc_supports_class_unloading)() = 0;
+Boolean (*gc_supports_class_unloading)() = 0;
 
 static apr_dso_handle_sym_t getFunction(apr_dso_handle_t *handle, const char *name, const char *dllName)
 {
@@ -171,26 +171,26 @@ void vm_add_gc(const char *dllName)
     }
 
 
-    gc_supports_compressed_references = (BOOLEAN (*)())
+    gc_supports_compressed_references = (Boolean (*)())
         getFunctionOptional(handle, 
                             "gc_supports_compressed_references", 
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_supports_compressed_references); 
     
-    gc_add_root_set_entry = (void (*)(Managed_Object_Handle *ref, BOOLEAN is_pinned)) 
+    gc_add_root_set_entry = (void (*)(Managed_Object_Handle *ref, Boolean is_pinned)) 
         getFunction(handle, "gc_add_root_set_entry", dllName); 
 
-    gc_add_weak_root_set_entry = (void (*)(Managed_Object_Handle *, BOOLEAN, BOOLEAN)) 
+    gc_add_weak_root_set_entry = (void (*)(Managed_Object_Handle *, Boolean, Boolean)) 
         getFunctionOptional(handle, "gc_add_weak_root_set_entry", dllName,
                 (apr_dso_handle_sym_t) default_gc_add_weak_root_set_entry); 
 
-    gc_add_compressed_root_set_entry = (void (*)(U_32 *ref, BOOLEAN is_pinned)) 
+    gc_add_compressed_root_set_entry = (void (*)(U_32 *ref, Boolean is_pinned)) 
         getFunctionOptional(handle, 
                             "gc_add_compressed_root_set_entry", 
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_add_compressed_root_set_entry); 
-    gc_add_root_set_entry_interior_pointer = (void (*)(void **slot, int offset, BOOLEAN is_pinned)) getFunction(handle, "gc_add_root_set_entry_interior_pointer", dllName);
-    gc_add_root_set_entry_managed_pointer = (void (*)(void **slot, BOOLEAN is_pinned))
+    gc_add_root_set_entry_interior_pointer = (void (*)(void **slot, int offset, Boolean is_pinned)) getFunction(handle, "gc_add_root_set_entry_interior_pointer", dllName);
+    gc_add_root_set_entry_managed_pointer = (void (*)(void **slot, Boolean is_pinned))
         getFunctionOptional(handle,
                             "gc_add_root_set_entry_managed_pointer",
                             dllName,
@@ -232,7 +232,7 @@ void vm_add_gc(const char *dllName)
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_heap_wrote_object);
     gc_init = (int (*)()) getFunction(handle, "gc_init", dllName);
-    gc_is_object_pinned = (BOOLEAN (*)(Managed_Object_Handle obj)) getFunction(handle, "gc_is_object_pinned", dllName);
+    gc_is_object_pinned = (Boolean (*)(Managed_Object_Handle obj)) getFunction(handle, "gc_is_object_pinned", dllName);
 
 
     gc_alloc = (Managed_Object_Handle (*)(unsigned size, 
@@ -273,7 +273,7 @@ void vm_add_gc(const char *dllName)
         getFunctionOptional(handle, "gc_set_mutator_block_flag", dllName,
             (apr_dso_handle_sym_t)default_gc_set_mutator_block_flag);
 
-    gc_clear_mutator_block_flag = (BOOLEAN (*)())
+    gc_clear_mutator_block_flag = (Boolean (*)())
         getFunctionOptional(handle, "gc_clear_mutator_block_flag", dllName,
             (apr_dso_handle_sym_t)default_gc_clear_mutator_block_flag);
 
@@ -281,7 +281,7 @@ void vm_add_gc(const char *dllName)
         getFunctionOptional(handle, "gc_get_hashcode", dllName, (apr_dso_handle_sym_t) default_gc_get_hashcode);
 
     gc_vm_initialized = (void (*)()) getFunction(handle, "gc_vm_initialized", dllName);
-    gc_requires_barriers = (BOOLEAN (*)()) 
+    gc_requires_barriers = (Boolean (*)()) 
         getFunctionOptional(handle, "gc_requires_barriers", dllName,
             (apr_dso_handle_sym_t)default_gc_requires_barriers);
     gc_thread_init = (void (*)(void *gc_information)) getFunction(handle, "gc_thread_init", dllName);
@@ -301,7 +301,7 @@ void vm_add_gc(const char *dllName)
                             "gc_heap_ceiling_address", 
                             dllName, 
                             (apr_dso_handle_sym_t)default_gc_heap_ceiling_address);
-    gc_supports_frontier_allocation = (BOOLEAN (*)(unsigned *offset_of_current, unsigned *offset_of_limit)) 
+    gc_supports_frontier_allocation = (Boolean (*)(unsigned *offset_of_current, unsigned *offset_of_limit)) 
         getFunctionOptional(handle, 
                             "gc_supports_frontier_allocation", 
                             dllName, 
@@ -313,7 +313,7 @@ void vm_add_gc(const char *dllName)
             (apr_dso_handle_sym_t)default_gc_write_barrier);
     gc_test_safepoint = (void (*)()) getFunctionOptional(handle, "gc_test_safepoint", dllName, (apr_dso_handle_sym_t)default_gc_test_safepoint);
 
-    gc_supports_class_unloading = (BOOLEAN (*)())
+    gc_supports_class_unloading = (Boolean (*)())
         getFunctionOptional(handle, 
                             "gc_supports_class_unloading", 
                             dllName,
@@ -347,7 +347,7 @@ bool vm_is_a_gc_dll(const char *dll_filename)
     return result;
 } //vm_is_a_gc_dll
 
-static BOOLEAN default_gc_requires_barriers()
+static Boolean default_gc_requires_barriers()
 {
     return FALSE;
 } //default_gc_requires_barriers
@@ -358,7 +358,7 @@ static void default_gc_wrapup()
 } //default_gc_wrapup
 
 
-static BOOLEAN default_gc_supports_compressed_references()
+static Boolean default_gc_supports_compressed_references()
 {
     return FALSE;
 } //default_gc_supports_compressed_references
@@ -438,7 +438,7 @@ static void default_gc_add_compressed_root_set_entry(U_32 * UNREF ref)
 
 
 static void default_gc_add_root_set_entry_managed_pointer(void ** UNREF slot,
-                                                          BOOLEAN UNREF is_pinned)
+                                                          Boolean UNREF is_pinned)
 {
     LDIE(8,"Fatal GC error: managed pointers are not supported.");
 } //default_gc_add_root_set_entry_managed_pointer
@@ -451,7 +451,7 @@ static void *default_gc_heap_base_address()
 } //default_gc_heap_base_address
 
 
-static BOOLEAN default_gc_supports_frontier_allocation(unsigned * UNREF offset_of_current, unsigned * UNREF offset_of_limit)
+static Boolean default_gc_supports_frontier_allocation(unsigned * UNREF offset_of_current, unsigned * UNREF offset_of_limit)
 {
     return FALSE;
 }
@@ -524,7 +524,7 @@ static void default_gc_set_mutator_block_flag()
 }
 
 
-static BOOLEAN default_gc_clear_mutator_block_flag()
+static Boolean default_gc_clear_mutator_block_flag()
 {
     WARN_ONCE(44, "The GC did not provide clear mutator block flag");
     return FALSE;
@@ -541,14 +541,14 @@ static void default_gc_write_barrier(Managed_Object_Handle)
 }
 
 static void default_gc_add_weak_root_set_entry(
-        Managed_Object_Handle* root, BOOLEAN pinned, BOOLEAN is_short)
+        Managed_Object_Handle* root, Boolean pinned, Boolean is_short)
 {
     WARN_ONCE(9, "The GC did not provide {0}" << "gc_add_weak_root_set_entry()");
     // default to strong reference semantics
     gc_add_root_set_entry(root, pinned);
 }
 
-static BOOLEAN default_gc_supports_class_unloading()
+static Boolean default_gc_supports_class_unloading()
 {
     return TRUE;
 } //default_gc_supports_class_unloading

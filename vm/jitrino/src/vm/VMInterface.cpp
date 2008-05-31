@@ -107,7 +107,7 @@ static  field_get_name_t field_get_name = 0;
 static  field_get_offset_t  field_get_offset = 0;
 static  field_get_type_info_t  field_get_type_info = 0;
 static  field_is_final_t  field_is_final = 0;
-static  field_is_magic_t  field_is_magic = 0; //BOOLEAN field_is_magic(Field_Handle fh);
+static  field_is_magic_t  field_is_magic = 0; //Boolean field_is_magic(Field_Handle fh);
 static  field_is_private_t  field_is_private = 0;
 static  field_is_static_t  field_is_static = 0;
 static  field_is_volatile_t  field_is_volatile = 0;
@@ -509,7 +509,7 @@ void*
 TypeManager::getBuiltinValueTypeVMTypeHandle(Type::Tag type) {
     switch (type) {
     case Type::Void:    return class_get_class_of_primitive_type(VM_DATA_TYPE_VOID);
-    case Type::BOOLEAN: return class_get_class_of_primitive_type(VM_DATA_TYPE_BOOLEAN);
+    case Type::Boolean: return class_get_class_of_primitive_type(VM_DATA_TYPE_BOOLEAN);
     case Type::Char:    return class_get_class_of_primitive_type(VM_DATA_TYPE_CHAR);
     case Type::Int8:    return class_get_class_of_primitive_type(VM_DATA_TYPE_INT8);
     case Type::Int16:   return class_get_class_of_primitive_type(VM_DATA_TYPE_INT16);

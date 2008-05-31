@@ -48,8 +48,8 @@ FORCE_INLINE Partial_Reveal_Object* collector_forward_object(Collector* collecto
   unsigned int size = vm_object_size(p_obj);
   
 #ifdef USE_32BITS_HASHCODE
-  BOOLEAN obj_is_set_hashcode = hashcode_is_set(p_obj);
-  BOOLEAN obj_hashcode_attached = FALSE;
+  Boolean obj_is_set_hashcode = hashcode_is_set(p_obj);
+  Boolean obj_hashcode_attached = FALSE;
   if(obj_is_set_hashcode){
     size += GC_OBJECT_ALIGNMENT;
    /* the tospace of semispace GC may have objects with hashcode attached*/

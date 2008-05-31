@@ -57,8 +57,18 @@
  * Various Numeric Types
  */
 
-// uint16, int16, uint64, int64,
+// Boolean, uint16, int16, uint64, int64,
 // POINTER_SIZE_INT
+
+// We can't use bool in non-C++ code
+#ifndef TRUE
+#define TRUE  1
+#endif
+#ifndef FALSE
+#define FALSE 0
+#endif
+
+typedef unsigned Boolean;
 
 //::For long long int, add the LL 
 #ifndef __WORDSIZE // exclude remark #193: zero used for undefined preprocessing identifier

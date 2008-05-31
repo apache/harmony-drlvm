@@ -73,7 +73,7 @@ typedef struct Marker{
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
   unsigned int result;
 
-  BOOLEAN marker_is_active;
+  Boolean marker_is_active;
 
   VmEventHandle markroot_finished_event;
 
@@ -95,7 +95,7 @@ void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, un
 void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space);
 
 void wait_mark_finish(GC* gc);
-BOOLEAN is_mark_finished(GC* gc);
+Boolean is_mark_finished(GC* gc);
 int64 gc_get_marker_time(GC* gc);
 
 #endif //_MARKER_H_

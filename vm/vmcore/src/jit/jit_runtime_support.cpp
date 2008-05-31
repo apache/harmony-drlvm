@@ -314,7 +314,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
 
     //*** Slow sequence
     const POINTER_SIZE_INT clss_off = (POINTER_SIZE_INT)&((VTable*)NULL)->clss;
-    BOOLEAN (*p_subclass)(Class_Handle, Class_Handle) = class_is_subtype;
+    Boolean (*p_subclass)(Class_Handle, Class_Handle) = class_is_subtype;
     if (do_slow) {
         cs = lil_parse_onto_end(cs,
             ":slowpath;"
@@ -1592,7 +1592,7 @@ static void *rth_checkcast_withresolve(Class_Handle klass, unsigned cp_idx, Mana
     oh_discard_local_handle(obj_h);
     END_RAISE_AREA
 
-    BOOLEAN res = class_is_subtype(objClass, castClass);
+    Boolean res = class_is_subtype(objClass, castClass);
     if (!res) {
         exn_throw_by_name("java/lang/ClassCastException", objClass->get_java_name()->bytes);
     }
@@ -2203,7 +2203,7 @@ void vm_aastore_test_update_stats(ManagedObject *elem, Vector_Handle array)
 }
 
 
-BOOLEAN class_is_subtype_fast(VTable *sub, Class *super)
+Boolean class_is_subtype_fast(VTable *sub, Class *super)
 {
     update_general_type_checking_stats(sub, super);
     return sub->clss->is_instanceof(super);
@@ -2214,7 +2214,7 @@ BOOLEAN class_is_subtype_fast(VTable *sub, Class *super)
 // according to the Java instanceof rules.
 //
 // No VM_STATS values are modified here.
-BOOLEAN class_is_subtype(Class *s, Class *t)
+Boolean class_is_subtype(Class *s, Class *t)
 {
     if (s == t) {
         return TRUE;

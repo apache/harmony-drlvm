@@ -30,7 +30,7 @@
  * still be preserved in  fspace, that means to give them time to die. 
  */
 
-extern BOOLEAN forward_first_half;
+extern Boolean forward_first_half;
 /* boundary splitting fspace into forwarding part and remaining part */
 extern void* object_forwarding_boundary; 
 
@@ -50,7 +50,7 @@ void* fspace_heap_start_adjust(Fspace* fspace, void* new_heap_start, POINTER_SIZ
 #endif
 
 void* fspace_alloc(unsigned size, Allocator *allocator);
-BOOLEAN fspace_alloc_block(Fspace* fspace, Allocator* allocator);
+Boolean fspace_alloc_block(Fspace* fspace, Allocator* allocator);
 
 void fspace_reset_after_collection(Fspace* fspace);
 

@@ -729,7 +729,7 @@ jboolean JNICALL IsAssignableFrom(JNIEnv * UNREF jni_env,
     Class* clss1 = jclass_to_struct_Class(clazz1);
     Class* clss2 = jclass_to_struct_Class(clazz2);
 
-    BOOLEAN isAssignable = class_is_subtype(clss1, clss2);
+    Boolean isAssignable = class_is_subtype(clss1, clss2);
     if (isAssignable) {
         return JNI_TRUE;
     } else {
@@ -1141,7 +1141,7 @@ jboolean JNICALL IsInstanceOf(JNIEnv * jni_env,
     Class* clss = jclass_to_struct_Class(clazz);
     Class* obj_clss = jclass_to_struct_Class(obj_class);
 
-    BOOLEAN isInstance = obj_clss->is_instanceof(clss);
+    Boolean isInstance = obj_clss->is_instanceof(clss);
 
     return isInstance ? JNI_TRUE : JNI_FALSE;
 } //IsInstanceOf

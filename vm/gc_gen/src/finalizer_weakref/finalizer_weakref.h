@@ -27,7 +27,7 @@
 #include "finalizer_weakref_metadata.h"
 #include "../thread/collector.h"
 
-extern BOOLEAN IGNORE_FINREF;
+extern Boolean IGNORE_FINREF;
 
 /* Phanref status: for future use
  * #define PHANTOM_REF_ENQUEUE_STATUS_MASK 0x3
@@ -54,7 +54,7 @@ inline REF *obj_get_referent_field(Partial_Reveal_Object *p_obj)
   return (REF*)((U_8*)p_obj+get_gc_referent_offset());
 }
 
-extern BOOLEAN DURING_RESURRECTION;
+extern Boolean DURING_RESURRECTION;
 typedef void (* Scan_Slot_Func)(Collector *collector, REF *p_ref);
 inline void scan_weak_reference(Collector *collector, Partial_Reveal_Object *p_obj, Scan_Slot_Func scan_slot)
 {
@@ -100,7 +100,7 @@ inline void scan_weak_reference_direct(Collector *collector, Partial_Reveal_Obje
   scan_slot(collector, p_referent_field);
 }
 
-inline BOOLEAN is_reference_obj(Partial_Reveal_Object *p_obj)
+inline Boolean is_reference_obj(Partial_Reveal_Object *p_obj)
 {
   WeakReferenceType type = special_reference_type(p_obj);
   if(type == NOT_REFERENCE)
@@ -115,7 +115,7 @@ extern void fallback_finref_cleanup(GC *gc);
 extern void gc_put_finref_to_vm(GC *gc);
 extern void put_all_fin_on_exit(GC *gc);
 
-extern void gc_update_finref_repointed_refs(GC *gc, BOOLEAN double_fix);
+extern void gc_update_finref_repointed_refs(GC *gc, Boolean double_fix);
 extern void gc_activate_finref_threads(GC *gc);
 
 void gc_copy_finaliable_obj_to_rootset(GC *gc);

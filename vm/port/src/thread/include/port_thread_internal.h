@@ -77,7 +77,7 @@ typedef struct
     port_suspend_req_t req_type; /* request type for signal handler */
     osthread_t suspendee; /* The thread which is processed */
     sem_t yield_sem; /* Semaphore to inform signal sender */
-    BOOLEAN signal_set; /* Is SIGUSR2 handler set up */
+    Boolean signal_set; /* Is SIGUSR2 handler set up */
 #endif /* !WIN32 */
 
 } port_shared_data_t;
@@ -95,11 +95,11 @@ typedef struct
     size_t guard_stack_size;
     size_t mem_protect_size;
 
-    BOOLEAN guard_page_set;
-    BOOLEAN restore_guard_page;
+    Boolean guard_page_set;
+    Boolean restore_guard_page;
 
-    BOOLEAN foreign; /* The thread was attached */
-    //BOOLEAN temp; /* Is indicated by 0ed guard_page_addr instead */
+    Boolean foreign; /* The thread was attached */
+    //Boolean temp; /* Is indicated by 0ed guard_page_addr instead */
 
     /* vv Signal handling stuff vv */
 #ifndef WIN32 /* UNIX */
@@ -113,9 +113,9 @@ typedef struct
     int     crash_stage;
 
     /* Flag to indicate that debugger should be attached right in OS handler */
-    BOOLEAN debugger;
+    Boolean debugger;
     /* Flag to produce minidump/core on the second exception catch */
-    BOOLEAN   produce_core;
+    Boolean   produce_core;
 
 } port_tls_data_t;
 
@@ -154,8 +154,8 @@ PORT_INLINE int set_private_tls_data(port_tls_data_t* data)
 
 
 /* Is used in both threading and signals */
-int port_thread_attach_local(port_tls_data_t* tlsdata, BOOLEAN temp,
-                                BOOLEAN foreign, size_t stack_size);
+int port_thread_attach_local(port_tls_data_t* tlsdata, Boolean temp,
+                                Boolean foreign, size_t stack_size);
 /* Detaches temporarily attached thread */
 int port_thread_detach_temporary();
 

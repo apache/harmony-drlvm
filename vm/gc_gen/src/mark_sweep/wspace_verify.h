@@ -39,15 +39,15 @@ void wspace_verify_before_collection(GC *gc);
 void wspace_verify_after_sweep(GC *gc);
 void wspace_verify_after_collection(GC *gc);
 
-void wspace_chunks_info(Wspace *wspace, BOOLEAN show_info);
+void wspace_chunks_info(Wspace *wspace, Boolean show_info);
 void wspace_alloc_info(unsigned int size);
 void wspace_alloc_info_summary(void);
 
-void wspace_gc_time(GC *gc, BOOLEAN before_gc);
-void wspace_mark_time(BOOLEAN before_mark);
-void wspace_sweep_time(BOOLEAN before_sweep, BOOLEAN wspace_need_compact);
-void wspace_compact_time(BOOLEAN before_compact);
-void wspace_fix_time(BOOLEAN before_fix);
-void wspace_merge_time(BOOLEAN before_merge);
+void wspace_gc_time(GC *gc, Boolean before_gc);
+void wspace_mark_time(Boolean before_mark);
+void wspace_sweep_time(Boolean before_sweep, Boolean wspace_need_compact);
+void wspace_compact_time(Boolean before_compact);
+void wspace_fix_time(Boolean before_fix);
+void wspace_merge_time(Boolean before_merge);
 
 #endif // _SSPACE_VERIFY_H_

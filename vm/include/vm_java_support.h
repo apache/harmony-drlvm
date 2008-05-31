@@ -65,7 +65,7 @@ VMEXPORT Class_Handle class_get_implements(Class_Handle ch, unsigned idx);
 *         function before compiling a method and return <code>JIT_FAILURE</code> if
 *         <code>method_is_java</code> returned <code>FALSE</code>.
 */ 
-VMEXPORT BOOLEAN method_is_java(Method_Handle mh);
+VMEXPORT Boolean method_is_java(Method_Handle mh);
 VMEXPORT unsigned     field_get_flags(Field_Handle f);
 VMEXPORT unsigned     class_get_flags(Class_Handle cl);
 

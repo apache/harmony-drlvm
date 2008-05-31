@@ -40,16 +40,16 @@ enum Transform_Kind {
 typedef struct Space_Tuner{
     Transform_Kind kind;
     /*This flags is set if the tuning direction changes in the process of tuning*/
-    BOOLEAN reverse;
+    Boolean reverse;
     
     POINTER_SIZE_INT tuning_size;
     /*Used for LOS_Shrink*/
     Block_Header* interim_blocks;
     /*This flag is set when tuning strategy decide to tune los size.
       *i.e. wasted memory is greater than wast_threshold.  */
-    BOOLEAN need_tune;
+    Boolean need_tune;
     /*This flag is set if gc is caused by los alloc failure.*/
-    BOOLEAN force_tune;
+    Boolean force_tune;
     
     uint64 speed_los;
     uint64 last_speed_los;
@@ -82,7 +82,7 @@ void gc_space_tuner_initialize(GC* gc);
 void gc_space_tuner_init_fake_blocks_for_los_shrink(GC* gc);
 void gc_space_tuner_release_fake_blocks_for_los_shrink(GC* gc);
 
-inline BOOLEAN gc_has_space_tuner(GC* gc)
-{ return (BOOLEAN)(POINTER_SIZE_INT)gc->tuner; }
+inline Boolean gc_has_space_tuner(GC* gc)
+{ return (Boolean)(POINTER_SIZE_INT)gc->tuner; }
 
 #endif /* _SPACE_TUNER_H_ */

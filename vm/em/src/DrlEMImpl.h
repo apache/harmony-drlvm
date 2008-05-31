@@ -96,9 +96,9 @@ public:
     virtual JIT_Result compileMethod(Method_Handle method_handle);
     virtual void registerCodeChunk(Method_Handle method_handle, void *code_addr,
         size_t size, void *data);
-    virtual Method_Handle lookupCodeChunk(void *addr, BOOLEAN is_ip_past,
+    virtual Method_Handle lookupCodeChunk(void *addr, Boolean is_ip_past,
         void **code_addr, size_t *size, void **data);
-    virtual BOOLEAN unregisterCodeChunk(void *addr);
+    virtual Boolean unregisterCodeChunk(void *addr);
     virtual unsigned int getNumProfilerThreads() const { return tbsClients.empty() ? 0 : 1;}
 
     virtual void classloaderUnloadingCallback(Class_Loader_Handle class_handle); 

@@ -26,9 +26,9 @@
 #include "java_support.h"
 
 Class_Handle GCHelper_clss;
-BOOLEAN java_helper_inlined;
+Boolean java_helper_inlined;
 
-void HelperClass_set_GenMode(BOOLEAN status)
+void HelperClass_set_GenMode(Boolean status)
 {
   if(!java_helper_inlined) return;
 

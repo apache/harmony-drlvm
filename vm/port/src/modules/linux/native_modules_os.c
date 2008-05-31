@@ -36,8 +36,8 @@ struct _raw_module
 {
     void*               start;
     void*               end;
-    BOOLEAN             acc_r;
-    BOOLEAN             acc_x;
+    Boolean             acc_r;
+    Boolean             acc_x;
     char*               name;
     raw_module*         next;
 };
@@ -123,7 +123,7 @@ native_module_t* native_fill_module(raw_module* rawModule, size_t count)
     return module;
 }
 
-BOOLEAN port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
+Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
 {
     char buf[PATH_MAX];
     pid_t pid;
