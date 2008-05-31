@@ -76,6 +76,15 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     static ProtectionDomain systemDomain;
     
     private static final long serialVersionUID = 3206093459760846163L;
+    
+    private static final Class<Cloneable> CLONEABLE_CLASS = Cloneable.class;
+    @SuppressWarnings("unchecked")
+    private static final Class<Enum> ENUM_CLASS = Enum.class;
+    private static final Class<Externalizable> EXTERNALIZABLE_CLASS = Externalizable.class;
+    private static final Class<Inherited> INHERITED_CLASS = Inherited.class;
+    private static final Class<Object> OBJECT_CLASS = Object.class;
+    private static final Class<Serializable> SERIALIZABLE_CLASS = Serializable.class;
+    
 
     public static Class<?> forName(String name) throws ClassNotFoundException {
         return forName(name, true, VMClassRegistry.getClassLoader(VMStack
@@ -553,11 +562,11 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     
     public boolean isAssignableFrom(Class<?> clazz) {
         
-        if (Serializable.class.equals(this)) {
+        if (SERIALIZABLE_CLASS.equals(this)) {
             return clazz.getReflectionData().isSerializable();
         }
         
-        if (Externalizable.class.equals(this)) {
+        if (EXTERNALIZABLE_CLASS.equals(this)) {
             return clazz.getReflectionData().isExternalizable();
         }
         
@@ -771,7 +780,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
     public boolean isEnum() {
         // check for superclass is needed for compatibility
         // otherwise there are false positives on anonymous element classes
-        return ((getModifiers() & ACC_ENUM) != 0 && getSuperclass() == Enum.class);
+        return ((getModifiers() & ACC_ENUM) != 0 && getSuperclass() == ENUM_CLASS);
     }
 
     public boolean isAnnotation() {
@@ -811,7 +820,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
 
     public Type[] getGenericInterfaces() throws GenericSignatureFormatError, TypeNotPresentException, MalformedParameterizedTypeException {
         if (isArray()) {
-            return new Type[]{Cloneable.class, Serializable.class};
+            return new Type[]{CLONEABLE_CLASS, SERIALIZABLE_CLASS};
         }
         if (isPrimitive()) {
             return new Type[0];
@@ -826,7 +835,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
             return null;
         }
         if (isArray()) {
-            return (Type) Object.class;
+            return (Type) OBJECT_CLASS;
         }
         
         Class<?> clazz = getSuperclass();
@@ -935,8 +944,8 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         
         private void resolveSerialProps() {
             if (!_serialPropsResolved){
-                _isExternalizable = VMClassRegistry.isAssignableFrom(Externalizable.class, Class.this);
-                _isSerializable = VMClassRegistry.isAssignableFrom(Serializable.class, Class.this);
+                _isExternalizable = VMClassRegistry.isAssignableFrom(EXTERNALIZABLE_CLASS, Class.this);
+                _isSerializable = VMClassRegistry.isAssignableFrom(SERIALIZABLE_CLASS, Class.this);
                 _serialPropsResolved = true;
             }
         }
@@ -1117,7 +1126,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
                     System.arraycopy(declaredAnnotations, 0, all, 0, size);
                     int pos = size;
                     next: for (Annotation s : sa) {
-                        if (s.annotationType().isAnnotationPresent(Inherited.class)) {
+                        if (s.annotationType().isAnnotationPresent(INHERITED_CLASS)) {
                             for (int i = 0; i < size; i++) {
                                 if (all[i].annotationType() == s.annotationType()) {
                                     // overriden by declared annotation
