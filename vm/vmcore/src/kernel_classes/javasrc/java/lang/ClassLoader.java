@@ -43,7 +43,7 @@ import org.apache.harmony.lang.ClassLoaderInfo;
 import org.apache.harmony.vm.VMStack;
 
 /**
- * @com.intel.drl.spec_ref 
+ * Base class for all class loaders
  * 
  * @author Evgueni Brevnov
  * @version $Revision: 1.1.2.2.4.4 $
@@ -62,7 +62,7 @@ public abstract class ClassLoader {
     private static ClassLoader systemClassLoader = null;
 
     /**
-     * empty set of sertificates
+     * empty set of certificates
      */
     private static final Certificate[] EMPTY_CERTIFICATES = new Certificate[0];
 
@@ -112,7 +112,7 @@ public abstract class ClassLoader {
      * @see java.lang.Class#definingLoader
      * @see #registerLoadedClass()
      */
-    private ArrayList<Class> loadedClasses = new ArrayList<Class>(); 
+    private ArrayList<Class<?>> loadedClasses = new ArrayList<Class<?>>(); 
 
     /**
      * package private to access from the java.lang.Class class. The following
@@ -127,19 +127,10 @@ public abstract class ClassLoader {
      */
     private final ClassLoader parentClassLoader;
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     protected ClassLoader() {
-        //assert systemClassLoader != null
-        // TODO XXX: use systemClassLoader field instead of
-        // getSystemClassLoader() method.
         this(getSystemClassLoader());
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     protected ClassLoader(ClassLoader parent) {
         SecurityManager sc = System.getSecurityManager();
         if (sc != null) {
@@ -151,9 +142,6 @@ public abstract class ClassLoader {
         definedPackages = new HashMap<String, Package>();
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public static ClassLoader getSystemClassLoader() {
         if (!initialized) {
             // we assume only one thread will initialize system class loader. So
@@ -182,40 +170,19 @@ public abstract class ClassLoader {
         return systemClassLoader;
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public static URL getSystemResource(String name) {
-        //assert systemClassLoader != null;
-        // TODO XXX: use systemClassLoader field instead of
-        // getSystemClassLoader() method.
         return getSystemClassLoader().getResource(name);
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public static InputStream getSystemResourceAsStream(String name) {
-        //assert systemClassLoader != null;
-        // TODO XXX: use systemClassLoader field instead of
-        // getSystemClassLoader() method.
         return getSystemClassLoader().getResourceAsStream(name);
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public static Enumeration<URL> getSystemResources(String name)
         throws IOException {
-        //assert systemClassLoader != null;
-        // TODO XXX: use systemClassLoader field instead of
-        // getSystemClassLoader() method.
        return getSystemClassLoader().getResources(name);
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public void clearAssertionStatus() {
         clearAssertionStatus = true;
         defaultAssertionStatus = -1;
@@ -223,9 +190,6 @@ public abstract class ClassLoader {
         classAssertionStatus = null;
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public final ClassLoader getParent() {
         SecurityManager sc = System.getSecurityManager();
         if (sc != null) {
@@ -238,9 +202,6 @@ public abstract class ClassLoader {
         return parentClassLoader;
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public URL getResource(String name) {
         String nm = name.toString();
         checkInitialized();
@@ -250,9 +211,6 @@ public abstract class ClassLoader {
         return foundResource == null ? findResource(nm) : foundResource;
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public InputStream getResourceAsStream(String name) {
         URL foundResource = getResource(name);
         if (foundResource != null) {
@@ -264,9 +222,6 @@ public abstract class ClassLoader {
         return null;
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public Enumeration<URL> getResources(String name) throws IOException {
         checkInitialized();
         ClassLoader cl = this;
@@ -289,8 +244,7 @@ public abstract class ClassLoader {
 
                 public boolean hasMoreElements() {
                     while (position >= 0) {
-                        if (((Enumeration)foundResources.get(position))
-                            .hasMoreElements()) {
+                        if (foundResources.get(position).hasMoreElements()) {
                             return true;
                         }
                         position--;
@@ -301,10 +255,8 @@ public abstract class ClassLoader {
                 public URL nextElement() {
                     while (position >= 0) {
                         try {
-                            return (foundResources.get(position))
-                            .nextElement();
-                        } catch (NoSuchElementException e) {                            
-                        }
+                            return (foundResources.get(position)).nextElement();
+                        } catch (NoSuchElementException e) {}
                         position--;
                     }
                     throw new NoSuchElementException();
@@ -312,16 +264,10 @@ public abstract class ClassLoader {
             };
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public Class<?> loadClass(String name) throws ClassNotFoundException {
         return loadClass(name, false);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     public void setClassAssertionStatus(String name, boolean flag) {
         if (name != null) {
             Class.disableAssertions = false;
@@ -334,9 +280,6 @@ public abstract class ClassLoader {
         }
     }
 
-    /**
-     * @com.intel.drl.spec_ref 
-     */
     public void setDefaultAssertionStatus(boolean flag) {
         if (flag) {
             Class.disableAssertions = false;
@@ -345,8 +288,6 @@ public abstract class ClassLoader {
     }
 
     /**
-     * @com.intel.drl.spec_ref
-     *  
      * Empty string is used to denote default package.
      */
     public void setPackageAssertionStatus(String name, boolean flag) {
@@ -362,18 +303,12 @@ public abstract class ClassLoader {
         packageAssertionStatus.put(name, Boolean.valueOf(flag));
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     * @deprecated
-     */
+    @Deprecated
     protected final Class<?> defineClass(byte[] data, int offset, int len)
         throws ClassFormatError {
         return defineClass(null, data, offset, len);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final Class<?> defineClass(String name, byte[] data, int offset, int len)
         throws ClassFormatError {
         return defineClass(name, data, offset, len, null);
@@ -391,18 +326,12 @@ public abstract class ClassLoader {
         clazz.definingLoader = this;
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final Class<?> defineClass(String name, ByteBuffer b, ProtectionDomain protectionDomain)
         throws ClassFormatError {
 		byte[] data = b.array();
         return defineClass(name, data, 0, data.length, protectionDomain);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final synchronized Class<?> defineClass(String name, byte[] data,
                                              int offset, int len,
                                              ProtectionDomain domain)
@@ -452,9 +381,6 @@ public abstract class ClassLoader {
     throws ClassFormatError;
 
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected Package definePackage(String name, String specTitle,
                                     String specVersion, String specVendor,
                                     String implTitle, String implVersion,
@@ -472,53 +398,29 @@ public abstract class ClassLoader {
         }
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected Class<?> findClass(String name) throws ClassNotFoundException {
         throw new ClassNotFoundException("Can not find class " + name);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected String findLibrary(String name) {
         return null;
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final native Class<?> findLoadedClass(String name);
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected URL findResource(String name) {
         return null;
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected Enumeration<URL> findResources(String name) throws IOException {
         return EmptyEnum.getInstance();
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final Class<?> findSystemClass(String name)
         throws ClassNotFoundException {
-        // assert systemClassLoader != null;
-        // TODO XXX: use systemClassLoader field instead of
-        // getSystemClassLoader() method.
         return getSystemClassLoader().loadClass(name, false);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected Package getPackage(String name) {
         checkInitialized();
         Package pkg = null;
@@ -526,7 +428,7 @@ public abstract class ClassLoader {
             throw new NullPointerException();
         }
         synchronized (definedPackages) {
-            pkg = (Package)definedPackages.get(name);
+            pkg = definedPackages.get(name);
         }
         if (pkg == null) {
             if (parentClassLoader == null) {
@@ -538,9 +440,6 @@ public abstract class ClassLoader {
         return pkg;
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected Package[] getPackages() {
         checkInitialized();
         ArrayList<Package> packages = new ArrayList<Package>();
@@ -552,11 +451,8 @@ public abstract class ClassLoader {
      * Registers this class loader as initiating for a class
      * Declared as package private to use it from java.lang.Class.forName
      */
-    native void registerInitiatedClass(Class clazz);
+    native void registerInitiatedClass(Class<?> clazz);
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected synchronized Class<?> loadClass(String name, boolean resolve)
         throws ClassNotFoundException {
         checkInitialized();
@@ -602,9 +498,6 @@ public abstract class ClassLoader {
         return clazz;
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final void resolveClass(Class<?> clazz) {
         if (clazz == null) {
             throw new NullPointerException();
@@ -612,9 +505,6 @@ public abstract class ClassLoader {
         VMClassRegistry.linkClass(clazz);
     }
 
-    /**
-     * @com.intel.drl.spec_ref
-     */
     protected final void setSigners(Class<?> clazz, Object[] signers) {
         checkInitialized();
         String name = clazz.getName();
@@ -766,7 +656,7 @@ public abstract class ClassLoader {
      */
     private Certificate[] getCertificates(String packageName,
                                           CodeSource codeSource) {
-        Certificate[] definedCerts = (Certificate[])packageCertificates
+        Certificate[] definedCerts = packageCertificates
             .get(packageName);
         Certificate[] classCerts = codeSource != null
             ? codeSource.getCertificates() : EMPTY_CERTIFICATES;
@@ -897,7 +787,7 @@ public abstract class ClassLoader {
         public static Package getPackage(String name) {
             synchronized (systemPackages) {
                 updatePackages();
-                return (Package)systemPackages.get(name.toString());
+                return systemPackages.get(name.toString());
             }
         }
 
@@ -925,7 +815,7 @@ public abstract class ClassLoader {
                     }
                 }
                 URL[] urls = new URL[urlList.size()];
-                resourceFinder = new URLClassLoader((URL[])urlList
+                resourceFinder = new URLClassLoader(urlList
                     .toArray(urls), null);
             }
         }
@@ -1017,7 +907,7 @@ public abstract class ClassLoader {
                     assert false: e.toString();
                 }
             }
-            instance = new SystemClassLoader((URL[])urlList
+            instance = new SystemClassLoader(urlList
                 .toArray(new URL[urlList.size()]), null);
         }
 
