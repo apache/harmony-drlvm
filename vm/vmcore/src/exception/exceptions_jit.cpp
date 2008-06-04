@@ -590,21 +590,19 @@ void exn_athrow_regs(Registers * regs, Class_Handle exn_class, bool java_code, b
     }
 
     if (ti->get_global_capability(DebugUtilsTI::TI_GC_ENABLE_EXCEPTION_EVENT)) {
-        Registers regs = {0};
         VM_thread *thread = p_TLS_vmthread;
         NativeCodePtr callback = (NativeCodePtr)
                 jvmti_exception_catch_callback;
 
-        si_copy_to_registers(si, &regs);
-        vm_set_exception_registers(thread, regs);
+        si_copy_to_registers(si, regs);
+        vm_set_exception_registers(thread, *regs);
         si_set_callback(si, &callback);
     } else if (p_TLS_vmthread->restore_guard_page) {
-        Registers regs = {0};
         VM_thread *thread = p_TLS_vmthread;
         NativeCodePtr callback = (NativeCodePtr)
                 exception_catch_callback;
-        si_copy_to_registers(si, &regs);
-        vm_set_exception_registers(thread, regs);
+        si_copy_to_registers(si, regs);
+        vm_set_exception_registers(thread, *regs);
         si_set_callback(si, &callback);
     }
 

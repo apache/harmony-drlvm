@@ -111,10 +111,10 @@ static void c_handler(Registers* pregs,
         {
             port_thread_restore_guard_page();
             tlsdata->restore_guard_page = FALSE;
-
-            if (port_thread_detach_temporary() == 0)
-                STD_FREE(tlsdata);
         }
+
+        if (port_thread_detach_temporary() == 0)
+            STD_FREE(tlsdata);
         return;
     }
 
@@ -250,6 +250,8 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
     if (code == STATUS_STACK_OVERFLOW)
     {
+        tlsdata->guard_page_set = FALSE; // GUARD_PAGE was cleared by OS
+
         if (!tlsdata->restore_guard_page)
             tlsdata->restore_guard_page = TRUE;
     }

@@ -109,7 +109,8 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
     startstr->arg = data;
     startstr->stack_size = stacksize;
 
-    handle = _beginthreadex(NULL, stacksize, thread_start_func, startstr, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
+    handle = _beginthreadex(NULL, (int)stacksize, thread_start_func,
+                            startstr, STACK_SIZE_PARAM_IS_A_RESERVATION, NULL);
 
     if (handle != (uintptr_t)-1L)
     {
@@ -127,6 +128,10 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
 
 static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
 {
+    DWORD oldProtect;
+    void* guard_addr;
+    size_t guard_size;
+
     if (!tlsdata)
         tlsdata = get_private_tls_data();
 
@@ -137,8 +142,18 @@ static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
         return 0;
 
     if ((set && tlsdata->guard_page_set) ||
-         !set && !tlsdata->guard_page_set)
+        (!set && !tlsdata->guard_page_set))
         return 0; // Already in needed state
+
+#ifdef _EM64T_
+    /* Windows x86_64 protects both guard page and guard stack area
+       specified by SetThreadStackGuarantee() with PAGE_GUARD flag */
+    guard_addr = tlsdata->guard_stack_addr;
+    guard_size = tlsdata->guard_stack_size + tlsdata->guard_page_size;
+#else
+    guard_addr = tlsdata->guard_page_addr;
+    guard_size = tlsdata->guard_page_size;
+#endif
 
     if (set)
     {
@@ -146,19 +161,17 @@ static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
                 < (size_t)tlsdata->guard_page_addr + tlsdata->guard_page_size)
             return -1;
 
-        if (!VirtualAlloc(tlsdata->guard_page_addr, tlsdata->guard_page_size,
-                            MEM_COMMIT, PAGE_GUARD | PAGE_READWRITE))
+        if (!VirtualProtect(guard_addr, guard_size,
+                            PAGE_GUARD | PAGE_READWRITE, &oldProtect))
             // should be successful always
             return -1;
     }
     else
     {
-        DWORD oldProtect;
-
         if ((size_t)&set < (size_t)tlsdata->guard_page_addr + tlsdata->guard_page_size)
             return -1;
 
-        if (!VirtualProtect(tlsdata->guard_page_addr, tlsdata->guard_page_size,
+        if (!VirtualProtect(guard_addr, guard_size,
                             PAGE_READWRITE, &oldProtect))
             // should be successful always
             return -1;
@@ -237,11 +250,7 @@ static int setup_stack(port_tls_data_t* tlsdata)
             < (size_t)tlsdata->guard_page_addr + tlsdata->guard_page_size)
         return -1;
 
-    if (!VirtualFree(tlsdata->guard_stack_addr,
-                        tlsdata->guard_stack_size, MEM_DECOMMIT))
-        // should be successful always
-        return -1;
-
+    tlsdata->guard_page_set = TRUE; // GUARD_PAGE is set by default
     return 0;
 }
 
@@ -297,12 +306,7 @@ int port_thread_attach_local(port_tls_data_t* tlsdata, Boolean temp,
     res = init_stack(tlsdata, stack_size, temp);
     if (res != 0) return res;
 
-    res = set_private_tls_data(tlsdata);
-
-    if (res != 0)
-        set_guard_page(tlsdata, FALSE);
-
-    return res;
+    return set_private_tls_data(tlsdata);
 }
 
 int port_thread_attach()
