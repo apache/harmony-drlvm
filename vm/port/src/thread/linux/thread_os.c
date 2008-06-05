@@ -203,10 +203,24 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
     return res;
 }
 
+int set_alt_stack(port_tls_data_t* tlsdata, Boolean set)
+{
+    stack_t sigalt;
+
+    // sets alternative stack
+    sigalt.ss_sp = tlsdata->guard_stack_addr;
+    sigalt.ss_size = tlsdata->guard_stack_size;
+//#if defined(FREEBSD)
+    sigalt.ss_flags = set ? 0 : SS_DISABLE;
+//#else
+//    sigalt.ss_flags = set ? SS_ONSTACK : SS_DISABLE;
+//#endif
+    return sigaltstack(&sigalt, NULL);
+}
+
 static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
 {
     int res;
-    stack_t sigalt;
 
     if (!tlsdata)
         tlsdata = get_private_tls_data();
@@ -218,7 +232,7 @@ static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
         return 0;
 
     if ((set && tlsdata->guard_page_set) ||
-         !set && !tlsdata->guard_page_set)
+        (!set && !tlsdata->guard_page_set))
         return 0; // Already in needed state
 
     res = mprotect(tlsdata->guard_page_addr, tlsdata->guard_page_size,
@@ -227,18 +241,13 @@ static int set_guard_page(port_tls_data_t* tlsdata, Boolean set)
     if (res != 0)
         return errno;
 
-    // sets alternative stack
-    sigalt.ss_sp = tlsdata->guard_stack_addr;
-    sigalt.ss_size = tlsdata->guard_stack_size;
-//#if defined(FREEBSD)
-    sigalt.ss_flags = set ? 0 : SS_DISABLE;
-//#else
-//    sigalt.ss_flags = set ? SS_ONSTACK : SS_DISABLE;
-//#endif
-    res = sigaltstack(&sigalt, NULL);
+    if (set)
+    {
+        res = set_alt_stack(tlsdata, TRUE);
 
-    if (res != 0)
-        return errno;
+        if (res != 0)
+            return errno;
+    }
 
     tlsdata->guard_page_set = set;
     return 0;

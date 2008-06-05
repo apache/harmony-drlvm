@@ -63,7 +63,11 @@ static void c_handler(Registers* pregs, size_t signum, void* fault_addr)
     {
     case SIGSEGV:
         if (tlsdata->restore_guard_page)
+        {
+            // Now it's safe to disable alternative stack
+            set_alt_stack(tlsdata, FALSE);
             result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, pregs, fault_addr, FALSE);
+        }
         else
             result = port_process_signal(PORT_SIGNAL_GPF, pregs, fault_addr, FALSE);
         break;
@@ -222,6 +226,9 @@ static void general_signal_handler(int signum, siginfo_t* info, void* context)
         else
         { // To process signal on protected stack area
             port_thread_clear_guard_page();
+            // Note: the call above does not disable alternative stack
+            // It can't be made while we are on alternative stack
+            // Alt stack will be disabled explicitly in c_handler()
             tlsdata->restore_guard_page = TRUE;
         }
     }

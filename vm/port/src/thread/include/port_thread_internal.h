@@ -159,6 +159,12 @@ int port_thread_attach_local(port_tls_data_t* tlsdata, Boolean temp,
 /* Detaches temporarily attached thread */
 int port_thread_detach_temporary();
 
+#ifndef WIN32
+/* To restore alternative stack out of signal handler on Linux */
+int set_alt_stack(port_tls_data_t* tlsdata, Boolean set);
+
+#endif
+
 
 #ifdef __cplusplus
 }
