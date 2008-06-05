@@ -135,3 +135,53 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
 
     port_transfer_to_regs(&regs);
 }
+
+
+extern "C" void* __cdecl port_setstack_stub(Registers* regs);
+
+// New stack's organization:
+//
+// |  alignment  |
+// |-------------|
+// | saved stack |
+// |  address    | <- to store RSP of current stack
+// |-------------|
+// |    arg 5    | <- present even if not used
+// |-------------|
+// |    arg 4    | <- present even if not used
+// |-------------|
+// |  32 bytes   | <- 'red zone' for argument registers flushing
+// |-------------|
+// | return addr | <- points to port_setstack_stub_end
+// |-------------| <- regs->rsp points to this cell
+
+void* port_call_alt_stack(void* fn, void* stack_addr, int num, ...)
+{
+    void** sp;
+    va_list ap;
+    Registers regs = {};
+
+    regs.rsp = (uint64)stack_addr;
+    regs.rsp -= 8*(1 + 1 + 6 + 1);
+    sp = (void**)regs.rsp;
+
+    va_start(ap, num);
+
+    if (num > 0)
+        regs.rcx = (uint64)va_arg(ap, void*);
+    if (num > 1)
+        regs.rdx = (uint64)va_arg(ap, void*);
+    if (num > 2)
+        regs.r8 = (uint64)va_arg(ap, void*);
+    if (num > 3)
+        regs.r9 = (uint64)va_arg(ap, void*);
+
+    for (int i = 5; i <= num; i++)
+    {
+        sp[i] = va_arg(ap, void*);
+    }
+
+    regs.rip = (uint64)fn;
+
+    return port_setstack_stub(&regs);
+}

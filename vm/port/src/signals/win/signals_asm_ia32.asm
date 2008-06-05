@@ -102,6 +102,54 @@ port_longjump_stub PROC
 port_longjump_stub ENDP
 
 
+; void* __cdecl port_setstack_stub(Registers* regs);
+;
+; The function calls some function on alternative stack.
+; Function address is already in EIP register of 'regs' structure.
+; We only need to store return address and stack address.
+;
+; | saved stack |
+; |  address    | <- to store ESP of current stack
+; |-------------|
+; |    arg 5    | <- present even if not used
+; |-------------|
+; |     ...     |
+; |-------------|
+; |    arg 0    | <- present even if not used
+; |-------------|
+; | return addr | <- points to port_setstack_stub_end
+; |-------------| <- regs->esp points to this cell
+
+PUBLIC  port_setstack_stub
+
+port_setstack_stub PROC
+
+    push    ebp
+    mov     edx, dword ptr [esp + 4 + 4]   ; get regs pointer
+    mov     ebp, dword ptr [edx + 1Ch] ; get new esp
+
+    call    port_setstack_stub_mid
+port_setstack_stub_mid:
+    pop     eax ; get address of port_setstack_stub_mid
+    ; calculate address of port_setstack_stub_end
+    add     eax, (port_setstack_stub_end - port_setstack_stub_mid)
+    ; store return address
+    mov     dword ptr [ebp], eax
+    ; store current ESP
+    mov     dword ptr [ebp + 28], esp
+
+    push    edx
+    call    port_transfer_to_regs
+
+port_setstack_stub_end:
+    ; restore ESP
+    mov     esp, dword ptr [esp + 24]
+    pop     ebp
+    ret
+
+port_setstack_stub ENDP
+
+
 _TEXT   ENDS
 
 END

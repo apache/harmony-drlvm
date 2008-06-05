@@ -102,6 +102,21 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
 
 void PORT_CDECL port_win_dbg_break(void);
 
+
+/**
+* The function to call another function on alternative stack.
+*
+* @param [in] fn    - the address of the function to be called
+* @param [in] stack - the address of memory area to be used as a stack
+* @param [in] num   - the number of parameters passed to the 'fn' function
+*                     in the variable args list (6 args at maximum)
+* @param [in] ...   - the parameters for 'fn'; should all be void* or of
+*                     the same size (pointer-sized)
+* @return           - can return any pointer-size value
+*/
+void* port_call_alt_stack(void* fn, void* stack_addr, int num, ...);
+
+
 #else /* UNIX */
 
 //

@@ -125,3 +125,42 @@ void port_transfer_to_function(void* fn, Registers* pregs, int num, ...)
 
     port_transfer_to_regs(&regs);
 }
+
+
+extern "C" void* __cdecl port_setstack_stub(Registers* regs);
+
+// New stack's organization:
+//
+// | saved stack |
+// |  address    | <- to store ESP of current stack
+// |-------------|
+// |    arg 5    | <- present even if not used
+// |-------------|
+// |     ...     |
+// |-------------|
+// |    arg 0    | <- present even if not used
+// |-------------|
+// | return addr | <- points to port_setstack_stub_end
+// |-------------| <- regs->esp points to this cell
+
+void* port_call_alt_stack(void* fn, void* stack_addr, int num, ...)
+{
+    void** sp;
+    va_list ap;
+    Registers regs = {};
+
+    regs.esp = (U_32)stack_addr;
+    regs.esp -= 4*(1 + 6 + 1);
+    sp = (void**)regs.esp;
+
+    va_start(ap, num);
+
+    for (int i = 1; i <= num; i++)
+    {
+        sp[i] = va_arg(ap, void*);
+    }
+
+    regs.eip = (U_32)fn;
+
+    return port_setstack_stub(&regs);
+}

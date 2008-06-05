@@ -145,6 +145,54 @@ port_longjump_stub PROC
 port_longjump_stub ENDP
 
 
+; void* __cdecl port_setstack_stub(Registers* regs);
+;
+; The function calls some function on alternative stack.
+; Function address is already in RIP register of 'regs' structure.
+; We only need to store return address and stack address.
+;
+; | saved stack |
+; |  address    | <- to store RSP of current stack
+; |-------------|
+; |    arg 5    | <- present even if not used
+; |-------------|
+; |    arg 4    | <- present even if not used
+; |-------------|
+; |  32 bytes   | <- 'red zone' for argument registers flushing
+; |-------------|
+; | return addr | <- points to port_setstack_stub_end
+; |-------------| <- regs->rsp points to this cell
+
+PUBLIC  port_setstack_stub
+
+port_setstack_stub PROC
+
+    push    rbp
+    
+    mov     r9, qword ptr [rcx] ; get new rsp
+
+    call    port_setstack_stub_mid
+port_setstack_stub_mid:
+    pop     rax ; get address of port_setstack_stub_mid
+    ; calculate address of port_setstack_stub_end
+    add     rax, (port_setstack_stub_end - port_setstack_stub_mid)
+    ; store return address
+    mov     qword ptr [r9], rax
+    ; store current RSP
+    mov     qword ptr [r9 + 56], rsp
+
+    ; RCX is unchanged
+    call    port_transfer_to_regs
+
+port_setstack_stub_end:
+    ; restore RSP
+    mov     rsp, qword ptr [rsp + 48]
+    pop     rbp
+    ret
+
+port_setstack_stub ENDP
+
+
 _TEXT   ENDS
 
 END

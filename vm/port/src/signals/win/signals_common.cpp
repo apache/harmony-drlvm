@@ -41,6 +41,8 @@
 #define FLAG_CORE ((port_crash_handler_get_flags() & PORT_CRASH_DUMP_PROCESS_CORE) != 0)
 #define FLAG_DBG  ((port_crash_handler_get_flags() & PORT_CRASH_CALL_DEBUGGER) != 0)
 
+#define ALT_PAGES_COUNT 16
+
 
 typedef void (PORT_CDECL *sigh_t)(int); // Signal handler type
 
@@ -142,6 +144,20 @@ void prepare_assert_dialog(Registers* regs)
     shutdown_signals();
 }
 
+static void* map_alt_stack(size_t size)
+{
+    LPVOID res = VirtualAlloc(0, (SIZE_T)size, MEM_RESERVE, PAGE_READWRITE);
+    if (!res)
+        return NULL;
+
+    return VirtualAlloc(res, (SIZE_T)size, MEM_COMMIT, PAGE_READWRITE);
+}
+
+static void unmap_alt_stack(void* addr, size_t size)
+{
+    VirtualFree(addr, (SIZE_T)size, MEM_RELEASE);
+}
+
 LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception)
 {
     DWORD code = nt_exception->ExceptionRecord->ExceptionCode;
@@ -181,17 +197,37 @@ LONG NTAPI vectored_exception_handler_internal(LPEXCEPTION_POINTERS nt_exception
         if (code == STATUS_STACK_OVERFLOW &&
             sd_is_handler_registered(PORT_SIGNAL_STACK_OVERFLOW))
         {
-            int result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
+            int result;
+            size_t alt_stack_size = ALT_PAGES_COUNT*tlsdata->guard_page_size;
+            void* alt_stack = map_alt_stack(alt_stack_size);
+            void* stack_bottom = (void*)((POINTER_SIZE_INT)alt_stack + alt_stack_size);
+
+            if (alt_stack)
+                result = (int)(POINTER_SIZE_INT)port_call_alt_stack(
+                                            port_process_signal, stack_bottom, 4,
+                                            PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
+            else
+                result = port_process_signal(PORT_SIGNAL_STACK_OVERFLOW, &regs, fault_addr, FALSE);
 
             if (result == 0)
             {
                 if (port_thread_detach_temporary() == 0)
                     STD_FREE(tlsdata);
+                if (alt_stack)
+                    unmap_alt_stack(alt_stack, alt_stack_size);
                 return EXCEPTION_CONTINUE_EXECUTION;
             }
 
             if (FLAG_CORE)
-                create_minidump(nt_exception);
+            {
+                if (alt_stack)
+                    port_call_alt_stack(create_minidump, stack_bottom, 1, nt_exception);
+                else
+                    create_minidump(nt_exception);
+            }
+
+            if (alt_stack)
+                unmap_alt_stack(alt_stack, alt_stack_size);
 
             if (result > 0)
             {
