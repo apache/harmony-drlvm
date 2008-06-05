@@ -180,10 +180,6 @@ public:
     void       genPseudoThrow();//TR
     void       genThrowSystemException(CompilationInterface::SystemExceptionId);//SI
     void       genThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation);//SI
-    void       genLeave(LabelInst* label);//TR
-    void       genEndFinally(); // TR
-    void       genEndFilter(); // TR
-    void       genEndCatch(); // TR
     void       genJSR(LabelInst* label); //TR
     void       genRet(Opnd *src);//TR
     Opnd*      genSaveRet();//TR
@@ -268,24 +264,7 @@ public:
     void       genFallThroughLabel(LabelInst* labelInst); //TR
     // method entry/exit
     LabelInst* genMethodEntryLabel(MethodDesc* methodDesc);//TR
-    // value object instructions
-    Opnd*      genLdObj(Type* type, Opnd* addrOfValObj);//TR
-    void       genStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type);//TR
-    void       genCopyObj(Type* type, Opnd* dstValPtr, Opnd* srcValPtr); // TR
-    void       genInitObj(Type* type, Opnd* valPtr); //TR
-    Opnd*      genSizeOf(Type* type);//TR
-    Opnd*      genMkRefAny(Type* type, Opnd* ptr);//TR
-    Opnd*      genRefAnyType(Opnd* typedRef);//TR
-    Opnd*      genRefAnyVal(Type* type, Opnd* typedRef);//TR
-    Opnd*      genUnbox(Type* type, Opnd* obj);//TR
-    Opnd*      genBox(Type* type, Opnd* val); // TR
-    Opnd*      genLdToken(MethodDesc* enclosingMethod, U_32 metadataToken);//TR
-    // block instructions
-    void       genCopyBlock(Opnd* dstAddr, Opnd* srcAddr, Opnd* size); // TR
-    void       genInitBlock(Opnd* dstAddr, Opnd* val, Opnd* size); //TR
-    Opnd*      genLocAlloc(Opnd* size);//TR
-    Opnd*      genArgList(); // TR
-
+    
     void       genTauTypeCompare(Opnd *arg0, MethodDesc* methodDesc, LabelInst *target,
                                  Opnd *tauNullChecked);//TR
 
@@ -389,9 +368,7 @@ public:
     void       genOptimisticBalancedMonitorExit(Opnd* src, Opnd *lockAddr, Opnd *oldValue);
     void       genMonitorEnterFence(Opnd *src);
     void       genMonitorExitFence(Opnd *src);
-    // checks
-    void       genSourceLineNumber(U_32 fileId, U_32 lineNumber);
-
+    
 private:
 
     void readFlagsFromCommandLine(SessionAction* argSource, const char* argPrefix);

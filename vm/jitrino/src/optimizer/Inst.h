@@ -265,8 +265,6 @@ public:
     virtual bool isType() const { return false; };
     virtual bool isVarAccess() const { return false; };
 
-    bool isLeave() const      {return getOpcode() == Op_Leave;     }
-    bool isEndFinally() const {return getOpcode() == Op_EndFinally;}
     bool isThrow() const ;
     bool isReturn() const     {return getOpcode() == Op_Return;    }
     bool isLdVar() const      {return getOpcode() == Op_LdVar;     }
@@ -1110,9 +1108,6 @@ public:
     Inst*    makeThrowSystemException(CompilationInterface::SystemExceptionId exceptionId);
     Inst*    makeThrowLinkingException(Class_Handle encClass, U_32 CPIndex, U_32 operation);
     Inst*    makeLeave(LabelInst* labelInst);
-    Inst*    makeEndFinally();
-    Inst*    makeEndFilter();
-    Inst*    makeEndCatch();
     Inst*    makeJSR(LabelInst* labelInst);
     Inst*    makeRet(Opnd *src);       // JSR-RET pair
     Inst*    makeSaveRet(Opnd *dst);   // JSR-RET pair
@@ -1215,17 +1210,6 @@ public:
             Opnd *obj, Opnd *retOpnd);
     Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc, Opnd *retOpnd);
     Inst*    makeMethodMarker(MethodMarkerInst::Kind kind, MethodDesc* methodDesc);
-
-
-    // value type instructions
-    Inst*    makeLdObj(Opnd* dst, Opnd* addrOfSrcValObj, Type* type);
-    Inst*    makeStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type);
-    Inst*    makeCopyObj(Opnd* dstValPtr, Opnd* srcValPtr, Type* type);
-    Inst*    makeInitObj(Opnd* valPtr, Type* type);
-    Inst*    makeSizeof(Opnd* dst, Type* type);
-    Inst*    makeBox(Opnd* dst, Opnd* val, Type* type);
-    Inst*    makeUnbox(Opnd* dst, Opnd* obj, Type* type);
-    Inst*    makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, U_32 metadataToken);
 
 
     // SSA
@@ -1633,15 +1617,6 @@ public:
     caseLeave(Inst* inst)=0;//              {return caseDefault(inst);}
 
     virtual Inst*
-    caseEndFinally(Inst* inst)=0;//         {return caseDefault(inst);}
-
-    virtual Inst*
-    caseEndFilter(Inst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseEndCatch(Inst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
     caseJSR(Inst* inst)=0;//          {return caseDefault(inst);}
 
     virtual Inst*
@@ -1856,57 +1831,9 @@ public:
     virtual Inst*
     caseMethodEnd(Inst* inst)=0;//          {return caseDefault(inst);}
 
-    virtual Inst*
-    caseSourceLineNumber(Inst* inst)=0;//   {return caseDefault(inst);}
-
     // source markers
     virtual Inst*
     caseMethodMarker(Inst* inst)=0;//       {return caseDefault(inst);}
-
-    // value type instructions
-    virtual Inst*
-    caseLdObj(TypeInst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseStObj(TypeInst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseCopyObj(TypeInst* inst)=0;//        {return caseDefault(inst);}
-
-    virtual Inst*
-    caseInitObj(TypeInst* inst)=0;//        {return caseDefault(inst);}
-
-    virtual Inst*
-    caseBox(TypeInst* inst)=0;//            {return caseDefault(inst);}
-
-    virtual Inst*
-    caseUnbox(TypeInst* inst)=0;//          {return caseDefault(inst);}
-
-    // checks
-    virtual Inst*
-    caseLdToken(TokenInst* inst)=0;//            {return caseDefault(inst);}
-
-    virtual Inst*
-    caseMkRefAny(Inst* inst)=0;//        {return caseDefault(inst);}
-
-    virtual Inst*
-    caseRefAnyVal(Inst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseRefAnyType(Inst* inst)=0;//         {return caseDefault(inst);}
-
-    virtual Inst*
-    caseInitBlock(Inst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseCopyBlock(Inst* inst)=0;//          {return caseDefault(inst);}
-
-    virtual Inst*
-    caseAlloca(Inst* inst)=0;//             {return caseDefault(inst);}
-
-    // makeGetType is not used
-    virtual Inst*
-    caseArgList(Inst* inst)=0;//            {return caseDefault(inst);}
 
     virtual Inst*
     casePhi(Inst* inst)=0;//                {return caseDefault(inst);}

@@ -114,10 +114,6 @@ static OpcodeInfo opcodeTable[] = {
     { Op_PseudoThrow,           true,  MB::Exception,     MK::Exception,                             "pseudoThrow ",  "pseudoThrow %b",                  },               
     { Op_ThrowSystemException,  true,  MB::Exception,     MK::None,                                  "throwsys ",     "throwsys %d %b",                  },
     { Op_ThrowLinkingException, true,  MB::Exception,     MK::None,                                  "throwLink ",    "throwLink",                    },
-    { Op_Leave,                 true,  MB::ControlFlow,   MK::None,                                  "leave ",        "leave %l",                     }, // CLI only -- DELETE
-    { Op_EndFinally,            true,  MB::ControlFlow,   MK::None,                                  "endfinally",    "endfinally",                   }, // CLI only -- DELETE
-    { Op_EndFilter,             true,  MB::ControlFlow,   MK::None,                                  "endfilter",     "endfilter",                    }, // CLI only -- DELETE
-    { Op_EndCatch,              true,  MB::Call,          MK::None,                                  "endcatch",      "endcatch",                     }, // CLI only -- DELETE
     { Op_JSR,                   true,  MB::Call,          MK::None,                                  "jsr",           "jsr %l",                       }, // Java only, JSR's -- DELETE
     { Op_Ret,                   true,  MB::ControlFlow,   MK::None,                                  "ret",           "ret       %s",                 }, // Java only, JSR's -- DELETE
     { Op_SaveRet,               true,  MB::ControlFlow,   MK::None,                                  "saveret",       "saveret      -) %l",           }, // Java only, JSR's -- DELETE
@@ -184,25 +180,8 @@ static OpcodeInfo opcodeTable[] = {
     { Op_Label,                 true,  MB::None,          MK::None,                                  "label ",        "%l: %b",                       }, // special label instructions for branch labels, finally, catch
     { Op_MethodEntry,           true,  MB::None,          MK::None,                                  "methodentry",   "--- MethodEntry(%d): (%s)  %b",}, // method entry label
     { Op_MethodEnd,             true,  MB::None,          MK::None,                                  "methodend",     "+++ MethodEnd(%d) (%s)",       }, // end of a method
-    { Op_SourceLineNumber,      true,  MB::None,          MK::None,                                  "lineno",        "???",                          }, // change to source position
-    { Op_LdObj,                 false, MB::Load,          MK::None,                                  "ldobj ",        "ldobj     [%0] -) %l",         }, // load a value type to the stack
-    { Op_StObj,                 true,  MB::StoreOrSync,   MK::None,                                  "stobj ",        "stobj     %1 -) [%0] -- %d",   }, // store a value type from the stack
-    { Op_CopyObj,               true,  MB::StoreOrSync,   MK::None,                                  "cpobj ",        "cpobj     [%1] -) [%0] -- %d", }, // copy a value type
-    { Op_InitObj,               true,  MB::StoreOrSync,   MK::None,                                  "initobj",       "initobj   [%0]",               }, // initialize a value type
-    { Op_Sizeof,                false, MB::Movable,       MK::None,                                  "sizeof",        "sizeof    %d -) %l",           }, // Pushes the size of a value type as a U4
-    { Op_Box,                   false, MB::Exception,     MK::None,                                  "box   ",        "box       %0,%d -) %l",        },
-    { Op_Unbox,                 false, MB::CSEable,       MK::None,                                  "unbox ",        "unbox     %0,%d -) %l",        },    
-    { Op_LdToken,               true , MB::None,          MK::None,                                  "ldtok ",        "ldtok        -) %l",           },   
-    { Op_MkRefAny,              false, MB::CSEable,       MK::None,                                  "mkrefany",      "mkrefany",                     }, // transforms a pointer to a typed reference
-    { Op_RefAnyVal,             false, MB::CSEable,       MK::None,                                  "refanyval",     "refanyval",                    }, // ??? Pushes a pointer to the typed reference ??? 
-    { Op_RefAnyType,            false, MB::CSEable,       MK::None,                                  "refanytype",    "refanytype",                   }, // Pushes the type token in a typed reference - same as obj.getClass()?
-                                                                                                                       
+    
     // Memory instructions                                                                                             
-    { Op_InitBlock,             true,  MB::StoreOrSync,   MK::None,                                  "initblk",       "initblk",                      }, // memset
-    { Op_CopyBlock,             true,  MB::StoreOrSync,   MK::None,                                  "cpblk ",        "cpblk ",                       }, // memcopy
-    { Op_Alloca,                true,  MB::StoreOrSync,   MK::None,                                  "alloca",        "alloca",                       }, // allocations memory from the stack,   },not verifiable
-    { Op_ArgList,               true,  MB::None,          MK::None,                                  "arglist",       "arglist",                      }, // for implementing varargs, use is private to CLI System.ArgIterator
-                                                                                                                       
     // Special SSA nodes                                                                                               
     { Op_Phi,                   false, MB::None,          MK::None,                                  "phi   ",        "phi(%s)      -) %l",           }, // merge point
     { Op_TauPi,                 false, MB::Movable,       MK::None,                                  "pi    ",        "pi(%0 : %d) ((%1)) -) %l",           }, // liverange split based on condition 
@@ -809,7 +788,6 @@ bool Operation::isConstant() const
     case Op_LdArrayBaseOffsetPlusHeapbase:
     case Op_LdArrayLenOffset:
     case Op_LdArrayLenOffsetPlusHeapbase:
-    case Op_LdToken:
         return true;
     default:
         return false;

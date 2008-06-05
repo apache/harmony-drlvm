@@ -2443,15 +2443,6 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
 }
 
 //_______________________________________________________________________________________________________________
-//  Load token
-
-CG_OpndHandle * InstCodeSelector::ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token) 
-{
-    ICS_ASSERT(0);
-    return 0;
-}
-
-//_______________________________________________________________________________________________________________
 //  Increment counter for the program instrumentation
 
 void InstCodeSelector::incCounter(Type *counterType,U_32 key) 

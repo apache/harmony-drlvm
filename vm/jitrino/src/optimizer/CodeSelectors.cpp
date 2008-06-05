@@ -886,12 +886,6 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                 }
             }
             break;
-        case Op_Leave:
-            {
-                assert(0);
-                instructionCallback.jump(); 
-            }
-            break;
         case Op_Throw:
             {
                 instructionCallback.throwException(getCGInst(inst->getSrc(0)), inst->getThrowModifier() == Throw_CreateStackTrace);
@@ -920,15 +914,6 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
             break;
         case Op_Catch:
             cgInst = instructionCallback.catchException(inst->getDst()->getType());
-            break;
-        case Op_EndFinally:
-            assert(0); 
-            break;
-        case Op_EndFilter:
-            assert(0); 
-            break;
-        case Op_EndCatch:
-            instructionCallback.endCatch();
             break;
         case Op_Copy:
             {
@@ -1777,97 +1762,6 @@ void _BlockCodeSelector::genInstCode(InstructionCallback& instructionCallback, I
                     ret_val);
             }
             break;      // nothing to do
-        case Op_SourceLineNumber: 
-            {
-                break;      // nothing to do
-            }
-        case Op_LdObj:
-            {
-                assert(inst->getNumSrcOperands() == 1);
-                cgInst = instructionCallback.ldValueObj(inst->getDst()->getType(),
-                    getCGInst(inst->getSrc(0)));
-            }
-            break;
-        case Op_StObj:
-            {
-                assert(inst->getNumSrcOperands() == 2);
-                instructionCallback.stValueObj(getCGInst(inst->getSrc(0)),
-                    getCGInst(inst->getSrc(1)));
-            }
-            break;
-        case Op_CopyObj:
-            {
-                assert(inst->getNumSrcOperands() == 2);
-                TypeInst *typeInst = (TypeInst *)inst;
-                instructionCallback.copyValueObj(typeInst->getTypeInfo(),
-                    getCGInst(inst->getSrc(0)),
-                    getCGInst(inst->getSrc(1)));
-            }
-            break;
-        case Op_InitObj:
-            {
-                assert(inst->getNumSrcOperands() == 1);
-                TypeInst * typeInst = (TypeInst *)inst;
-                instructionCallback.initValueObj(typeInst->getTypeInfo(),
-                    getCGInst(inst->getSrc(0)));
-            }
-            break;
-        case Op_Sizeof:
-            {
-                Type* type = inst->asTypeInst()->getTypeInfo();
-                assert(type->isValueType());
-                U_32 size = ((UserValueType*) type)->getUnboxedSize();
-                instructionCallback.ldc_i4(size);
-            }
-            break;
-        case Op_Box:
-            {
-                assert(inst->getNumSrcOperands() == 1);
-                Type * boxedType = inst->getDst()->getType();
-                assert(boxedType->isObject());
-                cgInst = instructionCallback.box((ObjectType *)boxedType,
-                    getCGInst(inst->getSrc(0))); 
-            }
-            break;
-        case Op_Unbox:
-            {
-                assert(inst->getNumSrcOperands() == 1);
-                cgInst = instructionCallback.unbox(inst->getDst()->getType(),
-                    getCGInst(inst->getSrc(0))); 
-            }
-            break;
-        case Op_LdToken:
-            {
-                assert(inst->getNumSrcOperands() == 0);
-                if (!genConsts) break;
-                TokenInst *tokenInst = (TokenInst *)inst;
-                U_32 token = tokenInst->getToken();
-                cgInst = instructionCallback.ldToken(inst->getDst()->getType(),
-                    tokenInst->getEnclosingMethod(), token);
-                isConstant = true;
-            }
-            break;
-        case Op_MkRefAny:
-            assert(0);
-            break;
-        case Op_RefAnyVal:
-            assert(0);
-            break;
-        case Op_RefAnyType:
-            assert(0);
-            break;
-        case Op_InitBlock:
-            assert(0);
-            break;
-        case Op_CopyBlock:
-            assert(0);
-            break;
-        case Op_Alloca:
-            assert(0);
-            break;
-        case Op_ArgList:
-            assert(0);
-            break;
         case Op_Phi:
             {
                 assert(0); // Phi nodes should be eliminated by deSSAing

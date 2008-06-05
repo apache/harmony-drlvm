@@ -156,12 +156,6 @@ private:
 
     Inst* caseLeave(Inst* inst) {return caseDefault(inst);}
 
-    Inst* caseEndFinally(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseEndFilter(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseEndCatch(Inst* inst) {return caseDefault(inst);}
-
     Inst* caseJSR(Inst* inst) {return caseDefault(inst);}
 
     Inst* caseRet(Inst* inst) {return caseDefault(inst);}
@@ -278,39 +272,8 @@ private:
 
     Inst* caseMethodEnd(Inst* inst) {return caseDefault(inst);}
 
-    Inst* caseSourceLineNumber(Inst* inst) {return caseDefault(inst);}
-
     // source markers
     Inst* caseMethodMarker(Inst* inst) {return caseDefault(inst);}
-
-    // value type instructions
-    Inst* caseLdObj(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseStObj(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseCopyObj(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseInitObj(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseBox(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseUnbox(TypeInst* inst) {return caseDefault(inst);}
-
-    Inst* caseLdToken(TokenInst* inst) {return caseDefault(inst);}
-
-    Inst* caseMkRefAny(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseRefAnyVal(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseRefAnyType(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseInitBlock(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseCopyBlock(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseAlloca(Inst* inst) {return caseDefault(inst);}
-
-    Inst* caseArgList(Inst* inst) {return caseDefault(inst);}
 
     Inst* casePhi(Inst* inst) {return caseDefault(inst);}
 

@@ -45,7 +45,6 @@ isEscapeOptimizationCandidate(Inst* inst) {
     case Op_LdRef:   case Op_NewObj: case Op_NewArray:
         return true;
     case Op_NewMultiArray:
-    case Op_Box:
         return true;
     case Op_LdConstant:
         //
@@ -171,7 +170,6 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
         // no src operands to mark
         break;
     case Op_NewMultiArray:
-    case Op_Box:
         break;
         //
         // sources of loads do not escape further
@@ -196,7 +194,6 @@ markEscapingInst(Inst* inst,BitSet& escapingInsts) {
         break;
     case Op_LdStaticAddr:   case Op_LdVarAddr:
         break;
-    case Op_Unbox:  case Op_LdObj:
     default:
         ::std::cerr << "ERROR: unknown escaping ref opcode: "
              << inst->getOperation().getOpcodeString()
@@ -281,7 +278,6 @@ initialize(Inst* inst,
     case Op_TauLdField:  case Op_TauLdElem: case Op_TauLdInd:
     case Op_LdArrayBaseAddr:    case Op_AddScaledIndex:
     case Op_LdFieldAddr:        case Op_LdElemAddr:
-    case Op_Unbox:  
     case Op_AddOffset:
         // create a def-use to base address computation
         defUseBuilder.addDefUse(inst->getSrc(0)->getInst(),inst,0);

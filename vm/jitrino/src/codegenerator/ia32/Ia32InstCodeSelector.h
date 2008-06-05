@@ -192,8 +192,7 @@ public:
     CG_OpndHandle* newArray(ArrayType* arrayType, CG_OpndHandle* numElems);
     CG_OpndHandle* newMultiArray(ArrayType* arrayType, U_32 numDims, CG_OpndHandle** dims);
     CG_OpndHandle* ldRef(Type *dstType, MethodDesc* enclosingMethod,U_32 stringToken, bool uncompress);
-    CG_OpndHandle* ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token);
-
+    
     void           incCounter(Type *counterType,U_32 counter);
     void           ret();
     void           ret(CG_OpndHandle* returnValue);

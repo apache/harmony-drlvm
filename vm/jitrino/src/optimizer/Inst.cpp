@@ -1893,9 +1893,6 @@ Inst* InstFactory::makeRet(Opnd* src) {
     return makeInst(Op_Ret, Modifier(), src->getType()->tag, OpndManager::getNullOpnd(), src);
 }
 
-Inst* InstFactory::makeLeave(LabelInst* labelInst) {
-    return makeBranchInst(Op_Leave, labelInst);
-}
 
 Inst* InstFactory::makeThrow(ThrowModifier mod, Opnd* exceptionObj) {
     return makeInst(Op_Throw, Modifier(mod), Type::Void, OpndManager::getNullOpnd(), exceptionObj);
@@ -1916,18 +1913,7 @@ Inst* InstFactory::makeThrowLinkingException(Class_Handle encClass, U_32 CPIndex
                               OpndManager::getNullOpnd(), encClass, CPIndex, operation);
 }
 
-Inst* InstFactory::makeEndFinally() {
-    return makeInst(Op_EndFinally, Modifier(), Type::Void, OpndManager::getNullOpnd());
-}
 
-Inst* InstFactory::makeEndFilter() {
-    assert(0);
-    return NULL;
-}
-
-Inst* InstFactory::makeEndCatch() {
-    return makeInst(Op_EndCatch, Modifier(), Type::Void, OpndManager::getNullOpnd());
-}
 Inst* InstFactory::makePrefetch(Opnd* addr) {
     return makeInst(Op_Prefetch, Modifier(), Type::Void, OpndManager::getNullOpnd(), addr);
 }
@@ -2438,10 +2424,6 @@ Inst* InstFactory::makeMonitorExitFence(Opnd* src) {
     return makeInst(Op_MonitorExitFence, Modifier(), Type::Void, OpndManager::getNullOpnd(), src);
 }
 
-Inst* InstFactory::makeLdToken(Opnd* dst, MethodDesc* enclosingMethod, U_32 metadataToken) {
-    return makeTokenInst(Op_LdToken, Modifier(), Type::Object, dst, metadataToken, enclosingMethod);
-}
-
 Inst* InstFactory::makeLdRef(Modifier mod, Opnd* dst, MethodDesc* enclosingMethod, U_32 token) {
     return makeTokenInst(Op_LdRef, mod, dst->getType()->tag, dst, token, enclosingMethod);
 }
@@ -2460,10 +2442,6 @@ Inst* InstFactory::makeTauCast(Opnd* dst, Opnd* src, Opnd *tauCheckedNull, Type*
                         dst->getType()->tag, dst, src, tauCheckedNull, type);
 }
 
-Inst* InstFactory::makeSizeof(Opnd* dst, Type* type) {
-    return makeTypeInst(Op_Sizeof, Modifier(), dst->getType()->tag, dst, type);
-}
-
 Inst* InstFactory::makeTauAsType(Opnd* dst, Opnd* src, Opnd *tauNullChecked, Type* type) {
     assert(tauNullChecked->getType()->tag == Type::Tau);
     return makeTypeInst(Op_TauAsType, Modifier(), dst->getType()->tag, dst, src, tauNullChecked, type);
@@ -2479,31 +2457,6 @@ Inst* InstFactory::makeTauInstanceOf(Opnd* dst, Opnd* src, Opnd* tauNullChecked,
 Inst* InstFactory::makeInitType(Type* type) {
     return makeTypeInst(Op_InitType, Modifier(Exception_Sometimes), 
                         Type::Void, OpndManager::getNullOpnd(), type);
-}
-
-// value type instructions
-Inst* InstFactory::makeLdObj(Opnd* dst, Opnd* addrOfSrcValObj, Type* type) {
-    return makeTypeInst(Op_LdObj, Modifier(), type->tag, dst, addrOfSrcValObj, type);
-}
-
-Inst* InstFactory::makeStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type) {
-    return makeTypeInst(Op_StObj, Modifier(), type->tag, OpndManager::getNullOpnd(), addrOfDstVal, srcVal, type);
-}
-
-Inst* InstFactory::makeCopyObj(Opnd* dstValPtr, Opnd* srcValPtr, Type* type) {
-    return makeTypeInst(Op_CopyObj, Modifier(), type->tag, OpndManager::getNullOpnd(), dstValPtr, srcValPtr, type);
-}
-
-Inst* InstFactory::makeInitObj(Opnd* valPtr, Type* type) {
-    return makeTypeInst(Op_InitObj, Modifier(), type->tag, OpndManager::getNullOpnd(), valPtr, type);
-}
-
-Inst* InstFactory::makeBox(Opnd* dst, Opnd* val, Type* type) {
-    return makeTypeInst(Op_Box, Modifier(), dst->getType()->tag, dst, val, type);
-}
-
-Inst* InstFactory::makeUnbox(Opnd* dst, Opnd* obj, Type* type) {
-    return makeTypeInst(Op_Unbox, Modifier(), dst->getType()->tag, dst, obj, type);
 }
 
 // lowered instructions
@@ -2682,10 +2635,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_PseudoThrow:        return casePseudoThrow(inst);
     case Op_ThrowSystemException: return caseThrowSystemException(inst);
     case Op_ThrowLinkingException: return caseThrowLinkingException(inst);
-    case Op_Leave:              return caseLeave(inst);
-    case Op_EndFinally:         return caseEndFinally(inst);
-    case Op_EndFilter:          return caseEndFilter(inst);
-    case Op_EndCatch:           return caseEndCatch(inst);
     case Op_JSR:                return caseJSR(inst);
     case Op_Ret:                return caseRet(inst);
     case Op_SaveRet:                return caseSaveRet(inst);
@@ -2750,22 +2699,6 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_Label:              return caseLabel(inst);
     case Op_MethodEntry:        return caseMethodEntry(inst);
     case Op_MethodEnd:          return caseMethodEnd(inst);
-    case Op_SourceLineNumber:   return caseSourceLineNumber(inst);
-    case Op_LdObj:              return caseLdObj(inst->asTypeInst());
-    case Op_StObj:              return caseStObj(inst->asTypeInst());
-    case Op_CopyObj:            return caseCopyObj(inst->asTypeInst());
-    case Op_InitObj:            return caseInitObj(inst->asTypeInst());
-    case Op_Sizeof:             return caseSizeof(inst->asTypeInst());
-    case Op_Box:                return caseBox(inst->asTypeInst());
-    case Op_Unbox:              return caseUnbox(inst->asTypeInst());
-    case Op_LdToken:            return caseLdToken(inst->asTokenInst());
-    case Op_MkRefAny:           return caseMkRefAny(inst);
-    case Op_RefAnyVal:          return caseRefAnyVal(inst);
-    case Op_RefAnyType:         return caseRefAnyType(inst);
-    case Op_InitBlock:          return caseInitBlock(inst);
-    case Op_CopyBlock:          return caseCopyBlock(inst);
-    case Op_Alloca:             return caseAlloca(inst);
-    case Op_ArgList:            return caseArgList(inst);
     case Op_Phi:                return casePhi(inst);
     case Op_TauPi:                 return caseTauPi(inst->asTauPiInst());
     case Op_IncCounter:         return caseIncCounter(inst);

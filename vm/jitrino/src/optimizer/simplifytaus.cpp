@@ -496,10 +496,6 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
         
     case Op_Throw:
     case Op_PseudoThrow:
-    case Op_Leave:
-    case Op_EndFinally:
-    case Op_EndFilter:
-    case Op_EndCatch:
         assert(0); 
         
     case Op_JSR:
@@ -647,26 +643,7 @@ Opnd *TauWalkerState::findReplacement(Opnd *src, Type *type, bool exactType)
     case Op_Label:
     case Op_MethodEntry:
     case Op_MethodEnd:
-    case Op_SourceLineNumber:
         assert(0); // no dstOpnd
-        
-    case Op_LdObj:
-    case Op_StObj:
-    case Op_CopyObj:
-    case Op_InitObj:
-    case Op_Sizeof:
-    case Op_Box:
-    case Op_Unbox:
-    case Op_LdToken:
-    case Op_MkRefAny:
-    case Op_RefAnyVal:
-    case Op_RefAnyType:
-    case Op_InitBlock:
-    case Op_CopyBlock:
-    case Op_Alloca:
-    case Op_ArgList:
-        assert(0); // do not know what to do with these
-        break;
         
     case Op_Phi:
         assert(0); // should be a ldvar instead

@@ -244,7 +244,6 @@ public:
                                       Type* dstType, CG_OpndHandle* src) = 0;
     virtual CG_OpndHandle*  convToFp(ConvertToFpOp::Types, Type* dstType, CG_OpndHandle* src) = 0;
 
-    virtual void            endCatch() {}
     virtual CG_OpndHandle*  ldFunAddr(Type* dstType, MethodDesc *desc) = 0; 
     virtual CG_OpndHandle*  tau_ldVirtFunAddr(Type* dstType, CG_OpndHandle* vtableAddr, 
                                               MethodDesc *desc,
@@ -405,7 +404,6 @@ public:
     virtual CG_OpndHandle*  newArray(ArrayType* arrayType, CG_OpndHandle* numElems) = 0;
     virtual CG_OpndHandle*  newMultiArray(ArrayType* arrayType, U_32 numDims, CG_OpndHandle** dims) = 0;
     virtual CG_OpndHandle*  ldRef(Type* type,MethodDesc* enclosingMethod,U_32 stringToken, bool autouncompress) = 0;
-    virtual CG_OpndHandle*  ldToken(Type *dstType,MethodDesc* enclosingMethod,U_32 token) = 0;
     virtual void            incCounter(Type *counterType,U_32 counter) = 0;
 
     virtual void            ret() = 0;

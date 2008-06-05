@@ -660,9 +660,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_Throw:
     case Op_ThrowSystemException:
     case Op_ThrowLinkingException:
-    case Op_Leave:
-    case Op_EndFinally:
-    case Op_EndFilter:
         thePass->effectExit(n, i);
         break;
     case Op_Catch:
@@ -872,22 +869,6 @@ MemoryOptInitWalker::applyToInst(Inst *i)
         break;
 
 
-    case Op_LdObj:
-
-    case Op_StObj:
-    case Op_CopyObj:
-
-    case Op_InitObj:
-    case Op_Box:
-    case Op_Unbox:
-    case Op_LdToken:
-    case Op_InitBlock:
-    case Op_CopyBlock:
-    case Op_Alloca:
-        assert(0);
-        break;
-
-
         // loads vtable from object, depends on object initialization
     case Op_TauLdVTableAddr:
 
@@ -937,14 +918,7 @@ MemoryOptInitWalker::applyToInst(Inst *i)
     case Op_TauCheckFinite: 
 
     case Op_TauStaticCast: // just a compile-time assertion
-    case Op_Label: case Op_SourceLineNumber:
-    case Op_Sizeof:
-
-    case Op_MkRefAny:   // these may allow pointers to escape or something
-    case Op_RefAnyVal:
-    case Op_RefAnyType:
-
-    case Op_ArgList:
+    case Op_Label:
     case Op_Phi:
     case Op_TauPi:
     case Op_TauPoint:
@@ -1385,7 +1359,6 @@ AliasRep AliasManager::getReference(Opnd *addr)
             }
         }
 
-    case Op_Alloca:
     case Op_LdVarAddr:
     case Op_Phi:
     case Op_DefArg: //magic as method param

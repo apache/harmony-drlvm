@@ -126,7 +126,7 @@ Simplifier::isNonNullObject(Opnd* opnd) {
     Inst* inst = opnd->getInst();
     switch (inst->getOpcode()) {
     case Op_NewObj:    case Op_NewArray:    case Op_NewMultiArray:
-    case Op_Box:       case Op_LdRef:    case Op_Catch:
+    case Op_LdRef:    case Op_Catch:
         return true;
     default:
     return false;
@@ -156,7 +156,7 @@ Simplifier::isExactType(Opnd* opnd) {
     Inst* inst = opnd->getInst();
     switch (inst->getOpcode()) {
     case Op_NewObj:    case Op_NewArray:    case Op_NewMultiArray:
-    case Op_Box:       case Op_LdRef:
+    case Op_LdRef:
         return true;
     case Op_DefArg:
         return (inst->getDefArgModifier() == SpecializedToExactType);

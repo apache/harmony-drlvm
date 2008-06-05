@@ -904,11 +904,6 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_ThrowSystemException:
         case Op_ThrowLinkingException:
             return true;
-        case Op_Leave:            // deleted
-        case Op_EndFinally:
-        case Op_EndFilter:
-        case Op_EndCatch:
-            return true;
         case Op_JSR:              // deleted
         case Op_Ret:
         case Op_SaveRet:
@@ -1051,24 +1046,7 @@ LazyExceptionOpt::instHasSideEffect(Inst* inst) {
         case Op_Label:
         case Op_MethodEntry:
         case Op_MethodEnd:
-        case Op_SourceLineNumber:
             return false;                
-        case Op_LdObj:
-        case Op_StObj:
-        case Op_CopyObj:
-        case Op_InitObj:
-        case Op_Sizeof:
-        case Op_Box:
-        case Op_Unbox:
-        case Op_LdToken:
-        case Op_MkRefAny:
-        case Op_RefAnyVal:
-        case Op_RefAnyType:
-        case Op_InitBlock:
-        case Op_CopyBlock:
-        case Op_Alloca:
-        case Op_ArgList:
-            return true;
         case Op_Phi:
         case Op_TauPi:
             return false;

@@ -1225,25 +1225,7 @@ IRBuilder::genSaveRet() {
     return dst;
 }
 
-void
-IRBuilder::genEndFinally() {
-    appendInst(instFactory->makeEndFinally());
-}
 
-void
-IRBuilder::genEndFilter() {
-    appendInst(instFactory->makeEndFilter());
-}
-
-void
-IRBuilder::genEndCatch() {
-    appendInst(instFactory->makeEndCatch());
-}
-
-void
-IRBuilder::genLeave(LabelInst* label) {
-    appendInst(instFactory->makeLeave(label));
-}
 
 void
 IRBuilder::genPrefetch(Opnd *addr) {
@@ -1725,13 +1707,6 @@ IRBuilder::genLdRef(MethodDesc* enclosingMethod, U_32 stringToken, Type* type) {
     Opnd* dst = createOpnd(type);
 
     appendInst(instFactory->makeLdRef(mod, dst, enclosingMethod, stringToken));
-    return dst;
-}
-
-Opnd*
-IRBuilder::genLdToken(MethodDesc* enclosingMethod, U_32 metadataToken) {
-    Opnd* dst = createOpnd(typeManager->getSystemObjectType());
-    appendInst(instFactory->makeLdToken(dst, enclosingMethod, metadataToken));
     return dst;
 }
 
@@ -3084,95 +3059,6 @@ IRBuilder::genInstanceOfWithResolve(Opnd* src, ObjectType* enclClass, U_32 cpInd
     return dst;
 }
 
-
-Opnd*
-IRBuilder::genSizeOf(Type* type) {
-    Opnd* dst = createOpnd(typeManager->getUInt32Type());
-    appendInst(instFactory->makeSizeof(dst, type));
-    return dst;
-}
-
-Opnd*
-IRBuilder::genUnbox(Type* type, Opnd* obj) {
-    assert(type->isValue());
-    Opnd *src = propagateCopy(obj);
-    genTauCheckNull(obj);
-    Opnd *two = genCast(src, typeManager->getObjectType(((NamedType*)type)->getVMTypeHandle()));
-    Opnd* dst = createOpnd(typeManager->getManagedPtrType(type));
-    appendInst(instFactory->makeUnbox(dst, two, type));
-    return dst;
-}
-
-Opnd*
-IRBuilder::genBox(Type* type, Opnd* val) {
-    assert(type->isValue());
-    val = propagateCopy(val);
-    Opnd* dst = createOpnd(typeManager->getObjectType(((NamedType*)type)->getVMTypeHandle()));
-    appendInst(instFactory->makeBox(dst, val, type));
-    return dst;
-}
-
-void
-IRBuilder::genCopyObj(Type* type, Opnd* dstValPtr, Opnd* srcValPtr) {
-    appendInst(instFactory->makeCopyObj(dstValPtr, srcValPtr, type));
-}
-
-void
-IRBuilder::genInitObj(Type* type, Opnd* valPtr) {
-    appendInst(instFactory->makeInitObj(valPtr, type));
-}
-
-Opnd*
-IRBuilder::genLdObj(Type* type, Opnd* addrOfValObj) {
-    Opnd* dst = createOpnd(type);
-    appendInst(instFactory->makeLdObj(dst, addrOfValObj, type));
-    return dst;
-}
-
-void
-IRBuilder::genStObj(Opnd* addrOfDstVal, Opnd* srcVal, Type* type) {
-    appendInst(instFactory->makeStObj(addrOfDstVal, srcVal, type));
-}
-
-void
-IRBuilder::genCopyBlock(Opnd* dstAddr, Opnd* srcAddr, Opnd* size) {
-    assert(0);
-}
-
-void
-IRBuilder::genInitBlock(Opnd* dstAddr, Opnd* srcAddr, Opnd* size) {
-    assert(0);
-}
-
-Opnd*
-IRBuilder::genLocAlloc(Opnd* size) {
-    assert(0);
-    return NULL;;
-}
-
-Opnd*
-IRBuilder::genArgList() {
-    assert(0);
-    return NULL;
-}
-
-Opnd*
-IRBuilder::genMkRefAny(Type* type, Opnd* ptr) {
-    assert(0);
-    return NULL;
-}
-
-Opnd*
-IRBuilder::genRefAnyType(Opnd* typedRef) {
-    assert(0);
-    return NULL;
-}
-
-Opnd*
-IRBuilder::genRefAnyVal(Type* type, Opnd* typedRef) {
-    assert(0);
-    return NULL;
-}
 
 //-----------------------------------------------------------------------------
 //

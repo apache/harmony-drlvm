@@ -613,7 +613,6 @@ EscAnalyzer::instrExam(Node* node) {
             case Op_Prefetch:
             case Op_TauStStatic:
             case Op_Copy:       
-            case Op_Box:
                 break;
 
             default:
@@ -4648,12 +4647,6 @@ EscAnalyzer::checkTauOpnd(Inst* tau_inst) {
         Inst *headInst = (Inst*)node->getFirstInst();
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
-            if (inst->getOpcode() == Op_InitObj) {
-                if (verboseLog) {
-                    os_sc << " Op_InitObj: ";
-                    inst->print(os_sc); os_sc << std::endl;
-                }
-            }
             U_32 nsrc = inst->getNumSrcOperands();
             for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands
@@ -4716,12 +4709,6 @@ EscAnalyzer::checkOpndUsage(U_32 lobjid) {
         Inst *headInst = (Inst*)node->getFirstInst();
         Opnd* opnd;
         for (Inst* inst=headInst->getNextInst();inst!=NULL;inst=inst->getNextInst()) {
-            if (inst->getOpcode() == Op_InitObj) {
-                if (verboseLog) {
-                    os_sc << " Op_InitObj: ";
-                    inst->print(os_sc); os_sc << std::endl;
-                }
-            }
             U_32 nsrc = inst->getNumSrcOperands();
             for (U_32 i=0; i<nsrc; i++) {
                 if (!(opnd=inst->getSrc(i))->isSsaOpnd())  // check ssa operands

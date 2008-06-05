@@ -330,11 +330,7 @@ enum Opcode {
     Op_PseudoThrow,                 // pseudo instruction to break infinte loops
     Op_ThrowSystemException,        // takes a CompilationInterface::SystemExceptionId parameter
     Op_ThrowLinkingException,       // generate a call to Helper_Throw_LinkingException
-    Op_Leave,                       
-    Op_EndFinally,                  
 
-    Op_EndFilter,                   
-    Op_EndCatch,                    
     Op_JSR,                         
 
     Op_Ret,                         
@@ -420,32 +416,7 @@ enum Opcode {
     Op_Label,                       // special label instructions for branch labels, finally, catch
     Op_MethodEntry,                 // method entry label
     Op_MethodEnd,                   // end of a method
-    Op_SourceLineNumber,            // change to source position
-                
-    // Instructions for manipulating value objects in CIL
-    Op_LdObj,                       // load a value type to the stack
-    Op_StObj,                       // store a value type from the stack
-    Op_CopyObj,                     // copy a value type
-    Op_InitObj,                     // initialize a value type
-    Op_Sizeof,                      // Pushes the size of a value type as a U4
-    Op_Box,
-    Op_Unbox,
-
-    // Pushes a RuntimeMethodHandle, RuntimeTypeHandle, or RuntimeFieldHandle for 
-    // passing to the Reflection methods in the system class library.
-    Op_LdToken,    
-
-    // Instruction for manipulating typed references
-    Op_MkRefAny,                 // transforms a pointer to a typed reference
-    Op_RefAnyVal,                   
-    Op_RefAnyType,                  
-
-    // Memory instructions
-    Op_InitBlock,                   // memset
-    Op_CopyBlock,                   // memcopy
-    Op_Alloca,                      // allocations memory from the stack, not verifiable
-    Op_ArgList,                     // for implementing varargs; use is private to CLI System.ArgIterator
-
+    
     // Special SSA nodes
     Op_Phi,                         // merge point
     Op_TauPi,                       // leverage split based on condition 

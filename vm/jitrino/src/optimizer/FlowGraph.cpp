@@ -751,20 +751,13 @@ static void _fixFinally(ControlFlowGraph& fg, Node *node, Node *retTarget) {
         return;
     }
     node->setTraversalNum(fg.getTraversalNum());
-    Inst *last = (Inst*)node->getLastInst();
-    if (last->isEndFinally()) {
-        // remove the 'ret' instruction
-        last->unlink();
-        // add edge from the new node to the target
-        fg.addEdge(node,retTarget);
-    } else {
-        const Edges& outEdges = node->getOutEdges();
-        Edges::const_iterator eiter;
-        for(eiter = outEdges.begin(); eiter != outEdges.end(); ++eiter) {
-            Edge* edge = *eiter;
-            _fixFinally(fg, edge->getTargetNode(),retTarget);
-        }
+    const Edges& outEdges = node->getOutEdges();
+    Edges::const_iterator eiter;
+    for(eiter = outEdges.begin(); eiter != outEdges.end(); ++eiter) {
+        Edge* edge = *eiter;
+        _fixFinally(fg, edge->getTargetNode(),retTarget);
     }
+
 }
 
 
@@ -812,23 +805,14 @@ bool FlowGraph::_inlineFinally(IRManager& irm, Node *from, Node *to, Node *retTa
     newto = duplicateNode(irm, to, to, opndRenameTable);
     fg.addEdge(from,newto);
     nodeRenameTable->setMapping(to,newto);
-    if (((Inst*)to->getLastInst())->isEndFinally()) {
-        // remove the duplicate 'end finally'
-        Inst *endInst =(Inst*)newto->getLastInst();
-        endInst->unlink();
-        // add edge from the new node to the target
-        fg.addEdge(newto,retTarget);
-    } else {
-        Log::out() << "LONG FINALLY\n";
 
-        const Edges& outEdges = to->getOutEdges();
-        Edges::const_iterator eiter;
-        for(eiter = outEdges.begin(); eiter != outEdges.end(); ++eiter) {
-            Edge* edge = *eiter;
-            _inlineFinally(irm, newto,edge->getTargetNode(),retTarget,nodeRenameTable,opndRenameTable);
-        }
-        _fixBranchTargets((Inst*)newto->getLastInst(),nodeRenameTable);
+    const Edges& outEdges = to->getOutEdges();
+    Edges::const_iterator eiter;
+    for(eiter = outEdges.begin(); eiter != outEdges.end(); ++eiter) {
+        Edge* edge = *eiter;
+        _inlineFinally(irm, newto,edge->getTargetNode(),retTarget,nodeRenameTable,opndRenameTable);
     }
+    _fixBranchTargets((Inst*)newto->getLastInst(),nodeRenameTable);
     return true;
 }
 
@@ -935,10 +919,7 @@ void FlowGraph::doTranslatorCleanupPhase(IRManager& irm) {
             }
             Inst *last = (Inst*)node->getLastInst();
             if (last->isBranch()) {
-                if (last->isLeave()) {
-                    // Inline Finally - only necessary after translation
-                    inlineFinally(irm, node);
-                } else if (last->isConditionalBranch()) { // loop peeling for conditional branches
+                if (last->isConditionalBranch()) { // loop peeling for conditional branches
                     Node *target  = ((BranchInst*)last)->getTargetLabel()->getNode();
                     if (((LabelInst*)target->getFirstInst())->getLabelId() > ((LabelInst*)node->getFirstInst())->getLabelId()) 
                     {
@@ -1182,9 +1163,7 @@ void FlowGraph::printInsts(std::ostream& cout, Node* node, U_32 indent){
     // The IR does not contain explicit GOTOs, so for IR printing purposes
     // we should print a GOTO if required, extracted from the CFG.
     inst = (Inst*)node->getLastInst();
-    if (!inst->isReturn() && !inst->isLeave() &&
-        !inst->isThrow()  &&
-        !inst->isEndFinally() && !inst->isRet()) {
+    if (!inst->isReturn() && !inst->isThrow()  && !inst->isRet()) {
             Node *target = NULL;
             if (inst->isConditionalBranch()) {
                 target = ((BranchInst*)inst)->getTakenEdge(false)->getTargetNode();
