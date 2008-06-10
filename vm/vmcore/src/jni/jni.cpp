@@ -1448,12 +1448,14 @@ VMEXPORT jmethodID JNICALL FromReflectedMethod(JNIEnv * jni_env, jobject method)
 
     if (clss == vm_env->java_lang_reflect_Constructor_Class) 
     {
-        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        static jmethodID m; 
+        if (!m) m = (jmethodID)class_lookup_method(clss, "getId", "()J");
         return (jmethodID) ((POINTER_SIZE_INT) CallLongMethodA(jni_env, method, m, 0));
     } 
     else if (clss == vm_env->java_lang_reflect_Method_Class)
     {
-        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        static jmethodID m;
+        if (!m) m = (jmethodID)class_lookup_method(clss, "getId", "()J");
         return (jmethodID) ((POINTER_SIZE_INT) CallLongMethodA(jni_env, method, m, 0));
     }
     return NULL;
@@ -1468,7 +1470,8 @@ VMEXPORT jfieldID JNICALL FromReflectedField(JNIEnv * jni_env, jobject field)
 
     if (clss == vm_env->java_lang_reflect_Field_Class) 
     {
-        static jmethodID m = (jmethodID)class_lookup_method(clss, "getId", "()J");
+        static jmethodID m;
+        if (!m) m = (jmethodID)class_lookup_method(clss, "getId", "()J");
         return (jfieldID) ((POINTER_SIZE_INT) CallLongMethodA(jni_env, field, m, 0));
     }
     return NULL;
