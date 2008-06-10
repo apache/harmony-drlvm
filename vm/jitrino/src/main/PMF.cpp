@@ -336,18 +336,18 @@ struct StrSubstitution
 
     void replace_class  ()      
     {
-        insert(Str(classname), true);
+        if (classname) insert(Str(classname), true);
     }
 
     void replace_tree   ()      
     {
-        insert(Str(classname), false);
+        if (classname) insert(Str(classname), false);
     }
 
     void replace_method ()      
     {
-        insert(Str(methodname), true);
-        insert(Str(signature), true);
+        if (methodname) insert(Str(methodname), true);
+        if (signature) insert(Str(signature), true);
     }
 
     void replace_seqnb  ()      
@@ -423,7 +423,9 @@ bool StrSubstitution::substitute (const Str& from)
 
 void StrSubstitution::insert (Str s, bool fix)
 {
-    assert(dptr + s.count < dend);
+    bool truncate = !(dptr + s.count < dend);
+    int max_len = truncate ? dend - dptr - 1 : s.count;
+    assert(max_len > 0);
 
     if (s.empty())
     {
@@ -433,7 +435,7 @@ void StrSubstitution::insert (Str s, bool fix)
 
     if (fix)
     {
-        for (const char* sptr = s.ptr, * send = s.ptr + s.count; sptr != send;)
+        for (const char* sptr = s.ptr, * send = s.ptr + max_len; sptr != send;)
         {
             char c = *sptr++;
             if (c == '/')
@@ -443,8 +445,8 @@ void StrSubstitution::insert (Str s, bool fix)
     }
     else
     {
-        memcpy(dptr, s.ptr, s.count);
-        dptr += s.count;
+        memcpy(dptr, s.ptr, max_len);
+        dptr += max_len;
     }
 }
 
