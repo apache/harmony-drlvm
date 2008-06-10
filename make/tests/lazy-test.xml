@@ -60,9 +60,9 @@
     <target name="check-lazy-test">
         <loadfile property="lazy.test.summary.txt" 
             srcFile="${lazy.test.summary}"/>
-        <echo message="  ***************************${line.separator}"/>
-        <echo message="  *** Kernel tests status ***${line.separator}"/>
-        <echo message="  ***************************${line.separator}"/>
+        <echo message="  *****************************${line.separator}"/>
+        <echo message="  * Lazyresolution tests status *${line.separator}"/>
+        <echo message="  *****************************${line.separator}"/>
         <echo message="${line.separator}"/>
         <echo message="${lazy.test.summary.txt}"/>
         <echo message="${line.separator}"/>
