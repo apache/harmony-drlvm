@@ -910,7 +910,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         gen_check_null(thiz, true);
 
         AR gr = valloc(jobj);
-        unsigned offset = method_get_vtable_offset(meth);
+        size_t offset = method_get_vtable_offset(meth);
         Opnd ptr;
 
         if (g_vtbl_squeeze) {
@@ -922,7 +922,7 @@ void CodeGen::gen_invoke(JavaByteCodes opcod, Method_Handle meth, unsigned short
         }
         else {
             ld(jobj, gr, thiz.reg(), rt_vtable_offset);
-            ptr = Opnd(jobj, gr, offset);
+            ptr = Opnd(jobj, gr, (int)offset);
         }
         call(ptr, cs, is_set(DBG_CHECK_STACK));
         runlock(thiz);

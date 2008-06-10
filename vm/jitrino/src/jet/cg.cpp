@@ -758,7 +758,7 @@ void CodeGen::gen_throw(Class_Handle exnClass, bool restore)
         gen_call_throw(ci_helper_lazy, rt_helper_throw_lazy, 0, exnClass, NULL);
     } else {
         static const CallSig ci_new(CCONV_HELPERS, jobj, i32, jobj);
-        unsigned size = class_get_object_size(exnClass);
+        unsigned size = (unsigned)class_get_object_size(exnClass);
         unsigned stackFix;
         Allocation_Handle ah = class_get_allocation_handle(exnClass);
         gen_call_vm(ci_new, rt_helper_new, 0, size, ah);
