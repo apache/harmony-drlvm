@@ -520,6 +520,9 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
 {  
     AutoTimer tm(enumerateTimer);
 
+    if(Log::cat_rt()->isEnabled())
+        Log::cat_rt()->out() << "ENUMERATE_STACK_FRAME(" << methodDesc << ")" << ::std::endl;
+
     // Compute stack information
     U_32 stackInfoSize = (U_32)StackInfo::getByteSize(methodDesc);
     U_8* infoBlock = methodDesc->getInfoBlock();
@@ -544,7 +547,7 @@ void RuntimeInterface::getGCRootSet(MethodDesc* methodDesc, GCInterface* gcInter
             gcSite.enumerate(gcInterface, context, stackInfo);
         }
     } else {
-        //NPE + GC -> nothing to enumerate for this frame;
+        //hw NPE + GC -> nothing to enumerate for this frame;
         //in debug mode all hardware exceptions are saved as empty gcsafepoints
         // yet there are some issues with SOE: 
         // e.g. we are in trouble if SOE is caught in the same method...
