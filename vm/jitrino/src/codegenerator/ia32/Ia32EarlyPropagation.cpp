@@ -35,7 +35,7 @@ namespace Ia32
 //========================================================================================
 /**
  *  class EarlyPropagation implements a simple algorithm of constant and copy propagation.
- *  It works only with operands which have single defintions. 
+ *  It works only with operands which have single definitions. 
  *  In addition to constants it also propagates heap reads.
  *  
  *  The main goal of the pass is to reduce register pressure.

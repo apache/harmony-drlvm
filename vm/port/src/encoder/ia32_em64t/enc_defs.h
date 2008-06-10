@@ -161,7 +161,7 @@ enum OpndRole {
 // Gregory -
 // It is critical that all register indexes (3rd number) inside of the
 // following table go in ascending order. That is R8 goes after
-// RDI. It is necessary for decoder when extending registers from RAX-DRI
+// RDI. It is necessary for decoder when extending registers from RAX-RDI
 // to R8-R15 by simply adding 8 to the index on EM64T architecture
 enum RegName {
 

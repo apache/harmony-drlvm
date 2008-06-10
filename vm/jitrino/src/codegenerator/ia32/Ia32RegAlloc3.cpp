@@ -689,7 +689,7 @@ bool RegAlloc3::buildGraph ()
     }
 
 //  Iterate over all instructions in CFG and calculate which operands
-//  are live simultaneouesly (result stored in matrix)
+//  live simultaneously (result stored in matrix)
 
     BitSet lives(mm, opandcount);
 
@@ -744,7 +744,7 @@ bool RegAlloc3::buildGraph ()
         if (graph[x].oproles->empty())
             graph[x].ignore = true;
 
-//  Connect nodes that represent simultaneouesly live operands
+//  Connect nodes that represent simultaneously live operands
 
     for (unsigned x1 = 1; x1 < graphsize; ++x1)
         for (unsigned x2 = 0; x2 < x1; ++x2)
@@ -980,8 +980,8 @@ bool RegAlloc3::coalescing (int* opandmap, BoolMatrix& matrix)
 }
 
 
-//  Colalesce graph nodes (x0) and (x1) and the corresponding operands.
-//  Node (x1) not to be used anymore, (x0) must be used unstead.
+//  Coalesce graph nodes (x0) and (x1) and the corresponding operands.
+//  Node (x1) not to be used anymore, (x0) must be used instead.
 //  Note that (x1) remains in the graph (must be ignored)
 //
 void RegAlloc3::coalesce (int* opandmap, BoolMatrix& matrix, int x0, int x1)

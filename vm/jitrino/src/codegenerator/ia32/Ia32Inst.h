@@ -84,7 +84,7 @@ public:
         DefScope_Null=0,
         /** The operand has single definition */
         DefScope_Temporary,
-        /** The operand has multiple defs all within one basic block (occures after convertion into 2-operand form) */
+        /** The operand has multiple defs all within one basic block (occurs after conversion into 2-operand form) */
         DefScope_SemiTemporary,
         /** The operand has merging defs */
         DefScope_Variable,
@@ -94,7 +94,7 @@ public:
     enum ConstraintKind{
         /** An additional constraint assigned during Opnd creation */
         ConstraintKind_Initial=0,
-        /** A constraint calculated in the contstraint resolver from instruction properties */
+        /** A constraint calculated in the constraint resolver from instruction properties */
         ConstraintKind_Calculated=1,
         /** A constraint defining assigned physical location of an operand */
         ConstraintKind_Location=2,
@@ -127,7 +127,7 @@ public:
             Kind_TypeRuntimeId,     
             /** The value of the operand is [0]->NamedType::getRuntimeIdentifier() */
             Kind_MethodRuntimeId,       
-            /** The value of the operand is [1], but the information can be used to serialize/deserizalize 
+            /** The value of the operand is [1], but the information can be used to serialize/deserialize 
             this value: [0] - Type * - the containing class, [1] - string token */
             Kind_StringDescription, 
             /** The value of the operand is [0]->ObjectType::getObjectSize() */

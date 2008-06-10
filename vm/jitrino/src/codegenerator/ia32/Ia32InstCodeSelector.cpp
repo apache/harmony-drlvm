@@ -2396,7 +2396,7 @@ CG_OpndHandle* InstCodeSelector::ldRef(Type *dstType,
         CallInst * callInst = irManager.newRuntimeHelperCallInst(VM_RT_LDC_STRING, 2, helperOpnds, retOpnd);
         appendInsts(callInst);
     } else {
-        // this optimized version is based on determinig item address at compile time.
+        // this optimized version is based on determining item address at compile time.
         // Respective compile time helper (class_get_const_string_intern_addr) is available for strings.
         // Similar function for literal constants is not ready.
         // TODO: rewrite this as soon as the helper for loading ref addr at compile time is ready.

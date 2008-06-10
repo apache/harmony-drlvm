@@ -517,7 +517,7 @@ void IRPrinter::printRuntimeInfo(const Opnd::RuntimeInfo * info)
         case Opnd::RuntimeInfo::Kind_MethodRuntimeId: 
             {
             MethodDesc * md=(MethodDesc*)info->getValue(0);
-            os<<"vtso:"; 
+            os<<"mh:"; 
             os<<md->getParentType()->getName()<<"."<<md->getName();
             }break;
         case Opnd::RuntimeInfo::Kind_EM_ProfileAccessInterface:

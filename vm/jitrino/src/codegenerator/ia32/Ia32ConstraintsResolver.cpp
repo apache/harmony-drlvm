@@ -157,10 +157,10 @@ static ActionFactory<ConstraintsResolver> _constraints("constraints", help);
  *        the calculated constraint is set to the constraint 
  *        preserving operand values during exception throwing
  *        This constraint is returned by getDispatchEntryConstraint
- *        In fact this is the constriant for the DRL calling convention
+ *        In fact this is the constraint for the DRL calling convention
  *
  *      This is done in calculateStartupOpndConstraints()
- *      Originally all calculateed constraints are equial to Initial constraints
+ *      Originally all calculated constraints are equal to Initial constraints
  *
  *  4)  Walks through all basic blocks collected and arranged at step 1
  *      in resolveConstraints()
@@ -182,14 +182,14 @@ static ActionFactory<ConstraintsResolver> _constraints("constraints", help);
  *          
  *              To do this already collected calculated constraint of 
  *              either original operand or its current replacement is anded 
- *              with instruction constraint for this operand occurence and
+ *              with instruction constraint for this operand occurrence and
  *              if the result is null, new operand is created and substituted instead
  *                              
- *              4.1.1.1) All def operands of the isntruction are traversed
+ *              4.1.1.1) All def operands of the instruction are traversed
  *                  and operand splitting is performed after the instruction (when necessary)
  *                  def&use cases are also handled during this step 
  *              4.1.1.2) If the instruction is CALL, all hovering operands of 
- *                  the isntruction are traversed.
+ *                  the instruction are traversed.
  *
  *                  Hovering operands are operands which are live across a call site and are not
  *                  redefined in the call site
