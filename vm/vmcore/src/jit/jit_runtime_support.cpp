@@ -125,7 +125,7 @@ static NativeCodePtr rth_get_lil_multianewarray(int* dyn_count)
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            (POINTER_SIZE_INT)FRAME_POPABLE,
+            (UDATA)FRAME_POPABLE,
             rth_multianewarrayhelper);
         assert(cs && lil_is_valid(cs));
         
@@ -199,7 +199,7 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            (POINTER_SIZE_INT)FRAME_POPABLE,
+            (UDATA)FRAME_POPABLE,
             p_instantiate_ref);
 #else
         cs = lil_parse_onto_end(cs,
@@ -213,8 +213,8 @@ static NativeCodePtr rth_get_lil_ldc_ref(int* dyn_count)
             "call %5i;"
             "pop_m2n;"
             "ret;",
-            (POINTER_SIZE_INT)FRAME_POPABLE,
-            handles_size, cap_off, cap_and_size, next_off,
+            (UDATA)FRAME_POPABLE,
+            (UDATA)handles_size, (UDATA)cap_off, (UDATA)cap_and_size, (UDATA)next_off,
             p_instantiate_ref);
 #endif
         assert(cs && lil_is_valid(cs));
@@ -303,7 +303,7 @@ static LilCodeStub* rth_gen_lil_type_test(LilCodeStub* cs, RthTypeTestNull null,
         cs = lil_parse_onto_end(cs,
             "ld l0,[l0+%0i*l1+%1i:pint];"
             "jc l0!=i1,failed;",
-            (POINTER_SIZE_INT)sizeof(Class*),
+            (UDATA)sizeof(Class*),
             vtable_add+supertable_off-sizeof(Class*));  // -4/8 because we want to index with depth-1
         assert(cs);
     }
@@ -768,7 +768,7 @@ static NativeCodePtr rth_get_lil_initialize_class(int* dyn_count)
             ":_exn_raised;"
             "out platform::void;"
             "call.noret %5i;",
-            p_is_inited, (POINTER_SIZE_INT)(FRAME_JNI | FRAME_POPABLE), p_init,
+            p_is_inited, (UDATA)(FRAME_JNI | FRAME_POPABLE), p_init,
             OFFSET(VM_thread, thread_exception.exc_object),
             OFFSET(VM_thread, thread_exception.exc_class),
             p_rethrow);
@@ -834,7 +834,7 @@ static NativeCodePtr rth_get_lil_gc_safe_point(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        (POINTER_SIZE_INT)(FRAME_NON_UNWINDABLE | FRAME_POPABLE | FRAME_SAFE_POINT),
+        (UDATA)(FRAME_NON_UNWINDABLE | FRAME_POPABLE | FRAME_SAFE_POINT),
         hythread_safe_point_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -867,7 +867,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_enter_callback(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        (POINTER_SIZE_INT)FRAME_POPABLE,
+        (UDATA)FRAME_POPABLE,
         jvmti_method_enter_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -896,7 +896,7 @@ static NativeCodePtr rth_get_lil_jvmti_method_exit_callback(int * dyn_count) {
         "call %1i;"
         "pop_m2n;"
         "ret;",
-        (POINTER_SIZE_INT)FRAME_POPABLE,
+        (UDATA)FRAME_POPABLE,
         jvmti_method_exit_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -927,7 +927,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_access_callback(int * dyn_count) {
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            (POINTER_SIZE_INT)FRAME_POPABLE,
+            (UDATA)FRAME_POPABLE,
             jvmti_field_access_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -974,7 +974,7 @@ static NativeCodePtr rth_get_lil_jvmti_field_modification_callback(int * dyn_cou
             "call %1i;"
             "pop_m2n;"
             "ret;",
-            (POINTER_SIZE_INT)FRAME_POPABLE,
+            (UDATA)FRAME_POPABLE,
             jvmti_field_modification_callback_ptr);
     assert(cs && lil_is_valid(cs));
     addr = LilCodeGenerator::get_platform()->compile(cs);
@@ -1039,9 +1039,9 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
         assert(cs);
     }
 #ifdef _IPF_
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (UDATA)(FRAME_POPABLE));
 #else
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (UDATA)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs,
         "locals 1;"
@@ -1049,9 +1049,10 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve foo
         "st[l0+%1i:g4], %2i;"
         "st[l0+%3i:pint], 0;"
         "handles=l0;",
-        handles_size,
-        cap_off, cap_and_size,
-        next_off);
+        (UDATA)handles_size,
+        (UDATA)cap_off, 
+        (UDATA)cap_and_size,
+        (UDATA)next_off);
 #endif
     assert(cs);
     cs = lil_parse_onto_end(cs, in2out);
@@ -1098,9 +1099,9 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
     }
 
 #ifdef _IPF_
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (UDATA)(FRAME_POPABLE));
 #else
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (UDATA)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs,
         "locals 1;"
@@ -1108,8 +1109,8 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_man
         "st[l0+%1i:g4], %2i;"
         "st[l0+%3i:pint], 0;"
         "handles=l0;",
-        handles_size,
-        cap_off, cap_and_size,
+        (UDATA)handles_size,
+        (UDATA)cap_off, (UDATA)cap_and_size,
         next_off);
 #endif
     assert(cs);
@@ -1156,9 +1157,9 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
     }
 
 #ifdef _IPF_
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i;", (UDATA)(FRAME_POPABLE));
 #else
-    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (POINTER_SIZE_INT)(FRAME_POPABLE));
+    cs = lil_parse_onto_end(cs, "push_m2n 0, %0i, handles;", (UDATA)(FRAME_POPABLE));
     assert(cs);
     cs = lil_parse_onto_end(cs,
         "locals 1;"
@@ -1166,8 +1167,8 @@ static NativeCodePtr rth_get_lil_stub_withresolve(int * dyn_count, f_resolve_int
         "st[l0+%1i:g4], %2i;"
         "st[l0+%3i:pint], 0;"
         "handles=l0;",
-        handles_size,
-        cap_off, cap_and_size,
+        (UDATA)handles_size,
+        (UDATA)cap_off, (UDATA)cap_and_size,
         next_off);
 #endif
     assert(cs);
