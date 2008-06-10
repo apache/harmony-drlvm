@@ -830,6 +830,10 @@ JavaByteCodeTranslator::putfield(U_32 constPoolIndex) {
     if (field && !field->isStatic()) {
         Type* fieldType = getFieldType(field,constPoolIndex);
         assert(fieldType);
+        if (VMMagicUtils::isVMMagicClass(fieldType->getName())) {
+            fieldType = convertVMMagicType2HIR(typeManager, fieldType);
+        }
+
         Opnd* value = popOpnd();
         Opnd* ref = popOpnd();
         irBuilder.genStField(fieldType,ref,field,value);
