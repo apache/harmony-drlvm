@@ -103,12 +103,6 @@ public class Thread implements Runnable {
      */
     private Runnable target;
 
-    /**
-     * This map is used to provide <code>ThreadLocal</code> functionality.
-     * Maps <code>ThreadLocal</code> object to value. Lazy initialization is
-     * used to avoid circular dependance.
-     */
-    private Map<ThreadLocal<Object>, Object> localValues = null;
 
     /**
      * Uncaught exception handler for this thread
@@ -160,6 +154,13 @@ public class Thread implements Runnable {
      * references.
      */
     private static final int GC_WATERMARK_MAX_COUNT = 700;
+
+    /*
+     * ThreadLocal values: local and inheritable
+     *
+     */
+    ThreadLocal.Values localValues;
+    ThreadLocal.Values inheritableValues;
     
     /**
      * @com.intel.drl.spec_ref
@@ -251,6 +252,12 @@ public class Thread implements Runnable {
         SecurityUtils.putContext(this, AccessController.getContext());
         // adding the thread to the thread group should be the last action
         group.add(this);
+
+	Thread parent = currentThread();
+        if (parent != null && parent.inheritableValues != null) {
+            inheritableValues = new ThreadLocal.Values(parent.inheritableValues);
+        } 
+
     }
 
     /**
@@ -288,7 +295,7 @@ public class Thread implements Runnable {
         this.name = (name != THREAD) ? this.name = name.toString() :
             THREAD + threadId;
 
-        initializeInheritableLocalValues(currentThread);
+
     
         checkGCWatermark();
         
@@ -304,6 +311,12 @@ public class Thread implements Runnable {
 
         SecurityUtils.putContext(this, AccessController.getContext());
         checkAccess();
+
+	Thread parent = currentThread();
+        if (parent != null && parent.inheritableValues != null) {
+            inheritableValues = new ThreadLocal.Values(parent.inheritableValues);
+        } 
+
     }
 
     /**
@@ -930,86 +943,6 @@ public class Thread implements Runnable {
             sm.checkPermission(RuntimePermissionCollection.MODIFY_THREAD_PERMISSION);
         }
         exceptionHandler = eh;
-    }
-
-    /**
-     * Associates the value specified to the <code>ThreadLocal</code> object
-     * given. <br>
-     * This nethod is designed to provide <code>ThreadLocal</code>
-     * functionality.
-     */
-    void setThreadLocal(ThreadLocal<Object> local, Object value) {
-        if (localValues == null) {
-            localValues = new IdentityHashMap<ThreadLocal<Object>, Object>();
-        }
-        localValues.put(local, value);
-    }
-
-    /**
-     * Returns the value associated with the <code>ThreadLocal</code> object
-     * specified. If no value is associated, returns the value produced by
-     * <code>initialValue()</code> method called for this object and
-     * associates this value to <code>ThreadLocal</code> object. <br>
-     * This nethod is designed to provide <code>ThreadLocal</code>
-     * functionality.
-     */
-    Object getThreadLocal(ThreadLocal<Object> local) {
-        Object value;
-        if (localValues == null) {
-            localValues = new IdentityHashMap<ThreadLocal<Object>, Object>();
-            value = local.initialValue();
-            localValues.put(local, value);
-            return value;
-        }
-        value = localValues.get(local);
-        if (value != null) {
-            return value;
-        } else {
-            if (localValues.containsKey(local)) {
-                return null;
-            } else {
-                value = local.initialValue();
-                localValues.put(local, value);
-                return value;
-            }
-        }
-    }
-    
-    /**
-     * Removes the association (if any) between the <code>ThreadLocal</code> object
-     * given and this thread's value. <br>
-     * This nethod is designed to provide <code>ThreadLocal</code>
-     * functionality.
-     */
-    void removeLocalValue(ThreadLocal<Object> local) {
-        if (localValues != null) {
-            localValues.remove(local);
-        }
-    }
-
-    /**
-     * Initializes local values represented by
-     * <code>InheritableThreadLocal</code> objects having local values for the
-     * parent thread <br>
-     * This method is designed to provide the functionality of
-     * <code>InheritableThreadLocal</code> class <br>
-     * This method should be called from <code>Thread</code>'s constructor.
-     */
-    private void initializeInheritableLocalValues(Thread parent) 
-    {
-        Map<ThreadLocal<Object>, Object> parentLocalValues = parent.localValues;
-        if (parentLocalValues == null) {
-           return;
-        }
-        localValues = new IdentityHashMap<ThreadLocal<Object>, Object>(parentLocalValues.size());
-        for (Iterator<ThreadLocal<Object>> it = parentLocalValues.keySet().iterator(); it.hasNext();) {
-            ThreadLocal<Object> local = it.next();
-            if (local instanceof InheritableThreadLocal) {
-                Object parentValue = parentLocalValues.get(local);
-                InheritableThreadLocal<Object> iLocal = (InheritableThreadLocal<Object>) local;
-                localValues.put(local, iLocal.childValue(parentValue));
-            }
-        }
     }
 
     /**
