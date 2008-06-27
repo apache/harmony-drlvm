@@ -409,7 +409,7 @@ void CopyExpansion::runImpl()
                         if (toOpnd == fromOpnd){
                             continue;
                         } else if (toOpnd->isPlacedIn(OpndKind_Reg) && fromOpnd->isPlacedIn(OpndKind_Reg)){
-                            if (toOpnd->getRegName()==fromOpnd->getRegName())
+                            if ( equals(toOpnd->getRegName(),fromOpnd->getRegName()) )
                                 continue;
                         }else{
 #ifdef _EM64T_

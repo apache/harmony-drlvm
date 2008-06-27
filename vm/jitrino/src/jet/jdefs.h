@@ -583,6 +583,14 @@ struct JTypeDesc {
 extern JTypeDesc jtypes[num_jtypes];
 
 /**
+ *@brief Tests whether specified #jtype represents signed integer value.
+ */
+inline bool is_signed_int( jtype jt )
+{
+    return jt==i8 || jt==i16 || jt==i32 || jt==i64;
+}
+
+/**
  *@brief Tests whether specified #jtype represents floating point value.
  */
 inline bool is_f( jtype jt )

@@ -38,7 +38,7 @@ void Opnd::assignRegName(RegName r)
     assert(r!=RegName_Null);
     memOpndKind=MemOpndKind_Null;
     regName=r;
-    constraints[ConstraintKind_Location]=Constraint(r);
+    constraints[ConstraintKind_Location]=Constraint(r,constraints[ConstraintKind_Calculated].getExt());
     checkConstraints();
 }
 
@@ -49,7 +49,9 @@ void Opnd::assignImmValue(int64 v)
     if (constraints[ConstraintKind_Location].getKind() != OpndKind_Imm)
         runtimeInfo=NULL;
     immValue=v;
-    constraints[ConstraintKind_Location]=Constraint(OpndKind_Imm, constraints[ConstraintKind_Initial].getSize());
+    constraints[ConstraintKind_Location]=Constraint(OpndKind_Imm,
+                                                    constraints[ConstraintKind_Initial].getSize(),
+                                                    constraints[ConstraintKind_Initial].getExt());
     checkConstraints();
 }
 
@@ -59,7 +61,9 @@ void Opnd::assignMemLocation(MemOpndKind k, Opnd * _base, Opnd * _index, Opnd * 
     assert(_base||_index||_displacement);
     assert(!_scale||_index);
 
-    constraints[ConstraintKind_Location]=Constraint(OpndKind_Mem, constraints[ConstraintKind_Initial].getSize());
+    constraints[ConstraintKind_Location]=Constraint(OpndKind_Mem,
+                                                    constraints[ConstraintKind_Initial].getSize(),
+                                                    constraints[ConstraintKind_Initial].getExt());
     memOpndKind=k;
 
     checkConstraints();
@@ -291,7 +295,7 @@ Constraint Inst::getConstraint(U_32 idx, U_32 memOpndMask, OpndSize size) const
             }
         }
             if (removeMemory) 
-                c = Constraint((OpndKind)(c.getKind() &~ OpndKind_Mem), c.getSize(), c.getMask());
+                c = Constraint((OpndKind)(c.getKind() &~ OpndKind_Mem), c.getSize(), c.getExt(), c.getMask());
         }
     }else{
         c = opnds[(idx - opndCount) / 4]->getMemOpndSubOpndConstraint((MemOpndSubOpndKind)((idx - opndCount) & 3));

@@ -180,8 +180,8 @@ static transfer_control_stub_type gen_transfer_control_stub()
     char* patch_offset = ((char *)ss) - 1; // Store location for jump patch
     *ss++ = (char)0x9C; // PUSHFD
     M_Base_Opnd m4(esp_reg, 0);
-    ss = alu(ss, and_opc, m4, Imm_Opnd(FLG_CLEAR_MASK));
-    ss = alu(ss, and_opc, ecx_opnd, Imm_Opnd(FLG_SET_MASK));
+    ss = alu(ss, and_opc, m4, Imm_Opnd(size_32,FLG_CLEAR_MASK));
+    ss = alu(ss, and_opc, ecx_opnd, Imm_Opnd(size_32,FLG_SET_MASK));
     ss = alu(ss, or_opc, m4, ecx_opnd);
     *ss++ = (char)0x9D; // POPFD
     // Patch conditional jump

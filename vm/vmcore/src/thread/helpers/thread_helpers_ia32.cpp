@@ -124,7 +124,7 @@ char* gen_monitorenter_fast_path_helper(char *ss, const R_Opnd & input_param1) {
 
 #ifdef LOCK_RESERVATION
 	ss = mov(ss, eax_opnd, M_Base_Opnd(ecx_reg, 1), size_8);            //  mov al, byte[ecx+1]
-    ss = test(ss,  eax_opnd,  Imm_Opnd(size_8, 0x4), size_8);           //  test al,0x4
+    ss = test(ss,  eax_opnd,  Imm_Opnd(size_8, 0x4, false), size_8);    //  test al,0x4
     ss = branch8(ss, Condition_NZ,  Imm_Opnd(size_8, 0));               //  jnz finish
     char *finish = ((char *)ss) - 1;
 

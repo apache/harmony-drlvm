@@ -99,16 +99,16 @@ Constraint Encoder::getAllRegs(OpndKind regKind)
     switch(regKind) {
     case OpndKind_GPReg:
         return Constraint(OpndKind_GPReg, 
-                          Constraint::getDefaultSize(OpndKind_GPReg), 0xff);
+                          Constraint::getDefaultSize(OpndKind_GPReg), OpndExt_None, 0xff);
     case OpndKind_XMMReg:
         return Constraint(OpndKind_XMMReg,
-                          Constraint::getDefaultSize(OpndKind_XMMReg), 0xff);
+                          Constraint::getDefaultSize(OpndKind_XMMReg), OpndExt_None, 0xff);
     case OpndKind_FPReg:
         return Constraint(OpndKind_FPReg,
-                          Constraint::getDefaultSize(OpndKind_FPReg), 0x1);
+                          Constraint::getDefaultSize(OpndKind_FPReg), OpndExt_None, 0x1);
     case OpndKind_StatusReg:
         return Constraint(OpndKind_StatusReg,
-                        Constraint::getDefaultSize(OpndKind_StatusReg), 0x1);
+                        Constraint::getDefaultSize(OpndKind_StatusReg), OpndExt_None, 0x1);
     default: 
         break;
     }
@@ -127,14 +127,6 @@ U_32 Encoder::getMnemonicProperties(const MnemonicDesc& mdesc)
             (mdesc.flags & MF_SAME_ARG_NO_USE? Inst::Properties_PureDef: 0);
 ;
 };
-
-//_________________________________________________________________________________________________
-bool Encoder::matches(Constraint co, Constraint ci, U_32 opndRoles,
-                      bool allowAliases)
-{
-    return co.isNull() || !(ci&co).isNull() || 
-        (allowAliases && !(ci.getAliasConstraint(co.getSize())&co).isNull());
-}
 
 //_________________________________________________________________________________________________
 const Encoder::OpcodeGroup * 
@@ -177,17 +169,36 @@ bool Encoder::matches(const OpcodeGroup* og, const FindInfo& fi,
         }
     }
     for (U_32 i = 0, n = fi.opndCount; i < n; i++) {
-        U_32 idx = fi.isExtended ? og->extendedToNativeMap[i] : i;
-        Constraint co=fi.opndConstraints[idx];
-        if (any) {
-            co = Constraint(OpndKind_Any, co.getSize());
-        }
+        Constraint co = fi.opndConstraints[i];
         if (!isOpndAllowed(og, i, co, fi.isExtended, any))
             return false;
     }
     return true;
 }
 
+//_________________________________________________________________________________________________
+bool Encoder::matches(Constraint co, Constraint ci)
+{
+    Constraint cc = ci&co;   
+    return  co.isNull() || ( !cc.isNull() && EncoderBase::extAllowed(co.getExt(),ci.getExt()) );
+}
+
+Constraint
+Encoder::expandImmediate(Constraint co) {
+    assert(co.getKind() == OpndKind_Imm);
+    OpndSize newSize = OpndSize_Null; 
+    switch (co.getSize()) {
+    case OpndSize_8:
+        newSize = OpndSize_16;
+        break;
+    case OpndSize_16:
+        newSize = OpndSize_32;
+        break;
+    default:;
+    }
+    return newSize == OpndSize_Null ? Constraint() :
+        Constraint((OpndKind)co.getKind(), newSize, co.getExt(), co.getMask());
+}
 //_________________________________________________________________________________________________
 bool 
 Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, bool isExtended, bool any)
@@ -197,10 +208,22 @@ Encoder::isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, b
 
         Constraint ci=og->opndConstraints[idx];
 
-        if (!matches(co, ci, Encoder::getOpndRoles(og->opndRoles,idx), any && (!(Encoder::getOpndRoles(og->opndRoles,idx)&Inst::OpndRole_Def) || getBaseConditionMnemonic(og->mnemonic) == Mnemonic_SETcc))) {
-            return false;
+        assert(!ci.isNull());
+        
+        // Strict matching
+        if (matches(co, ci)) {
+            return true;
         }
-        return true;
+        
+        // Try to match with extended immediate.
+        if (any && co.getKind() == OpndKind_Imm) {
+            while (!(co = expandImmediate(co)).isNull()) {
+                if (matches(co, ci)) {
+                    return true;
+                }
+            }
+        }
+        return false;
 }
 
 //_________________________________________________________________________________________________
@@ -219,11 +242,12 @@ U_8* Encoder::emit(U_8* stream, const Inst * inst)
         const Opnd * p = opnds[idx];
         Constraint c = p->getConstraint(Opnd::ConstraintKind_Location);
 
+        OpndExt ext = p->getConstraint(Opnd::ConstraintKind_Calculated).getExt();
         OpndSize sz = inst->opcodeGroup->opndConstraints[args.count()].getSize();
     
         switch( c.getKind() ) {
         case OpndKind_Imm:
-            args.add(EncoderBase::Operand(sz, p->getImmValue()));
+            args.add(EncoderBase::Operand(sz, p->getImmValue(), ext));
             break;
         case OpndKind_Mem:
             {
@@ -262,7 +286,8 @@ U_8* Encoder::emit(U_8* stream, const Inst * inst)
                     baseReg,
                     indexReg,
                     NULL == pscale ? 0 : (unsigned char)pscale->getImmValue(),
-                    disp);
+                    disp,
+                    ext);
                 args.add( o );
                 // Emit prefix here - so it relates to the real instruction
                 // emitted alter, rather that to the hidden MOV inserted above
@@ -280,7 +305,7 @@ U_8* Encoder::emit(U_8* stream, const Inst * inst)
             // with different size
             RegName reg = Constraint::getAliasRegName(opndReg, sz);
             assert(reg != RegName_Null);
-            args.add(EncoderBase::Operand(reg));
+            args.add(EncoderBase::Operand(reg,ext));
             }
             break;
         }
@@ -329,8 +354,8 @@ bool canBeIncluded(const Encoder::OpcodeGroup& og, Encoder::OpcodeDescription& o
         if(!((Constraint)og.opndConstraints[j]).canBeMergedWith(od.opndConstraints[j]))
             return false;
 
-        Constraint ogConstr = ((Constraint)og.opndConstraints[j]).intersectWith(Constraint((OpndKind)(OpndKind_Reg|OpndKind_Imm),OpndSize_Any,0xFFFF));
-        Constraint odConstr = ((Constraint)od.opndConstraints[j]).intersectWith(Constraint((OpndKind)(OpndKind_Reg|OpndKind_Imm),OpndSize_Any,0xFFFF));
+        Constraint ogConstr = ((Constraint)og.opndConstraints[j]).intersectWith(Constraint((OpndKind)(OpndKind_Reg|OpndKind_Imm), OpndSize_Any, OpndExt_Any, 0xFFFF));
+        Constraint odConstr = ((Constraint)od.opndConstraints[j]).intersectWith(Constraint((OpndKind)(OpndKind_Reg|OpndKind_Imm), OpndSize_Any, OpndExt_Any, 0xFFFF));
 
         Constraint::CompareResult compareResult = ogConstr.compare(odConstr);
 
@@ -419,12 +444,14 @@ void Encoder::initOD(OpcodeDescription& od, const OpcodeDesc * opcode)
     for (unsigned k=0; k<od.opndRoles.count; k++) {
         if (opcode->opnds[k].reg != RegName_Null) {
             // exact Register specified
-            od.opndConstraints[k] = Constraint(opcode->opnds[k].reg);
+            od.opndConstraints[k] = Constraint(opcode->opnds[k].reg, opcode->opnds[k].ext);
         }
         else {
-            od.opndConstraints[k] = Constraint(opcode->opnds[k].kind, 
-                opcode->opnds[k].size == OpndSize_Null ? 
-                                        OpndSize_Any : opcode->opnds[k].size);
+            od.opndConstraints[k] = Constraint(
+                opcode->opnds[k].kind, 
+                opcode->opnds[k].size == OpndSize_Null ? OpndSize_Any : opcode->opnds[k].size,
+                opcode->opnds[k].ext
+            );
         }
     }
 }

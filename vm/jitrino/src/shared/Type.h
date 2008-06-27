@@ -59,15 +59,15 @@ public:
         // (1) Value types
         // --------------------
         //   (1.1) Built-in value types
-        Tau,     // essentially a void type, used for 
+        Tau,    // essentially a void type, used for 
         Void,    
         Boolean,
-        Char,
-        IntPtr,  // ptr-sized integer
+        Char,   // unsigned 2-byte integer
+        IntPtr, // ptr-sized integer
         Int8,
         Int16,
-        Int32, // 4-byte integer
-        Int64, // 8-byte integer
+        Int32,  // 4-byte integer
+        Int64,  // 8-byte integer
         UIntPtr, // unsigned ptr-sized integer
         UInt8,
         UInt16,
@@ -383,7 +383,9 @@ public:
 #endif
     static bool isIntegerOf4Bytes(Tag tag) { return isIntegerOf4Signed(tag) || isIntegerOf4Unsigned(tag); }
     static bool isIntegerOf8Bytes(Tag tag) { return isIntegerOf8Signed(tag) || isIntegerOf8Unsigned(tag); }
-    
+
+    // checks if a constant fits into type
+    static bool constFits(int64 val, Tag tag);
 
 protected:
     virtual bool    _isFinalClass()    {return false;}
@@ -790,6 +792,18 @@ public:
 
     void setLazyResolutionMode(bool flag) {lazyResolutionMode = flag;}
     bool isLazyResolutionMode() const {return lazyResolutionMode;}
+
+    Type* getIntegerType(int size, bool isSigned) {
+        switch (size) {
+        case 1: return isSigned ? int8Type  : uint8Type;
+        case 2: return isSigned ? int16Type : uint16Type;
+        case 4: return isSigned ? int32Type : uint32Type;
+        case 8: return isSigned ? int64Type : uint64Type;
+        default: assert(0); return int32Type;
+        } 
+    }
+    Type* getSignedIntegerType(int size) { return getIntegerType(size, true); }
+    Type* getUnsignedIntegerType(int size) { return getIntegerType(size, false);}
 
 private:
     MemoryManager& memManager;

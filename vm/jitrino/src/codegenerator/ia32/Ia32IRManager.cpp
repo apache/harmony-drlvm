@@ -96,7 +96,7 @@ Opnd * IRManager::newOpnd(Type * type)
 //_____________________________________________________________________________________________
 Opnd * IRManager::newOpnd(Type * type, Constraint c)
 {
-    c.intersectWith(Constraint(OpndKind_Any, getTypeSize(type)));
+    c.intersectWith(Constraint(OpndKind_Any, getTypeSize(type), extByType(type->tag)));
     assert(!c.isNull());
     Opnd * opnd=new(memoryManager) Opnd(opndId++, type, c);
     addOpnd(opnd);
@@ -234,7 +234,7 @@ SwitchInst * IRManager::newSwitchInst(U_32 numTargets, Opnd * index)
 //_____________________________________________________________________________________________
 Opnd * IRManager::newRegOpnd(Type * type, RegName reg)
 {
-    Opnd * opnd = newOpnd(type, Constraint(getRegKind(reg)));
+    Opnd * opnd = newOpnd(type, Constraint(getRegKind(reg), OpndSize_Any, extByType(type->tag)));
     opnd->assignRegName(reg);
     return opnd;
 }
@@ -297,14 +297,16 @@ void IRManager::initInitialConstraints()
 //_____________________________________________________________________________________________
 Constraint IRManager::createInitialConstraint(Type::Tag t)const
 {
-    OpndSize sz=getTypeSize(t);
+    OpndSize sz = getTypeSize(t);
+    OpndExt ext = extByType(t); 
+    
     if (t==Type::Single||t==Type::Double||t==Type::Float)
-        return Constraint(OpndKind_XMMReg, sz)|Constraint(OpndKind_Mem, sz);
+        return Constraint(OpndKind_XMMReg, sz, ext)|Constraint(OpndKind_Mem, sz, ext);
     if (sz<=Constraint::getDefaultSize(OpndKind_GPReg))
-        return Constraint(OpndKind_GPReg, sz)|Constraint(OpndKind_Mem, sz)|Constraint(OpndKind_Imm, sz);
+        return Constraint(OpndKind_GPReg, sz, ext)|Constraint(OpndKind_Mem, sz, ext)|Constraint(OpndKind_Imm, sz, ext);
     if (sz==OpndSize_64)
-        return Constraint(OpndKind_Mem, sz)|Constraint(OpndKind_Imm, sz); // imm before lowering
-    return Constraint(OpndKind_Memory, sz);
+        return Constraint(OpndKind_Mem, sz, ext)|Constraint(OpndKind_Imm, sz, ext); // imm before lowering
+    return Constraint(OpndKind_Memory, sz, ext);
 }
 
 //_____________________________________________________________________________________________
@@ -1017,9 +1019,24 @@ Inst * IRManager::newMemMovSequence(Opnd * targetOpnd, Opnd * sourceOpnd, U_32 r
 
     assert(tmpRegName!=RegName_Null);
     Opnd * tmp=getRegOpnd(tmpRegName);
+
+    if(sourceOpnd->getSize() != targetOpnd->getSize()) {
+        assert(sourceOpnd->getSize() > targetOpnd->getSize());
+        tmpRegName = getAliasReg(tmpRegName,targetOpnd->getSize());
+        assert(tmpRegName!=RegName_Null);
+        Opnd* shortSrc = newMemOpnd(targetOpnd->getType(),
+                                    sourceOpnd->getMemOpndKind(),
+                                    sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base),
+                                    sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Index),
+                                    sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale),
+                                    sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement),
+                                    sourceOpnd->getSegReg());
+        appendToInstList(instList, newCopyPseudoInst(Mnemonic_MOV, shortSrc, sourceOpnd));
+        sourceOpnd = shortSrc;
+    }
+
     Opnd * tmpAdjusted=newRegOpnd(targetOpnd->getType(), tmpRegName);
     Opnd * tmpRegStackOpnd = newMemOpnd(tmp->getType(), MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0); 
-
 
     if (unusedTmpRegName==RegName_Null)
         appendToInstList(instList, newInst(Mnemonic_MOV, tmpRegStackOpnd, tmp));
@@ -1050,21 +1067,23 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 r
     }
 
     OpndSize sourceSize=sourceConstraint.getSize();
+    OpndSize targetSize=targetConstraint.getSize();
     U_32 sourceByteSize=getByteSize(sourceSize);
-    OpndKind targetKind=(OpndKind)targetConstraint.getKind();
-    OpndKind sourceKind=(OpndKind)sourceConstraint.getKind();
 
 #if defined(_DEBUG) || !defined(_EM64T_)
-    OpndSize targetSize=targetConstraint.getSize();
     assert(targetSize<=sourceSize); // only same size or truncating conversions are allowed
 #endif
 
-    if (targetKind&OpndKind_Reg) {
-        if(sourceOpnd->isPlacedIn(OpndKind_Imm) && sourceOpnd->getImmValue()==0 && targetKind==OpndKind_GPReg && 
-            !sourceOpnd->getRuntimeInfo() && !(getRegMask(RegName_EFLAGS)&flagsRegUsageMask)) {
-            return newInst(Mnemonic_XOR,targetOpnd, targetOpnd);
+    if (targetOpnd->isPlacedIn(OpndKind_Reg)) {
+        if(sourceOpnd->isPlacedIn(OpndKind_Imm)
+            && sourceOpnd->getImmValue()==0
+            && targetOpnd->isPlacedIn(OpndKind_GPReg)
+            && !sourceOpnd->getRuntimeInfo()
+            && !(getRegMask(RegName_EFLAGS)&flagsRegUsageMask)) {
+                return newInst(Mnemonic_XOR,targetOpnd, targetOpnd);
         }
-        else if (targetKind==OpndKind_XMMReg && sourceOpnd->getMemOpndKind()==MemOpndKind_ConstantArea) {
+        else if (targetOpnd->isPlacedIn(OpndKind_XMMReg)
+            && sourceOpnd->getMemOpndKind()==MemOpndKind_ConstantArea) {
 #ifdef _EM64T_
             Opnd * addr = NULL;
             Opnd * base = sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base);
@@ -1105,10 +1124,10 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 r
         }
     }
 
-    if ( (targetKind==OpndKind_GPReg||targetKind==OpndKind_Mem) && 
-         (sourceKind==OpndKind_GPReg||sourceKind==OpndKind_Mem||sourceKind==OpndKind_Imm)
+    if ( targetOpnd->isPlacedIn(OpndKind_GPReg_Mem) && 
+         (sourceOpnd->isPlacedIn(OpndKind_GPReg_Mem) || sourceOpnd->isPlacedIn(OpndKind_Imm))
     ){
-        if (sourceKind==OpndKind_Mem && targetKind==OpndKind_Mem){
+        if (sourceOpnd->isPlacedIn(OpndKind_Mem) && targetOpnd->isPlacedIn(OpndKind_Mem)){
             Inst * instList=NULL;
 #ifndef _EM64T_
             U_32 targetByteSize=getByteSize(targetSize);
@@ -1136,47 +1155,88 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 r
             return instList;
         }else{
 #ifdef _EM64T_
-            if((targetOpnd->getMemOpndKind() == MemOpndKind_StackAutoLayout) && (sourceKind==OpndKind_Imm) && (sourceOpnd->getSize() == OpndSize_64)) 
+            if((targetOpnd->getMemOpndKind() == MemOpndKind_StackAutoLayout)
+                && (sourceOpnd->isPlacedIn(OpndKind_Imm)) && (sourceOpnd->getSize() == OpndSize_64)) 
                 return newMemMovSequence(targetOpnd, sourceOpnd, regUsageMask, false);
             else 
 #else
             assert(sourceByteSize<=4);
 #endif
-                return newInst(Mnemonic_MOV, targetOpnd, sourceOpnd); // must satisfy constraints
+            if (sourceSize != targetSize) {
+                if (sourceOpnd->isPlacedIn(OpndKind_Imm)) {
+                    sourceOpnd = newImmOpnd(targetOpnd->getType(),sourceOpnd->getImmValue());
+                } else if (sourceOpnd->isPlacedIn(OpndKind_Reg)) {
+                    if (/*sourceSize == OpndSize_32 && */sourceOpnd->getType()->isInteger() 
+                        //&& targetOpnd->getType()->isInteger()
+#ifdef _EM64T_
+                        || sourceSize == OpndSize_64 
+                        && sourceOpnd->getType()->isObject() 
+                        && targetOpnd->getType()->isCompressedReference() 
+                        //TODO verify if types match exactly?
+#endif
+                        ) {
+                        RegName regName = getAliasReg(sourceOpnd->getRegName(), targetSize);
+                        assert(regName != RegName_Null);
+                        Opnd* reg = newOpnd(typeManager.getSignedIntegerType(getByteSize(targetSize)), Constraint(regName));
+                        reg->assignRegName(regName);
+                        Inst * instList=NULL;
+                        appendToInstList(instList, newCopyPseudoInst(Mnemonic_MOV, reg, sourceOpnd));
+                        appendToInstList(instList, newInst(Mnemonic_MOV, targetOpnd, reg));
+                        return instList;
+                    } else {
+                        assert(0);
+                        return NULL;
+                    }
+                } else if (sourceOpnd->isPlacedIn(OpndKind_Mem)) {
+                    assert(sourceOpnd->getType()->isInteger() && targetOpnd->getType()->isInteger());
+                    assert(targetOpnd->isPlacedIn(OpndKind_GPReg));
+                    Opnd* shortSrc = newMemOpnd(targetOpnd->getType(),
+                                                sourceOpnd->getMemOpndKind(),
+                                                sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Base),
+                                                sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Index),
+                                                sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Scale),
+                                                sourceOpnd->getMemOpndSubOpnd(MemOpndSubOpndKind_Displacement),
+                                                sourceOpnd->getSegReg());
+                    Inst * instList=NULL;
+                    appendToInstList(instList, newCopyPseudoInst(Mnemonic_MOV, shortSrc, sourceOpnd));
+                    appendToInstList(instList, newInst(Mnemonic_MOV, targetOpnd, shortSrc));
+                    return instList;
+                }
+            }
+            assert(targetOpnd->getSize() == sourceOpnd->getSize());
+            return newInst(Mnemonic_MOV, targetOpnd, sourceOpnd); // must satisfy constraints
         }
-    }else if ( 
-        (targetKind==OpndKind_XMMReg||targetKind==OpndKind_Mem) && 
-        (sourceKind==OpndKind_XMMReg||sourceKind==OpndKind_Mem)
-    ){
+    }else if (targetOpnd->isPlacedIn(OpndKind_XMMReg_Mem)
+            && sourceOpnd->isPlacedIn(OpndKind_XMMReg_Mem)){
         targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         if (sourceByteSize==4){
             return newInst(Mnemonic_MOVSS,targetOpnd, sourceOpnd);
         }else if (sourceByteSize==8){
-            bool regsOnly = targetKind==OpndKind_XMMReg && sourceKind==OpndKind_XMMReg;
+            bool regsOnly = targetOpnd->isPlacedIn(OpndKind_XMMReg) && sourceOpnd->isPlacedIn(OpndKind_XMMReg);
             if (regsOnly && CPUID::isSSE2Supported()) {
                 return newInst(Mnemonic_MOVAPD, targetOpnd, sourceOpnd);
             } else  {
                 return newInst(Mnemonic_MOVSD, targetOpnd, sourceOpnd);
             }
         }
-    }else if (targetKind==OpndKind_FPReg && sourceKind==OpndKind_Mem){
+    }else if (targetOpnd->isPlacedIn(OpndKind_FPReg) && sourceOpnd->isPlacedIn(OpndKind_Mem)){
         sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_FLD, targetOpnd, sourceOpnd);
-    }else if (targetKind==OpndKind_Mem && sourceKind==OpndKind_FPReg){
+    }else if (targetOpnd->isPlacedIn(OpndKind_Mem) && sourceOpnd->isPlacedIn(OpndKind_FPReg)){
         targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_FSTP, targetOpnd, sourceOpnd);
-    }else if (targetKind==OpndKind_XMMReg && (sourceKind==OpndKind_Mem || sourceKind==OpndKind_GPReg)){
-        if (sourceKind==OpndKind_Mem)
+    }else if (targetOpnd->isPlacedIn(OpndKind_XMMReg) && sourceOpnd->isPlacedIn(OpndKind_GPReg_Mem)){
+        if (sourceOpnd->isPlacedIn(OpndKind_Mem))
             sourceOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_MOVD, targetOpnd, sourceOpnd);
-    }else if ((targetKind==OpndKind_Mem || targetKind==OpndKind_GPReg) && sourceKind==OpndKind_XMMReg){
-        if (targetKind==OpndKind_Mem)
+    }else if (targetOpnd->isPlacedIn(OpndKind_GPReg_Mem) && sourceOpnd->isPlacedIn(OpndKind_XMMReg)){
+        if (targetOpnd->isPlacedIn(OpndKind_Mem))
             targetOpnd->setMemOpndAlignment(Opnd::MemOpndAlignment_16);
         return newInst(Mnemonic_MOVD, targetOpnd, sourceOpnd);
     }else if (
-        (targetKind==OpndKind_FPReg && sourceKind==OpndKind_XMMReg)||
-        (targetKind==OpndKind_XMMReg && sourceKind==OpndKind_FPReg)
+        (targetOpnd->isPlacedIn(OpndKind_FPReg) && sourceOpnd->isPlacedIn(OpndKind_XMMReg))
+        || (targetOpnd->isPlacedIn(OpndKind_XMMReg) && sourceOpnd->isPlacedIn(OpndKind_FPReg))
     ){
         Inst * instList=NULL;
         Opnd * tmp = newMemOpnd(targetOpnd->getType(), MemOpndKind_StackAutoLayout, getRegOpnd(STACK_REG), 0);
@@ -1195,35 +1255,34 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 r
 
 Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, U_32 regUsageMask)
 {
-    assert(opnd!=NULL);
+    assert(opnd != NULL);
 
-    Constraint constraint = opnd->getConstraint(Opnd::ConstraintKind_Location);
-    if (constraint.isNull())
+    if (opnd->isPlacedIn(OpndKind_Null))
         return newCopyPseudoInst(mn, opnd);
 
-    OpndKind kind=(OpndKind)constraint.getKind();
-    OpndSize size=constraint.getSize();
+    OpndSize size = opnd->getConstraint(Opnd::ConstraintKind_Location).getSize();
 
-    Inst * instList=NULL;
+    Inst * instList = NULL;
 
 #ifdef _EM64T_
-    if ( ((kind==OpndKind_GPReg ||kind==OpndKind_Mem)&& size!=OpndSize_32)||(kind==OpndKind_Imm && size<OpndSize_32)){
+    if ( (opnd->isPlacedIn(OpndKind_GPReg_Mem) && size != OpndSize_32)
+        ||(opnd->isPlacedIn(OpndKind_Imm) && size < OpndSize_32)){
             return newInst(mn, opnd);
 #else
-    if ( kind==OpndKind_GPReg||kind==OpndKind_Mem||kind==OpndKind_Imm ){
-        if (size==OpndSize_32){
+    if (opnd->isPlacedIn(OpndKind_GPReg_Mem) || opnd->isPlacedIn(OpndKind_Imm)){
+        if (size == OpndSize_32){
             return newInst(mn, opnd);
-        }else if (size<OpndSize_32){ 
-        }else if (size==OpndSize_64){
+        }else if (size < OpndSize_32){ 
+        }else if (size == OpndSize_64){
             if (mn==Mnemonic_PUSH){
-                Opnd * opndLo=newOpnd(typeManager.getUInt32Type());
+                Opnd * opndLo = newOpnd(typeManager.getUInt32Type());
                 appendToInstList(instList, newAliasPseudoInst(opndLo, opnd, 0)); 
-                Opnd * opndHi=newOpnd(typeManager.getIntPtrType());
+                Opnd * opndHi = newOpnd(typeManager.getIntPtrType());
                 appendToInstList(instList, newAliasPseudoInst(opndHi, opnd, 4)); 
                 appendToInstList(instList, newInst(Mnemonic_PUSH, opndHi));
                 appendToInstList(instList, newInst(Mnemonic_PUSH, opndLo));
             }else{
-                Opnd * opnds[2]={ newOpnd(typeManager.getUInt32Type()), newOpnd(typeManager.getInt32Type()) };
+                Opnd * opnds[2] = { newOpnd(typeManager.getUInt32Type()), newOpnd(typeManager.getInt32Type()) };
                 appendToInstList(instList, newInst(Mnemonic_POP, opnds[0])); 
                 appendToInstList(instList, newInst(Mnemonic_POP, opnds[1]));
                 appendToInstList(instList, newAliasPseudoInst(opnd, 2, opnds));
@@ -1232,20 +1291,20 @@ Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, U_32 regUsageMask
         }
 #endif
     }
-    Opnd * espOpnd=getRegOpnd(STACK_REG);
-    Opnd * tmp=newMemOpnd(opnd->getType(), MemOpndKind_StackManualLayout, espOpnd, 0); 
+    Opnd * espOpnd = getRegOpnd(STACK_REG);
+    Opnd * tmp = newMemOpnd(opnd->getType(), MemOpndKind_StackManualLayout, espOpnd, 0); 
 #ifdef _EM64T_
-    Opnd * sizeOpnd=newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT));
-    if(kind==OpndKind_Imm) {
-        assert(mn==Mnemonic_PUSH);
+    Opnd * sizeOpnd = newImmOpnd(typeManager.getInt32Type(), sizeof(POINTER_SIZE_INT));
+    if(opnd->isPlacedIn(OpndKind_Imm)) {
+        assert(mn == Mnemonic_PUSH);
         appendToInstList(instList, newInst(Mnemonic_SUB, espOpnd, sizeOpnd));
         appendToInstList(instList, newMemMovSequence(tmp, opnd, regUsageMask));
-    } else if (kind == OpndKind_GPReg){
-        assert(mn==Mnemonic_PUSH);
+    } else if (opnd->isPlacedIn(OpndKind_GPReg)){
+        assert(mn == Mnemonic_PUSH);
         appendToInstList(instList, newInst(Mnemonic_SUB, espOpnd, sizeOpnd));
         appendToInstList(instList, newInst(Mnemonic_MOV, tmp, opnd));
     } else {
-        if (mn==Mnemonic_PUSH){
+        if (mn == Mnemonic_PUSH){
             appendToInstList(instList, newInst(Mnemonic_SUB, espOpnd, sizeOpnd));
             appendToInstList(instList, newCopySequence(tmp, opnd, regUsageMask));
         }else{
@@ -1254,11 +1313,11 @@ Inst * IRManager::newPushPopSequence(Mnemonic mn, Opnd * opnd, U_32 regUsageMask
         }
     }
 #else
-    U_32 cb=getByteSize(size);
-    U_32 slotSize=4; 
-    cb=(cb+slotSize-1)&~(slotSize-1);
-    Opnd * sizeOpnd=newImmOpnd(typeManager.getInt32Type(), cb);
-    if (mn==Mnemonic_PUSH){
+    U_32 cb = getByteSize(size);
+    U_32 slotSize = 4; 
+    cb = (cb+slotSize-1)&~(slotSize-1);
+    Opnd * sizeOpnd = newImmOpnd(typeManager.getInt32Type(), cb);
+    if (mn == Mnemonic_PUSH){
         appendToInstList(instList, newInst(Mnemonic_SUB, espOpnd, sizeOpnd));
         appendToInstList(instList, newCopySequence(tmp, opnd, regUsageMask));
     }else{
@@ -1324,8 +1383,9 @@ void IRManager::calculateTotalRegUsage(OpndKind regKind) {
     U_32 opndCount=getOpndCount();
     for (U_32 i=0; i<opndCount; i++){
         Opnd * opnd=getOpnd(i);
-        if (opnd->isPlacedIn(regKind))
+        if (opnd->isPlacedIn(regKind)) {
             gpTotalRegUsage |= getRegMask(opnd->getRegName());
+        }
     }
 }
 //_________________________________________________________________________________________________
@@ -1361,6 +1421,7 @@ Type * IRManager::getTypeFromTag(Type::Tag tag)const
         case Type::Int64:   
         case Type::UInt8:   
         case Type::UInt16:  
+        case Type::Char:  
         case Type::UInt32:  
         case Type::UInt64:  
         case Type::Single:  
@@ -1906,9 +1967,9 @@ void IRManager::expandSystemExceptions(U_32 reservedForFlags)
                     Node* dispatchNode= dispatchEdge->getTargetNode();
                     if ((dispatchNode!=fg->getUnwindNode()) ||(checkOpnds[opnd] == (POINTER_SIZE_INT)-1
 #ifdef _EM64T_
-                            ||!Type::isCompressedReference(opnd->getType()->tag)
+                          ||!Type::isCompressedReference(opnd->getType()->tag)
 #endif
-                            )){
+                       )){
                         Node* throwBasicBlock = fg->createBlockNode();
                         ObjectType* excType = compilationInterface.findClassUsingBootstrapClassloader(NULL_POINTER_EXCEPTION);
                         assert(lastInst->getBCOffset()!=ILLEGAL_BC_MAPPING_VALUE);

@@ -60,7 +60,7 @@ inline bool fit32(int64 val) {
     return (INT_MIN <= val) && (val <= INT_MAX);
 }
 
-inline static void add_r(EncoderBase::Operands & args, const R_Opnd & r, Opnd_Size sz) {
+inline static void add_r(EncoderBase::Operands & args, const R_Opnd & r, Opnd_Size sz, OpndExt ext = OpndExt_None) {
     RegName reg = map_reg(r.reg_no());
     if (sz != n_size) {
         OpndSize size = map_size(sz);
@@ -68,18 +68,18 @@ inline static void add_r(EncoderBase::Operands & args, const R_Opnd & r, Opnd_Si
             reg = getAliasReg(reg, size);
         }
     }
-    args.add(EncoderBase::Operand(reg));
+    args.add(EncoderBase::Operand(reg, ext));
 }
 
-inline static void add_m(EncoderBase::Operands & args, const M_Opnd & m, Opnd_Size sz) {
+inline static void add_m(EncoderBase::Operands & args, const M_Opnd & m, Opnd_Size sz, OpndExt ext = OpndExt_None) {
         assert(n_size != sz);
         args.add(EncoderBase::Operand(map_size(sz),
             map_reg(m.base().reg_no()), map_reg(m.index().reg_no()),
-            (unsigned)m.scale().get_value(), (int)m.disp().get_value()));
+            (unsigned)m.scale().get_value(), (int)m.disp().get_value(), ext));
 }
 
-inline static void add_rm(EncoderBase::Operands & args, const RM_Opnd & rm, Opnd_Size sz) {
-    rm.is_reg() ? add_r(args, (R_Opnd &)rm, sz) : add_m(args, (M_Opnd &)rm, sz);
+inline static void add_rm(EncoderBase::Operands & args, const RM_Opnd & rm, Opnd_Size sz, OpndExt ext = OpndExt_None) {
+    rm.is_reg() ? add_r(args, (R_Opnd &)rm, sz, ext) : add_m(args, (M_Opnd &)rm, sz, ext);
 }
 
 inline static void add_xmm(EncoderBase::Operands & args, const XMM_Opnd & xmm, bool dbl) {
@@ -98,7 +98,8 @@ inline static void add_fp(EncoderBase::Operands & args, unsigned i, bool dbl) {
 
 inline static void add_imm(EncoderBase::Operands & args, const Imm_Opnd & imm) {
     assert(n_size != imm.get_size());
-    args.add(EncoderBase::Operand(map_size(imm.get_size()), imm.get_value()));
+    args.add(EncoderBase::Operand(map_size(imm.get_size()), imm.get_value(),
+        imm.is_signed() ? OpndExt_Signed : OpndExt_Zero));
 }
 
 ENCODER_DECLARE_EXPORT char * prefix(char * stream, InstrPrefix p) {
@@ -209,7 +210,7 @@ ENCODER_DECLARE_EXPORT char * test(char * stream, const RM_Opnd & rm, const Imm_
     EncoderBase::Operands args;
     add_rm(args, rm, sz);
     assert(imm.get_size() <= sz);
-    args.add(EncoderBase::Operand(map_size(size_32), imm.get_value()));
+    add_imm(args, imm);
     return (char*)EncoderBase::encode(stream, Mnemonic_TEST, args);
 }
 
@@ -354,7 +355,7 @@ ENCODER_DECLARE_EXPORT char * movq(char * stream, const XMM_Opnd & xmm, const RM
 ENCODER_DECLARE_EXPORT char * movsx(char * stream, const R_Opnd & r, const RM_Opnd & rm, Opnd_Size sz) {
     EncoderBase::Operands args;
     add_r(args, r, n_size);
-    add_rm(args, rm, sz);
+    add_rm(args, rm, sz, OpndExt_Signed);
     return (char*)EncoderBase::encode(stream, Mnemonic_MOVSX, args);
 }
 
@@ -364,7 +365,7 @@ ENCODER_DECLARE_EXPORT char * movzx(char * stream, const R_Opnd & r, const RM_Op
     // movzx r64, r/m32 is not available on em64t
     // mov r32, r/m32 should zero out upper bytes
     assert(sz <= size_16);
-    add_rm(args, rm, sz);
+    add_rm(args, rm, sz, OpndExt_Zero);
     return (char*)EncoderBase::encode(stream, Mnemonic_MOVZX, args);
 }
 
@@ -736,7 +737,7 @@ ENCODER_DECLARE_EXPORT char * ret(char * stream, const Imm_Opnd & imm)
 ENCODER_DECLARE_EXPORT char * ret(char * stream, unsigned short pop)
 {
     // TheManual says it can only be imm16
-    EncoderBase::Operands args(EncoderBase::Operand(OpndSize_16, pop));
+    EncoderBase::Operands args(EncoderBase::Operand(OpndSize_16, pop, OpndExt_Zero));
     return (char*)EncoderBase::encode(stream, Mnemonic_RET, args);
 }
 

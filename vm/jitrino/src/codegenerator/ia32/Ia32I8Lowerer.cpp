@@ -1122,6 +1122,7 @@ void I8Lowerer::inlineDivRem64(bool wantReminder, Inst* inst)
     Opnd* temp_hi = irManager->newOpnd(int32type);
     Opnd* zero = irManager->newImmOpnd(int32type, 0);
     Opnd* one = irManager->newImmOpnd(int32type, 1);
+    Opnd* one8 = irManager->newImmOpnd(tm.getInt8Type(), 1);
     //
 
     newSubGFG();
@@ -1282,10 +1283,10 @@ void I8Lowerer::inlineDivRem64(bool wantReminder, Inst* inst)
                             // ^^^divisor now in edi:ebx and ecx:esi
 
                             // shift both divisor and dividend right on 1 bit
-    /* shr edx, 1       */  newInst(Mnemonic_SHR, edx, one);
-    /* rcr eax, 1       */  newInst(Mnemonic_RCR, eax, one);
-    /* ror edi, 1       */  newInst(Mnemonic_ROR, edi, one);
-    /* rcr ebx, 1       */  newInst(Mnemonic_RCR, ebx, one);
+    /* shr edx, 1       */  newInst(Mnemonic_SHR, edx, one8);
+    /* rcr eax, 1       */  newInst(Mnemonic_RCR, eax, one8);
+    /* ror edi, 1       */  newInst(Mnemonic_ROR, edi, one8);
+    /* rcr ebx, 1       */  newInst(Mnemonic_RCR, ebx, one8);
 
     //
     // FIXME: workarounding WebMaker problem, which does not like 
@@ -1313,14 +1314,18 @@ void I8Lowerer::inlineDivRem64(bool wantReminder, Inst* inst)
     /* shrd eax, edx, CL*/  newInst(Mnemonic_SHRD, eax, edx, ecx);
     /* shr  edx, CL   */    newInst(Mnemonic_SHR, edx, ecx);
 #else
-    Opnd* trueECX = irManager->getRegOpnd(RegName_ECX);
+//    Opnd* trueECX = irManager->getRegOpnd(RegName_ECX);
+    Opnd* trueECX   = irManager->newOpnd(tm.getInt32Type()/*, Constraint(RegName_ECX)*/);
     newInst(Mnemonic_MOV, trueECX, ecx);
+//    Opnd* ecxCL   = irManager->getRegOpnd(RegName_CL);
+    Opnd* ecxCL   = irManager->newOpnd(tm.getInt8Type(), Constraint(RegName_CL));
+    newInst(Mnemonic_MOV, ecxCL, trueECX);
     //~FIXME
-    /* shrd ebx, edi, CL*/  newInst(Mnemonic_SHRD, ebx, edi, trueECX);
-    /* shrd eax, edx, CL*/  newInst(Mnemonic_SHRD, eax, edx, trueECX);
-    /* shr  edx, CL   */    newInst(Mnemonic_SHR, edx, trueECX);
+    /* shrd ebx, edi, CL*/  newInst(Mnemonic_SHRD, ebx, edi, ecxCL);
+    /* shrd eax, edx, CL*/  newInst(Mnemonic_SHRD, eax, edx, ecxCL);
+    /* shr  edx, CL   */    newInst(Mnemonic_SHR, edx, ecxCL);
 #endif
-    /* rol  edi, 1    */    newInst(Mnemonic_ROL, edi, one);
+    /* rol  edi, 1    */    newInst(Mnemonic_ROL, edi, one8);
                             // get quotient
     /* div    ebx     */    newInst(Mnemonic_DIV, 2, edx, eax, edx, eax, ebx, NULL);
     /* mov ebx, temp_lo*/   newInst(Mnemonic_MOV, ebx, temp_lo);

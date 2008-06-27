@@ -1015,7 +1015,7 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         return false;
 
     Constraint cx = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
+    Constraint cr((OpndKind)cx.getKind(), c.getSize(), c.getExt(), cx.getMask());
 
 //  handle first instruction of the interval
 
@@ -1120,7 +1120,7 @@ bool SpillGen::tryEvict (Opline& opline, Constraint c)
         return false;
 
     Constraint cx = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
+    Constraint cr((OpndKind)cx.getKind(), c.getSize(), c.getExt(), cx.getMask());
 
     Instx* begx = opline.instx;
     Instx* endx = begx;
@@ -1168,7 +1168,7 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
         return false;
 
     Constraint ca = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)ca.getKind(), c.getSize(), ca.getMask());
+    Constraint cr((OpndKind)ca.getKind(), c.getSize(), c.getExt(), ca.getMask());
 
     Inst* inst = opline.instx->inst;
 

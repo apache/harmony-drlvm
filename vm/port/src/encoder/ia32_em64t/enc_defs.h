@@ -104,7 +104,7 @@ enum OpndKind {
     OpndKind_MaxRegKind     = OpndKind_StatusReg,   // a max existing kind of register
     OpndKind_MaxReg,                                // -'- + 1 to be used in array defs
     //
-    OpndKind_Immediate      = 0x20, OpndKind_Imm=OpndKind_Immediate,
+    OpndKind_Imm            = 0x20,
     OpndKind_Memory         = 0x40, OpndKind_Mem=OpndKind_Memory,
     //
     OpndKind_Reg            = 0x1F,
@@ -137,8 +137,21 @@ enum OpndSize {
     OpndSize_128           = 0x20,
 #endif
     OpndSize_Max,
-    OpndSize_Any            = 0xFF,
+    OpndSize_Any            = 0x3F,
     OpndSize_Default        = OpndSize_Any
+};
+
+/**
+ * Defines type of extention allowed for particular operand.
+ * For example imul r32,r_m32,imm8 sign extend imm8 before performing multiplication.
+ * To satisfy instruction constraints immediate operand should be either OpndExt_Signed
+ * or OpndExt_Any.
+ */     
+enum OpndExt {
+    OpndExt_None    = 0x0,
+    OpndExt_Signed  = 0x1,
+    OpndExt_Zero    = 0x2,
+    OpndExt_Any     = 0x3,
 };
 
 /** 

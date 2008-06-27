@@ -638,32 +638,41 @@ char * EncoderBase::prefix(char* stream, InstPrefix pref)
 /**
  *
  */
-static bool try_match(const EncoderBase::OpcodeDesc& odesc, 
-                      const EncoderBase::Operands& opnds, bool strict) {
+bool EncoderBase::extAllowed(OpndExt opndExt, OpndExt instExt) {
+    if (instExt == opndExt || instExt == OpndExt_Any || opndExt == OpndExt_Any) {
+            return true;
+    }
+//asm("int3");
+assert(0);
+    return false;
+}
+
+/**
+ *
+ */
+static bool match(const EncoderBase::OpcodeDesc& odesc, 
+                      const EncoderBase::Operands& opnds) {
                       
     assert(odesc.roles.count == opnds.count());
     
-    for(unsigned j=0; j<odesc.roles.count; j++) {
-        // - the location must match exactly
-        if ((odesc.opnds[j].kind & opnds[j].kind()) != opnds[j].kind()) {
+    for(unsigned j = 0; j < odesc.roles.count; j++) {
+        const EncoderBase::OpndDesc& desc = odesc.opnds[j];
+        const EncoderBase::Operand& op = opnds[j];  
+        // location must match exactly
+        if ((desc.kind & op.kind()) != op.kind()) {
+//assert(0);
             return false;
         }
-        if (strict) {
-            // the size must match exactly
-            if (odesc.opnds[j].size != opnds[j].size()) {
-                return false;
-            }
+        // size must match exactly
+        if (desc.size != op.size()) {
+//assert(0);
+            return false;
         }
-        else {
-            // must match only for def operands, and dont care about use ones
-            // situations like 'mov r8, imm32/mov r32, imm8' so the 
-            // destination operand defines the overall size
-            if (EncoderBase::getOpndRoles(odesc.roles, j) & OpndRole_Def) {
-                if (odesc.opnds[j].size != opnds[j].size()) {
-                    return false;
-                }
-            }
+        // extentions should be consistent
+        if (!EncoderBase::extAllowed(op.ext(), desc.ext)) {
+            return false;
         }
+        
     }
     return true;
 }
@@ -717,9 +726,7 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
     if (opcodeIndex == NOHASH) {
         // fast-path did no work. try to lookup sequentially
         const OpcodeDesc * odesc = opcodes[mn];
-        int idx = -1;
-        bool found = false;
-        for (idx=0; !odesc[idx].last; idx++) {
+        for (int idx = 0; !odesc[idx].last; idx++) {
             const OpcodeDesc& opcode = odesc[idx];
             if (opcode.platf == OpcodeInfo::decoder) {
                 continue;
@@ -727,28 +734,11 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
             if (opcode.roles.count != opnds.count()) {
                 continue;
             }
-            if (try_match(opcode, opnds, true)) {
-                found = true;
+            if (match(opcode, opnds)) {
+                opcodeIndex = idx;
                 break;
             }
         }
-        if (!found) {
-            for (idx=0; !odesc[idx].last; idx++) {
-                const OpcodeDesc& opcode = odesc[idx];
-                if (opcode.platf == OpcodeInfo::decoder) {
-                    continue;
-                }
-                if (opcode.roles.count != opnds.count()) {
-                    continue;
-                }
-                if (try_match(opcode, opnds, false)) {
-                    found = true;
-                    break;
-                }
-            }
-        }
-        assert(found);
-        opcodeIndex = idx;
 #ifdef ENCODER_USE_SUBHASH
         put(mn, hash, opcodeIndex);
 #endif
@@ -758,6 +748,7 @@ EncoderBase::lookup(Mnemonic mn, const Operands& opnds)
     assert(!odesc->last);
     assert(odesc->roles.count == opnds.count());
     assert(odesc->platf != OpcodeInfo::decoder);
+    assert(match(*odesc, opnds));
 #if !defined(_EM64T_)
     // tuning was done for IA32 only, so no size restriction on EM64T
     //assert(sizeof(OpcodeDesc)==128);

@@ -193,7 +193,7 @@ enum InstrPrefix {
 class Opnd {
 
 protected:
-    enum Tag { Imm, Reg, Mem, FP, XMM };
+    enum Tag { SignedImm, UnsignedImm, Reg, Mem, FP, XMM };
 
     const Tag  tag;
 
@@ -229,18 +229,28 @@ protected:
     Opnd_Size           size;
 
 public:
-    Imm_Opnd(I_32 val): Opnd(Imm), value(val), size(size_32) {
-        if (CHAR_MIN <= val && val <= CHAR_MAX) {
-            size = size_8;
-        }
-        else if (SHRT_MIN <= val && val <= SHRT_MAX) {
-            size = size_16;
+    Imm_Opnd(I_32 val, bool isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(size_32) {
+        if (isSigned) {
+            if (CHAR_MIN <= val && val <= CHAR_MAX) {
+                size = size_8;
+            } else if (SHRT_MIN <= val && val <= SHRT_MAX) {
+                size = size_16;
+            }
+        } else {
+            assert(val >= 0);
+            if (val <= UCHAR_MAX) {
+                size = size_8;
+            } else if (val <= USHRT_MAX) {
+                size = size_16;
+            }
         }
     }
-    Imm_Opnd(const Imm_Opnd& that): Opnd(Imm), value(that.value), size(that.size) {};
+    Imm_Opnd(const Imm_Opnd& that): Opnd(that.tag), value(that.value), size(that.size) {};
 
 #ifdef _EM64T_
-    Imm_Opnd(Opnd_Size sz, int64 val): Opnd(Imm), value(val), size(sz) {
+    Imm_Opnd(Opnd_Size sz, int64 val, bool isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(sz) {
 #ifndef NDEBUG
         switch (size) {
         case size_8:
@@ -265,7 +275,8 @@ public:
 
 #else
 
-    Imm_Opnd(Opnd_Size sz, I_32 val): Opnd(Imm), value(val), size(sz) {
+    Imm_Opnd(Opnd_Size sz, I_32 val, int isSigned = true):
+        Opnd(isSigned ? SignedImm : UnsignedImm), value(val), size(sz) {
 #ifndef NDEBUG
         switch (size) {
         case size_8:
@@ -287,13 +298,14 @@ public:
     I_32 get_value() const { return value; }
 
 #endif
-    Opnd_Size get_size(void) const { return size; }
+    Opnd_Size get_size() const { return size; }
+    bool      is_signed() const { return tag == SignedImm; }
 };
 
 class RM_Opnd: public Opnd {
 
 public:
-    bool is_reg() const { return tag != Imm && tag != Mem; }
+    bool is_reg() const { return tag != SignedImm && tag != UnsignedImm && tag != Mem; }
 
 protected:
     RM_Opnd(Tag t): Opnd(t) {}

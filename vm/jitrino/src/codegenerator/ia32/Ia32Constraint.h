@@ -72,7 +72,7 @@ public:
     For OpndKind_Reg and sub-kinds initializes the mask field to 0xffff
     */
     Constraint(OpndKind k)
-        :mask(OpndKind_Reg&k?0xffff:0), size(OpndSize_Any), kind(k)
+        :mask(OpndKind_Reg&k?0xffff:0), size(OpndSize_Any), ext(OpndExt_Any), kind(k)
     { assert(k!=OpndKind_Null); }
 
     /** Creates a constraint of the specified OpndKind k and OpndSize s
@@ -82,17 +82,27 @@ public:
     If k contains OpndKind_Reg the constructor initializes the mask field to 0xffff
     */
     Constraint(OpndKind k, OpndSize s)
-        :mask(OpndKind_Reg&k?0xffff:0), size(s), kind(k)
+        :mask(OpndKind_Reg&k?0xffff:0), size(s), ext(OpndExt_Any), kind(k)
     { assert(k!=OpndKind_Null && size!=OpndSize_Null); }
 
-    /** Creates a constraint of the specified OpndKind, OpndSize, and register mask m
+    /** Creates a constraint of the specified OpndKind k, OpndSize s and OpndExt e
+
+    Both k and s cannot be _Null.
+
+    If k contains OpndKind_Reg the constructor initializes the mask field to 0xffff
+    */
+    Constraint(OpndKind k, OpndSize s, OpndExt e)
+        :mask(OpndKind_Reg&k?0xffff:0), size(s), ext(e), kind(k)
+    { assert(k!=OpndKind_Null && size!=OpndSize_Null); }
+
+    /** Creates a constraint of the specified OpndKind, OpndSize, OpndExt and register mask m
 
     Both k and s cannot be _Null, and k must contain be OpndKind_Reg if mask is not null
 
     For OpndKind_Reg and sub-kinds initializes the mask field to 0xffff
     */
-    Constraint(OpndKind k, OpndSize s, U_32 m)
-        :mask(m), size(s), kind(k)
+    Constraint(OpndKind k, OpndSize s, OpndExt e, U_32 m)
+        :mask(m), size(s), ext(e), kind(k)
     {   assert(k!=OpndKind_Null && size!=OpndSize_Null); assert(mask==0||(OpndKind_Reg&k)!=0);  }
 
     /** Creates a constraint corresponding to the specified physical register RegName
@@ -103,8 +113,8 @@ public:
 
     The mask field of the constraint is initialized to the mask corresponding to the specified register
     */
-    Constraint(RegName reg)
-        :mask(getRegMask(reg)), size(getRegSize(reg)), kind(getRegKind(reg)) {}
+    Constraint(RegName reg, OpndExt e = OpndExt_Any)
+        :mask(getRegMask(reg)), size(getRegSize(reg)), ext(e), kind(getRegKind(reg)) {}
 
     
     Constraint(const char * str){ fullValue = 0; str=parse(str); assert(str!=NULL); }
@@ -119,6 +129,12 @@ public:
     /** returns the mask field of the constraint */
     U_32 getMask()const{ return mask; }
 
+    /** returns the ext field of the constraint */
+    OpndExt getExt()const {return (OpndExt)ext; }
+    
+    /** sets the ext field of the constraint */
+    void setExt(U_32 e){ext=e; }
+    
     /** sets the mask field of the constraint */
     void setMask(U_32 m){ mask=m; }
 
@@ -217,7 +233,8 @@ private:
     union{
         struct {
             U_32  mask:16;
-            U_32  size:8;
+            U_32  size:6;
+            U_32  ext:2;
             U_32  kind:8;
         };
         U_32  fullValue;

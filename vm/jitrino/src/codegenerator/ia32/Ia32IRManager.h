@@ -344,6 +344,15 @@ public:
         }
     }
 
+    static OpndExt extByType(Type::Tag t) {
+        if( t == Type::Char || t == Type::Boolean || Type::isUnsignedInteger(t) ) {
+            return OpndExt_Zero; 
+        } else if( Type::isSignedInteger(t) ) {
+            return OpndExt_Signed; 
+        }
+        return OpndExt_Any;
+    }
+
     //-----------------------------------------------------------------------------------------------
     bool isOnlyPrologSuccessor(Node * bb) ;
 

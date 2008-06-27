@@ -900,7 +900,7 @@ static R_Opnd* move_location_to_a_register(char** buf, LcgIa32Context* c, LcgIa3
     case LOLT_Immed: {
         R_Opnd* tmp = get_temp_register(c, *temp_reg);
         ++*temp_reg;
-        *buf = mov(*buf, *tmp, Imm_Opnd(loc->u.v));
+        *buf = mov(*buf, *tmp, Imm_Opnd(size_32, loc->u.v));
         return tmp;}
     default: DIE(("Unknown type")); for(;;);
     }
@@ -922,9 +922,9 @@ static void move_location_to_register(char** buf, R_Opnd* reg1, R_Opnd* reg2, Lc
         }
         break;}
     case LOLT_Immed: {
-        *buf = mov(*buf, *reg1, Imm_Opnd(loc->u.v));
+        *buf = mov(*buf, *reg1, Imm_Opnd(size_32, loc->u.v));
         if (two) {
-            *buf = mov(*buf, *reg2, Imm_Opnd(0));
+            *buf = mov(*buf, *reg2, Imm_Opnd(size_32,0));
         }
         break;}
     case LOLT_Tofs:{
@@ -1053,9 +1053,9 @@ public:
             case LO_Mov:
                 // Treat immed->stack specially, the others are done by the movs o1->r->dst
                 if (ii->loc1.t==LOLT_Stack && ii->loc2.t==LOLT_Immed) {
-                    *buf = mov(*buf, M_Base_Opnd(esp_reg, ii->loc1.u.v), Imm_Opnd(ii->loc2.u.v));
+                    *buf = mov(*buf, M_Base_Opnd(esp_reg, ii->loc1.u.v), Imm_Opnd(size_32,ii->loc2.u.v));
                     if (type_in_two_regs(ii->t)) {
-                        *buf = mov(*buf, M_Base_Opnd(esp_reg, ii->loc1.u.v+4), Imm_Opnd(0));
+                        *buf = mov(*buf, M_Base_Opnd(esp_reg, ii->loc1.u.v+4), Imm_Opnd(size_32, 0));
                     }
                 }
                 break;
@@ -1197,7 +1197,7 @@ public:
     {
         *buf = addr_emit_moves(*buf, &ii->u.address);
         if (ii->loc3.t==LOLT_Immed) {
-            Imm_Opnd imm(ii->loc3.u.v);
+            Imm_Opnd imm(type_to_opnd_size(t),ii->loc3.u.v);
             *buf = mov(*buf, *(ii->u.address.addr), imm, type_to_opnd_size(t));
         } else {
             R_Opnd* r = move_location_to_a_register(buf, &ctxt, &ii->loc3, &ii->temp_register);
@@ -1219,7 +1219,7 @@ public:
         move_location_to_register(buf, &eax_opnd, NULL, &ii->loc3, t);
         *buf = prefix(*buf, lock_prefix);
         *buf = cmpxchg(*buf, *(ii->u.address.addr), *r, type_to_opnd_size(t));       
-        *buf = branch32(*buf, Condition_NZ, Imm_Opnd(-4));
+        *buf = branch32(*buf, Condition_NZ, Imm_Opnd(size_32,-4));
         la_tab.add_patch_to_label(l, *buf-4, LPT_Rel32);
     }
 

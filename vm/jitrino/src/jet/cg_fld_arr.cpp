@@ -386,7 +386,7 @@ void CodeGen::do_field_op(const FieldOpInfo& fieldOp)
             // store the resulting I_32
             Opnd where32(i32, where.base(), where.disp(), 
                           where.index(), where.scale());
-            mov(where32, Opnd(jobj, tmp)); //s0.as_opnd(i32));
+            mov(where32, Opnd(i32, tmp)); //s0.as_opnd(i32));
         }
         runlock(s0);
     }

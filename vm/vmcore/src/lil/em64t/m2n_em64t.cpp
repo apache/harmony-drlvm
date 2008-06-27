@@ -301,12 +301,12 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
         Imm_Opnd(size_32, 0), size_64);
     // store current_frame_type
     bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
-    assert(fit32(current_frame_type));
+    assert(fit32(current_frame_type)); //FIXME31
     buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n_top),
         Imm_Opnd(size_32, current_frame_type), size_64);
     // store a method associated with the current m2n frame
     bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
-    if (fit32((int64)method)) {
+    if (fit32((int64)method)) { //FIXME31
         buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n_top),
             Imm_Opnd(size_32, (int64)method), size_64);
     } else {
@@ -316,7 +316,7 @@ char * m2n_gen_push_m2n(char * buf, Method_Handle method,
     // store local object handles
     bytes_to_m2n_top -= LcgEM64TContext::GR_SIZE;
     buf = mov(buf, M_Base_Opnd(rsp_reg, bytes_to_m2n_top),
-        Imm_Opnd(size_64, (int64)0), size_64);
+        Imm_Opnd(size_32, (int64)0), size_64);
 
     // move pointer to the current VM_Thread structure to rax
     buf = m2n_gen_ts_to_register(buf, &rax_opnd,

@@ -279,8 +279,7 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_Convert_F2I_D2I(Inst* inst)
     // 2. Assigned to FPU - convert to FPU operations, to 
     //    avoid long FPU->mem->XMM chain
     // 3. Assigned to XMM - see #1
-    const bool xmm_way = 
-        !(src->hasAssignedPhysicalLocation() && src->isPlacedIn(OpndKind_FPReg));
+    const bool xmm_way = src->canBePlacedIn(OpndKind_XMMReg);
 
     if (!xmm_way) {
         //TODO: will add FPU later if measurements show it worths trying
@@ -509,8 +508,9 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
                 nextmovopnd2 = next->getOpnd(nextmovuses.begin());
             }
             if (movopnd1->getId() == nextmovopnd2->getId() && 
-                !isMem(movopnd2) && !isMem(nextmovopnd1) &&
-                !isMem(movopnd1)
+                !isMem(movopnd2) && !isMem(nextmovopnd1) && !isMem(movopnd1) &&
+                movopnd1->getSize() == movopnd2->getSize() &&
+                nextmovopnd1->getSize() == nextmovopnd2->getSize()
                 )
             {
                 BitSet ls(irManager->getMemoryManager(), irManager->getOpndCount());
@@ -522,7 +522,16 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
                 bool dstNotUsed = !ls.getBit(movopnd1->getId());
                 if (dstNotUsed)
                 {
-                    irManager->newInst(Mnemonic_MOV, nextmovopnd1, movopnd2)->insertAfter(inst);
+                    Inst* merged;
+                    // peephole pass can be used in various positions in pipeline
+                    // thus avoid inserting pseudo instructions in late stages
+                    // still try to be useful in early stages
+                    if (inst->hasKind(Inst::Kind_PseudoInst) && next->hasKind(Inst::Kind_PseudoInst)) {
+                        merged = irManager->newCopyPseudoInst(Mnemonic_MOV, nextmovopnd1, movopnd2);
+                    } else {
+                        merged = irManager->newInst(Mnemonic_MOV, nextmovopnd1, movopnd2);
+                    }
+                    merged->insertAfter(inst);
                     inst->unlink();
                     next->unlink();
                     return Changed_Node;
@@ -667,8 +676,9 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MUL(Inst* inst) {
             if (minBit == maxBit) {
                 assert(minBit>=2);
                 if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2^"<<minBit<<std::endl;
-                Type* int32Type = irManager->getTypeManager().getUInt32Type();
-                irManager->newInstEx(Mnemonic_SHL, 1, dst, src1, irManager->newImmOpnd(int32Type, minBit))->insertAfter(inst);
+                Type* immType = irManager->getTypeManager().getUInt8Type();
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src1)->insertBefore(inst);
+                irManager->newInst(Mnemonic_SHL, dst, irManager->newImmOpnd(immType, minBit))->insertBefore(inst);
                 inst->unlink();
                 return Changed_Inst;
             }
