@@ -943,6 +943,9 @@ size_t SpillGen::pass1 ()
             {
                 Constraint c(opline.opnd->getConstraint(Opnd::ConstraintKind_Initial));
                 update(opline.instx->inst, opline.opnd, c);
+                // sign extension mode is irrelevant to reg allocation but may affect calculations 
+                // so reset it to match any
+                c.setExt(OpndExt_Any);
                 opline.idx = registers.getIndex(c);
 
                 if (!tryRegister(opline, c, prefreg))
