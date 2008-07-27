@@ -153,8 +153,8 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   assert(!((POINTER_SIZE_INT)nos_boundary % SPACE_ALLOC_UNIT));
   nos_base = vm_reserve_mem(nos_boundary, nos_reserve_size);
   if( nos_base != nos_boundary ){
-    DIE2("gc.base","Warning: Static NOS mapping: Can't reserve memory at address"<<nos_boundary<<" for size "<<nos_reserve_size<<" for NOS.");
-    DIE2("gc.base","Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.");
+    LDIE(82, "gc.base: Warning: Static NOS mapping: Can't reserve memory at address {0} for size {1} for NOS."<< nos_boundary << nos_reserve_size);
+    LDIE(83, "gc.base: Please not use static NOS mapping by undefining STATIC_NOS_MAPPING, or adjusting NOS_BOUNDARY value.");
     exit(0);
   }
   reserved_end = (void*)((POINTER_SIZE_INT)nos_base + nos_reserve_size);
@@ -165,7 +165,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
   while( !reserved_base || reserved_base >= nos_base){
     los_mos_base = (void*)((POINTER_SIZE_INT)los_mos_base - SPACE_ALLOC_UNIT);
     if(los_mos_base < RESERVE_BOTTOM){
-      DIE2("gc.base","Static NOS mapping: Can't reserve memory at address"<<reserved_base<<" for specified size "<<los_mos_size);
+      LDIE(84, "gc.base: Static NOS mapping: Can't reserve memory at address {0} for specified size {1}." <<reserved_base << los_mos_size);
       exit(0);      
     }
     reserved_base = vm_reserve_mem(los_mos_base, los_mos_reserve_size);
@@ -192,17 +192,17 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     if(large_page_hint){
       reserved_base = alloc_large_pages(max_heap_size, large_page_hint);
       if(reserved_base){
-        WARN(("GC use large pages."));
+        LWARN(46, "GC use large pages.");
       } else {
         free(large_page_hint);
         large_page_hint = NULL;
-        WARN(("GC use small pages."));
+        LWARN(47, "GC use small pages.");
       }
     }
   
   if(reserved_base == NULL){
     if(max_heap_size < min_heap_size){
-      DIE(("Max heap size is smaller than min heap size. Please choose other values."));
+      LDIE(79, "Max heap size is smaller than min heap size. Please choose other values.");
     }
 
     unsigned int max_size_reduced = 0;
@@ -216,7 +216,7 @@ void gc_gen_initialize(GC_Gen *gc_gen, POINTER_SIZE_INT min_heap_size, POINTER_S
     physical_start = reserved_base;
     
     if(max_size_reduced){
-      DIE(("Max heap size: can't be reserved. The max size can be reserved is %dMB", max_heap_size/MB));
+      LDIE(80, "Max heap size: can't be reserved. The max size can be reserved is {0}MB" << max_heap_size/MB);
       exit(0);
     }
     
@@ -486,7 +486,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
       GC_PROP |= ALGO_COPY_SEMISPACE;
     
     }else {
-      WARN(("GC algorithm setting incorrect. Will use default value.\n"));
+      LWARN(48, "GC algorithm setting incorrect. Will use default value.");
       use_default = TRUE;
     }
   }
@@ -509,7 +509,7 @@ GC* gc_gen_decide_collection_algo(char* minor_algo, char* major_algo, Boolean ha
       GC_PROP |= ALGO_MARKSWEEP;
     
     }else{
-     WARN(("GC algorithm setting incorrect. Will use default value.\n"));
+     LWARN(48, "GC algorithm setting incorrect. Will use default value.");
      use_default = TRUE; 
     }
   }
@@ -884,7 +884,7 @@ void gc_gen_reclaim_heap(GC_Gen *gc, int64 gc_start_time)
   }
   
   if( gc->collect_result == FALSE){
-    DIE(("Out of Memory while collecting!\n"));
+    LDIE(81, "Out of Memory while collecting!");
   }
   
   nos_reset_after_collection(nos);

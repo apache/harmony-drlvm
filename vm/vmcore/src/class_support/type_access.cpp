@@ -164,7 +164,7 @@ Class_Handle type_info_get_class_no_exn(Type_Info_Handle tih)
 
 Method_Signature_Handle type_info_get_method_sig(Type_Info_Handle UNREF tih)
 {
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
     return 0;
 } //type_info_get_method_sig
 
@@ -182,7 +182,7 @@ Type_Info_Handle type_info_get_type_info(Type_Info_Handle tih)
     case K_UnmanagedPointer:
         return td->get_pointed_to_type();
     default:
-        DIE(("Unexpected kind"));
+        LDIE(73, "Unexpected kind");
         return 0;
     }
 } //type_info_get_type_info
@@ -223,7 +223,7 @@ BOOLEAN type_info_is_resolved(Type_Info_Handle tih) {
     case K_Object:
         return td->is_loaded();
     default:
-        DIE(("Unexpected kind"));
+        LDIE(73, "Unexpected kind");
         return 0;
     }
 }

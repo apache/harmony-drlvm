@@ -50,7 +50,7 @@ void compile_flush_generated_code() {
 }
 
 void patch_code_with_threads_suspended(U_8* UNREF code_block, U_8* UNREF new_code, size_t UNREF size) {
-    DIE(("Not supported on EM64T currently"));
+    LDIE(47, "Not supported on EM64T currently");
 }
 
 void compile_protect_arguments(Method_Handle method, GcFrame * gc) {

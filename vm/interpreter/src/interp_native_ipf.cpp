@@ -38,13 +38,13 @@ uint64* interpreter_get_stacked_register_address(uint64* bsp, unsigned reg) {
             return (uint64*) &m2n->local_object_handles;
         case M2N_METHOD:
             INFO("get_stacked_register_address for method:");
-            DIE(("Unexpected register"));
+            LDIE(74, "Unexpected register");
         case M2N_FRAME_TYPE:
             return (uint64*) &m2n->current_frame_type;
             
         default:
             INFO("get_stacked_register_address: " << (int)reg);
-            DIE(("Unexpected register"));
+            LDIE(74, "Unexpected register");
     }
     return 0;
 }
@@ -153,7 +153,7 @@ interpreter_execute_native_method(
                 arg_words[argId++] = args[pos++].j;
                 break;
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(argId <= sz + 2);
@@ -232,7 +232,7 @@ interpreter_execute_native_method(
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
     TRACE("invokeJNI: done\n");
 
@@ -359,7 +359,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 pos-= 2;
                 break;
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(*mtype == ')');
@@ -510,7 +510,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
     TRACE("invokeJNI: done\n");
 
@@ -627,7 +627,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 pos-=2;
                 break;
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(*mtype == ')');
@@ -778,7 +778,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
     TRACE("invokeJNI: done\n");
 

@@ -1106,7 +1106,7 @@ private:
                 emitter.ipf_stf(float_mem_size_d, mem_st_spill, mem_none, tmp_addr1->addr, src->addr, current_predicate);
             }
             else {
-                DIE(("Unexpected kind"));  // src shouldn't be a GR!
+                LDIE(73, "Unexpected kind");  // src shouldn't be a GR!
             }
         }
         else if (dest->kind == LLK_Gr) {
@@ -1121,7 +1121,7 @@ private:
                 emitter.ipf_mov(dest->addr, src->addr, current_predicate);
             }
             else {
-                DIE(("Unexpected kind"));  // src->kind shouldn't be LLK_Fr or LLK_Stk16
+                LDIE(73, "Unexpected kind");  // src->kind shouldn't be LLK_Fr or LLK_Stk16
             }
         }
         else if (dest->kind == LLK_Fr)  {
@@ -1142,7 +1142,7 @@ private:
                 emitter.ipf_fmov(dest->addr, src->addr, current_predicate);
             }
             else {
-                DIE(("Unexpected kind"));  // src should not be GR!
+                LDIE(73, "Unexpected kind");  // src should not be GR!
             }
         }
         else {
@@ -1686,7 +1686,7 @@ public:
                 emitter.ipf_sxt(ext_size, dst_loc->addr, dst_loc->addr, current_predicate);
         }
         else {
-            DIE(("Unexpected kind"));  // dst_loc shouldn't be FR or STK16
+            LDIE(73, "Unexpected kind");  // dst_loc shouldn't be FR or STK16
         }
     }  // ld
 
@@ -1752,7 +1752,7 @@ public:
             emitter.ipf_st(size, st_flag, mem_none, addr_loc->addr, src_loc->addr, current_predicate);
         }
         else {
-            DIE(("Unexpected kind"));  // src_loc shouldn't be FR or STK16!
+            LDIE(73, "Unexpected kind");  // src_loc shouldn't be FR or STK16!
         }
     }  // st
 
@@ -1950,7 +1950,7 @@ public:
                     call_addr_gr = tmp_res->addr;
                 }
                 else {
-                    DIE(("Unexpected kind"));  // address can't be FP!
+                    LDIE(73, "Unexpected kind");  // address can't be FP!
                 }
                 emitter.ipf_mtbr(tmp_br, call_addr_gr);
                 emitter.ipf_bri(br_cond, br_many, br_sptk, br_none, tmp_br);
@@ -1998,7 +1998,7 @@ public:
                 call_addr_gr = tmp_res->addr;
             }
             else {
-                DIE(("Unexpected kind"));  // address can't be FP!
+                LDIE(73, "Unexpected kind");  // address can't be FP!
             }
             if (context.has_push_m2n()) {
                 emitter.ipf_mtbr(BRANCH_CALL_REG, call_addr_gr);

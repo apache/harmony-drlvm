@@ -589,8 +589,8 @@ void ClassLoader::StartUnloading()
             Class* c = it->second;
             if (*c->get_class_handle())
             {
-                DIE(("FAILED on unloading classloader: \n%p live j.l.Class of unloaded class is detected: %s",
-                    (void*)m_table[i], c->get_name()->bytes));
+                LDIE(72, "FAILED on unloading classloader: \n{0} live j.l.Class of unloaded class is detected: {1}" <<
+                    (void*)m_table[i] << c->get_name()->bytes);
             }
          }
 #endif

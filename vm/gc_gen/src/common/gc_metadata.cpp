@@ -127,7 +127,7 @@ Vector_Block* gc_metadata_extend(Pool* pool)
  
   unsigned int num_alloced = metadata->num_alloc_segs;
   if(num_alloced == GC_METADATA_SEGMENT_NUM){
-    DIE(("GC: Run out GC metadata, please give it more segments!"));
+    LDIE(78, "GC: Run out GC metadata, please give it more segments!");
   }
 
   unsigned int seg_size =  GC_METADATA_EXTEND_SIZE_BYTES + METADATA_BLOCK_SIZE_BYTES;

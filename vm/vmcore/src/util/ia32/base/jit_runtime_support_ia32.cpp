@@ -66,7 +66,7 @@ static void vm_throw_java_lang_ClassCastException()
     ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
     exn_throw_by_name("java/lang/ClassCastException");
-    DIE(("The last called function should not return"));
+    LDIE(49, "The last called function should not return");
 } //vm_throw_java_lang_ClassCastException
 
 #ifdef VM_STATS // exclude remark in release mode (defined but not used)
@@ -776,7 +776,7 @@ static void vm_throw_java_lang_IncompatibleClassChangeError()
 {
     ASSERT_THROW_AREA;
     exn_throw_by_name("java/lang/IncompatibleClassChangeError");
-    DIE(("The last called function should not return"));
+    LDIE(49, "The last called function should not return");
 } //vm_throw_java_lang_IncompatibleClassChangeError
 
 
@@ -850,7 +850,7 @@ static void vm_throw_java_lang_ArithmeticException()
     ASSERT_THROW_AREA;
     assert(!hythread_is_suspend_enabled());
     exn_throw_by_name("java/lang/ArithmeticException");
-    DIE(("The last called function should not return"));
+    LDIE(49, "The last called function should not return");
 } //vm_throw_java_lang_ArithmeticException
 
 
@@ -948,7 +948,7 @@ vm_throw_linking_exception(Class *clss,
 {
     TRACE("vm_throw_linking_exception, idx=" << cp_index << "\n");
     vm_rt_class_throw_linking_error(clss, cp_index, opcode);
-    DIE(("The last called function should not return"));
+    LDIE(49, "The last called function should not return");
 } //vm_throw_linking_exception
 
 
@@ -1058,7 +1058,7 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
     case VM_RT_GC_HEAP_WRITE_REF:
         return (void*)gc_heap_slot_write_ref;
     default:
-        DIE(("Unexpected helper id"));
+        LDIE(50, "Unexpected helper id {0}" << f);
         return 0;
     }
 } //vm_helper_get_addr

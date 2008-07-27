@@ -300,7 +300,7 @@ static void emit_convertToByteArray_override(Emitter_Handle eh, Method *method) 
 
 static unsigned default_override_size(Method *m)
 {
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
     return 0;
 }
 
@@ -415,7 +415,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
         case VM_DATA_TYPE_VALUE:
         {
             // 20030711: Must verify this with the calling convention
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
             // This should never cause loading
             Class_Handle c = type_info_get_class(tih);
             assert(c);
@@ -423,7 +423,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
             break;
         }
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
         }
     }
 }

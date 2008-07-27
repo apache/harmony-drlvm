@@ -38,7 +38,7 @@
 #include "jvmti_break_intf.h"
 #include "jni_utils.h"
 
-#define NOT_IMPLEMENTED assert(0); abort()
+#define NOT_IMPLEMENTED LDIE(51, "Not implemented")
 
 static inline short
 jvmti_GetHalfWordValue( const unsigned char *bytecode,

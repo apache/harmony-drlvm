@@ -39,7 +39,7 @@ class IPF_Encoder : public Merced_Encoder {
         // assure little-endian because get_slot01_code_image() needs it
     }
 
-    void code_emit() { DIE(("Not implemented")); }     // shouldn't be called
+    void code_emit() { LDIE(51, "Not implemented"); }     // shouldn't be called
 
     void get_slot01_code_image(uint64 *p_code_image1, uint64 *p_code_image2) {
         uint64& code_image1 = *p_code_image1;

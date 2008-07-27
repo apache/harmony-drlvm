@@ -173,7 +173,7 @@ is_vector_of_primitives(Class* p_class)
         return false;
     if(p_class->is_array())
         return true;
-    DIE(("Should never be called unless p_class is an array"));
+    LDIE(65, "Should never be called unless p_class is an array");
     return true;
 }
 
@@ -1396,7 +1396,7 @@ bool Class::prepare(Global_Env* env)
             break;
         default:
             m_vtable->array_element_shift = 65535;
-            DIE(("Unexpected array element size: %d", m_vtable->array_element_size));
+            LDIE(66, "Unexpected array element size: {0}" << m_vtable->array_element_size);
             break;
         }
     }
@@ -1422,7 +1422,7 @@ bool Class::prepare(Global_Env* env)
         if(m_alignment != GC_OBJECT_ALIGNMENT) { 
             // The GC will align on 4 byte boundaries by default on IA32....
 #ifdef POINTER64
-            DIE(("Alignment is supposed to be appropriate"));
+            LDIE(67, "Alignment is supposed to be appropriate");
 #endif
             // Make sure it is a legal mask.
             assert((m_alignment & CL_PROP_ALIGNMENT_MASK) <= CL_PROP_ALIGNMENT_MASK);

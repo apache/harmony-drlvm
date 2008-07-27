@@ -140,19 +140,19 @@ NativeCodePtr m2n_get_ip(M2nFrame* m2nf)
 void m2n_set_ip(M2nFrame* lm2nf, NativeCodePtr ip)
 {
     assert(lm2nf);
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
 }
 
 // sets pointer to the registers used for jvmti PopFrame
 void set_pop_frame_registers(M2nFrame* m2nf, Registers* regs) {
     // FIXME: not sure we want to support this function on IPF
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
 }
 
 // returns pointer to the registers used for jvmti PopFrame
 Registers* get_pop_frame_registers(M2nFrame* m2nf) {
     // FIXME: not sure we want to support this function on IPF
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
     return 0;
 }
 
@@ -466,27 +466,25 @@ uint64* m2n_get_arg_word(M2nFrame* m2nf, unsigned n)
 
 void m2n_push_suspended_frame(M2nFrame* m2nf, Registers* regs)
 {
-    abort(); // FIXME: check that it works
+    LDIE(86, "check that it works"); // FIXME: check that it works
     m2n_push_suspended_frame(p_TLS_vmthread, m2nf, regs);
 }
 
 void m2n_push_suspended_frame(VM_thread* thread, M2nFrame* m2nf, Registers* regs) 
 {
-    // FIXME: not implemented
-    assert(0);
-    abort();
+    LDIE(51, "Not implemented");
 }
 
 
 M2nFrame* m2n_push_suspended_frame(Registers* regs)
 {
-    abort(); // FIXME: check that it works
+    LDIE(86, "check that it works"); // FIXME: check that it works
     return m2n_push_suspended_frame(p_TLS_vmthread, regs);
 }
 
 M2nFrame* m2n_push_suspended_frame(VM_thread* thread, Registers* regs)
 {
-    abort(); // FIXME: check that it works
+    LDIE(86, "check that it works"); // FIXME: check that it works
     M2nFrame* m2nf = (M2nFrame*)STD_MALLOC(sizeof(M2nFrame));
     assert(m2nf);
     m2n_push_suspended_frame(thread, m2nf, regs);
@@ -494,9 +492,7 @@ M2nFrame* m2n_push_suspended_frame(VM_thread* thread, Registers* regs)
 }
 
 bool m2n_is_suspended_frame(M2nFrame * m2nf) {
-    // FIXME: not implemented
-    assert(0);
-    abort();
+    LDIE(51, "Not implemented");
     return false;
 
 }

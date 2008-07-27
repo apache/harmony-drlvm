@@ -1880,7 +1880,7 @@ class_alloc_new_object_and_run_constructor(Class* clss,
             }
             break;
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
             break;
         }
         iter = advance_arg_iterator(iter);

@@ -746,11 +746,11 @@ void Method::_set_nop()
             }
             break;
         default:
-            DIE(("Unexpected stack state"));
+            LDIE(57, "Unexpected stack state");
             return;
         }
     }
-    DIE(("Should not get here"));
+    LDIE(56, "should'nt get here");
 } //Method::_set_nop
 
 

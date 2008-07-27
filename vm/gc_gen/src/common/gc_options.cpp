@@ -84,7 +84,7 @@ static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
     GC_PROP |= ALGO_MS_NORMAL;
     gc = gc_ms_create();
   }else{
-    WARN(("\nGC algorithm setting incorrect. Will use default value.\n"));
+    LWARN(48, "GC algorithm setting incorrect. Will use default value.");
     GC_PROP |= ALGO_COMPACT_MOVE;
     gc = gc_mc_create();  
   }
@@ -96,7 +96,7 @@ static int vm_property_get_integer(const char *property_name)
 {
     assert(property_name);
     if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
-        DIE(("Property value %s is not set!", property_name));
+        LDIE(76, "Property value {0} is not set!" << property_name);
     }
 
     return vm_property_get_integer(property_name, 0, VM_PROPERTIES);
@@ -106,7 +106,7 @@ static BOOLEAN vm_property_get_boolean(const char *property_name)
 {
   assert(property_name);
   if (!vm_property_is_set(property_name, VM_PROPERTIES)){
-        DIE(("Property value %s is not set!", property_name));
+        LDIE(76, "Property value {0} is not set!" << property_name);
   }
 
   return vm_property_get_boolean(property_name, FALSE, VM_PROPERTIES);
@@ -116,7 +116,7 @@ static size_t vm_property_get_size(const char* property_name)
 {
     assert(property_name);
     if(!vm_property_is_set(property_name, VM_PROPERTIES)) {
-        DIE(("Property value %s is not set!", property_name));
+        LDIE(76, "Property value {0} is not set!" << property_name);
     }
 
     return vm_property_get_size(property_name, 0, VM_PROPERTIES);
@@ -157,7 +157,7 @@ GC* gc_parse_options()
 
   if(unique_algo){
     if(minor_algo || major_algo){
-      WARN(("Generational options cannot be set with unique_algo, ignored."));
+      LWARN(60, "Generational options cannot be set with unique_algo, ignored.");
     }
     gc = gc_decide_collection_algo(unique_algo, has_los);
     vm_properties_destroy_value(unique_algo);  
@@ -201,11 +201,11 @@ GC* gc_parse_options()
 
     if (max_heap_size < min_heap_size){
       max_heap_size = min_heap_size;
-      WARN(("Max heap size you set is too small, reset to %dMB", max_heap_size/MB));
+      LWARN(61, "Max heap size you set is too small, reset to {0}MB" << max_heap_size/MB);
     }
     if (0 == max_heap_size){
       max_heap_size = HEAP_SIZE_DEFAULT;
-      WARN(("Max heap size you set equals to zero, reset to %dMB", max_heap_size/MB));
+      LWARN(62, "Max heap size you set equals to zero, reset to {0}MB" << max_heap_size/MB);
     }
  
     min_heap_size = max_heap_size / 10;
@@ -219,13 +219,13 @@ GC* gc_parse_options()
     min_heap_size = vm_property_get_size("gc.ms");
     if (min_heap_size < min_heap_size_bytes){
       min_heap_size = min_heap_size_bytes;
-      WARN(("Min heap size you set is too small, reset to %dMB", min_heap_size/MB));
+      LWARN(63, "Min heap size you set is too small, reset to {0}MB" << min_heap_size/MB);
     } 
   }
 
   if (min_heap_size > max_heap_size){
     max_heap_size = min_heap_size;
-    WARN(("Max heap size is too small, reset to %dMB", max_heap_size/MB));
+    LWARN(61, "Max heap size you set is too small, reset to {0}MB" << max_heap_size/MB);
   }
 
   min_heap_size_bytes = min_heap_size;
@@ -314,7 +314,7 @@ GC* gc_parse_options()
     Boolean use_all_concurrent_phase= vm_property_get_boolean("gc.concurrent_gc");
     if(use_all_concurrent_phase){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
-      DIE(( "Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+      LDIE(77, "Please define USE_UNIQUE_MARK_SWEEP_GC macro.");
 #endif
       gc_specify_con_enum();
       gc_specify_con_mark();
@@ -327,7 +327,7 @@ GC* gc_parse_options()
     Boolean USE_CONCURRENT_ENUMERATION = vm_property_get_boolean("gc.concurrent_enumeration");
     if(USE_CONCURRENT_ENUMERATION){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
-      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+      LDIE(77, "Please define USE_UNIQUE_MARK_SWEEP_GC macro.");
 #endif
       gc_specify_con_enum();
       gc->generate_barrier = TRUE;
@@ -338,7 +338,7 @@ GC* gc_parse_options()
     Boolean USE_CONCURRENT_MARK = vm_property_get_boolean("gc.concurrent_mark");
     if(USE_CONCURRENT_MARK){
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
-      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+      LDIE(77, "Please define USE_UNIQUE_MARK_SWEEP_GC macro.");
 #endif
       gc_specify_con_mark();
       gc->generate_barrier = TRUE;
@@ -352,7 +352,7 @@ GC* gc_parse_options()
       /*currently, concurrent sweeping only starts after concurrent marking.*/
       assert(gc_is_specify_con_mark());
 #ifndef USE_UNIQUE_MARK_SWEEP_GC
-      DIE(("Please define USE_UNIQUE_MARK_SWEEP_GC macro."));
+      LDIE(77, "Please define USE_UNIQUE_MARK_SWEEP_GC macro.");
 #endif
       gc_specify_con_sweep();
       IGNORE_FINREF = TRUE; /*TODO: finref is unsupported.*/
@@ -384,14 +384,14 @@ GC* gc_parse_options()
   if(vm_property_is_set("gc.prefetch_distance",VM_PROPERTIES)==1) {
     PREFETCH_DISTANCE = vm_property_get_size("gc.prefetch_distance");
     if(!PREFETCH_ENABLED) {
-      WARN(("Prefetch distance set with Prefetch disabled!"));
+      LWARN(64, "Prefetch distance set with Prefetch disabled!");
     }
   }
 
   if(vm_property_is_set("gc.prefetch_stride",VM_PROPERTIES)==1) {
     PREFETCH_STRIDE = vm_property_get_size("gc.prefetch_stride");
     if(!PREFETCH_ENABLED) {
-      WARN(("Prefetch stride set  with Prefetch disabled!"));
+      LWARN(65, "Prefetch stride set  with Prefetch disabled!");
     }  
   }
   

@@ -275,7 +275,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
                 argId -= 2;
                 break;
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(argId >= 0);
@@ -331,7 +331,7 @@ JIT_execute_method_default(JIT_Handle jit, jmethodID methodID, jvalue *return_va
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     if (exn_raised()) {

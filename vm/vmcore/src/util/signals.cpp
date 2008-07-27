@@ -215,8 +215,7 @@ Boolean native_breakpoint_handler(port_sigtype UNREF signum, Registers* regs, vo
 {
     TRACE2("signals", "Native breakpoint detected at " << regs->get_ip());
 #ifdef _IPF_
-    assert(0); // Not implemented
-    abort();
+    LDIE(51, "Not implemented");
 #endif
 
     if (VM_Global_State::loader_env == NULL || interpreter_enabled())
@@ -242,8 +241,7 @@ Boolean arithmetic_handler(port_sigtype UNREF signum, Registers* regs, void* fau
 {
     TRACE2("signals", "ArithmeticException detected at " << regs->get_ip());
 #ifdef _IPF_
-    assert(0); // Not implemented
-    abort();
+    LDIE(51, "Not implemented");
 #endif
 
     vm_thread_t vmthread = get_thread_ptr();

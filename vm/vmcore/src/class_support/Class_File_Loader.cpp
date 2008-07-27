@@ -352,7 +352,7 @@ parse_annotation_value(AnnotationValue& value, ByteReader& cfs, Class* clss)
                 value.const_value.string = cp.get_utf8_string(const_idx);
                 break;
             default:
-                DIE(("Annotation parsing internal error"));
+                LDIE(68, "Annotation parsing internal error");
             }
         }
         break;

@@ -331,7 +331,7 @@ static LilType type_info_to_lil_type(Type_Info_Handle tih, bool handles)
         // ? 20030613: I really don't want this code here, but for now...
         Class_Handle UNUSED ch = type_info_get_class(tih);
         assert(ch);
-        DIE(("Unexpected data type"));
+        LDIE(52, "Unexpected data type");
     }
     case VM_DATA_TYPE_MP:
     case VM_DATA_TYPE_UP:

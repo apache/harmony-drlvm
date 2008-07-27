@@ -26,7 +26,7 @@
 #include "jit_export_jpda.h"
 #include <apr_dso.h>
 #include <apr_strings.h>
-#include "clog.h"
+#include "cxxlog.h"
 #include "lock_manager.h"
 #include "jvmti_dasm.h"
 

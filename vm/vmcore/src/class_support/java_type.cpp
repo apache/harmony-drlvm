@@ -141,7 +141,7 @@ Class* TypeDesc::load_type_desc()
         return clss;
     default:
         // All other types are not Java types, so fail
-        DIE(("Unexpected kind"));
+        LDIE(73, "Unexpected kind");
         return NULL;
     }
 }

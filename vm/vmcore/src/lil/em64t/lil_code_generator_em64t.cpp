@@ -272,7 +272,7 @@ private:
     // returns the location of the n'th fp local
     const LcgEM64TLoc * get_fp_local(const unsigned n) const {
         // DO NOT SUPPORT FP LOCALS
-        DIE(("Not supported"));
+        LDIE(44, "Not supported");
         return NULL;
         /*
         assert(n < context.get_num_fr_locals());

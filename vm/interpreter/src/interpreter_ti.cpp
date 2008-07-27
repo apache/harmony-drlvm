@@ -598,7 +598,7 @@ jvalue new_field_value(Field *field, StackFrame& frame) {
         }
             break;
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
     }
     return val;
 }

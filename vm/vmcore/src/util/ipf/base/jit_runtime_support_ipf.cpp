@@ -1107,8 +1107,7 @@ static void gen_vm_rt_monitorenter_fast_path(Merced_Code_Emitter &emitter, bool 
     return; // ichebyki
 #if 1
     // FIXME: code outdated
-    assert(0);
-    abort();
+    LDIE(85, "Outdated Code");
 #else
     const int thread_stack_key_reg          = THREAD_ID_REG;
     const int object_stack_key_addr_reg     = SCRATCH_GENERAL_REG4;
@@ -1191,8 +1190,7 @@ static void gen_vm_rt_monitorexit_fast_path(Merced_Code_Emitter &emitter, bool c
 {
     return; // ichebyki
     // FIXME: code is outdated
-    assert(0);
-    abort();
+    LDIE(85, "Outdated Code");
 #if 0
     const int object_stack_key_addr_reg     = SCRATCH_GENERAL_REG3;
     const int object_lock_info_reg          = SCRATCH_GENERAL_REG4;

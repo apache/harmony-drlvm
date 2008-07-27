@@ -245,7 +245,7 @@ static void init_magic_helper_class(Class* magic_helper_class){
     class_initialize(magic_helper_class);
 
     if (exn_raised()){
-        DIE(("Exception raised while initializing helper class %s", magic_helper_class->get_name()->bytes));
+        LDIE(63, "Exception raised while initializing helper class {0}" << magic_helper_class->get_name()->bytes);
     }
     tmn_suspend_enable();
 }

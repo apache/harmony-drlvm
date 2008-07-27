@@ -326,7 +326,7 @@ void * vm_helper_get_addr(VM_RT_SUPPORT f) {
     case VM_RT_NEW_VECTOR_USING_VTABLE:
         return rth_get_lil_new_vector_using_vtable();
     default:
-        DIE(("Unexpected helper id %d", f));
+        LDIE(50, "Unexpected helper id {0}" << f);
         return NULL;
     }
 }

@@ -21,6 +21,7 @@
 #include "platform_lowlevel.h"
 #include "interpreter_exports.h"
 #include "jit_export.h"
+#include "cxxlog.h"
 
 typedef void *GC_Enumeration_Handle;
 
@@ -42,11 +43,11 @@ extern "C" {
     EXPORT extern void JIT_execute_method(JIT_Handle,jmethodID method, jvalue *return_value, jvalue *args);
 }
 
-EXPORT void JIT_unwind_stack_frame(JIT_Handle, Method_Handle, JitFrameContext *) { abort(); }
-EXPORT void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) { abort(); }
+EXPORT void JIT_unwind_stack_frame(JIT_Handle, Method_Handle, JitFrameContext *) { LDIE(51, "Not implemented"); }
+EXPORT void JIT_get_root_set_from_stack_frame(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) { LDIE(51, "Not implemented"); }
 EXPORT void JIT_get_root_set_for_thread_dump(JIT_Handle, Method_Handle, GC_Enumeration_Handle, JitFrameContext *) {return;}
-EXPORT void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *) { abort(); }
-EXPORT void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *) { abort(); return (void *)JIT_FAILURE;}
+EXPORT void JIT_fix_handler_context(JIT_Handle, Method_Handle, JitFrameContext *) { LDIE(51, "Not implemented"); }
+EXPORT void * JIT_get_address_of_this(JIT_Handle, Method_Handle, const JitFrameContext *) { LDIE(51, "Not implemented"); return (void *)JIT_FAILURE;}
 
 
 struct StackTraceFrame;

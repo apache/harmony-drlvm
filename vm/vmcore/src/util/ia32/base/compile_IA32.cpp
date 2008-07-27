@@ -141,7 +141,7 @@ void compile_protect_arguments(Method_Handle method, GcFrame* gc) {
 }
 
 void patch_code_with_threads_suspended(U_8* UNREF code_block, U_8* UNREF new_code, size_t UNREF size) {
-    DIE(("Not supported on IA32 currently"));
+    LDIE(46, "Not supported on IA32 currently");
 }
 
 // Convert a reference on the stack, if null, from a managed null

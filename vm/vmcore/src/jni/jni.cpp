@@ -617,7 +617,7 @@ static void JNICALL UnimpStub(JNIEnv* UNREF env)
 {
     // If we ever get here, we are in an implemented JNI function
     // By looking at the call stack and assembly it should be clear which one
-    DIE(("Not implemented"));
+    LDIE(51, "Not implemented");
 }
 
 

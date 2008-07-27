@@ -75,7 +75,7 @@ jthrowable exn_get()
     } else if (NULL != vm_thread->thread_exception.exc_class) {
         exc = exn_create((Exception*)&(vm_thread->thread_exception));
     } else {
-        DIE(("It's impossible internal error in exception handling."));
+        LDIE(59, "It's impossible internal error in exception handling.");
     }
     return exc;
 } // exn_get
@@ -100,7 +100,7 @@ Class* exn_get_class() {
     } else if (NULL != vm_thread->thread_exception.exc_class) {
         result = vm_thread->thread_exception.exc_class;
     } else {
-        DIE(("It's impossible internal error in exception handling."));
+        LDIE(59, "It's impossible internal error in exception handling.");
     }
     return result;
 }
@@ -387,7 +387,7 @@ void exn_rethrow()
 
         exn_throw_by_class_internal(exc_class, exc_message, exc_cause);
     } else {
-        DIE(("There is no exception."));
+        LDIE(60, "There is no exception.");
     }
 #endif
     DIE(("It's Unreachable place."));

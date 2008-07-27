@@ -171,7 +171,7 @@ interpreter_execute_native_method(
                 }
 
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
 //    assert(argId <= sz + 2);
@@ -243,7 +243,7 @@ interpreter_execute_native_method(
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     if (exn_raised()) {
@@ -401,7 +401,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
                 break;
 
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(*mtype == ')');
@@ -537,7 +537,7 @@ interpreterInvokeStaticNative(StackFrame& prevFrame, StackFrame& frame, Method *
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     if (method->is_synchronized()) {
@@ -679,7 +679,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
                 pos -= 2;
                 break;
             default:
-                DIE(("Unexpected java type"));
+                LDIE(53, "Unexpected java type");
         }
     }
     assert(*mtype == ')');
@@ -816,7 +816,7 @@ interpreterInvokeVirtualNative(StackFrame& prevFrame, StackFrame& frame, Method 
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     if (method->is_synchronized()) {

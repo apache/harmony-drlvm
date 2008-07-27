@@ -835,7 +835,7 @@ VMBreakPoints::process_native_breakpoint(Registers* regs)
     return; // We'll go to updated regs
 #else
     // PLATFORM dependent code
-    abort();
+    LDIE(45, "Not supported on this platform");
 #endif
 }
 

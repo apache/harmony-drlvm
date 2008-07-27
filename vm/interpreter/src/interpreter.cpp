@@ -1698,7 +1698,7 @@ Opcode_PUTSTATIC(StackFrame& frame) {
             }
 
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
     }
     frame.ip += 3;
 }
@@ -1779,7 +1779,7 @@ Opcode_GETSTATIC(StackFrame& frame) {
             }
 
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
     }
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
             << " (val = " << (int)frame.stack.pick().i << ")");
@@ -1896,7 +1896,7 @@ Opcode_PUTFIELD(StackFrame& frame) {
             }
 
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
     }
     frame.ip += 3;
 }
@@ -1977,7 +1977,7 @@ Opcode_GETFIELD(StackFrame& frame) {
             }
 
         default:
-            DIE(("Unexpected data type"));
+            LDIE(52, "Unexpected data type");
     }
     DEBUG_BYTECODE(field->get_name()->bytes << " " << field->get_descriptor()->bytes
             << " (val = " << (int)frame.stack.pick().i << ")");
@@ -2487,7 +2487,7 @@ method_exit_callback_with_frame(Method *method, StackFrame& frame) {
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     method_exit_callback(method, false, val);
@@ -3217,7 +3217,7 @@ interpreter_execute_method(
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
     setLastStackFrame(frame.prev);
     DEBUG_TRACE("interpreter_invoke }}}\n");
@@ -3305,7 +3305,7 @@ interpreterInvokeStatic(StackFrame& prevFrame, Method *method) {
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     setLastStackFrame(frame.prev);
@@ -3393,7 +3393,7 @@ interpreterInvoke(StackFrame& prevFrame, Method *method, int args, ManagedObject
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
 
     setLastStackFrame(frame.prev);
@@ -3582,7 +3582,7 @@ interpreterInvokeSpecial(StackFrame& prevFrame, Method *method) {
             break;
 
         default:
-            DIE(("Unexpected java type"));
+            LDIE(53, "Unexpected java type");
     }
     setLastStackFrame(frame.prev);
     DEBUG_TRACE("invoke_special }}}\n");

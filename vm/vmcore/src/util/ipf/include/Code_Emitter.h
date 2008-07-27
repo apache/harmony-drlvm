@@ -249,7 +249,7 @@ public:
 
     void ipf_nop (EM_Syllable_Type tv, unsigned imm21=0)
       { encoder->ipf_nop(tv, imm21);
-        DIE(("Not implemented"));  //ToDo: nop assumes several form depending on which slot
+        LDIE(51, "Not implemented");  //ToDo: nop assumes several form depending on which slot
     }
 
     void ipf_add (unsigned dest, unsigned src1, unsigned src2, unsigned pred=0)
@@ -1354,7 +1354,7 @@ protected:
 
 private:
 
-    void operator delete (void *) { DIE(("Not implemented")); }
+    void operator delete (void *) { LDIE(51, "Not implemented"); }
 
 
 protected: // data
@@ -1743,7 +1743,7 @@ public:
     }
 private: // functions
 
-    void operator delete (void *) { DIE(("Not implemented")); }
+    void operator delete (void *) { LDIE(51, "Not implemented"); }
 
     virtual void emit_bundle(Bundle_IR * bundle);
     virtual void place_instr_into_slot(Bundle_IR * bundle, int slot, Unsch_Instr_IR& instr, unsigned need_stop);
@@ -1889,7 +1889,7 @@ public:
 
 private:
 
-    void operator delete (void *) { DIE(("Not implemented")); }
+    void operator delete (void *) { LDIE(51, "Not implemented"); }
 
     // set whether instruction sets/resets reference
     void set_def_ref (bool def_ref) {

@@ -28,8 +28,7 @@
 
 void *dummy_tls_func()
 {
-    assert(0);
-    abort();
+    LDIE(56, "shouldn't get here");
 }
 
 

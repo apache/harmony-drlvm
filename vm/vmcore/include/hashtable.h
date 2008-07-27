@@ -23,7 +23,7 @@
 #define __HASHTABLE_H__
 
 #include <assert.h>
-#include "clog.h"
+#include "cxxlog.h"
 #include <map>
 
 // FIXME: we expect POINTER_SIZE_INT is already defined by some includes...
