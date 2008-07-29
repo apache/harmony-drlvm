@@ -296,6 +296,25 @@ inline Boolean obj_is_marked_in_oi(Partial_Reveal_Object* p_obj)
 
 #endif /* MARK_BIT_FLIPPING */
 
+inline Boolean obj_set_vt_to_next_obj(Partial_Reveal_Object* p_obj,Partial_Reveal_Object* next_obj)
+{
+  set_obj_info(p_obj, (Obj_Info_Type)-1);
+  obj_set_vt(p_obj,(VT)((VT_SIZE_INT)(POINTER_SIZE_INT)next_obj - (VT_SIZE_INT)(POINTER_SIZE_INT)p_obj));
+  return TRUE;
+}
+
+inline Boolean obj_vt_is_to_next_obj(Partial_Reveal_Object* p_obj)
+{
+  Obj_Info_Type info = get_obj_info_raw(p_obj);
+  info = ~info;
+  return (info == 0);
+}
+
+inline Partial_Reveal_Object* obj_get_next_obj_from_vt(Partial_Reveal_Object* p_obj)
+{
+  return (Partial_Reveal_Object*)((VT_SIZE_INT)(POINTER_SIZE_INT)p_obj + (VT_SIZE_INT)obj_get_vt_raw(p_obj));
+}
+
 /********************* for concurrent GC *******************************/
 inline Boolean obj_is_dirty_in_oi(Partial_Reveal_Object* p_obj)
 {

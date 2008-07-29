@@ -124,10 +124,13 @@ static void mspace_move_objects(Collector* collector, Mspace* mspace)
         
       assert(((POINTER_SIZE_INT)dest_sector_addr + curr_sector_size) <= block_end );
 
+      Partial_Reveal_Object *last_obj_end = (Partial_Reveal_Object *)start_pos;
       /* check if next live object is out of current sector. If not, loop back to continue within this sector. FIXME:: we should add a condition for block check (?) */      
       p_obj =  block_get_next_marked_object(curr_block, &start_pos);
-      if ((p_obj != NULL) && (OBJECT_INDEX_TO_OFFSET_TABLE(p_obj) == curr_sector))
+      if ((p_obj != NULL) && (OBJECT_INDEX_TO_OFFSET_TABLE(p_obj) == curr_sector)) {
+      	if(last_obj_end != p_obj) obj_set_vt_to_next_obj(last_obj_end, p_obj);
         continue;
+      }
 
       /* current sector is done, let's move it. */
       POINTER_SIZE_INT sector_distance = (POINTER_SIZE_INT)src_sector_addr - (POINTER_SIZE_INT)dest_sector_addr;

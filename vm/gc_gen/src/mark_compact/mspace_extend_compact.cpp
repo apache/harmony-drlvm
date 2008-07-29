@@ -182,6 +182,8 @@ static void mspace_refix_repointed_refs(Collector *collector, Mspace* mspace, vo
     while(p_obj < block_end){
       object_refix_ref_slots(p_obj, start_address, end_address, addr_diff);
       p_obj = obj_end(p_obj);
+      if(obj_vt_is_to_next_obj(p_obj))
+        p_obj = obj_get_next_obj_from_vt(p_obj);
     }
 #ifdef USE_32BITS_HASHCODE
     /*repoint the p_obj in hashcode_table in the moved block.*/

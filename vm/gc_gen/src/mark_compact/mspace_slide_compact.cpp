@@ -442,7 +442,7 @@ void slide_compact_mspace(Collector* collector)
     gc_identify_dead_weak_roots(gc);
 
     if( gc->tuner->kind != TRANS_NOTHING ) gc_compute_space_tune_size_after_marking(gc);
-    assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
+    //assert(!(gc->tuner->tuning_size % GC_BLOCK_SIZE_BYTES));
     /* prepare for next phase */
     gc_init_block_for_collectors(gc, mspace);
     

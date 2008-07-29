@@ -209,7 +209,10 @@ inline Partial_Reveal_Object *next_marked_obj_in_block(Partial_Reveal_Object *cu
   while(cur_obj < block_end){
     if( obj_is_marked_in_vt(cur_obj))
       return cur_obj;
-    cur_obj = obj_end(cur_obj);
+    if( obj_vt_is_to_next_obj(cur_obj))
+      cur_obj = obj_get_next_obj_from_vt(cur_obj);
+    else
+      cur_obj = obj_end(cur_obj);
     PREFETCH( ((POINTER_SIZE_INT) cur_obj) + 64);
   }
   

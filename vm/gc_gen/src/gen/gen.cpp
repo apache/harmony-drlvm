@@ -946,10 +946,14 @@ void gc_gen_iterate_heap(GC_Gen *gc)
     while(p_obj < block_end){
       cont = vm_iterate_object((Managed_Object_Handle)p_obj);
       if (!cont) return;
+      if (obj_vt_is_to_next_obj((Partial_Reveal_Object *)p_obj)) 
+        p_obj = (POINTER_SIZE_INT)obj_get_next_obj_from_vt((Partial_Reveal_Object *)p_obj);
+      else {
 #ifdef USE_32BITS_HASHCODE
-      hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)p_obj))?GC_OBJECT_ALIGNMENT:0;
+        hash_extend_size  = (hashcode_is_attached((Partial_Reveal_Object*)p_obj))?GC_OBJECT_ALIGNMENT:0;
 #endif
-      p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj) + hash_extend_size;
+        p_obj = p_obj + vm_object_size((Partial_Reveal_Object *)p_obj) + hash_extend_size;
+      }
     }
     curr_block = curr_block->next;
     if(curr_block == NULL) break;
