@@ -28,6 +28,7 @@
 #include <vector>
 #include <stdio.h>
 #include <assert.h>
+#include <string.h>
 
 #ifdef _WIN32
 #pragma pack(push)

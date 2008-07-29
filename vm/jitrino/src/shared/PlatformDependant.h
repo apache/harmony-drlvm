@@ -45,6 +45,7 @@
 #undef stdcall__
 #undef cdecl_       
 #ifdef PLATFORM_POSIX
+#include <limits.h>
 
 #ifndef  __stdcall
    #define __stdcall

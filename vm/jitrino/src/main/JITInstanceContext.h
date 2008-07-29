@@ -27,6 +27,7 @@
 
 #include <assert.h>
 #include <string>
+#include <string.h>
 
 
 

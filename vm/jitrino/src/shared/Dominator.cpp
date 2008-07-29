@@ -22,6 +22,7 @@
  */
 
 #include "Dominator.h"
+#include <string.h>
 
 namespace Jitrino {
 

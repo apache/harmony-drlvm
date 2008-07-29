@@ -33,6 +33,10 @@
 
 #define TIMERS_IMPLEMENTED
 //#define USE_THREAD_TIMER
+
+#else
+#include <string.h>
+#include <stdio.h>
 #endif
 
 

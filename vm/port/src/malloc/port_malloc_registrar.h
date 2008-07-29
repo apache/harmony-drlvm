@@ -23,6 +23,7 @@
 #ifdef WIN32
     #include <malloc.h>
 #else
+    #include <stdio.h>
     #include <stdlib.h>
     #include <pthread.h>
 #endif

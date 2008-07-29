@@ -28,6 +28,7 @@
 #include "mkernel.h"
 #include "MemoryManager.h"
 #include "Stl.h"
+#include <string.h>
 #include <iostream>
 #include <iomanip>
 #include <fstream>

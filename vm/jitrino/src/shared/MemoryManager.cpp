@@ -25,6 +25,7 @@
 #include <malloc.h>
 #else
 #include <stdlib.h>
+#include <string.h>
 #endif
 #include <iostream>
 #include <stdio.h>

@@ -24,6 +24,9 @@
 #include "XTimer.h"
 #include "Counter.h"
 #include "Stl.h"
+#ifdef PLATFORM_POSIX
+#include <limits.h>
+#endif
 
 #ifdef _DEBUG_SPILLGEN
 #include "Ia32SpillGenDbg.h"
