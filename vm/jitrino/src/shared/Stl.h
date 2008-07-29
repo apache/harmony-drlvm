@@ -42,10 +42,14 @@
 
 #include <ext/hash_set>
 #include <ext/hash_map>
+#if (defined __GNUC__) && ((__GNUC__ >= 4 && __GNUC_MINOR__ > 2))
+#include <backward/hash_fun.h>
+#else
 #if (defined __GNUC__) && ((__GNUC__ >= 3 && __GNUC_MINOR__ > 3) || __GNUC__ > 3)
 #include <ext/hash_fun.h>
 #else
 #include <ext/stl_hash_fun.h>
+#endif
 #endif
 
 
