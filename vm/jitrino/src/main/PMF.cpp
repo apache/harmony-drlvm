@@ -622,11 +622,12 @@ LogStream& LogStream::log (LogStream::SID sid, const char* pipename, size_t name
         for (size_t idx = 0, n = streams.size(); idx != n; ++idx)
         {
             const LogTemplate& lt = streams.logtemplate(idx);
-            if ((lt.pathp == 0 || lt.pathp->empty()) && lt.sid == sid)
+            if ((lt.pathp == 0 || lt.pathp->empty()) && lt.sid == sid) {
                 if (lt.filtername == pipe)
                     return streams.logstream(idx);
                 else if (lt.filtername.empty())
                     lsp = &streams.logstream(idx);
+            }
         }
         if (lsp != 0)
             return *lsp;
@@ -653,11 +654,12 @@ LogStream& LogStream::log (const char* streamname, const char* pipename, size_t 
         for (size_t idx = 0, n = streams.size(); idx != n; ++idx)
         {
             const LogTemplate& lt = streams.logtemplate(idx);
-            if ((lt.pathp == 0 || lt.pathp->empty()) && lt.streamname == streamname)
+            if ((lt.pathp == 0 || lt.pathp->empty()) && lt.streamname == streamname) {
                 if (lt.filtername == pipe)
                     return streams.logstream(idx);
                 else if (lt.filtername.empty())
                     lsp = &streams.logstream(idx);
+            }
         }
         if (lsp != 0)
             return *lsp;
@@ -2004,7 +2006,7 @@ void PMF::walk (Pipeline& pipeline, Pipeline::Alias* aliasp, Strs& fqname)
                 cmdp->fatal("Invalid path item selection");
         }
 
-        if (goon)
+        if (goon) {
             if (child.aliasp != 0)
                 walk(pipeline, child.aliasp, fqname);
             else
@@ -2018,6 +2020,7 @@ void PMF::walk (Pipeline& pipeline, Pipeline::Alias* aliasp, Strs& fqname)
                 *step.fqname = fqname;
                 pipeline.steps->push_back(step);
             }
+        }
 
         fqname.pop_back();
     }

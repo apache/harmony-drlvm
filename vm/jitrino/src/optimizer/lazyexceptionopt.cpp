@@ -142,7 +142,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
         }
     }
     if (md.getSideEffect() == MSE_Unknown) {
-        if (m_sideEff == MSE_Unknown)
+        if (m_sideEff == MSE_Unknown) {
             if (isExceptionInit && isArgCheckNull) {
 #ifdef _DEBUG
                 if (Log::isEnabled()) {
@@ -153,6 +153,7 @@ LazyExceptionOpt::doLazyExceptionOpt() {
                 m_sideEff = MSE_True_Null_Param;
             } else
                 m_sideEff = MSE_False;
+        }
         md.setSideEffect(m_sideEff);
     } 
 

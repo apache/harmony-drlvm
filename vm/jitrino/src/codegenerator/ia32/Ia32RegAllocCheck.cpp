@@ -200,7 +200,7 @@ void RegAllocCheck::checkLiveness ()
                 //  conditional definitions are ignored
                 if ((props & Inst::Properties_Conditional) == 0)
                 {
-                    if (regdefs[ridx] != regnxts[ridx])
+                    if (regdefs[ridx] != regnxts[ridx]) {
                         if (regnxts[ridx] != 0)
                         {
                             error() << "  " << *inst << " " << regName((int)ridx) 
@@ -211,7 +211,7 @@ void RegAllocCheck::checkLiveness ()
                         {
                             //  dead def
                         }
-
+                    }
                     regnxts[ridx] = 0;  // this register can used in the instruction
                 }
             }

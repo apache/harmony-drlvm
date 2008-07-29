@@ -370,11 +370,12 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     Log::out() << ::std::endl;
                 }
                 AbcdReasons *ignore;
-                if (!thePass->isMarkedToEliminate(theInst, ignore))
+                if (!thePass->isMarkedToEliminate(theInst, ignore)) {
                     if (why)
                         thePass->markCheckToEliminateAndWhy(theInst, why);
                     else
                         thePass->markCheckToEliminate(theInst);
+                }
             } else {
                 if (Log::isEnabled()) {
                     Log::out() << "!!! We can eliminate UB check of ";
@@ -386,11 +387,12 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     Log::out() << ::std::endl;
                 }
                 AbcdReasons *ignore;
-                if (!thePass->isMarkedToEliminateUB(theInst, ignore))
+                if (!thePass->isMarkedToEliminateUB(theInst, ignore)) {
                     if (why)
                         thePass->markCheckToEliminateUBAndWhy(theInst, why);
                     else 
                         thePass->markCheckToEliminateUB(theInst);
+                }
             }
         } else {
             if (successLB) {
@@ -404,11 +406,12 @@ void AbcdSolver::tryToEliminate(Inst *theInst)
                     Log::out() << ::std::endl;
                 }
                 AbcdReasons *ignore;
-                if (!thePass->isMarkedToEliminateLB(theInst, ignore))
+                if (!thePass->isMarkedToEliminateLB(theInst, ignore)) {
                     if (why)
                         thePass->markCheckToEliminateLBAndWhy(theInst, why);
                     else
                         thePass->markCheckToEliminateLB(theInst);
+                }
             }
         }
         if (!(successLB && successUB)) {
