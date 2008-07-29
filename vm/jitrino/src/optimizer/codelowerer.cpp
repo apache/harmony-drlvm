@@ -414,8 +414,8 @@ CodeLowerer::caseTauCheckCast(TypeInst* inst)
                     Inst *succ2HeadInst = (Inst*)succ2->getFirstInst();
                     Inst *insertBeforeInst = succ2HeadInst->getNextInst();
                     while (insertBeforeInst!=NULL 
-                        && (insertBeforeInst->getOpcode() == Op_Phi) 
-                            || (insertBeforeInst->getOpcode() == Op_TauPi)) 
+                        && ( (insertBeforeInst->getOpcode() == Op_Phi) 
+                             || (insertBeforeInst->getOpcode() == Op_TauPi) ) ) 
                     {
                         insertBeforeInst = insertBeforeInst->getNextInst();
                     }
