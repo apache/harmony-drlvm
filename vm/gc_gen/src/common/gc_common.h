@@ -312,7 +312,7 @@ inline Boolean obj_vt_is_to_next_obj(Partial_Reveal_Object* p_obj)
 
 inline Partial_Reveal_Object* obj_get_next_obj_from_vt(Partial_Reveal_Object* p_obj)
 {
-  return (Partial_Reveal_Object*)((VT_SIZE_INT)(POINTER_SIZE_INT)p_obj + (VT_SIZE_INT)obj_get_vt_raw(p_obj));
+  return (Partial_Reveal_Object*)((POINTER_SIZE_INT)p_obj + (POINTER_SIZE_INT)(VT_SIZE_INT)obj_get_vt_raw(p_obj));
 }
 
 /********************* for concurrent GC *******************************/
