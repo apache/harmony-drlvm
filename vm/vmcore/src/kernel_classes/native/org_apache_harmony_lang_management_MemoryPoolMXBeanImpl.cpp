@@ -52,7 +52,7 @@ Java_org_apache_harmony_lang_management_MemoryPoolMXBeanImpl_getCollectionUsageI
     jlong max = 1L<<22;
 
     jclass memoryPoolMXBeanClazz =jenv->FindClass(
-        "org/apache/harmony/lang/management/MemoryPoolMXBean");
+        "java/lang/management/MemoryPoolMXBean");
     if (jenv->ExceptionCheck()) {return NULL;};
 
     jmethodID getNameMethod = jenv->GetMethodID(
