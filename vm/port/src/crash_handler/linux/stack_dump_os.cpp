@@ -30,6 +30,12 @@
 #include "port_malloc.h"
 #include "stack_dump.h"
 
+#if defined(MACOSX)
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#else
+extern char** environ;
+#endif
 
 static char* g_curdir = NULL;
 static char* g_cmdline = NULL;
