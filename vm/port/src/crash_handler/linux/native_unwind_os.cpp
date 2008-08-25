@@ -21,6 +21,12 @@
 #include "port_modules.h"
 #include "native_unwind.h"
 
+#if defined(MACOSX)
+#include <crt_externs.h>
+#define environ (*_NSGetEnviron())
+#else
+extern char** environ;
+#endif
 
 bool native_is_in_code(UnwindContext* context, void* ip)
 {
