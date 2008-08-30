@@ -2329,7 +2329,7 @@ jvmti_event_thread_function(void *args)
     jni_env->GetJavaVM(&java_vm);
 
     // attaching native thread to VM
-    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, "TIEventThread", NULL};
+    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, const_cast<char*>("TIEventThread"), NULL};
     jint status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, &vm_args);
     if(status != JNI_OK) {
         LDIE(24, "{0} cannot attach current thread" << "jvmti_event_thread_function:");

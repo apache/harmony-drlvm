@@ -212,7 +212,7 @@ void oh_null_init_handles(ObjectHandles* handles);
 //   number_handles - Number of handles to allocate space for
 //   base_var       - LIL variable to hold pointer to base of handles structure
 //   helper_var     - LIL variable to use to initialise structure
-LilCodeStub* oh_gen_allocate_handles(LilCodeStub*, unsigned number_handles, char* base_var, char* helper_var);
+LilCodeStub* oh_gen_allocate_handles(LilCodeStub*, unsigned number_handles, const char* base_var, const char* helper_var);
 
 // Calculate the offset of the base of a previously allocated structure to a particular handle
 // The base variable (see oh_gen_allocate_handles) plus this offset is the value to use for the handle
@@ -223,7 +223,7 @@ POINTER_SIZE_INT oh_get_handle_offset(unsigned handle_indx);
 //   handle_indx - Index of handle to initialise
 //   val         - LIL operand for the object reference to use to initialise handle
 //   null_check  - If true check for a managed null and store an unmanaged null instead
-LilCodeStub* oh_gen_init_handle(LilCodeStub*, char* base_var, unsigned handle_indx, char* val, bool null_check);
+LilCodeStub* oh_gen_init_handle(LilCodeStub*, const char* base_var, unsigned handle_indx, const char* val, bool null_check);
 
 //////////////////////////////////////////////////////////////////////////
 // 20031218: Needed for old stub code

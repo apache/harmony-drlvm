@@ -327,7 +327,7 @@ char is_wrapper_class(const char* name)
 {
     char _sig = '\0';
     const char* c_ptr = (name);
-    char* type = "java/lang/";
+    const char* type = "java/lang/";
 
     while (*type++ == *c_ptr++);
 

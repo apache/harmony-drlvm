@@ -162,7 +162,7 @@ VMEXPORT void lil_free_code_stub(LilCodeStub* cs)
 #define hexnum(c) (num(c) || ((c)>='a' && (c)<='f') || ((c)>='A' && (c)<='F'))
 #define alphanum(c) (alpha(c) || num(c))
 
-static void error(const char** src, char* err1, char* err2="")
+static void error(const char** src, const char* err1, const char* err2="")
 {
     FILE* err_f = stderr;
     fprintf(err_f, "lil parse error: %s%s\n\t", err1, err2);
@@ -211,7 +211,7 @@ static char lil_parse_percent(const char** src, LilVarArgs* va)
 // This function does not change *src on failure
 // (except to skip whitespace),
 // and this is needed in some code below
-static bool lil_parse_kw_no_error(const char** src, char* kw)
+static bool lil_parse_kw_no_error(const char** src, const char* kw)
 {
     lil_skip_ws(src);
     unsigned c;
@@ -224,7 +224,7 @@ static bool lil_parse_kw_no_error(const char** src, char* kw)
     return true;
 }
 
-static bool lil_parse_kw(const char** src, char* kw)
+static bool lil_parse_kw(const char** src, const char* kw)
 {
     bool res = lil_parse_kw_no_error(src, kw);
     if (!res) error(src, "expected ", kw);
@@ -1902,7 +1902,7 @@ static bool lil_verify_binary_cond(LilPredicate UNREF p, LilType t1, LilType t2)
     return t1==t2;
 }
 
-static bool lil_print_err(char *s, LilInstruction* i, unsigned inst_number)
+static bool lil_print_err(const char *s, LilInstruction* i, unsigned inst_number)
 {
     fprintf(stderr, "lil code stub invalid at instruction %d: %s\n  ", inst_number, s);
     if (i) lil_print_instruction(stdout, i);

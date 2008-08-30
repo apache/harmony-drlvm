@@ -261,7 +261,7 @@ struct ManagedObject;
 // Print the stack trace stored in the exception object to the given file.
 void exn_print_stack_trace(FILE* f, jthrowable exc);
 
-void print_uncaught_exception_message(FILE *f, char* context_message, jthrowable exc);
+void print_uncaught_exception_message(FILE *f, const char* context_message, jthrowable exc);
 
 
 //**** Native code exception support

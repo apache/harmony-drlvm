@@ -197,7 +197,7 @@ void verify_stack_enumeration() {
 }
 
 // Let it be literate :)
-static char* num_suffix(int n) {
+static const char* num_suffix(int n) {
     if ((n/10)%10 == 1) return "th"; // 10-19
     if (n%10 == 1) return "st"; // 1, 21, 31, ... 91
     if (n%10 == 2) return "nd"; // 2, 22, 32, ... 92

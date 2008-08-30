@@ -49,18 +49,18 @@
 
 #include <errno.h>
 
-static void Error (char *lpszMess, JNIEnv *env, jlongArray la) 
+static void Error (const char *lpcszMess, JNIEnv *env, jlongArray la) 
 { 
    jboolean jb = true;
    jlong *lp = (jlong*)env->GetLongArrayElements(la, &jb);
    lp[0] = 0;
    env->ReleaseLongArrayElements(la, lp, 0);
-   if (lpszMess != NULL) {
-        INFO(lpszMess); 
+   if (lpcszMess != NULL) {
+        INFO(lpcszMess); 
    }
 }
 
-static void ThrowError(JNIEnv *env, char *message = 0) {
+static void ThrowError(JNIEnv *env, const char *message = 0) {
     jclass jc = env->FindClass((const char *)"java/io/IOException");
     env->ThrowNew(jc, message ? message : strerror(errno));
 }

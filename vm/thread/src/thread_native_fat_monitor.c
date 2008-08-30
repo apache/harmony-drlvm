@@ -43,7 +43,7 @@
  * @see hythread_monitor_destroy
  *
  */
-IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA flags, char *name) {
+IDATA VMCALL hythread_monitor_init_with_name(hythread_monitor_t *mon_ptr, UDATA flags, const char *name) {
     int r;
     hythread_monitor_t mon;
 

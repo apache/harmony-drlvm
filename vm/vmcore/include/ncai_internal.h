@@ -18,7 +18,7 @@ extern "C" {
 
 typedef struct _NcaiRegisterTableItem
 {
-    char*       name;       // Register name
+    const char* name;       // Register name
     jint        size;       // Register size in bytes
     unsigned    offset;     // Register offset in NcaiRegisters structure
 

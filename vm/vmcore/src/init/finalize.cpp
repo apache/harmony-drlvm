@@ -83,13 +83,13 @@ class Object_Queue
     unsigned num_objects;
 
     Lock_Manager objects_lock;
-    char*  log_domain;
+    const char*  log_domain;
 
     void reallocate(unsigned new_capacity);
     
 public:
     Object_Queue();
-    Object_Queue(char*  log_domain);
+    Object_Queue(const char* log_domain);
     ~Object_Queue(){
         STD_FREE(objects);
     }
@@ -147,7 +147,7 @@ Object_Queue::Object_Queue() {
     Object_Queue::Object_Queue("unknown");
 }
 
-Object_Queue::Object_Queue(char*  log_domain)
+Object_Queue::Object_Queue(const char* log_domain)
 {
     objects     = 0;
     capacity    = 0;

@@ -545,7 +545,7 @@ void oh_null_init_handles(ObjectHandles* handles) {
 
 }
 
-LilCodeStub* oh_gen_allocate_handles(LilCodeStub* cs, unsigned number_handles, char* base_var, char* UNREF helper_var)
+LilCodeStub* oh_gen_allocate_handles(LilCodeStub* cs, unsigned number_handles, const char* base_var, const char* UNREF helper_var)
 {
     char buf[200];
 
@@ -587,7 +587,7 @@ POINTER_SIZE_INT oh_get_handle_offset(unsigned handle_indx)
     return refs_off+handle_indx*sizeof(ManagedObject*);
 }
 
-LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, char* base_var, unsigned handle_indx, char* val, bool null_check)
+LilCodeStub* oh_gen_init_handle(LilCodeStub* cs, const char* base_var, unsigned handle_indx, const char* val, bool null_check)
 {
     char buf[200];
     POINTER_SIZE_INT offset = oh_get_handle_offset(handle_indx);

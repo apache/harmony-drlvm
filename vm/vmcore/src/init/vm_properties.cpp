@@ -70,12 +70,12 @@ static const char *api_dll_files[] =
  *  names separated by PORT_PATH_SEPARATOR.  If patch is NULL, no path
  *  or separator will be prefixed
  */
-static char *compose_full_files_path_names_list(const char *path,
+static const char *compose_full_files_path_names_list(const char *path,
                                                 const char **dll_names,
                                                 const int names_number, 
                                                 bool is_dll)
 {
-    char* full_name = "";
+    const char* full_name = "";
     for (int iii = 0; iii < names_number; iii++)
     {
         const char *tmp = dll_names[iii];
@@ -276,9 +276,9 @@ static void init_java_properties(Properties & properties)
     status = port_user_timezone(&user_tz, prop_pool);
     if (APR_SUCCESS != status) {
         INFO("Failed to get user timezone from the system. Error code " << status);
-        user_tz = "GMT";
+        user_tz = NULL;
     }
-    properties.set_new("user.timezone", user_tz);
+    properties.set_new("user.timezone", user_tz ? user_tz : "GMT");
 
     /*
     *  it's possible someone forgot to set this property - set to default of .
@@ -312,7 +312,7 @@ static void init_vm_properties(Properties & properties)
         *  pass NULL for the pathname as we don't want 
         *  any path pre-pended
         */
-        char* path_buf = compose_full_files_path_names_list(NULL, api_dll_files, n_api_dll_files, true);
+        const char* path_buf = compose_full_files_path_names_list(NULL, api_dll_files, n_api_dll_files, true);
         properties.set_new("vm.other_natives_dlls", path_buf);
 }
 
@@ -376,11 +376,12 @@ jint initialize_properties(Global_Env * p_env)
             TRACE("setting internal property " << option + 4);
             src = strdup(option + 4);
             char* name = unquote(src);
-            char* value = strchr(src, '=');
-            if(value)
+            char* valptr = strchr(src, '=');
+            const char* value;
+            if(valptr)
             {
-                *value = '\0';
-                ++value;
+                *valptr = '\0';
+                value = valptr + 1;
             }
             else 
             {

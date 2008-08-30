@@ -37,13 +37,13 @@ struct JvmtiExtension
 static jvmtiParamInfo jvmtiGetNCAIEnvironmentParams[] =
 {
     {
-        "ncai_env_ptr",
+        const_cast<char*>("ncai_env_ptr"),
         JVMTI_KIND_OUT,
         JVMTI_TYPE_CVOID,
         JNI_FALSE
     },
     {
-        "version",
+        const_cast<char*>("version"),
         JVMTI_KIND_IN,
         JVMTI_TYPE_JINT,
         JNI_FALSE
@@ -61,8 +61,8 @@ static JvmtiExtension jvmti_extension_list[] =
         NULL,
         {
             jvmtiGetNCAIEnvironment,
-            "org.apache.harmony.vm.GetExtensionEnv",
-            "Returns the reference to the NCAI function table",
+            const_cast<char*>("org.apache.harmony.vm.GetExtensionEnv"),
+            const_cast<char*>("Returns the reference to the NCAI function table"),
             sizeof(jvmtiGetNCAIEnvironmentParams) / sizeof(jvmtiParamInfo),
             jvmtiGetNCAIEnvironmentParams,
             sizeof(jvmtiGetNCAIEnvironmentErrors) / sizeof(jvmtiError),

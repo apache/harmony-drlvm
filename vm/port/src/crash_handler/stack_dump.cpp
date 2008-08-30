@@ -211,8 +211,8 @@ static void sd_print_stack(Registers* regs, port_unwind_compiled_frame unwind)
 
 struct sig_name_t
 {
-    int    num;
-    char*  name;
+    int          num;
+    const char*  name;
 };
 
 static sig_name_t sig_names[] =

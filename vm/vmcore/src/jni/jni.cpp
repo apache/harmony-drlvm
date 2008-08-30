@@ -482,7 +482,7 @@ jint JNICALL JNI_GetCreatedJavaVMs(JavaVM ** vmBuf,
 jint JNICALL JNI_CreateJavaVM(JavaVM ** p_vm, JNIEnv ** p_jni_env,
                                           void * args) {
     jboolean daemon = JNI_FALSE;
-    char * name = "main";
+    const char * name = "main";
     JNIEnv * jni_env;
     Global_Env * vm_env;
     jthread java_thread;
@@ -1527,7 +1527,7 @@ jlong JNICALL GetDirectBufferCapacity(JNIEnv* env, jobject buf)
 
 VMEXPORT jint JNICALL DestroyJavaVM(JavaVM * vm)
 {
-    char * name = "destroy";
+    const char* name = "destroy";
     jboolean daemon = JNI_FALSE;
     jthread java_thread;
     JavaVM_Internal * java_vm;

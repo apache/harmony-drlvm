@@ -429,7 +429,7 @@ static void print_methods()
 
 
 
-static void print_array_distribution(char *caption, uint64 *array)
+static void print_array_distribution(const char *caption, uint64 *array)
 {
     bool print_distributions = false;
     int decade_high, min_size_decade, max_size_decade, i;

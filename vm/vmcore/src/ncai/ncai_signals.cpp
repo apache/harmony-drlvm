@@ -17,16 +17,16 @@
 
 struct st_signal_info
 {
-    jint    signal;
-    char*   name;
-    size_t  name_size;
+    jint        signal;
+    const char* name;
+    size_t      name_size;
 };
 
 static size_t ncai_get_signal_count();
 static st_signal_info* find_signal(jint sig);
 static jint ncai_get_min_signal();
 static jint ncai_get_max_signal();
-static char* ncai_get_signal_name(jint signal);
+static const char* ncai_get_signal_name(jint signal);
 static size_t ncai_get_signal_name_size(jint signal);
 bool ncai_is_signal_in_range(jint signal);
 
@@ -62,7 +62,7 @@ ncaiGetSignalInfo(ncaiEnv *env, jint signal, ncaiSignalInfo* info_ptr)
     if (!ncai_is_signal_in_range(signal))
         return NCAI_ERROR_ILLEGAL_ARGUMENT;
 
-    char* name = ncai_get_signal_name(signal);
+    const char* name = ncai_get_signal_name(signal);
     if (name == NULL)
         return NCAI_ERROR_ILLEGAL_ARGUMENT;
 
@@ -216,7 +216,7 @@ static jint ncai_get_max_signal()
     return max_sig_value;
 }
 
-static char* ncai_get_signal_name(jint signal)
+static const char* ncai_get_signal_name(jint signal)
 {
     st_signal_info* psig = find_signal(signal);
     return psig ? psig->name : NULL;

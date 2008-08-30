@@ -130,7 +130,7 @@ ncaiGetThreadInfo(ncaiEnv *env, ncaiThread thread, ncaiThreadInfo *info_ptr)
 
     info_ptr->kind = NCAI_THREAD_VM_INTERNAL;
 
-    char* name_int = "native_0x";
+    const char* name_int = "native_0x";
     size_t name_len = strlen(name_int) + 4 + 1;
     info_ptr->name = (char*)ncai_alloc(name_len);
     assert(info_ptr->name);

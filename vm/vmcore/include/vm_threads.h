@@ -110,7 +110,7 @@ size_t vm_object_get_lockword_size();
  *
  * @return <code>int</code>
  */
-IDATA jthread_throw_exception(char* name, char* message);
+IDATA jthread_throw_exception(const char* name, const char* message);
 
 /**
  * Throws given exception object. Desides whether current thread is unwindable

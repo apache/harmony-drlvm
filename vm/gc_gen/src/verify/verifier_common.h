@@ -77,7 +77,7 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
 Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options);
 void verifier_log_before_gc(Heap_Verifier* heap_verifier);
 void verifier_log_after_gc(Heap_Verifier* heap_verifier);
-void verifier_log_start(char* message);
+void verifier_log_start(const char* message);
 Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
 
 

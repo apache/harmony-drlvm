@@ -428,7 +428,7 @@ const char* cd_get_module_type(const char* short_name)
     if (!memcmp(short_name, PORT_DSO_PREFIX, strlen(PORT_DSO_PREFIX)))
         nameptr += strlen(PORT_DSO_PREFIX);
 
-    char* vm_modules[] = {"java", "em", "encoder", "gc_gen", "gc_gen_uncomp", "gc_cc",
+    const char* vm_modules[] = {"java", "em", "encoder", "gc_gen", "gc_gen_uncomp", "gc_cc",
         "harmonyvm", "hythr", "interpreter", "jitrino", "vmi"};
 
     for (size_t i = 0; i < sizeof(vm_modules)/sizeof(vm_modules[0]); i++)

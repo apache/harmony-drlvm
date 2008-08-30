@@ -160,7 +160,7 @@ typedef struct HyThreadMonitor {
 
     UDATA flags;
 
-    char *name;
+    const char *name;
 
 } HyThreadMonitor;
 

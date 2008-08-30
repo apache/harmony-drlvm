@@ -628,7 +628,7 @@ static jint run_java_init(JNIEnv * jni_env) {
  * @param[in] name thread's name
  * @param[in] daemon JNI_TRUE if new thread is a daemon, JNI_FALSE otherwise
  */
-static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject group, char * name, jboolean daemon) {
+static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject group, const char * name, jboolean daemon) {
     static Method * constructor = NULL;
     const char * descriptor = "(Ljava/lang/ThreadGroup;Ljava/lang/String;JJIZ)V";
     jvalue args[7];
@@ -719,7 +719,7 @@ static jint vm_create_jthread(jthread * thread_object, JNIEnv * jni_env, jobject
  * @param[in] daemon JNI_TRUE if thread is daemon, JNI_FALSE otherwise
  * @return JNI_OK on success.
  */
-jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * java_vm, jobject group, char * name, jboolean daemon) {
+jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread, JavaVM * java_vm, jobject group, const char * name, jboolean daemon) {
     JNIEnv * jni_env;
     hythread_t native_thread;
     jint status;

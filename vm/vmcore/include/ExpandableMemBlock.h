@@ -33,7 +33,7 @@ public:
         if(m_pBlock)
             STD_FREE(m_pBlock);
     }
-    void AppendBlock(char *szBlock, long nLen = -1){
+    void AppendBlock(const char *szBlock, long nLen = -1){
         if(!szBlock)return;
         if(nLen <= 0)nLen = (long) strlen(szBlock);
         if(!nLen)return;
@@ -47,7 +47,7 @@ public:
         memcpy((char*)m_pBlock + m_nCurPos, szBlock, nLen);
         m_nCurPos += nLen;
     }
-    void AppendFormatBlock(char *szfmt, ... ){
+    void AppendFormatBlock(const char *szfmt, ... ){
         va_list arg;
         //char *buf = (char*)calloc(1024, 1);
         char buf[1024];

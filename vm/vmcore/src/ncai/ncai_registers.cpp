@@ -8,7 +8,7 @@
 
 #include "suspend_checker.h"
 #include "open/ncai_thread.h"
-//#include "ncai_utils.h"
+#include "ncai_utils.h"
 #include "ncai_internal.h"
 #include "ncai_direct.h"
 
@@ -44,7 +44,13 @@ ncaiGetRegisterInfo(ncaiEnv *env, jint reg_number, ncaiRegisterInfo* info_ptr)
     if (info_ptr == NULL)
         return NCAI_ERROR_NULL_POINTER;
 
-    info_ptr->name = g_ncai_reg_table[reg_number].name;
+    size_t namesize = strlen(g_ncai_reg_table[reg_number].name) + 1;
+    char* name = (char*)ncai_alloc(namesize);
+
+    if (name)
+        memcpy(name, g_ncai_reg_table[reg_number].name, namesize);
+
+    info_ptr->name = name;
     info_ptr->size = g_ncai_reg_table[reg_number].size;
 
     return NCAI_ERROR_NONE;

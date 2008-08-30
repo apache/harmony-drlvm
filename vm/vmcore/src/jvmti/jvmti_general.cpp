@@ -411,7 +411,7 @@ jvmtiSetVerboseFlag(jvmtiEnv* env,
 
     CHECK_EVERYTHING();
 
-    char* category = "";
+    const char* category = "";
     switch (flag)
     {
     case JVMTI_VERBOSE_OTHER:

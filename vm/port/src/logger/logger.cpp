@@ -242,8 +242,8 @@ static int set_locale(const char* logger_locale)
     if (NULL == lang) {
         return 0; // out of C heap
     }
-    char* region = "";
-    char* variant = "";
+    char* region = NULL;
+    char* variant = NULL;
 
     char* pos = strchr(lang, '_');
     if (pos == NULL) {
@@ -262,7 +262,7 @@ static int set_locale(const char* logger_locale)
     variant++;
 
 set:
-    portlib->nls_set_locale(portlib, lang, region, variant);
+    portlib->nls_set_locale(portlib, lang, region ? region : "", variant ? variant : "");
     free((void*)lang);
     return 1;
 }

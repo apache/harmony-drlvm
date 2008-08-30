@@ -88,7 +88,7 @@ static NativeLibInfo* search_library_list(const char* library_name)
 // Searches for JNI_OnLoad through given library and calls it
 static jint find_call_JNI_OnLoad(NativeLibraryHandle lib_handle)
 {
-static char* name_list[] =
+static const char* name_list[] =
     {   "JNI_OnLoad"
 #ifdef PLATFORM_NT
     ,   "_JNI_OnLoad@8"
@@ -126,7 +126,7 @@ static char* name_list[] =
 // FIXME unused static
 void find_call_JNI_OnUnload(NativeLibraryHandle lib_handle)
 {
-static char* name_list[] =
+static const char* name_list[] =
     {   "JNI_OnUnload"
 #ifdef PLATFORM_NT
     ,   "_JNI_OnUnload@8"

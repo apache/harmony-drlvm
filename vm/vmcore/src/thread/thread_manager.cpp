@@ -108,7 +108,7 @@ vm_thread_t jthread_get_vm_thread_ptr_stub()
 
 vm_thread_accessor get_thread_ptr = jthread_get_vm_thread_ptr_stub;
 
-IDATA jthread_throw_exception(char *name, char *message)
+IDATA jthread_throw_exception(const char *name, const char *message)
 {
     assert(hythread_is_suspend_enabled());
     jobject jthe = exn_create(name);

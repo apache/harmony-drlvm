@@ -142,11 +142,11 @@ static IDATA ref_enqueue_thread_func(void **args)
 {
     JavaVM *java_vm = (JavaVM *)args[0];
     JNIEnv *jni_env;
-    char *name = "ref handler";
+    const char *name = "ref handler";
 
     JavaVMAttachArgs *jni_args = (JavaVMAttachArgs*)STD_MALLOC(sizeof(JavaVMAttachArgs));
     jni_args->version = JNI_VERSION_1_2;
-    jni_args->name = name;
+    jni_args->name = const_cast<char*>(name);
     jni_args->group = (jobject)args[1];
     IDATA status = AttachCurrentThreadAsDaemon(java_vm, (void**)&jni_env, jni_args);
     assert(status == JNI_OK);

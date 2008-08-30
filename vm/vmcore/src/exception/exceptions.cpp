@@ -657,7 +657,7 @@ void exn_print_stack_trace(FILE * f, jthrowable exc)
 //////////////////////////////////////////////////////////////////////////
 // Uncaught Exceptions
 
-void print_uncaught_exception_message(FILE * f, char *context_message,
+void print_uncaught_exception_message(FILE * f, const char *context_message,
     jthrowable exc)
 {
     assert(hythread_is_suspend_enabled());

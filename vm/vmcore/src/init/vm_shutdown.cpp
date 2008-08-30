@@ -322,7 +322,7 @@ static IDATA vm_interrupt_process(void * data) {
  */
 static IDATA vm_interrupt_entry_point(void * data) {
     JavaVM * java_vm = (JavaVM *)data;
-    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, "InterruptionHandler", NULL};
+    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, const_cast<char*>("InterruptionHandler"), NULL};
 
     JNIEnv * jni_env;
     jint status = AttachCurrentThread(java_vm, (void **)&jni_env, &vm_args);
@@ -358,7 +358,7 @@ static IDATA vm_dump_process(void * data) {
  */
 static IDATA vm_dump_entry_point(void * data) {
     JavaVM * java_vm = (JavaVM *)data;
-    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, "DumpHandler", NULL};
+    JavaVMAttachArgs vm_args = {JNI_VERSION_1_2, const_cast<char*>("DumpHandler"), NULL};
 
     JNIEnv * jni_env;
     jint status = AttachCurrentThread(java_vm, (void **)&jni_env, &vm_args);

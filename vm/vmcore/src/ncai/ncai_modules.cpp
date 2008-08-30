@@ -163,7 +163,7 @@ static ncaiError ncai_get_module_info(ncaiModule module, ncaiModuleInfo *info_pt
 
 static void ncai_identify_module_is_VM(ncaiModule module)
 {
-    char* vm_modules[] = {"java", "vmcore", "harmonyvm", "em", "interpreter",
+    const char* vm_modules[] = {"java", "vmcore", "harmonyvm", "em", "interpreter",
         "gc_gen", "gc_gen_uncomp", "gc_cc", "vmi", "encoder", "jitrino", "hythr"};
 
     for (size_t i = 0; i < sizeof(vm_modules)/sizeof(vm_modules[0]); i++)

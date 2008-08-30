@@ -22,7 +22,7 @@
 
 jint vm_attach_internal(JNIEnv ** p_jni_env, jthread * java_thread,
                         JavaVM * java_vm, jobject group,
-                        char * name, jboolean daemon);
+                        const char * name, jboolean daemon);
 jint vm_init1(JavaVM_Internal * java_vm, JavaVMInitArgs * vm_arguments);
 jint vm_init2(JNIEnv * jni_env);
 /**

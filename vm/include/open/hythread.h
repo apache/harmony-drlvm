@@ -168,7 +168,7 @@ hythread_monitor_lock PROTOTYPE((hythread_t self, hythread_monitor_t monitor));
 extern HY_CFUNC IDATA VMCALL 
 hythread_park PROTOTYPE((I_64 millis, IDATA nanos));
 extern HY_CFUNC IDATA VMCALL 
-hythread_monitor_init_with_name PROTOTYPE((hythread_monitor_t* handle, UDATA flags, char* name));
+hythread_monitor_init_with_name PROTOTYPE((hythread_monitor_t* handle, UDATA flags, const char* name));
 extern HY_CFUNC IDATA VMCALL 
 hythread_monitor_try_enter PROTOTYPE((hythread_monitor_t monitor));
 extern HY_CFUNC hythread_t VMCALL
