@@ -900,7 +900,7 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_SETcc(Inst* inst)
                 isImm(movopnd2) && movopnd2->getImmValue() == 0 &&
                 movopnd1->getId() == cmpopnd1->getId() &&
                 //case CMP:
-                (next->getMnemonic() != Mnemonic_CMP || isImm(cmpopnd2) && cmpopnd2->getImmValue() == 0) &&
+                (next->getMnemonic() != Mnemonic_CMP || (isImm(cmpopnd2) && cmpopnd2->getImmValue() == 0)) &&
                 //case TEST:
                 (next->getMnemonic() != Mnemonic_TEST || cmpopnd1->getId() == cmpopnd2->getId())
                 )

@@ -114,11 +114,10 @@ OSROpndInfo OSRInductionDetector::processOpnd(LoopTree* tree,
         if (defInst->getNumSrcOperands() > 1) {
             OSROpndInfo info2 =
                 processOpnd(tree, loopHead, defStack, defInst->getSrc(1));
-            if ((info1.isCounter() && !info1.isPhiSplit())
-                && (info2.isDOL() || info2.isLDConst())
-                || (info2.isCounter()
-                    && !info2.isPhiSplit())
-                && (info1.isDOL() || info1.isLDConst())) {
+            if ( ((info1.isCounter() && !info1.isPhiSplit())
+                   && (info2.isDOL() || info2.isLDConst()))
+                 || ((info2.isCounter() && !info2.isPhiSplit())
+                   && (info1.isDOL() || info1.isLDConst())) ) {
 
                 result.setType(OSROpndInfo::COUNTER);
                 result.setIncrement(info1.isCounter()? info1.

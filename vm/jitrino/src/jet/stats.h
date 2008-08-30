@@ -132,10 +132,10 @@ public:
     #define STATS_MEASURE_MIN_MAX_VALUE( what, value, nam ) \
     { \
         if ( (NULL == Stats::g_name_filter) || (NULL != strstr(meth_fname(), Stats::g_name_filter)) ) { \
-        Stats::what##_total += value; \
-        if( Stats::what##_max < value ) { Stats::what##_max = value; Stats::what##_max_name = nam; }; \
+        Stats::what##_total += (value); \
+        if( Stats::what##_max < (value) ) { Stats::what##_max = (value); Stats::what##_max_name = nam; }; \
         static bool what##_done = false; \
-        if( !what##_done && Stats::what##_min > value ) { what##_done = true; Stats::what##_min = value; Stats::what##_min_name = nam; }; \
+        if( !what##_done && Stats::what##_min > (value) ) { what##_done = true; Stats::what##_min = (value); Stats::what##_min_name = nam; }; \
         }\
     }
 #else   // JIT_STATS

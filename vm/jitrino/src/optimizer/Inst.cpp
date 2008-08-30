@@ -166,9 +166,9 @@ Edge* BranchInst::getTakenEdge(U_32 result) {
     for(Edges::const_iterator eiter = edges.begin(); eiter != edges.end(); ++eiter) {
         edge = *eiter;
         Node * tar = edge->getTargetNode();
-        if (!tar->isDispatchNode() &&
-            ((result == 0) && (tar->getFirstInst() != targetLabel)) ||
-            ((result == 1) && (tar->getFirstInst() == targetLabel)) ) {
+        if ( (!tar->isDispatchNode() &&
+              ((result == 0) && (tar->getFirstInst() != targetLabel))) ||
+             ((result == 1) && (tar->getFirstInst() == targetLabel)) ) {
             break;
         }
     }
@@ -1805,7 +1805,7 @@ Inst* InstFactory::makeConvZE(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* s
 
 Inst* InstFactory::makeConvUnmanaged(Modifier mod, Type::Tag toType, Opnd* dst, Opnd* src) {
     assert ((dst->getType()->isUnmanagedPtr() && (src->getType()->isObject() || src->getType()->isManagedPtr()))
-        || ((dst->getType()->isObject() || dst->getType()->isManagedPtr())) && src->getType()->isUnmanagedPtr()); 
+        || (((dst->getType()->isObject() || dst->getType()->isManagedPtr())) && src->getType()->isUnmanagedPtr())); 
     return makeInst(Op_ConvUnmanaged, mod, toType, dst, src);
 }
 

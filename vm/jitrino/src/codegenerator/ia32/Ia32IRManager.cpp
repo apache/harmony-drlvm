@@ -1169,9 +1169,9 @@ Inst * IRManager::newCopySequence(Opnd * targetBOpnd, Opnd * sourceBOpnd, U_32 r
                     if (/*sourceSize == OpndSize_32 && */sourceOpnd->getType()->isInteger() 
                         //&& targetOpnd->getType()->isInteger()
 #ifdef _EM64T_
-                        || sourceSize == OpndSize_64 
-                        && sourceOpnd->getType()->isObject() 
-                        && targetOpnd->getType()->isCompressedReference() 
+                        || ( sourceSize == OpndSize_64 
+                             && sourceOpnd->getType()->isObject() 
+                             && targetOpnd->getType()->isCompressedReference() )
                         //TODO verify if types match exactly?
 #endif
                         ) {
@@ -2225,7 +2225,7 @@ bool IRManager::verify()
     Node* unwind = fg->getUnwindNode();
     Node* exit = fg->getExitNode();
     assert(exit!=NULL);
-    assert(unwind == NULL || unwind->getOutDegree() == 1 && unwind->isConnectedTo(true, exit));
+    assert(unwind == NULL || (unwind->getOutDegree() == 1 && unwind->isConnectedTo(true, exit)));
     const Edges& exitInEdges = exit->getInEdges();
     for (Edges::const_iterator ite = exitInEdges.begin(), ende = exitInEdges.end(); ite!=ende; ++ite) {
         Edge* edge = *ite;

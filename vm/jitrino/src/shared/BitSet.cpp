@@ -198,7 +198,7 @@ bool BitSet::isEmpty() const {
 //  Sets 32 bits to values indicated by a bit mask and returns old values
 //
 U_32 BitSet::set32Bits(U_32 firstBitNumber, U_32 value) {
-    assert(words != 0 && firstBitNumber < setSize || firstBitNumber % 32 == 0);
+    assert((words != 0 && firstBitNumber < setSize) || firstBitNumber % 32 == 0);
     U_32 wordIndex = getWordIndex(firstBitNumber);
     U_32 oldValue = words[wordIndex];
     words[wordIndex] = value;
@@ -208,7 +208,7 @@ U_32 BitSet::set32Bits(U_32 firstBitNumber, U_32 value) {
 //  Returns values of 32 bits encoded as a bit mask
 //
 U_32 BitSet::get32Bits(U_32 firstBitNumber) {
-    assert(words != 0 && firstBitNumber < setSize || firstBitNumber % 32 == 0);
+    assert((words != 0 && firstBitNumber < setSize) || firstBitNumber % 32 == 0);
     return words[getWordIndex(firstBitNumber)];
 }
 //

@@ -495,7 +495,7 @@ JIT_Result Compiler::compile(Compile_Handle ch, Method_Handle method,
     
     STATS_MEASURE_MIN_MAX_VALUE(code_size, total_code_size, meth_fname());
     STATS_MEASURE_MIN_MAX_VALUE(native_per_bc_ratio, 
-                                m_infoBlock.get_bc_size() == 0 ? 
+                                (m_infoBlock.get_bc_size() == 0) ? 
                                 0 : total_code_size/m_infoBlock.get_bc_size(),
                                 meth_fname());
 

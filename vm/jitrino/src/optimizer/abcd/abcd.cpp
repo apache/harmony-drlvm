@@ -599,7 +599,8 @@ SsaTmpOpnd *Abcd::makeReasonPhi(Opnd *derefVar, StlVector<AbcdReasons *> &reason
     tauPhiInst->insertBefore(derefVarInst);
     Inst *tauLdVarInst = instFactory.makeLdVar(tauResOpnd, tauPhiDstOpnd);
     Inst *ldVarLoc = tauPhiInst->getNextInst();
-    while (ldVarLoc!=NULL && (ldVarLoc->getOpcode() == Op_Phi) || (ldVarLoc->getOpcode() == Op_TauPi)) {
+    while ( (ldVarLoc!=NULL && (ldVarLoc->getOpcode() == Op_Phi)) ||
+            (ldVarLoc->getOpcode() == Op_TauPi) ) {
         ldVarLoc = ldVarLoc->getNextInst();
     }
     if (Log::isEnabled()) {

@@ -179,10 +179,10 @@ void GCSafePointsInfo::insertLivenessFilters() {
             }
             U_32 objOps  = 0;
             for (Inst* inst = (Inst*)node->getLastInst(); inst!=NULL; inst = inst->getPrevInst()) {
-                if (inst->getOpndCount() == 0 && ((inst->getKind() == Inst::Kind_MethodEndPseudoInst) 
-                        || (inst->getKind() == Inst::Kind_MethodEntryPseudoInst))
-                        || (inst->getMnemonic() == Mnemonic_NOP 
-                        || inst->getKind() == Inst::Kind_EmptyPseudoInst) ) 
+                if ( (inst->getOpndCount() == 0 && ((inst->getKind() == Inst::Kind_MethodEndPseudoInst) 
+                        || (inst->getKind() == Inst::Kind_MethodEntryPseudoInst)))
+                     || (inst->getMnemonic() == Mnemonic_NOP
+                        || inst->getKind() == Inst::Kind_EmptyPseudoInst) )
                 {
                     continue; 
                 }

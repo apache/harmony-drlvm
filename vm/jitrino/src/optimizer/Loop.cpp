@@ -629,8 +629,8 @@ void LoopBuilder::peelLoops(StlVector<Edge*>& loopEdgesIn) {
                 Opnd* unhandledGlobal = NULL;
                 bool hasExit = exit != NULL;
                 bool exitIsUnwind = hasExit && (exit == fg.getUnwindNode());
-                bool exitIsNotDominated = !hasExit || dom.hasDomInfo(header) && dom.hasDomInfo(exit)
-                    && !dom.dominates(header, exit);
+                bool exitIsNotDominated = !hasExit ||
+                    (dom.hasDomInfo(header) && dom.hasDomInfo(exit) && !dom.dominates(header, exit));
                 StlVector<Inst*>::iterator iiter;
                 for(iiter = variantInsts.begin(); iiter != variantInsts.end(); ++iiter) {
                     Inst* inst = *iiter;

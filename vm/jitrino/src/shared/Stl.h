@@ -130,9 +130,9 @@ class StlMMAllocator
 
   // Allocator equality tests
   template <class U>
-  bool operator==(const StlMMAllocator<U>& allocator) { return pmm == allocator.pmm; }
+  bool operator==(const StlMMAllocator<U>& allocator) const { return pmm == allocator.pmm; }
   template <class U>
-  bool operator!=(const StlMMAllocator<U>& allocator) { return pmm != allocator.pmm; }
+  bool operator!=(const StlMMAllocator<U>& allocator) const { return pmm != allocator.pmm; }
 
   // Type conversion utility to obtain StlMMAllocator for different underlying type.
   template <class U> struct rebind { typedef StlMMAllocator<U> other; };

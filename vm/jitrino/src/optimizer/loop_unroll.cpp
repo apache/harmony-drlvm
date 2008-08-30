@@ -373,8 +373,8 @@ static OpndLoopInfo processOpnd(LoopNode* loopHead, LoopTree* lt, InstStack& def
             log_ident(defStack.size());
             Log::out()<<"PHI(";info1.print(Log::out());Log::out()<<",";info2.print(Log::out());Log::out()<<")"<<std::endl;
         }
-        if ((info1.isCounter() && !info1.isPhiSplit()) && (info2.isDOL() || info2.isLDConst())
-            || (info2.isCounter() && !info2.isPhiSplit()) && (info1.isDOL() || info1.isLDConst()))
+        if ( ((info1.isCounter() && !info1.isPhiSplit()) && (info2.isDOL() || info2.isLDConst()))
+             || ((info2.isCounter() && !info2.isPhiSplit()) && (info1.isDOL() || info1.isLDConst())) )
         {
             result.setType(OpndLoopInfo::COUNTER);
             result.setIncrement(info1.isCounter() ? info1.getIncrement() : info2.getIncrement());
