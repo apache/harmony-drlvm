@@ -100,7 +100,6 @@
             <compilerarg value="/QxN" if="is.icl"/>
             <compilerarg value="/Qip" if="is.icl"/>
 
-            <defineset define="HY_NO_SIG" if="hy.skip.sig"/>
             <defineset define="HY_LOCAL_ZLIB" if="hy.skip.zlib"/>
         </compiler>
 

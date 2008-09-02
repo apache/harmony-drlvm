@@ -50,9 +50,6 @@ static const char *api_dll_files[] =
 {
     "harmonyvm",
     "hythr",
-#if !defined(HY_NO_SIG)
-    "hysig",
-#endif
     "hyprt",
 #if defined(HY_LOCAL_ZLIB)
     "z",

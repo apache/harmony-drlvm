@@ -107,7 +107,6 @@
         <echo message="  hy.cpp.compiler = ${hy.cpp.compiler}" />
         <echo message="              cfg = ${hy.cfg}" />
         <echo message="     svn revision = ${svn.revision}" />
-        <echo message="        hy.no.sig = ${hy.no.sig}" />
         <echo message="    hy.local.zlib = ${hy.local.zlib}" />
         <echo message=" common resources = ${common.resources}" />
         <echo message="         HDK root = ${hy.hdk}" />
