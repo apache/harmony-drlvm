@@ -20,6 +20,53 @@
 #include <sys/ucontext.h>
 #include "port_thread.h"
 
+#if defined(FREEBSD)
+
+void port_thread_context_to_regs(Registers* regs, ucontext_t *uc)
+{
+    regs->rax = uc->uc_mcontext.mc_rax;
+    regs->rcx = uc->uc_mcontext.mc_rcx;
+    regs->rdx = uc->uc_mcontext.mc_rdx;
+    regs->rdi = uc->uc_mcontext.mc_rdi;
+    regs->rsi = uc->uc_mcontext.mc_rsi;
+    regs->rbx = uc->uc_mcontext.mc_rbx;
+    regs->rbp = uc->uc_mcontext.mc_rbp;
+    regs->rip = uc->uc_mcontext.mc_rip;
+    regs->rsp = uc->uc_mcontext.mc_rsp;
+    regs->r8  = uc->uc_mcontext.mc_r8;
+    regs->r9  = uc->uc_mcontext.mc_r9;
+    regs->r10 = uc->uc_mcontext.mc_r10;
+    regs->r11 = uc->uc_mcontext.mc_r11;
+    regs->r12 = uc->uc_mcontext.mc_r12;
+    regs->r13 = uc->uc_mcontext.mc_r13;
+    regs->r14 = uc->uc_mcontext.mc_r14;
+    regs->r15 = uc->uc_mcontext.mc_r15;
+    regs->eflags = uc->uc_mcontext.mc_flags;
+}
+
+void port_thread_regs_to_context(ucontext_t *uc, Registers* regs)
+{
+    uc->uc_mcontext.mc_rax = regs->rax;
+    uc->uc_mcontext.mc_rcx = regs->rcx;
+    uc->uc_mcontext.mc_rdx = regs->rdx;
+    uc->uc_mcontext.mc_rdi = regs->rdi;
+    uc->uc_mcontext.mc_rsi = regs->rsi;
+    uc->uc_mcontext.mc_rbx = regs->rbx;
+    uc->uc_mcontext.mc_rbp = regs->rbp;
+    uc->uc_mcontext.mc_rip = regs->rip;
+    uc->uc_mcontext.mc_rsp = regs->rsp;
+    uc->uc_mcontext.mc_r8  = regs->r8;
+    uc->uc_mcontext.mc_r9  = regs->r9;
+    uc->uc_mcontext.mc_r10 = regs->r10;
+    uc->uc_mcontext.mc_r11 = regs->r11;
+    uc->uc_mcontext.mc_r12 = regs->r12;
+    uc->uc_mcontext.mc_r13 = regs->r13;
+    uc->uc_mcontext.mc_r14 = regs->r14;
+    uc->uc_mcontext.mc_r15 = regs->r15;
+    uc->uc_mcontext.mc_flags = regs->eflags;
+}
+
+#else
 
 void port_thread_context_to_regs(Registers* regs, ucontext_t *uc)
 {
@@ -64,3 +111,4 @@ void port_thread_regs_to_context(ucontext_t *uc, Registers* regs)
     uc->uc_mcontext.gregs[REG_R15] = regs->r15;
     uc->uc_mcontext.gregs[REG_EFL] = regs->eflags;
 }
+#endif

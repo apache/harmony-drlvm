@@ -64,6 +64,60 @@ size_t ncai_get_reg_table_size()
     return sizeof(g_ncai_reg_table)/sizeof(g_ncai_reg_table[0]);
 }
 
+#if defined(FREEBSD)
+
+static void ncai_context_to_registers(ucontext_t* pcontext, NcaiRegisters* pregs)
+{
+    pregs->rax  = pcontext->uc_mcontext.mc_rax;
+    pregs->rbx  = pcontext->uc_mcontext.mc_rbx;
+    pregs->rcx  = pcontext->uc_mcontext.mc_rcx;
+    pregs->rdx  = pcontext->uc_mcontext.mc_rdx;
+    pregs->rsp  = pcontext->uc_mcontext.mc_rsp;
+    pregs->rbp  = pcontext->uc_mcontext.mc_rbp;
+    pregs->rsi  = pcontext->uc_mcontext.mc_rsi;
+    pregs->rdi  = pcontext->uc_mcontext.mc_rdi;
+    pregs->r8   = pcontext->uc_mcontext.mc_r8;
+    pregs->r9   = pcontext->uc_mcontext.mc_r9;
+    pregs->r10  = pcontext->uc_mcontext.mc_r10;
+    pregs->r11  = pcontext->uc_mcontext.mc_r11;
+    pregs->r12  = pcontext->uc_mcontext.mc_r12;
+    pregs->r13  = pcontext->uc_mcontext.mc_r13;
+    pregs->r14  = pcontext->uc_mcontext.mc_r14;
+    pregs->r15  = pcontext->uc_mcontext.mc_r15;
+    pregs->fs = 0;
+    pregs->gs = 0;
+    pregs->ss = 0;
+    pregs->cs = 0;
+    pregs->rip    = pcontext->uc_mcontext.mc_rip;
+    pregs->eflags = pcontext->uc_mcontext.mc_flags;
+}
+
+static void ncai_registers_to_context(NcaiRegisters* pregs, ucontext_t* pcontext)
+{
+    pcontext->uc_mcontext.mc_rax  = pregs->rax;
+    pcontext->uc_mcontext.mc_rbx  = pregs->rbx;
+    pcontext->uc_mcontext.mc_rcx  = pregs->rcx;
+    pcontext->uc_mcontext.mc_rdx  = pregs->rdx;
+    pcontext->uc_mcontext.mc_rsp  = pregs->rsp;
+    pcontext->uc_mcontext.mc_rbp  = pregs->rbp;
+    pcontext->uc_mcontext.mc_rsi  = pregs->rsi;
+    pcontext->uc_mcontext.mc_rdi  = pregs->rdi;
+    pcontext->uc_mcontext.mc_r8   = pregs->r8;
+    pcontext->uc_mcontext.mc_r9   = pregs->r9;
+    pcontext->uc_mcontext.mc_r10  = pregs->r10;
+    pcontext->uc_mcontext.mc_r11  = pregs->r11;
+    pcontext->uc_mcontext.mc_r12  = pregs->r12;
+    pcontext->uc_mcontext.mc_r13  = pregs->r13;
+    pcontext->uc_mcontext.mc_r14  = pregs->r14;
+    pcontext->uc_mcontext.mc_r15  = pregs->r15;
+    // cs, gs, fs and ss registers are not restored, because there is
+    // no storage for them
+    pcontext->uc_mcontext.mc_rip  = pregs->rip;
+    pcontext->uc_mcontext.mc_flags  = pregs->eflags;
+}
+
+#else // # defined(FREEBSD)
+
 #ifdef PLATFORM_POSIX
 
 static void ncai_context_to_registers(ucontext_t* pcontext, NcaiRegisters* pregs)
@@ -177,6 +231,8 @@ static void ncai_registers_to_context(NcaiRegisters* pregs, CONTEXT* pcontext)
 }
 
 #endif // #ifdef PLATFORM_POSIX
+
+#endif // # defined(FREEBSD)
 
 bool ncai_get_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 {
