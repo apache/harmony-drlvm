@@ -155,6 +155,20 @@ void oh_deallocate_global_handle(ObjectHandle);
  */
 void oh_enumerate_global_handles();
 
+/*
+ * Weak global handles
+ */
+
+/**
+ * Creates weak global handle, which needs to be explicitly freed.
+ */
+ObjectHandle oh_allocate_weak_global_handle_from_jni();
+/**
+ * Frees weak global handle.
+ */
+void oh_deallocate_weak_global_handle(ObjectHandle);
+/* For interface simplicity, weak global handles are also enumerated in function oh_enumerate_global_handles */
+
 //////////////////////////////////////////////////////////////////////////
 // Local Handles
 

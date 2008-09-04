@@ -970,13 +970,29 @@ jboolean JNICALL IsSameObject(JNIEnv * UNREF jni_env,
         return JNI_TRUE;
     }
 
-    if(!(ref1 && ref2)) {
-        // One reference is null and the other is not.
-        return JNI_FALSE;
-    }
-
     ObjectHandle h1 = (ObjectHandle)ref1;
     ObjectHandle h2 = (ObjectHandle)ref2;
+    jboolean result;
+
+    if(!h1) {
+        assert(h2);
+        tmn_suspend_disable();
+        if(h2->object)
+            result = JNI_FALSE;
+        else    // h1 is NULL and h2 points to NULL object
+            result = JNI_TRUE;
+        tmn_suspend_enable();
+        return result;
+    } else if(!h2) {
+        assert(h1);
+        tmn_suspend_disable();
+        if(h1->object)
+            result = JNI_FALSE;
+        else    // h2 is NULL and h1 points to NULL object
+            result = JNI_TRUE;
+        tmn_suspend_enable();
+        return result;
+    }
 
     tmn_suspend_disable();       //---------------------------------v
 
@@ -985,7 +1001,7 @@ jboolean JNICALL IsSameObject(JNIEnv * UNREF jni_env,
     TRACE2("jni-same", "IsSameObject: Obj1 = " << java_ref1->vt()->clss->get_name()->bytes <<
         " Obj2 = " << java_ref2->vt()->clss->get_name()->bytes <<
         " objects are " << ((java_ref1 == java_ref2) ? "same" : "different"));
-    jboolean result = (jboolean)((java_ref1 == java_ref2) ? JNI_TRUE : JNI_FALSE);
+    result = (jboolean)((java_ref1 == java_ref2) ? JNI_TRUE : JNI_FALSE);
 
     tmn_suspend_enable();        //---------------------------------^
 
@@ -1418,14 +1434,47 @@ VMEXPORT jweak JNICALL NewWeakGlobalRef(JNIEnv * jni_env, jobject obj)
 {
     TRACE("NewWeakGlobalRef called");
     assert(hythread_is_suspend_enabled());
-    return NewGlobalRef(jni_env, obj);
+    
+    if (exn_raised() || !obj) return NULL;
+
+    if(obj == NULL) {
+        return NULL;
+    }
+
+    assert(hythread_is_suspend_enabled());
+    ObjectHandle new_handle = oh_allocate_weak_global_handle_from_jni();
+
+    if (new_handle == NULL) {
+        return NULL;
+    }
+
+    ObjectHandle old_handle = (ObjectHandle)obj;
+
+    tmn_suspend_disable();       //---------------------------------v
+
+    new_handle->object = old_handle->object;
+    TRACE("NewWeakGlobalRef class = " << old_handle->object->vt()->clss);
+
+    tmn_suspend_enable();        //---------------------------------^
+
+    return (jweak)new_handle;
 }
 
 VMEXPORT void JNICALL DeleteWeakGlobalRef(JNIEnv * jni_env, jweak obj)
 {
     TRACE("DeleteWeakGlobalRef called");
     assert(hythread_is_suspend_enabled());
-    DeleteGlobalRef(jni_env, obj);
+    
+    if (obj == NULL) return;
+
+#ifdef _DEBUG
+    tmn_suspend_disable();
+    ObjectHandle h = (ObjectHandle)obj;
+    TRACE("DeleteGlobalRef class = " << h->object->vt()->clss);
+    tmn_suspend_enable();
+#endif
+
+    oh_deallocate_weak_global_handle((ObjectHandle)obj);
 }
 
 jboolean JNICALL ExceptionCheck(JNIEnv * jni_env)

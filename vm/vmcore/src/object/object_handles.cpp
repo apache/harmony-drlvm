@@ -258,12 +258,90 @@ void oh_deallocate_global_handle(ObjectHandle handle)
     STD_FREE(h);
 } //vm_delete_global_object_handle
 
+static void oh_enumerate_weak_global_handles();
+
 void oh_enumerate_global_handles()
 {
     TRACE2("enumeration", "enumerating global handles");
     for(ObjectHandlesOld* g = global_object_handles; g; g=g->next)
         if (g->handle.object)
             vm_enumerate_root_reference((void**)&g->handle.object, FALSE);
+    oh_enumerate_weak_global_handles();
+}
+
+//////////////////////////////////////////////////////////////////////////
+// Weak Global Handles
+static ObjectHandlesOld* weak_global_object_handles = NULL;
+
+static ObjectHandle oh_allocate_weak_global_handle_internal()
+{
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
+    // Allocate and init handle
+    ObjectHandlesOld* h = oh_allocate_object_handle(); //(ObjectHandlesOld*)m_malloc(sizeof(ObjectHandlesOld));
+
+    if (h == NULL)  {
+        return NULL;
+    }
+
+    h->handle.object = NULL;
+    h->allocated_on_the_stack = false;
+    
+    hythread_suspend_disable(); // ----------------vvv
+    vm_env->p_handle_lock->_lock(); 
+    // Insert at beginning of globals list
+    h->prev = NULL;
+    h->next = weak_global_object_handles;
+    weak_global_object_handles = h;
+    if(h->next)
+        h->next->prev = h;
+    vm_env->p_handle_lock->_unlock();
+    hythread_suspend_enable(); //--------------------------------------------^^^
+    return &h->handle;
+} //vm_create_weak_global_object_handle
+
+ObjectHandle oh_allocate_weak_global_handle_from_jni()
+{
+    ObjectHandle res = oh_allocate_weak_global_handle_internal();
+
+    if (res == NULL) {
+        exn_raise_object(VM_Global_State::loader_env->java_lang_OutOfMemoryError);
+    }
+    return res;
+}
+
+static bool UNUSED is_weak_global_handle(ObjectHandle handle)
+{
+    for(ObjectHandlesOld* g = weak_global_object_handles; g; g=g->next)
+        if (g==(ObjectHandlesOld*)handle) return true;
+    return false;
+}
+
+void oh_deallocate_weak_global_handle(ObjectHandle handle)
+{
+    Global_Env * vm_env = VM_Global_State::loader_env;
+
+    tmn_suspend_disable(); // ----------vvv
+    vm_env->p_handle_lock->_lock();
+    assert(is_weak_global_handle(handle));
+
+    handle->object = NULL;
+    ObjectHandlesOld* h = (ObjectHandlesOld*)handle;
+    if (h->next) h->next->prev = h->prev;
+    if (h->prev) h->prev->next = h->next;
+    if (h==weak_global_object_handles) weak_global_object_handles = h->next;
+
+    vm_env->p_handle_lock->_unlock();
+    tmn_suspend_enable(); // -------------------------------------^^^
+    STD_FREE(h);
+} //vm_delete_global_object_handle
+
+static void oh_enumerate_weak_global_handles()
+{
+    TRACE2("enumeration", "enumerating weak global handles");
+    for(ObjectHandlesOld* g = weak_global_object_handles; g; g=g->next)
+        if (g->handle.object)
+            vm_enumerate_weak_root_reference((void**)&g->handle.object, FALSE);
 }
 
 //////////////////////////////////////////////////////////////////////////
