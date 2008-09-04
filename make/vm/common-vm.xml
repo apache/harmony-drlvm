@@ -130,7 +130,8 @@
 
             <syslibset libs="advapi32,odbc32,userenv,ws2_32,mswsock,psapi" if="is.windows"/>
 
-            <syslibset type="shared" libs="m,dl,stdc++,rt" if="is.unix.x86"/>
+            <syslibset type="shared" libs="m,dl,stdc++,rt" if="is.linux.x86"/>
+            <syslibset type="shared" libs="pthread" if="is.freebsd"/>
             <!--linkerarg value="-lgcc_s" if="is.unix.x86" unless="is.icc"/-->
         </linker>
     </target>

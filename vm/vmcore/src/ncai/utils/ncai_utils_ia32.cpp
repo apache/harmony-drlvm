@@ -59,6 +59,49 @@ size_t ncai_get_reg_table_size()
     return sizeof(g_ncai_reg_table)/sizeof(g_ncai_reg_table[0]);
 }
 
+#if defined(FREEBSD)
+
+static void ncai_context_to_registers(ucontext_t* pcontext, NcaiRegisters* pregs)
+{
+    pregs->eax  = pcontext->uc_mcontext.mc_eax;
+    pregs->ebx  = pcontext->uc_mcontext.mc_ebx;
+    pregs->ecx  = pcontext->uc_mcontext.mc_ecx;
+    pregs->edx  = pcontext->uc_mcontext.mc_edx;
+    pregs->esp  = pcontext->uc_mcontext.mc_esp;
+    pregs->ebp  = pcontext->uc_mcontext.mc_ebp;
+    pregs->esi  = pcontext->uc_mcontext.mc_esi;
+    pregs->edi  = pcontext->uc_mcontext.mc_edi;
+    pregs->ds = pcontext->uc_mcontext.mc_ds;
+    pregs->es = pcontext->uc_mcontext.mc_es;
+    pregs->fs = pcontext->uc_mcontext.mc_fs;
+    pregs->gs = pcontext->uc_mcontext.mc_gs;
+    pregs->ss = pcontext->uc_mcontext.mc_ss;
+    pregs->cs = pcontext->uc_mcontext.mc_cs;
+    pregs->eip    = pcontext->uc_mcontext.mc_eip;
+    pregs->eflags = pcontext->uc_mcontext.mc_eflags;
+}
+
+static void ncai_registers_to_context(NcaiRegisters* pregs, ucontext_t* pcontext)
+{
+    pcontext->uc_mcontext.mc_eax  = pregs->eax;
+    pcontext->uc_mcontext.mc_ebx  = pregs->ebx;
+    pcontext->uc_mcontext.mc_ecx  = pregs->ecx;
+    pcontext->uc_mcontext.mc_edx  = pregs->edx;
+    pcontext->uc_mcontext.mc_esp  = pregs->esp;
+    pcontext->uc_mcontext.mc_ebp  = pregs->ebp;
+    pcontext->uc_mcontext.mc_esi  = pregs->esi;
+    pcontext->uc_mcontext.mc_edi  = pregs->edi;
+    pcontext->uc_mcontext.mc_ds = pregs->ds;
+    pcontext->uc_mcontext.mc_es = pregs->es;
+    pcontext->uc_mcontext.mc_fs = pregs->fs;
+    pcontext->uc_mcontext.mc_gs = pregs->gs;
+    pcontext->uc_mcontext.mc_ss = pregs->ss;
+    pcontext->uc_mcontext.mc_cs = pregs->cs;
+    pcontext->uc_mcontext.mc_eip  = pregs->eip;
+    pcontext->uc_mcontext.mc_eflags  = pregs->eflags;
+}
+#else
+
 #ifdef PLATFORM_POSIX
 
 static void ncai_context_to_registers(ucontext_t* pcontext, NcaiRegisters* pregs)
@@ -149,6 +192,7 @@ static void ncai_registers_to_context(NcaiRegisters* pregs, CONTEXT* pcontext)
 }
 
 #endif // #ifdef PLATFORM_POSIX
+#endif // # defined(FREEBSD)
 
 bool ncai_get_register_value(hythread_t thread, jint reg_number, void* buf_ptr)
 {

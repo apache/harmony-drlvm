@@ -45,6 +45,8 @@ static _syscall0(pid_t, gettid)/* static definition */
 #endif /* _syscall0 */
 
 #else /* !LINUX */
+#include <sys/types.h>
+#include <unistd.h>
 #define gettid() getpid()
 #endif
 

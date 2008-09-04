@@ -36,6 +36,9 @@
 extern "C" {
 #endif
 
+#if defined(FREEBSD)
+#define PTHREAD_MUTEX_RECURSIVE_NP PTHREAD_MUTEX_RECURSIVE
+#endif
 
 /**
  * @defgroup port_mutex Basic mutexes

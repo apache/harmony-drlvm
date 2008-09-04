@@ -21,6 +21,10 @@
 #include "port_modules.h"
 #include "native_unwind.h"
 
+#if defined(FREEBSD)
+#include <pthread_np.h>
+#endif
+
 #if defined(MACOSX)
 #include <crt_externs.h>
 #define environ (*_NSGetEnviron())
