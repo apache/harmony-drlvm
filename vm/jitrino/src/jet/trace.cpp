@@ -125,7 +125,8 @@ const char * get_exe_dir(void)
 #ifdef PLATFORM_POSIX
     static const char self_path[] = "/proc/self/exe";
     // Resolve full path to module
-    if (readlink(self_path, buf, sizeof(buf)) < 0) {
+    memset(buf, 0, sizeof(buf));
+    if (readlink(self_path, buf, sizeof(buf)-1) < 0) {
 #else
     if (!GetModuleFileName(NULL, buf, sizeof(buf))) {
 #endif
