@@ -130,7 +130,7 @@ APR_DECLARE(apr_status_t) port_user_timezone(char** tzname,
 			&& APR_LNK == fi.filetype) {
 
 			memset(buf, 0, sizeof(buf));
-			if (readlink(cur_file, buf, sizeof(buf)) == -1) {
+			if (readlink(cur_file, buf, sizeof(buf)-1) == -1) {
 				break;
 			}
 			cur_file = buf;
