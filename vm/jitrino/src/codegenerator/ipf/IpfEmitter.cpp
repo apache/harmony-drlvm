@@ -1418,7 +1418,7 @@ void Emitter::printDisasm(char * cap) {
         string sz("");
         int len = 0;
 
-        len = readlink("/proc/self/exe", buf, sizeof(buf));
+        len = readlink("/proc/self/exe", buf, sizeof(buf)-1);
         if (len < 0) {
             buf[0]='.';
             buf[1]='/';
