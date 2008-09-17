@@ -33,7 +33,7 @@ import java.lang.reflect.*;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
-
+import java.util.*;
 import junit.framework.TestCase;
 
 /*
@@ -96,6 +96,10 @@ import junit.framework.TestCase;
     /**/@igt class MC011\u0576\u06C0\u06F10 extends Mc010\u0576\u06C0\u06F10 implements MI010\u0576\u06C0\u06F10 {};
     public void test_2() {
         //ClassGenericsTest<? super Class>.Mc002<ClassGenericsTest>.Mc004<ClassGenericsTest> f1;
+        Locale locale = Locale.getDefault();
+        Locale locale2;
+        locale2 = new Locale("*.UTF8");
+        if(locale==locale2){
         Type ap[];
         TypeVariable tv;
         Type ab[];
@@ -255,7 +259,7 @@ import junit.framework.TestCase;
         //////////////////////////////////////////////////////////////////////////////////////////////
 			if(!((Class)MC011\u0576\u06C0\u06F10.class.getGenericSuperclass()).getName().equals("java.lang.ClassGenericsTest$Mc010\u0576\u06C0\u06F10")) fail("test_2, case 086 FAILED: "+((Class)Mc008\u0576\u06C0\u06F10.class.getGenericSuperclass()).getName());
 		//}
-
+        }
   }
 
     /**
@@ -417,6 +421,10 @@ import junit.framework.TestCase;
 ///* + */    public void foo4For_5(ClassGenericsTest<? super Class>.Mc002<ClassGenericsTest>.Mc004<?> a1, @igt(author="Czar") Mc003<Mc005> a2, @igt(author="President") Mc003<Mc005> ... a3) {}
 /* - */    public ClassGenericsTest<? super Class>.Mc002<ClassGenericsTest>.Mc004<ClassGenericsTest> foo5For_5(X a1, Class<Type> a2,  ClassGenericsTest<? super Class>.Mc002<ClassGenericsTest>.Mc004<ClassGenericsTest> a3) {return a3;}
     public void test_5() {
+        Locale locale = Locale.getDefault();
+        Locale locale2;
+        locale2 = new Locale("*.UTF8");
+        if(locale==locale2){
         Type rt;
         TypeVariable tv;
         ParameterizedType oc1;
@@ -773,6 +781,7 @@ import junit.framework.TestCase;
         if (RuntimeAdditionalSupport1.openingFlag) {
 	        if(!m.toGenericString().equals("public transient java.lang.ClassGenericsTest<X>.Mc003<java.lang.ClassGenericsTest<X>.Mc005> java.lang.ClassGenericsTest.foo4For_5(java.lang.ClassGenericsTest<? super java.lang.Class>.Mc002<java.lang.ClassGenericsTest>.Mc004<?>,java.lang.ClassGenericsTest<X>.Mc003<java.lang.ClassGenericsTest<X>.Mc005>,java.lang.ClassGenericsTest<X>.Mc003<java.lang.ClassGenericsTest<X>.Mc005>[])")) fail("test_5, case 166 FAILED: |"+m.toGenericString()+"|");
 		}
+        }
   }
     
     /**

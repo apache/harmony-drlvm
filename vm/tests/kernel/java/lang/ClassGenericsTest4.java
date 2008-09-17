@@ -25,7 +25,7 @@ package java.lang;
 import java.lang.reflect.*;
 import java.io.File;
 import java.io.FileOutputStream;
-
+import java.util.*;
 import org.apache.harmony.test.TestResources;
 
 import junit.framework.TestCase;
@@ -257,6 +257,10 @@ try{
      * checks for cases when generalized classes have been loaded by another class loader
      */
     public void test_2 () throws Exception {
+        Locale locale = Locale.getDefault();
+        Locale locale2;
+        locale2 = new Locale("*.UTF8");
+        if(locale==locale2){
 		ClassLoader ld = TestResources.getLoader();
 		Class temp = ld.loadClass("org.apache.harmony.lang.generics.TemplateSet");
 		Class ac[] = temp.getDeclaredClasses();
@@ -441,8 +445,8 @@ try{
 		if(!((Class)ai[0]).getName().equals("org.apache.harmony.lang.generics.TemplateSet$MI010\u0576\u06C0\u06F10")) fail("test_2, case 085 FAILED: "+((Class)ai[0]).getName());
         //////////////////////////////////////////////////////////////////////////////////////////////
 		if(!((Class)MC011\u0576\u06C0\u06F10.getGenericSuperclass()).getName().equals("org.apache.harmony.lang.generics.TemplateSet$Mc010\u0576\u06C0\u06F10")) fail("test_2, case 086 FAILED: "+((Class)Mc008\u0576\u06C0\u06F10.getGenericSuperclass()).getName());
-	}
-
+        }	
+}
     /**
      * spoiled signature
      */
