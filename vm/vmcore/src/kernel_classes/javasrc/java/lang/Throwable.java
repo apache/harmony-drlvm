@@ -118,16 +118,16 @@ public class Throwable implements Serializable {
      * @com.intel.drl.spec_ref 
      */
 	public Throwable initCause(Throwable initialCause) {
-		if (initialCause == this) {
+		if (cause == this) {
+			if (initialCause != this) {
+				cause = initialCause;
+				return this;
+			}
 			throw new IllegalArgumentException("A throwable cannot be its own cause.");
 		}
 		// second call of initCause(Throwable)
-		if (cause != this) {
-			throw new IllegalStateException("A cause can be set at most once." + 
+		throw new IllegalStateException("A cause can be set at most once." + 
                     " Illegal attempt to re-set the cause of " + this);
-		}
-		cause = initialCause;
-		return this;
 	}
 
     /**
