@@ -21,6 +21,7 @@
 #ifndef _LOG_PARAMS_H
 #define _LOG_PARAMS_H
 
+#include <stdio.h>
 #include <iostream>
 #include <vector>
 #include <string.h>
