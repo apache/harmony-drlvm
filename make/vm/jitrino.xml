@@ -185,6 +185,7 @@
                 <compilerarg value="-fmessage-length=0" if="is.gcc"/>
                 <compilerarg value="-Wall" if="is.gcc"/>
                 <compilerarg value="-Werror" if="is.gcc"/>
+                <compilerarg value="-Wno-uninitialized" if="is.gcc"/>
 
                 <compilerarg value="-x" />
                 <compilerarg value="c++" />
