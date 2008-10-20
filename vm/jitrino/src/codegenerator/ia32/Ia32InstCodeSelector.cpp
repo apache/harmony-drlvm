@@ -336,14 +336,7 @@ Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * 
 
     OpndSize srcSize=irManager.getTypeSize(srcType);
     OpndSize dstSize=irManager.getTypeSize(dstType);
-
-    if (dstSize!=srcSize && srcOpnd->isPlacedIn(OpndKind_Imm) && dstOpnd == NULL) {
-        int64 immValue = srcOpnd->getImmValue();
-        if (dstSize > srcSize || Type::constFits(immValue, dstType->tag)) {
-            return irManager.newImmOpnd(dstType, immValue);
-        }
-    }
-
+    
     if (dstSize==srcSize){ // trivial conversion
         if (dstOpnd==NULL && dstType == srcType) {
             dstOpnd=srcOpnd;
@@ -361,7 +354,7 @@ Opnd * InstCodeSelector::convertIntToInt(Opnd * srcOpnd, Type * dstType, Opnd * 
         if (dstOpnd==NULL)
             dstOpnd=irManager.newOpnd(dstType);
 #ifdef _EM64T_
-        appendInsts(irManager.newInstEx(srcType->isSignedInteger() & !isZeroExtend ? Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
+            appendInsts(irManager.newInstEx(srcType->isSignedInteger() & !isZeroExtend ? Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
 #else
         if (dstSize<OpndSize_64){
             appendInsts(irManager.newInstEx(srcType->isSignedInteger() && !isZeroExtend ? Mnemonic_MOVSX:Mnemonic_MOVZX, 1, dstOpnd, srcOpnd));
@@ -412,8 +405,7 @@ Opnd * InstCodeSelector::convertIntToFp(Opnd * srcOpnd, Type * dstType, Opnd * d
 #endif
 
             //load float value to FP0
-            Type* dType = irManager.getTypeManager().getDoubleType();
-            Opnd* fpResOpnd = irManager.newRegOpnd(dType, RegName_FP0);
+            Opnd* fpResOpnd = irManager.newOpnd(irManager.getTypeManager().getDoubleType());
             Inst* convInst = irManager.newInst(Mnemonic_FILD, fpResOpnd, int64Opnd);            
             appendInsts(convInst);
 
@@ -553,10 +545,6 @@ Opnd * InstCodeSelector::convert(CG_OpndHandle * oph, Type * dstType, Opnd * dst
     Opnd * srcOpnd=(Opnd*)oph;
 
     Type * srcType=srcOpnd->getType();
-    if (dstOpnd == NULL && dstType == srcType) {
-        dstOpnd = srcOpnd;
-        return dstOpnd;
-    }
     bool converted=false;
     if (isIntegerType(srcType)){
         if (isIntegerType(dstType)){
@@ -700,11 +688,7 @@ Opnd * InstCodeSelector::simpleOp_I8(Mnemonic mn, Type * dstType, Opnd * src1, O
 Opnd * InstCodeSelector::fpOp(Mnemonic mn, Type * dstType, Opnd * src1, Opnd * src2)
 {
     Opnd * dst=irManager.newOpnd(dstType);
-    Opnd * srcOpnd1 = src1->canBePlacedIn(OpndKind_XMMReg)? NULL : irManager.newOpnd(dstType);
-    srcOpnd1 = convert(src1, dstType, srcOpnd1);
-    Opnd * srcOpnd2 = src2->canBePlacedIn(OpndKind_XMMReg_Mem)? NULL : irManager.newOpnd(dstType);
-    srcOpnd2 = convert(src2, dstType, srcOpnd2);
-
+    Opnd * srcOpnd1=(Opnd*)convert(src1, dstType), * srcOpnd2=(Opnd*)convert(src2, dstType);
     appendInsts(irManager.newInstEx(mn, 1, dst, srcOpnd1, srcOpnd2));
     return dst;
 }
@@ -999,17 +983,15 @@ CG_OpndHandle* InstCodeSelector::neg(NegOp::Types   opType,
         case NegOp::F:
         {
             Type * dstType=irManager.getTypeFromTag(Type::Double);
-            dst = irManager.newOpnd(dstType, Constraint(OpndKind_FPReg, ((Opnd*)src)->getSize(), OpndExt_Any));
-            copyOpnd(dst,(Opnd*)src);
-            appendInsts(irManager.newInst(Mnemonic_FCHS,dst));
+            dst = irManager.newOpnd(dstType);
+            appendInsts(irManager.newInstEx(Mnemonic_FCHS,1,dst,(Opnd*)src));
             break;
         }
         case NegOp::S:
         {
             Type * dstType=irManager.getTypeFromTag(Type::Single);
-            dst = irManager.newOpnd(dstType, Constraint(OpndKind_FPReg, ((Opnd*)src)->getSize(), OpndExt_Any));
-            copyOpnd(dst,(Opnd*)src);
-            appendInsts(irManager.newInst(Mnemonic_FCHS,dst));
+            dst = irManager.newOpnd(dstType);
+            appendInsts(irManager.newInstEx(Mnemonic_FCHS,1,dst,(Opnd*)src));
             break;
         }
         default:
@@ -1206,9 +1188,9 @@ Opnd * InstCodeSelector::shiftOp(IntegerOp::Types opType, Mnemonic mn, Opnd * va
             dstType=irManager.getTypeFromTag(Type::Int64);
             dst=irManager.newOpnd(dstType);
 #ifndef _EM64T_
-            appendInsts(irManager.newI8PseudoInst(mn,1,dst,(Opnd*)convert(value, dstType),(Opnd*)convert(shiftAmount, typeManager.getInt8Type())));
+            appendInsts(irManager.newI8PseudoInst(mn,1,dst,(Opnd*)convert(value, dstType),(Opnd*)convert(shiftAmount, typeManager.getInt32Type())));
 #else
-            appendInsts(irManager.newInstEx(mn,1,dst,(Opnd*)convert(value, dstType),(Opnd*)convert(shiftAmount, typeManager.getInt8Type())));
+            appendInsts(irManager.newInstEx(mn,1,dst,(Opnd*)convert(value, dstType),(Opnd*)convert(shiftAmount, typeManager.getInt32Type())));
 #endif
             return dst;
         default:
@@ -1286,15 +1268,13 @@ CG_OpndHandle*  InstCodeSelector::cmp(CompareOp::Operators cmpOp,
                                          CG_OpndHandle*       src1,
                                          CG_OpndHandle*       src2, int ifNaNResult) 
 {
-    Opnd * dst8=irManager.newOpnd(typeManager.getUInt8Type());
     Opnd * dst=irManager.newOpnd(typeManager.getInt32Type());
     bool swapped=cmpToEflags(cmpOp, opType, (Opnd*)src1, (Opnd*)src2);
     ConditionMnemonic cm=getConditionMnemonicFromCompareOperator(cmpOp, opType);
     if (swapped) 
         cm=swapConditionMnemonic(cm);
-    appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst8, irManager.newImmOpnd(typeManager.getUInt8Type(), 0)));
-    appendInsts(irManager.newInstEx(getMnemonic(Mnemonic_SETcc, cm), 1, dst8,dst8));
-    appendInsts(irManager.newInstEx(Mnemonic_MOVZX, 1, dst, dst8));
+    appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+    appendInsts(irManager.newInstEx(getMnemonic(Mnemonic_SETcc, cm), 1, dst,dst));
     if (ifNaNResult == 1 || (ifNaNResult ==0 && ((opType==CompareOp::F) ||(opType==CompareOp::S) ||(opType==CompareOp::D)) && ((cmpOp == CompareOp::Geu) || (cmpOp == CompareOp::Gtu) || (cmpOp == CompareOp::Ne) || (cmpOp == CompareOp::Eq)))) {
         appendInsts(irManager.newInstEx(Mnemonic_CMOVP,1,dst,dst,irManager.newImmOpnd(typeManager.getInt32Type(), ifNaNResult)));
     }
@@ -1379,40 +1359,26 @@ bool InstCodeSelector::cmpToEflags(CompareOp::Operators cmpOp, CompareOp::Types 
         case CompareOp::F:
         {
             Type * srcType=irManager.getTypeFromTag(Type::Double);
-            Opnd * srcOpnd1 = src1->canBePlacedIn(OpndKind_XMMReg)? NULL : irManager.newOpnd(srcType);
-            srcOpnd1 = convert(src1, srcType, srcOpnd1);
-            Opnd * srcOpnd2;
-            if (src2) {
-                srcOpnd2 = src2->canBePlacedIn(OpndKind_XMMReg_Mem)? NULL : irManager.newOpnd(srcType);
-                srcOpnd2 = convert(src2, srcType, srcOpnd2);
-            } else {
+            Opnd * srcOpnd1=(Opnd*)convert(src1, srcType);
 #ifdef _EM64T_
-                Opnd * baseOpnd = irManager.newOpnd(typeManager.getUnmanagedPtrType(srcType));
-                srcOpnd2 = irManager.newFPConstantMemOpnd((double)0.0, baseOpnd, (BasicBlock*)currentBasicBlock);
+            Opnd * baseOpnd = irManager.newOpnd(typeManager.getUnmanagedPtrType(srcType));
+            Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((double)0.0, baseOpnd, (BasicBlock*)currentBasicBlock);
 #else
-                srcOpnd2 = irManager.newFPConstantMemOpnd((double)0.0);
+            Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((double)0.0);
 #endif
-            }
             appendInsts(irManager.newInst(Mnemonic_UCOMISD, srcOpnd1, srcOpnd2));
             break;
         }
         case CompareOp::S:
         {
             Type * srcType=irManager.getTypeFromTag(Type::Single);
-            Opnd * srcOpnd1 = src1->canBePlacedIn(OpndKind_XMMReg)? NULL : irManager.newOpnd(srcType);
-            srcOpnd1 = convert(src1, srcType, srcOpnd1);
-            Opnd * srcOpnd2;
-            if (src2) {
-                srcOpnd2 = src2->canBePlacedIn(OpndKind_XMMReg_Mem)? NULL : irManager.newOpnd(srcType);
-                srcOpnd2 = convert(src2, srcType, srcOpnd2);
-            } else {
+            Opnd * srcOpnd1=(Opnd*)convert(src1, srcType);
 #ifdef _EM64T_
-                Opnd * baseOpnd = irManager.newOpnd(typeManager.getUnmanagedPtrType(srcType));
-                srcOpnd2 = irManager.newFPConstantMemOpnd((float)0.0, baseOpnd, (BasicBlock*)currentBasicBlock);
+            Opnd * baseOpnd = irManager.newOpnd(typeManager.getUnmanagedPtrType(srcType));
+            Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((float)0.0, baseOpnd, (BasicBlock*)currentBasicBlock);
 #else
-                srcOpnd2 = irManager.newFPConstantMemOpnd((float)0.0);
+            Opnd * srcOpnd2=src2?(Opnd*)convert(src2, srcType):irManager.newFPConstantMemOpnd((float)0.0);
 #endif
-            }
             appendInsts(irManager.newInst(Mnemonic_UCOMISS, srcOpnd1, srcOpnd2));
             break;
         }
@@ -2132,7 +2098,7 @@ CG_OpndHandle* InstCodeSelector::simpleLdInd(Type * dstType, Opnd * addr,
 {
 #ifdef _EM64T_
     if(irManager.refsAreCompressed() && memType > Type::Float && memType!=Type::UnmanagedPtr) {
-        Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.getUInt32Type(), addr);
+        Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.getInt32Type(), addr);
         Opnd * dst = irManager.newOpnd(typeManager.getInt64Type());
         // loading compressed 32-bit managed address, ensure zero-extention
         copyOpnd(dst, opnd, true);
@@ -2169,7 +2135,7 @@ void InstCodeSelector::simpleStInd(Opnd * addr,
     if(irManager.refsAreCompressed() && memType > Type::Float && !src->getType()->isUnmanagedPtr()) {
         Type * unmanagedPtrType = typeManager.getUnmanagedPtrType(typeManager.getInt8Type());
         Opnd * heap_base = heapBaseOpnd(unmanagedPtrType, (POINTER_SIZE_INT)VMInterface::getHeapBase());
-        Opnd * compressed_src = irManager.newOpnd(src->getType());
+        Opnd * compressed_src = irManager.newOpnd(typeManager.compressType(src->getType()));
         Opnd * opnd = irManager.newMemOpndAutoKind(typeManager.compressType(src->getType()), addr);
         appendInsts(irManager.newInstEx(Mnemonic_SUB, 1, compressed_src, src, heap_base));
         appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, opnd, compressed_src));
@@ -2489,7 +2455,7 @@ void InstCodeSelector::incCounter(Type *counterType,U_32 key)
     Opnd* baseOpnd = irManager.newImmOpnd(typeManager.getUnmanagedPtrType(typeManager.getUIntPtrType()), (POINTER_SIZE_INT)ptr);
     Opnd* memOpnd = irManager.newMemOpnd(typeManager.getUIntPtrType(), MemOpndKind_Heap, baseOpnd, NULL, NULL, NULL);
     const Mnemonic mn = Mnemonic_ADD;
-    Inst* inst = irManager.newInst(mn, memOpnd,  irManager.newImmOpnd(typeManager.getInt8Type(), 1));
+    Inst* inst = irManager.newInst(mn, memOpnd,  irManager.newImmOpnd(typeManager.getUInt32Type(), 1));
     appendInsts(inst);
 }
 
@@ -2602,7 +2568,7 @@ CG_OpndHandle* InstCodeSelector::tau_ldVTableAddr(Type* dstType,
 
     int64 heapBase = (int64) VMInterface::getVTableBase();
     Opnd * acc =  simpleOp_I8(Mnemonic_ADD, dstType, (Opnd *)base, irManager.newImmOpnd(dstType, Opnd::RuntimeInfo::Kind_VTableAddrOffset));
-    Opnd * sourceVTableAddr=irManager.newMemOpnd(typeManager.getUInt32Type(), acc, 0, 0, irManager.newImmOpnd(typeManager.getUInt32Type(), 0));
+    Opnd * sourceVTableAddr=irManager.newMemOpnd(typeManager.getInt32Type(), acc, 0, 0, irManager.newImmOpnd(typeManager.getUInt32Type(), 0));
     acc=irManager.newOpnd(dstType);
     appendInsts(irManager.newInstEx(Mnemonic_MOVZX, 1, acc, sourceVTableAddr));
     vtableAddr =  simpleOp_I8(Mnemonic_ADD, dstType, acc,  irManager.newImmOpnd(dstType, heapBase));
@@ -2832,8 +2798,8 @@ CG_OpndHandle* InstCodeSelector::callhelper(U_32              numArgs,
         assert(irManager.getTypeSize(opnds[1]->getType())==irManager.getTypeSize(opnds[2]->getType()));
         bool is64bit = irManager.getTypeSize(opnd1Type) == OpndSize_64;
 //        Type* opType = is64bit ? typeManager.getInt64Type():typeManager.getInt32Type();
-        Constraint ceax(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, OpndExt_Any, 1<<getRegIndex(is64bit?RegName_RAX:RegName_EAX));
-        Constraint cecx(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, OpndExt_Any, 1<<getRegIndex(is64bit?RegName_RCX:RegName_ECX));
+        Constraint ceax(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, 1<<getRegIndex(is64bit?RegName_RAX:RegName_EAX));
+        Constraint cecx(OpndKind_GPReg, is64bit?OpndSize_64:OpndSize_32, 1<<getRegIndex(is64bit?RegName_RCX:RegName_ECX));
         Opnd* eaxOpnd = irManager.newOpnd(opnds[1]->getType(), ceax);
         Opnd* ecxOpnd = irManager.newOpnd(opnds[2]->getType(), cecx);
 #else
@@ -2849,10 +2815,8 @@ CG_OpndHandle* InstCodeSelector::callhelper(U_32              numArgs,
         appendInsts(inst);
 
         //save the result
-        Opnd * dst8=irManager.newOpnd(typeManager.getUInt8Type());
-        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dst8, irManager.newImmOpnd(typeManager.getUInt8Type(), 0)));
-        appendInsts(irManager.newInst(Mnemonic_SETZ,dst8));
-        appendInsts(irManager.newInstEx(Mnemonic_MOVZX, 1, dstOpnd, dst8));
+        appendInsts(irManager.newCopyPseudoInst(Mnemonic_MOV, dstOpnd, irManager.newImmOpnd(typeManager.getInt32Type(), 0)));
+        appendInsts(irManager.newInst(Mnemonic_SETZ, dstOpnd));
         break;
     }
     case AddValueProfileValue:
@@ -3229,7 +3193,11 @@ CG_OpndHandle* InstCodeSelector::tau_instanceOf(ObjectType *type,
                                                  CG_OpndHandle* obj,
                                                  CG_OpndHandle* tauCheckedNull) 
 {
-    Opnd * dst=irManager.newOpnd(typeManager.getInt32Type()); // boolean is represented as int32
+#ifdef _EM64T_
+    Opnd * dst=irManager.newOpnd(typeManager.getInt64Type());
+#else
+    Opnd * dst=irManager.newOpnd(typeManager.getInt32Type());
+#endif
     Opnd * args[]={ (Opnd*)obj, irManager.newImmOpnd(getRuntimeIdType(), Opnd::RuntimeInfo::Kind_TypeRuntimeId, type) };
     CallInst * callInst=irManager.newRuntimeHelperCallInst(
         VM_RT_INSTANCEOF,

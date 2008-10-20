@@ -381,6 +381,7 @@ private:
     //
     Opnd*    propagateCopy(Opnd*);
     Inst*    appendInst(Inst*);
+    Type*    getOpndTypeFromLdType(Type* ldType);
     Opnd*    createOpnd(Type*);
     PiOpnd*  createPiOpnd(Opnd *org);
     Opnd*    createTypeOpnd(ObjectType* type);

@@ -632,25 +632,15 @@ bool RegAlloc3::buildGraph ()
         opndx.ignore = false;
 
         int ridx;
-        Constraint loc = opnd->getConstraint(Opnd::ConstraintKind_Location/*, OpndSize_Default*/);
+        Constraint loc = opnd->getConstraint(Opnd::ConstraintKind_Location, OpndSize_Default);
         if (loc.isNull())
         {// this operand is not allocated yet
-            loc = opnd->getConstraint(Opnd::ConstraintKind_Calculated/*, OpndSize_Default*/);
+            loc = opnd->getConstraint(Opnd::ConstraintKind_Calculated, OpndSize_Default);
             if ((ridx = registers.index(loc)) != -1)
             {// operand should be assigned to register
                 opndx.ridx  = ridx;
                 opndx.alloc = 0;
                 opndx.avail = loc.getMask() & registers[ridx].getMask();
-#if !defined(_EM64T_)
-                if (loc.getSize() == OpndSize_8 && loc.getMask() == 0xffff) { 
-                    // FIXME better check for mask ?
-                    // allow only low-byte regs to workaround platform irregularity
-                    opndx.avail &= (getRegMask(RegName_AL)
-                        |getRegMask(RegName_BL)
-                        |getRegMask(RegName_CL)
-                        |getRegMask(RegName_DL));
-                }
-#endif
                 opndx.nbavails = bitCount(opndx.avail);
                 assert(opndx.nbavails != 0);
                 opndx.spillcost = 1;

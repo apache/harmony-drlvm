@@ -204,7 +204,7 @@ char* m2n_gen_push_m2n(char* buf, Method_Handle method, frame_type current_frame
     buf = push(buf, Imm_Opnd(current_frame_type));
     
     int last_m2n_frame_offset = (int)&((VM_thread*)0)->last_m2n_frame;
-    Imm_Opnd imm1(size_32,last_m2n_frame_offset);
+    Imm_Opnd imm1(last_m2n_frame_offset);
     buf = alu(buf, add_opc,  eax_opnd,  imm1);
 
     Imm_Opnd imm2((unsigned)method);

@@ -114,46 +114,38 @@ static void check_args(const Opnd& op0, const Opnd& op1)
     assert(!op0.is_imm());
 }
 
-static OpndExt default_arg_ext(jtype t) {
-    if (is_signed_int(t)) return OpndExt_Signed;
-    else if ( t == u16) return OpndExt_Zero;
-    else return OpndExt_None;
-}
-
 static void add_arg(EncoderBase::Operands& args, const Opnd& op, 
                     bool can_shrink = false)
 {
     OpndSize sz = to_size(op.jt());
-    OpndExt ext = default_arg_ext(op.jt());
     if (op.is_reg()) {
         RegName reg = devirt(op.reg(), op.jt());
         //::OpndKind kind = is_f(op.reg()) ? OpndKind_XMMReg : OpndKind_GPReg;
-        //args.add(EncoderBase::Operand(sz, kind, reg, ext));
-        args.add(EncoderBase::Operand(reg, ext));
+        //args.add(EncoderBase::Operand(sz, kind, reg));
+        args.add(EncoderBase::Operand(reg));
     }
     else if (op.is_mem()) {
         RegName base = op.base() != ar_x ? devirt(op.base()) : RegName_Null;
         RegName idx = op.index() == ar_x ? RegName_Null : devirt(op.index());
-        EncoderBase::Operand mem(sz, base, idx, op.scale(), op.disp(), ext);
+        EncoderBase::Operand mem(sz, base, idx, op.scale(), op.disp());
         args.add(mem);
     }
     else {
         assert(!is_f(op.jt()));
         if (op.jt() == i64) {
-            EncoderBase::Operand imm(sz, op.lval(), ext);
+            EncoderBase::Operand imm(sz, op.lval());
             args.add(imm);
         }
         else if (op.jt() == jobj) {
-            EncoderBase::Operand imm(sz, (int_ptr)(void*)op.lval(), ext);
+            EncoderBase::Operand imm(sz, (int_ptr)(void*)op.lval());
             args.add(imm);
         }
         else {
             assert(op.jt()<=i32);
             if (can_shrink && fits_i8(op.ival())) {
                 sz = OpndSize_8;
-                ext = OpndExt_Any;
             }
-            EncoderBase::Operand imm(sz, op.ival(), ext);
+            EncoderBase::Operand imm(sz, op.ival());
             args.add(imm);
         }
     }

@@ -635,8 +635,7 @@ private:
     }
 
     void shift_op_rm_imm(const LcgEM64TLoc * dest, const LcgEM64TLoc * src, I_32 imm_val) {
-        assert(fit8(imm_val));
-        const Imm_Opnd & imm = get_imm_opnd(imm_val, size_8);
+        const Imm_Opnd & imm = get_imm_opnd(imm_val);
         if (src->kind == LLK_Gr) {
         if (dest->kind == LLK_Gr) {
             buf = mov(buf, get_r_opnd(dest), get_r_opnd(src), size_64);

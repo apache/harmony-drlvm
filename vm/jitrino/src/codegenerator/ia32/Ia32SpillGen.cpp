@@ -946,9 +946,6 @@ size_t SpillGen::pass1 ()
             {
                 Constraint c(opline.opnd->getConstraint(Opnd::ConstraintKind_Initial));
                 update(opline.instx->inst, opline.opnd, c);
-                // sign extension mode is irrelevant to reg allocation but may affect calculations 
-                // so reset it to match any
-                c.setExt(OpndExt_Any);
                 opline.idx = registers.getIndex(c);
 
                 if (!tryRegister(opline, c, prefreg))
@@ -1021,7 +1018,7 @@ bool SpillGen::tryRegister (Opline& opline, Constraint c, RegMask prefreg)
         return false;
 
     Constraint cx = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)cx.getKind(), c.getSize(), c.getExt(), cx.getMask());
+    Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
 
 //  handle first instruction of the interval
 
@@ -1126,7 +1123,7 @@ bool SpillGen::tryEvict (Opline& opline, Constraint c)
         return false;
 
     Constraint cx = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)cx.getKind(), c.getSize(), c.getExt(), cx.getMask());
+    Constraint cr((OpndKind)cx.getKind(), c.getSize(), cx.getMask());
 
     Instx* begx = opline.instx;
     Instx* endx = begx;
@@ -1174,7 +1171,7 @@ bool SpillGen::tryRepair (Opline& opline, Constraint c)
         return false;
 
     Constraint ca = c.getAliasConstraint(OpndSize_Default) & registers[opline.idx];
-    Constraint cr((OpndKind)ca.getKind(), c.getSize(), c.getExt(), ca.getMask());
+    Constraint cr((OpndKind)ca.getKind(), c.getSize(), ca.getMask());
 
     Inst* inst = opline.instx->inst;
 

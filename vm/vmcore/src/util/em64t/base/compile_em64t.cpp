@@ -160,7 +160,7 @@ char * gen_convert_managed_to_unmanaged_null_em64t(char * ss,
         ss = alu(ss, cmp_opc, input_param1, r11_opnd, size_64);
         ss = branch8(ss, Condition_NE, Imm_Opnd(size_8, 0));  // not null, branch around the mov 0
         char *backpatch_address__not_managed_null = ((char *)ss) - 1;
-        ss = mov(ss, input_param1, Imm_Opnd(size_32, 0));
+        ss = mov(ss, input_param1, Imm_Opnd(0));
         POINTER_SIZE_SINT offset = (POINTER_SIZE_SINT)ss - (POINTER_SIZE_SINT)backpatch_address__not_managed_null - 1;
         *backpatch_address__not_managed_null = (char)offset;
     REFS_RUNTIME_SWITCH_ENDIF
@@ -209,7 +209,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
     assert(stack_size % 16 != 0);
 
     // set up stack frame
-	stub = alu(stub, sub_opc, rsp_opnd, Imm_Opnd(size_32, stack_size));
+    stub = alu(stub, sub_opc, rsp_opnd, Imm_Opnd(stack_size));
 
     // TODO: think over saving xmm registers conditionally
 #ifndef _WIN64
@@ -285,7 +285,7 @@ static NativeCodePtr compile_get_compile_me_generic() {
 #endif
 
     // adjust stack pointer
-    stub = alu(stub, add_opc, rsp_opnd, Imm_Opnd(size_32, stack_size));
+    stub = alu(stub, add_opc, rsp_opnd, Imm_Opnd(stack_size));
     // transfer control to the compiled code
     stub = jump(stub, rax_opnd);
     

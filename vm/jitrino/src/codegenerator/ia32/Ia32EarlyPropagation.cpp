@@ -62,9 +62,6 @@ static ActionFactory<EarlyPropagation> _early_prop("early_prop");
 static bool isTypeConversionAllowed(Opnd* fromOpnd, Opnd* toOpnd) {
     Type * fromType = fromOpnd->getType();
     Type * toType = toOpnd->getType();
-    if (fromType->isFloatingPoint() != toType->isFloatingPoint()) {
-        return false;
-    }
     bool fromIsGCType = fromType->isObject() || fromType->isManagedPtr();
     bool toIsGCType = toType->isObject() || toType->isManagedPtr();
     return fromIsGCType == toIsGCType;
@@ -156,17 +153,8 @@ void EarlyPropagation::runImpl()
                     U_32 defOpndId = defOpnd->getId();
                     OpndInfo * opndInfo = opndInfos + defOpndId;
                     bool instHandled=false;
-                    bool typeConvOk = srcOpnd->getSize() == defOpnd->getSize() && isTypeConversionAllowed(srcOpnd, defOpnd);
-                    bool kindsAreOk = true;
-                    // this is caused by the fact that FPReg and XMMReg can not be merged in the same Constraint
-                    // there might be a problem with replacing operads of different reg kinds
-                    // if src and def has different reg kinds the inst must be skipped
-                    if(srcOpnd->canBePlacedIn(OpndKind_FPReg) || defOpnd->canBePlacedIn(OpndKind_FPReg)) {
-                        Constraint srcConstr = srcOpnd->getConstraint(Opnd::ConstraintKind_Calculated);
-                        Constraint defConstr = defOpnd->getConstraint(Opnd::ConstraintKind_Calculated);
-                        kindsAreOk = ! (srcConstr&defConstr).isNull();
-                    }
-                    if (typeConvOk && kindsAreOk && opndInfo->defCount == 1 && ! srcOpnd->isPlacedIn(OpndKind_Reg)){
+                    bool typeConvOk = isTypeConversionAllowed(srcOpnd, defOpnd);
+                    if (typeConvOk && opndInfo->defCount == 1 && ! srcOpnd->isPlacedIn(OpndKind_Reg)){
                         if (!defOpnd->hasAssignedPhysicalLocation()){
                             opndInfo->sourceInst = inst;
                             opndInfo->sourceOpndId = srcOpnd->getId();

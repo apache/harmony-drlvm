@@ -454,7 +454,6 @@ void RegAlloc2::buildRegs ()
 
     OpndKind k = (OpndKind)constrs.getKind(); 
     OpndSize s = constrs.getSize();
-    OpndExt e = constrs.getExt();
 
     registers.clear();
     RegMask mask = constrs.getMask();
@@ -465,7 +464,7 @@ void RegAlloc2::buildRegs ()
             Register* r = new (mm) Register(mm);
             r->regmask = m,
             r->regname = getRegName(k, s, x);
-            r->constraint = Constraint(k, s, e, m);
+            r->constraint = Constraint(k, s, m);
             r->length = 0;
             r->beg=(Instnb)UINT_MAX;
             r->end=(Instnb)0;

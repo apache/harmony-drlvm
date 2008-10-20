@@ -102,7 +102,6 @@ OpndSize Constraint::getDefaultSize(U_32 k)
 Constraint Constraint::getAliasConstraint(OpndSize s, U_32 offset)const
 {
     OpndSize sz=(OpndSize)size;
-    OpndExt e = (OpndExt)ext;
     if (s==OpndSize_Default){
         s=getDefaultSize(kind);
         if (s==OpndSize_Any)
@@ -135,7 +134,7 @@ Constraint Constraint::getAliasConstraint(OpndSize s, U_32 offset)const
         newMask=mask;
     }
     if (newMask==0) newKind&=~OpndKind_Reg;
-    return newKind==OpndKind_Null?Constraint():Constraint( (OpndKind)newKind, s, e, newMask);
+    return newKind==OpndKind_Null?Constraint():Constraint( (OpndKind)newKind, s, newMask);
 }
 
 //_________________________________________________________________________________________________
@@ -182,7 +181,7 @@ RegName Constraint::getAliasRegName(RegName regName, OpndSize sz, U_32 offset)
 RegName Constraint::getAliasRegName(RegName regName, U_32 offset)const
 {
     RegName rn=getAliasRegName(regName, (OpndSize)size, offset);
-    return contains(Constraint(rn,(OpndExt)ext))?rn:RegName_Null;
+    return contains(rn)?rn:RegName_Null;
 }
 
 

@@ -338,7 +338,7 @@ static bool isHeapBase(Opnd* immOpnd) {
 }
 
 I_32 GCSafePointsInfo::getOffsetFromImmediate(Opnd* offsetOpnd) const {
-    if (offsetOpnd->isPlacedIn(OpndKind_Imm)) {
+    if (offsetOpnd->isPlacedIn(OpndKind_Immediate)) {
         if (offsetOpnd->getImmValue() == 0 && offsetOpnd->getRuntimeInfo()!=NULL) {
             irm.resolveRuntimeInfo(offsetOpnd);
         }

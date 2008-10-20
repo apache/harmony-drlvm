@@ -68,8 +68,7 @@ public:
         const OpcodeGroup * opcodeGroup;
     };
 
-    static bool matches(Constraint co, Constraint ci);
-    static Constraint expandImmediate(Constraint co);
+    static bool matches(Constraint co, Constraint ci, U_32 opndRoles, bool allowAliases);
     static const OpcodeGroup* findOpcodeGroup(const FindInfo& fi);
     static bool matches(const OpcodeGroup* og, const FindInfo& fi, bool any);
     static bool isOpndAllowed(const Encoder::OpcodeGroup * og, U_32 i, Constraint co, bool isExtended, bool any);

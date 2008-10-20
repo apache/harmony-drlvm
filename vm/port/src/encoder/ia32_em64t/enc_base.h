@@ -103,11 +103,6 @@ public:
      static char * prefix(char* stream, InstPrefix pref);
 
     /**
-     * @brief Determines if operand with opndExt suites the position with instExt.
-     */
-    static bool extAllowed(OpndExt opndExt, OpndExt instExt);
-
-    /**
      * @brief Returns #MnemonicDesc by the given Mnemonic.
      */
     static const MnemonicDesc * getMnemonicDesc(Mnemonic mn)
@@ -157,10 +152,6 @@ public:
          * @brief Size of the operand.
          */
         OpndSize        size;
-        /**
-         * @brief Extention of the operand.
-         */
-        OpndExt         ext;
         /**
          * @brief Appropriate RegName if operand must reside on a particular
          *        register (i.e. CWD/CDQ instructions), RegName_Null 
@@ -310,13 +301,12 @@ public:
         /**
          * @brief Initializes the instance with empty size and kind.
          */
-        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_ext(OpndExt_None), m_need_rex(false) {}
+        Operand() : m_kind(OpndKind_Null), m_size(OpndSize_Null), m_need_rex(false) {}
         /**
          * @brief Creates register operand from given RegName.
          */
-        Operand(RegName reg, OpndExt ext = OpndExt_None) : m_kind(getRegKind(reg)), 
-                               m_size(getRegSize(reg)),
-                               m_ext(ext), m_reg(reg) 
+        Operand(RegName reg) : m_kind(getRegKind(reg)), 
+                               m_size(getRegSize(reg)), m_reg(reg) 
         {
             hash_it();
         }
@@ -328,8 +318,9 @@ public:
          * size and kind from the RegName. 
          * The provided size and kind must match the RegName's ones though.
          */
-        Operand(OpndSize sz, OpndKind kind, RegName reg, OpndExt ext = OpndExt_None) :
-            m_kind(kind), m_size(sz), m_ext(ext), m_reg(reg) 
+        Operand(OpndSize sz, OpndKind kind, RegName reg) : m_kind(kind), 
+                                                           m_size(sz), 
+                                                           m_reg(reg) 
         {
             assert(m_size == getRegSize(reg));
             assert(m_kind == getRegKind(reg));
@@ -338,24 +329,24 @@ public:
         /**
          * @brief Creates immediate operand with the given size and value.
          */
-        Operand(OpndSize size, long long ival, OpndExt ext = OpndExt_None) :
-            m_kind(OpndKind_Imm), m_size(size), m_ext(ext), m_imm64(ival)
+        Operand(OpndSize size, long long ival) : m_kind(OpndKind_Imm), 
+                                                 m_size(size), m_imm64(ival)
         {
             hash_it();
         }
         /**
          * @brief Creates immediate operand of OpndSize_32.
          */
-        Operand(int ival, OpndExt ext = OpndExt_None) :
-            m_kind(OpndKind_Imm), m_size(OpndSize_32), m_ext(ext), m_imm64(ival)
+        Operand(int ival) : m_kind(OpndKind_Imm), m_size(OpndSize_32), 
+                            m_imm64(ival)
         {
             hash_it();
         }
         /**
          * @brief Creates immediate operand of OpndSize_16.
          */
-        Operand(short ival, OpndExt ext = OpndExt_None) :
-            m_kind(OpndKind_Imm), m_size(OpndSize_16), m_ext(ext), m_imm64(ival)
+        Operand(short ival) : m_kind(OpndKind_Imm), m_size(OpndSize_16), 
+                              m_imm64(ival)
         {
             hash_it();
         }
@@ -363,8 +354,8 @@ public:
         /**
          * @brief Creates immediate operand of OpndSize_8.
          */
-        Operand(char ival, OpndExt ext = OpndExt_None) :
-            m_kind(OpndKind_Imm), m_size(OpndSize_8), m_ext(ext), m_imm64(ival)
+        Operand(char ival) : m_kind(OpndKind_Imm), m_size(OpndSize_8), 
+                             m_imm64(ival)
         {
             hash_it();
         }
@@ -373,7 +364,7 @@ public:
          * @brief Creates memory operand.
          */
         Operand(OpndSize size, RegName base, RegName index, unsigned scale,
-                int disp, OpndExt ext = OpndExt_None) : m_kind(OpndKind_Mem), m_size(size), m_ext(ext)
+                int disp) : m_kind(OpndKind_Mem), m_size(size)
         {
             m_base = base;
             m_index = index;
@@ -385,8 +376,8 @@ public:
         /**
          * @brief Creates memory operand with only base and displacement.
          */
-        Operand(OpndSize size, RegName base, int disp, OpndExt ext = OpndExt_None) :
-            m_kind(OpndKind_Mem), m_size(size), m_ext(ext)
+        Operand(OpndSize size, RegName base, int disp) : 
+                               m_kind(OpndKind_Mem), m_size(size)
         {
             m_base = base;
             m_index = RegName_Null;
@@ -405,10 +396,6 @@ public:
          * @brief Returns size of the operand.
          */
         OpndSize size(void) const { return m_size; }
-        /**
-         * @brief Returns extention of the operand.
-         */
-        OpndExt ext(void) const { return m_ext; }
         /**
          * @brief Returns hash of the operand.
          */
@@ -449,11 +436,6 @@ public:
          */
         bool is_mmxreg(void) const { return is_placed_in(OpndKind_MMXReg); }
 #endif
-        /**
-         * @brief Tests whether operand is signed immediate operand.
-         */
-        //bool is_signed(void) const { assert(is_imm()); return m_is_signed; }
-        
         /**
          * @brief Returns base of memory operand (RegName_Null if not memory).
          */
@@ -508,7 +490,6 @@ public:
         // general info
         OpndKind    m_kind;
         OpndSize    m_size;
-        OpndExt     m_ext;
         // complex address form support
         RegName     m_base;
         RegName     m_index;
@@ -583,7 +564,7 @@ public:
 #ifdef _DEBUG
     /**
      * Verifies some presumptions about encoding data table. 
-     * Called automaticaly during statics initialization.
+     * Called automagicaly during statics initialization.
      */
     static int verify(void);
 #endif

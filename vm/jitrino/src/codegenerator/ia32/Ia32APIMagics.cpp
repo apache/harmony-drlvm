@@ -939,9 +939,7 @@ void  APIMagicHandler::convertIntToInt(Opnd* dst, Opnd* src, Node* node)
 
     if(srcType != dstType) {
 #ifdef _EM64T_
-        Opnd* aux = irm->newOpnd(irm->getTypeManager().getUInt32Type());
-        node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, aux, src));
-        node->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, dst, aux));
+        node->appendInst(irm->newInstEx(Mnemonic_MOVZX, 1, dst, src));
 #else
         node->appendInst(irm->newCopyPseudoInst(Mnemonic_MOV, dst, src));
 #endif

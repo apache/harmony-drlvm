@@ -1321,17 +1321,5 @@ const char * Type::tag2str(Tag t) {
     return type_tag_names[t].name;
 }
 
-bool Type::constFits(int64 val, Tag tag) {
-    if (tag == Int8 || tag == UInt8) {
-        return (val & (int64)0x00000000000000FF) == val;
-    } else if (tag == Int16 || tag == UInt16 || tag == Char) {
-        return (val & (int64)0x000000000000FFFF) == val;
-    } else if (isIntegerOf4Bytes(tag)) {
-        return (val & (int64)0x00000000FFFFFFFF) == val;
-    } else {
-        assert(0); // implement if you need it
-    }
-    return false;
-}
 
 } //namespace Jitrino 
