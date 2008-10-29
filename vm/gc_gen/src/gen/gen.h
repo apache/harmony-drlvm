@@ -76,9 +76,12 @@ typedef struct GC_Gen {
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
 
-  Marker** markers;
-  unsigned int num_markers;
+  /*concurrent markers and collectors*/
+  Conclctor** conclctors;
+  unsigned int num_conclctors;
+  //unsigned int num_active_conclctors;
   unsigned int num_active_markers;
+  unsigned int num_active_sweepers;
 
   /* metadata is the pool for rootset, markstack, etc. */  
   GC_Metadata* metadata;
@@ -99,7 +102,7 @@ typedef struct GC_Gen {
   //For_LOS_extend
   Space_Tuner* tuner;
   
-  unsigned int gc_concurrent_status;
+  volatile unsigned int gc_concurrent_status;
   Collection_Scheduler* collection_scheduler;
 
   SpinLock lock_con_mark;
@@ -213,7 +216,6 @@ void* nos_space_adjust(Space* space, void* new_nos_boundary, POINTER_SIZE_INT ne
 #endif
 
 #endif /* ifndef _GC_GEN_H_ */
-
 
 
 

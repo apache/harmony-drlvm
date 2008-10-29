@@ -66,7 +66,7 @@ extern char* large_page_hint;
 #define prefetchnta(pref_addr)	_mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
 #endif /*ALLOC_PREFETCH*/
 
-#elif defined (__linux__) || defined(FREEBSD)
+#elif defined (__linux__)
 #define FORCE_INLINE inline  __attribute__((always_inline))
 
 #ifdef PREFETCH_SUPPORTED
@@ -154,6 +154,13 @@ inline int vm_suspend_all_threads()
   return disable_count;
 }
 
+inline int vm_suspend_all_threads( hythread_iterator_t *thread_iterator )
+{
+  int disable_count = hythread_reset_suspend_disable();
+  hythread_suspend_all(thread_iterator, NULL);
+  hythread_suspend_disable();
+  return disable_count;
+}
 inline void vm_resume_all_threads(int disable_count)
 {
   hythread_suspend_enable();
@@ -323,6 +330,7 @@ inline void string_to_upper(char* s)
 
 #ifdef PLATFORM_POSIX
 #define max(x, y) (((x)>(y))?(x):(y))
+#define min(x, y) (((x)<(y))?(x):(y))
 #endif
 
 typedef volatile unsigned int SpinLock;

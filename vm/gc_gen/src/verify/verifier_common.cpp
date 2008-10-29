@@ -209,7 +209,7 @@ void verifier_log_before_gc(Heap_Verifier* heap_verifier)
   }
 }
 
-void verifier_log_start(const char* message)
+void verifier_log_start(char* message)
 {
   printf("------------------------------%-16s------------------------------\n", message);
 }
@@ -217,7 +217,7 @@ void verifier_log_start(const char* message)
 void verifier_collect_kind_log(Heap_Verifier* heap_verifier)
 {
   GC* gc = heap_verifier->gc;
-  const char* gc_kind;
+  char* gc_kind;
   if(collect_is_minor()){ 
     gc_kind = " minor collection.";
   }else if(collect_is_fallback()){ 
@@ -266,6 +266,7 @@ void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
     printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
+
 
 
 

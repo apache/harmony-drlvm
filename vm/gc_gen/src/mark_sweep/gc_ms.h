@@ -47,10 +47,12 @@ typedef struct GC_MS {
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
   
-  Marker** markers;
-  unsigned int num_markers;
+  /*concurrent markers and collectors*/
+  Conclctor** conclctors;
+  unsigned int num_conclctors;
   unsigned int num_active_markers;
-  
+  unsigned int num_active_sweepers;
+
   /* metadata is the pool for rootset, markstack, etc. */
   GC_Metadata *metadata;
   Finref_Metadata *finref_metadata;
@@ -70,7 +72,7 @@ typedef struct GC_MS {
   //For_LOS_extend
   Space_Tuner *tuner;
 
-  unsigned int gc_concurrent_status;
+  volatile unsigned int gc_concurrent_status;
   Collection_Scheduler* collection_scheduler;
 
   SpinLock lock_con_mark;
@@ -91,10 +93,22 @@ typedef struct GC_MS {
 //////////////////////////////////////////////////////////////////////////////////////////
 
 inline void *gc_ms_fast_alloc(unsigned size, Allocator *allocator)
-{ return wspace_thread_local_alloc(size, allocator); }
+{ 
+  void *p_obj = wspace_thread_local_alloc(size, allocator);
+  if(p_obj) { 
+    ((Mutator*)allocator)->new_obj_size += size;
+    ((Mutator*)allocator)->new_obj_num++;
+  }
+  return p_obj;
+ }
 
 inline void *gc_ms_alloc(unsigned size, Allocator *allocator)
-{ return wspace_alloc(size, allocator); }
+{ 
+  void * p_obj = wspace_alloc(size, allocator);
+  if(p_obj)
+      ((Mutator*)allocator)->new_obj_num++;
+  return p_obj;
+}
 
 inline Wspace *gc_ms_get_wspace(GC_MS *gc)
 { return gc->wspace; }
@@ -107,6 +121,8 @@ inline POINTER_SIZE_INT gc_ms_free_memory_size(GC_MS *gc)
 
 inline POINTER_SIZE_INT gc_ms_total_memory_size(GC_MS *gc)
 { return space_committed_size((Space*)gc_ms_get_wspace(gc)); }
+
+void gc_ms_print_detail_stat(GC_MS *gc);
 
 /////////////////////////////////////////////////////////////////////////////////////////
 
@@ -122,5 +138,12 @@ void gc_ms_start_con_sweep(GC_MS* gc, unsigned int num_collectors);
 void gc_ms_start_mostly_con_mark(GC_MS* gc, unsigned int num_markers);
 void gc_ms_start_mostly_con_final_mark(GC_MS* gc, unsigned int num_markers);
 void gc_ms_reset_space_stat(GC_MS* gc);
+
+unsigned int gc_ms_get_live_object_size(GC_MS* gc);
+
+FORCE_INLINE Con_Collection_Statistics *gc_ms_get_con_collection_stat(GC_MS* gc)
+{
+  return gc->wspace->con_collection_statistics;
+}
 
 #endif // _GC_MS_H_

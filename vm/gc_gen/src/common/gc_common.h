@@ -39,7 +39,8 @@
 
 #include "../common/gc_for_barrier.h"
 
-/* 
+ 
+ /*
 #define USE_UNIQUE_MARK_SWEEP_GC  //define it to only use Mark-Sweep GC (no NOS, no LOS).
 #define USE_UNIQUE_MOVE_COMPACT_GC //define it to only use Move-Compact GC (no NOS, no LOS).
 */
@@ -336,19 +337,7 @@ inline Boolean obj_dirty_in_oi(Partial_Reveal_Object* p_obj)
   return TRUE;
 }
 
-extern volatile Boolean obj_alloced_live;
-inline Boolean is_obj_alloced_live()
-{ return obj_alloced_live;  }
 
-inline void gc_enable_alloc_obj_live()
-{ 
-  obj_alloced_live = TRUE;  
-}
-
-inline void gc_disable_alloc_obj_live()
-{ 
-  obj_alloced_live = FALSE; 
-}
 
 /***************************************************************/
 
@@ -391,7 +380,7 @@ inline void obj_clear_rem_bit(Partial_Reveal_Object* p_obj)
 /***************************************************************/
 
 /* all GCs inherit this GC structure */
-struct Marker;
+struct Conclctor;
 struct Mutator;
 struct Collector;
 struct GC_Metadata;
@@ -421,9 +410,12 @@ typedef struct GC{
   unsigned int num_collectors;
   unsigned int num_active_collectors; /* not all collectors are working */
 
-  Marker** markers;
-  unsigned int num_markers;
+  /*concurrent markers and collectors*/
+  Conclctor** conclctors;
+  unsigned int num_conclctors;
+  //unsigned int num_active_conclctors;
   unsigned int num_active_markers;
+  unsigned int num_active_sweepers;
   
   /* metadata is the pool for rootset, tracestack, etc. */  
   GC_Metadata* metadata;
@@ -443,7 +435,7 @@ typedef struct GC{
 
   Space_Tuner* tuner;
 
-  unsigned int gc_concurrent_status; /*concurrent GC status: only support CONCURRENT_MARK_PHASE now*/
+  volatile unsigned int gc_concurrent_status; /*concurrent GC status: only support CONCURRENT_MARK_PHASE now*/
   Collection_Scheduler* collection_scheduler;
 
   SpinLock lock_con_mark;
@@ -488,11 +480,15 @@ inline unsigned int gc_get_processor_num(GC* gc) { return gc->_num_processors; }
 
 GC* gc_parse_options();
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause);
+void gc_relaim_heap_con_mode( GC *gc);
 void gc_prepare_rootset(GC* gc);
 
 
-int64 get_collection_end_time();
-void set_collection_end_time();
+int64 get_gc_start_time();
+void set_gc_start_time();
+
+int64 get_gc_end_time();
+void set_gc_end_time();
 
 /* generational GC related */
 

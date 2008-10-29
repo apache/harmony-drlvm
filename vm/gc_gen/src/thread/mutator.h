@@ -50,7 +50,14 @@ typedef struct Mutator {
   SpinLock dirty_set_lock;
   unsigned int dirty_obj_slot_num; //only ON_THE_FLY
   unsigned int dirty_obj_num; //concurrent mark  
+  
+  /* obj alloc information */
   POINTER_SIZE_INT new_obj_size;
+  /* accurate object number and total size*/
+  POINTER_SIZE_INT new_obj_num;
+  POINTER_SIZE_INT new_obj_occupied_size;
+  POINTER_SIZE_INT write_barrier_marked_size;
+
 } Mutator;
 
 void mutator_initialize(GC* gc, void* tls_gc_info);
@@ -64,7 +71,11 @@ Boolean gc_local_dirtyset_is_empty(GC* gc);
 Vector_Block* gc_get_local_dirty_set(GC* gc, unsigned int shared_id);
 void gc_start_mutator_time_measure(GC* gc);
 int64 gc_get_mutator_time(GC* gc);
-POINTER_SIZE_INT gc_get_new_object_size(GC* gc, Boolean need_reset);
+
+unsigned int gc_get_mutator_write_barrier_marked_size( GC *gc );
+unsigned int gc_get_mutator_dirty_obj_num(GC *gc);
+unsigned int gc_get_mutator_new_obj_size( GC* gc );
+unsigned int gc_reset_mutator_new_obj_size( GC* gc );
 
 inline void mutator_post_signal(Mutator* mutator, unsigned int handshake_signal)
 { 

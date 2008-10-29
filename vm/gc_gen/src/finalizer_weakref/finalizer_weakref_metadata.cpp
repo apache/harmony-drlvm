@@ -22,6 +22,7 @@
 #include "finalizer_weakref_metadata.h"
 #include "../thread/mutator.h"
 #include "../thread/collector.h"
+#include "../thread/conclctor.h"
 
 #define FINREF_METADATA_SEG_SIZE_BIT_SHIFT 20
 #define FINREF_METADATA_SEG_SIZE_BYTES (1 << FINREF_METADATA_SEG_SIZE_BIT_SHIFT)
@@ -235,20 +236,6 @@ void gc_set_weakref_sets(GC *gc)
     collector->weakref_set= NULL;
     collector->phanref_set= NULL;
   }
-  
-  if(gc_mark_is_concurrent() && !gc_sweep_is_concurrent()){
-    unsigned int num_active_markers = gc->num_active_markers;
-    for(unsigned int i = 0; i < num_active_markers; i++)
-    {
-      Collector *marker = (Collector*)gc->markers[i];
-      pool_put_entry(metadata->softref_pool, marker->softref_set);
-      pool_put_entry(metadata->weakref_pool, marker->weakref_set);
-      pool_put_entry(metadata->phanref_pool, marker->phanref_set);
-      marker->softref_set = NULL;
-      marker->weakref_set= NULL;
-      marker->phanref_set= NULL;
-    }
-  }
   return;
 }
 
@@ -445,6 +432,7 @@ Boolean finref_copy_pool(Pool *src_pool, Pool *dest_pool, GC *gc)
   }
  return TRUE;
 }
+
 
 
 

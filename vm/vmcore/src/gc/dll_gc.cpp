@@ -91,6 +91,7 @@ void (*gc_heap_write_global_slot_compressed)(U_32 *p_slot,
 void (*gc_heap_write_ref)(Managed_Object_Handle p_base_of_object_with_slot,
                                  unsigned offset,
                                  Managed_Object_Handle value) = 0;
+Boolean (*gc_heap_copy_object_array)(Managed_Object_Handle src_array, unsigned int src_start, Managed_Object_Handle dst_array, unsigned int dst_start, unsigned int length)=0;
 void (*gc_heap_wrote_object)(Managed_Object_Handle p_base_of_object_just_written) = 0;
 int (*gc_init)() = 0;
 Boolean (*gc_is_object_pinned)(Managed_Object_Handle obj) = 0;
@@ -226,6 +227,11 @@ void vm_add_gc(const char *dllName)
                             "gc_heap_write_global_slot_compressed",
                             dllName,
                             (apr_dso_handle_sym_t)default_gc_heap_write_global_slot_compressed);
+    gc_heap_copy_object_array = (Boolean (*)(Managed_Object_Handle src_array, unsigned int src_start, Managed_Object_Handle dst_array, unsigned int dst_start, unsigned int length))
+	getFunctionOptional(handle,
+                            "gc_heap_copy_object_array",
+                            dllName,
+                            (apr_dso_handle_sym_t)default_gc_heap_wrote_object);	
     gc_heap_wrote_object = (void (*)(Managed_Object_Handle p_base_of_object_just_written))
         getFunctionOptional(handle,
                             "gc_heap_wrote_object",

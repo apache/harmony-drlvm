@@ -543,78 +543,23 @@ ArrayCopyResult array_copy(ManagedObject *src, I_32 srcOffset, ManagedObject *ds
         {
 #ifdef VM_STATS
             increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object);
-#endif // VM_STATS
-            ManagedObject **src_body =
-                (ManagedObject **)get_vector_element_address_ref(src, srcOffset);
-            ManagedObject **dst_body =
-                (ManagedObject **)get_vector_element_address_ref(dst, dstOffset);
-
             if(src_class == dst_class) {
-                // If the types of arrays are the same, no type conflicts of array elements are possible.
-#ifdef VM_STATS
-                increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_same_type);
-#endif // VM_STATS
-                memmove(dst_body, src_body, length * REF_SIZE);
+		 increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_same_type);
             } else {
-                // If the types are different, the arrays are different and no overlap of the source and destination is possible.
-#ifdef VM_STATS
                 increment_array_copy_counter(VM_Statistics::get_vm_stats().num_arraycopy_object_different_type);
-#endif // VM_STATS
-                Class* dst_elem_clss = dst_class->get_array_element_class();
-                assert(dst_elem_clss);
-                
-                REFS_RUNTIME_SWITCH_IF
-#ifdef REFS_RUNTIME_OR_COMPRESSED
-                    COMPRESSED_REFERENCE *src_body_compressed = (COMPRESSED_REFERENCE *)src_body;
-                    COMPRESSED_REFERENCE *dst_body_compressed = (COMPRESSED_REFERENCE *)dst_body;
-                    for (int count = 0; count < length; count++) {
-                        // For non-null elements check if types are compatible.
-                        COMPRESSED_REFERENCE src_elem_offset = src_body_compressed[count];
-                        if (src_elem_offset != 0) {
-                            ManagedObject *src_elem = (ManagedObject *)uncompress_compressed_reference(src_elem_offset);
-                            Class *src_elem_clss = src_elem->vt()->clss;
-                            if (src_elem_clss == dst_elem_clss) {
-                            } else if (!src_elem_clss->is_instanceof(dst_elem_clss)) {
-                                // note: VM_STATS values are updated when Class::is_instanceof() is called.
-                                // Since we only flag the base do it before we throw exception
-                                gc_heap_wrote_object(dst);
-                                return ACR_TypeMismatch;
-                            }
-                        }
-                        // If ArrayStoreException hasn't been thrown, copy the element.
-                        dst_body_compressed[count] = src_body_compressed[count];
-                        // There is not a gc_heap_write_ref call here since gc is disabled and we use gc_heap_wrote_object interface below.
-                    }
-#endif // REFS_RUNTIME_OR_COMPRESSED
-                REFS_RUNTIME_SWITCH_ELSE
-#ifdef REFS_RUNTIME_OR_UNCOMPRESSED
-                     for (int count = 0; count < length; count++) {
-                        // For non-null elements check if types are compatible.
-                        if (src_body[count] != NULL) {
-                            Class *src_elem_clss = src_body[count]->vt()->clss;
-                            if (src_elem_clss == dst_elem_clss) {
-                            } else if (!src_elem_clss->is_instanceof(dst_elem_clss)) {
-                                // note: VM_STATS values are updated when class_is_subtype_fast() is called.
-                                // Since we only flag the base do it before we throw exception
-                                gc_heap_wrote_object(dst);
-                                return ACR_TypeMismatch;
-                            }
-                        }
-                        // If ArrayStoreException hasn't been thrown, copy the element.
-                        dst_body[count] = src_body[count];
-                        // There is not a gc_heap_write_ref call here since gc is disabled and we use gc_heap_wrote_object interface below.
-                    }
-#endif // REFS_RUNTIME_OR_UNCOMPRESSED
-                REFS_RUNTIME_SWITCH_ENDIF
             }
+#endif // VM_STATS
 
-            gc_heap_wrote_object(dst);
+             //the object oopy is handled in GC module
+            if( !gc_heap_copy_object_array(src, srcOffset, dst, dstOffset, length) )
+		 return ACR_TypeMismatch;
         }
         break;
     default:
-        LDIE(62, "Unexpected type specifier");
+        DIE(("Unexpected type specifier"));
     }
 
     return ACR_Okay;
 } //array_copy
+
 

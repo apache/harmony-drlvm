@@ -2,9 +2,60 @@
 #include "wspace_chunk.h"
 #include "wspace_mark_sweep.h"
 #include "gc_ms.h"
+#include "../thread/conclctor.h"
 #include "../gen/gen.h"
 
-static void collector_sweep_normal_chunk_con(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
+
+static void wspace_check_free_list_chunks(Free_Chunk_List* free_list)
+{
+  Free_Chunk* chunk = free_list->head;
+  while(chunk ){
+    assert(!(chunk->status & (CHUNK_TO_MERGE |CHUNK_MERGED) ));
+    chunk = chunk->next;
+  }
+}
+
+static void wspace_check_free_chunks_status(Wspace* wspace)
+{
+  unsigned int i;
+  
+  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
+    wspace_check_free_list_chunks(&wspace->aligned_free_chunk_lists[i]);
+
+  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
+    wspace_check_free_list_chunks(&wspace->unaligned_free_chunk_lists[i]);
+
+  wspace_check_free_list_chunks(wspace->hyper_free_chunk_list);
+
+}
+
+inline static void check_list(Free_Chunk_List *chunk_list)
+{
+	Free_Chunk *chunk = chunk_list->head;
+	unsigned int count = 0;
+	while(chunk) {
+      count++;
+	  chunk = chunk->next;
+	}
+	assert( count == chunk_list->chunk_num );
+}
+
+inline static void collector_add_free_chunk(Conclctor *sweeper, Free_Chunk *chunk)
+{
+  Free_Chunk_List *list = sweeper->free_chunk_list;
+  
+  chunk->status = CHUNK_FREE | CHUNK_TO_MERGE;
+  chunk->next = list->head;
+  chunk->prev = NULL;
+  if(list->head)
+    list->head->prev = chunk;
+  else
+    list->tail = chunk;
+  list->head = chunk;
+  list->chunk_num++;
+}
+
+static void collector_sweep_normal_chunk_con(Conclctor *sweeper, Wspace *wspace, Chunk_Header *chunk)
 {
   unsigned int slot_num = chunk->slot_num;
   unsigned int live_num = 0;
@@ -13,20 +64,24 @@ static void collector_sweep_normal_chunk_con(Collector *collector, Wspace *wspac
   
   unsigned int index_word_num = (slot_num + SLOT_NUM_PER_WORD_IN_TABLE - 1) / SLOT_NUM_PER_WORD_IN_TABLE;
   for(unsigned int i=0; i<index_word_num; ++i){
+    
     table[i] &= cur_alloc_mask;
     unsigned int live_num_in_word = (table[i] == cur_alloc_mask) ? SLOT_NUM_PER_WORD_IN_TABLE : word_set_bit_num(table[i]);
     live_num += live_num_in_word;
+    
+    /* for concurrent sweeping, sweeping and allocation are performed concurrently. so we can not just count the current live obj*/
+    
     if((first_free_word_index == MAX_SLOT_INDEX) && (live_num_in_word < SLOT_NUM_PER_WORD_IN_TABLE)){
       first_free_word_index = i;
       pfc_set_slot_index((Chunk_Header*)chunk, first_free_word_index, cur_alloc_color);
     }
   }
   assert(live_num <= slot_num);
-  collector->live_obj_size += live_num * chunk->slot_size;
-  collector->live_obj_num += live_num;
+  sweeper->live_obj_size += live_num * chunk->slot_size;
+  sweeper->live_obj_num += live_num;
 
   if(!live_num){  /* all objects in this chunk are dead */
-    collector_add_free_chunk(collector, (Free_Chunk*)chunk);
+    collector_add_free_chunk(sweeper, (Free_Chunk*)chunk);
    } else {
     chunk->alloc_num = live_num;
    if(!chunk_is_reusable(chunk)){  /* most objects in this chunk are swept, add chunk to pfc list*/
@@ -37,171 +92,172 @@ static void collector_sweep_normal_chunk_con(Collector *collector, Wspace *wspac
   }
 }
 
-static inline void collector_sweep_abnormal_chunk_con(Collector *collector, Wspace *wspace, Chunk_Header *chunk)
+static inline void collector_sweep_abnormal_chunk_con(Conclctor *sweeper, Wspace *wspace, Chunk_Header *chunk)
 {
   assert(chunk->status == (CHUNK_ABNORMAL | CHUNK_USED));
   POINTER_SIZE_INT *table = chunk->table;
   table[0] &= cur_alloc_mask;
   if(!table[0]){    
-    collector_add_free_chunk(collector, (Free_Chunk*)chunk);
+    collector_add_free_chunk(sweeper, (Free_Chunk*)chunk);
   }
   else {
     wspace_reg_live_abnormal_chunk(wspace, chunk);
-    collector->live_obj_size += CHUNK_SIZE(chunk);
-    collector->live_obj_num++;
+    sweeper->live_obj_size += CHUNK_SIZE(chunk);
+    sweeper->live_obj_num++;
   }
 }
 
-static void wspace_sweep_chunk_con(Wspace* wspace, Collector* collector, Chunk_Header_Basic* chunk)
+static void wspace_sweep_chunk_con(Wspace* wspace, Conclctor* sweeper, Chunk_Header_Basic* chunk)
 {  
   if(chunk->status & CHUNK_NORMAL){   /* chunk is used as a normal sized obj chunk */
     assert(chunk->status == (CHUNK_NORMAL | CHUNK_USED));
-    collector_sweep_normal_chunk_con(collector, wspace, (Chunk_Header*)chunk);
+    collector_sweep_normal_chunk_con(sweeper, wspace, (Chunk_Header*)chunk);
   } else {  /* chunk is used as a super obj chunk */
     assert(chunk->status == (CHUNK_ABNORMAL | CHUNK_USED));
-    collector_sweep_abnormal_chunk_con(collector, wspace, (Chunk_Header*)chunk);
+    collector_sweep_abnormal_chunk_con(sweeper, wspace, (Chunk_Header*)chunk);
   }
 }
 
-static Free_Chunk_List* wspace_get_free_chunk_list(Wspace* wspace)
+//used in last sweeper and final stw reset
+Free_Chunk_List merged_free_chunk_list; 
+Free_Chunk_List free_chunk_list_from_sweepers;
+Free_Chunk_List global_free_chunk_list;
+
+static Free_Chunk_List* wspace_collect_free_chunks_from_sweepers(GC *gc)
 {
-  GC* gc = wspace->gc;
-  Free_Chunk_List* free_chunk_list = (Free_Chunk_List*) STD_MALLOC(sizeof(Free_Chunk_List));
+  Free_Chunk_List* free_chunk_list = &free_chunk_list_from_sweepers;
   assert(free_chunk_list);
-  memset(free_chunk_list, 0, sizeof(Free_Chunk_List));
+  free_chunk_list_init(free_chunk_list);
   
-  /* Collect free chunks from collectors to one list */
-  for(unsigned int i=0; i<gc->num_collectors; ++i){
-    Free_Chunk_List *list = gc->collectors[i]->free_chunk_list;
+  for( unsigned int i=0; i<gc->num_conclctors; i++ ) {
+    Conclctor *conclctor = gc->conclctors[i];
+    if( conclctor->role != CONCLCTOR_ROLE_SWEEPER )
+      continue;
+    Free_Chunk_List *list = conclctor->free_chunk_list;
     move_free_chunks_between_lists(free_chunk_list, list);
   }
-  
   return free_chunk_list;
 }
 
-Boolean wspace_get_free_chunk_concurrent(Wspace *wspace, Free_Chunk* chunk)
+
+static void wspace_reset_free_list_chunks(Free_Chunk_List* free_list)
 {
-  POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
-  assert(!(chunk_size % CHUNK_GRANULARITY));
-
-  Free_Chunk_List* free_list = NULL;
-
-  /*Find list*/
-  if(chunk_size > HYPER_OBJ_THRESHOLD)
-    free_list = wspace->hyper_free_chunk_list;
-  else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
-    free_list = &wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)];
-  else
-    free_list = &wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)];
-
-  /*Lock this free list*/
-  lock(free_list->lock);
-
-  /*Search free list for chunk*/
-  Free_Chunk* chunk_iter = free_list->head;
-  while((POINTER_SIZE_INT)chunk_iter){
-    if((POINTER_SIZE_INT)chunk_iter == (POINTER_SIZE_INT)chunk){
-      /*Find chunk and delete from list.*/     
-      free_list_detach_chunk(free_list, chunk);
-      unlock(free_list->lock);
-      return TRUE;
-    }
-    chunk_iter = chunk_iter->next;
-  }
-  
-  unlock(free_list->lock);
-  
-  return FALSE;
-}
-
-void wspace_merge_adj_free_chunks(Wspace* wspace,Free_Chunk* chunk)
-{
-  Free_Chunk *wspace_ceiling = (Free_Chunk*)space_heap_end((Space*)wspace);
-
-  /* Check if the back adjcent chunks are free */
-  Free_Chunk *back_chunk = (Free_Chunk*)chunk->adj_next;
-  while(back_chunk < wspace_ceiling && (back_chunk->status & CHUNK_FREE)){
-    assert(chunk < back_chunk);
-    /* Remove back_chunk from list */
-    if(wspace_get_free_chunk_concurrent(wspace,back_chunk)){
-      back_chunk = (Free_Chunk*)back_chunk->adj_next;
-      chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
-    }else{
-      break;
-    }
-  }
-
-  chunk->status = CHUNK_FREE | CHUNK_MERGED;
-  /* put the free chunk to the according free chunk list */
-  wspace_put_free_chunk_to_tail(wspace, chunk);
-
-}
-
-static void wspace_merge_list_concurrent(Wspace* wspace, Free_Chunk_List* free_list)
-{
-  lock(free_list->lock);
   Free_Chunk* chunk = free_list->head;
-  
-  while(chunk && !is_free_chunk_merged(chunk)){
-    free_list_detach_chunk(free_list, chunk);
-    unlock(free_list->lock);
-    
-    wspace_merge_adj_free_chunks(wspace, chunk);
-    
-    lock(free_list->lock);
-    chunk = free_list->head;
-  }
-  
-  unlock(free_list->lock);
-}
-
-static void wspace_merge_free_chunks_concurrent(Wspace* wspace, Free_Chunk_List* free_list)
-{
-  Free_Chunk *chunk = free_list->head;
-
-  /*merge free list*/
-  wspace_merge_list_concurrent(wspace, free_list);
-  
-  /*check free pool*/
-  unsigned int i;
-  
-  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
-    wspace_merge_list_concurrent(wspace, &wspace->aligned_free_chunk_lists[i]);
-
-  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
-    wspace_merge_list_concurrent(wspace, &wspace->unaligned_free_chunk_lists[i]);
-
-  wspace_merge_list_concurrent(wspace, wspace->hyper_free_chunk_list);
-}
-
-static void wspace_reset_free_list_chunks(Wspace* wspace, Free_Chunk_List* free_list)
-{
-  lock(free_list->lock);
-  Free_Chunk* chunk = free_list->head;
-  
   while(chunk ){
     assert(chunk->status & CHUNK_FREE);
     chunk->status = CHUNK_FREE;
     chunk = chunk->next;
   }
-  
-  unlock(free_list->lock);
 }
 
-
-static void wspace_reset_free_chunks_status(Wspace* wspace)
+static void wspace_reset_free_list_chunks(Free_Chunk_List* free_list, Chunk_Status_t status)
 {
-  unsigned int i;
-  
-  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
-    wspace_reset_free_list_chunks(wspace, &wspace->aligned_free_chunk_lists[i]);
-
-  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
-    wspace_reset_free_list_chunks(wspace, &wspace->unaligned_free_chunk_lists[i]);
-
-  wspace_reset_free_list_chunks(wspace, wspace->hyper_free_chunk_list);
-
+  Free_Chunk* chunk = free_list->head;
+  while(chunk ){
+    assert(chunk->status & CHUNK_FREE);
+    chunk->status = status;
+    chunk = chunk->next;
+  }
 }
+
+static unsigned int get_to_merge_length(Free_Chunk_List *free_list) 
+{
+	Free_Chunk* chunk = free_list->head;
+	unsigned int counter = 0;
+	while(chunk) {
+		if(chunk->status&CHUNK_MERGED) {
+           return counter;
+		}
+		counter++;
+		chunk = chunk->next;
+	}
+	return counter;
+}
+
+static unsigned int get_length(Free_Chunk_List *free_list) 
+{
+	Free_Chunk* chunk = free_list->head;
+	unsigned int counter = 0;
+	while(chunk) {
+		counter++;
+		chunk = chunk->next;
+	}
+	return counter;
+}
+
+static void wspace_merge_free_list(Wspace* wspace, Free_Chunk_List *free_list)
+{
+  int64 merge_start = time_now();
+  Free_Chunk *wspace_ceiling = (Free_Chunk*)space_heap_end((Space*)wspace);
+  Free_Chunk *chunk = free_list->head;
+  while(chunk && !(chunk->status &CHUNK_MERGED)) {
+
+    free_list->head = chunk->next;
+	free_list->chunk_num--;
+    if(free_list->head)
+      free_list->head->prev = NULL;
+    /* Check if the back adjcent chunks are free */
+    Free_Chunk *back_chunk = (Free_Chunk*)chunk->adj_next;
+    while(back_chunk < wspace_ceiling && (back_chunk->status & (CHUNK_TO_MERGE|CHUNK_MERGED))) {
+      assert(chunk < back_chunk);
+      /* Remove back_chunk from list */
+      free_list_detach_chunk(free_list, back_chunk);  
+      back_chunk = (Free_Chunk*)back_chunk->adj_next;
+      chunk->adj_next = (Chunk_Header_Basic*)back_chunk;
+    }
+    if(back_chunk < wspace_ceiling)
+      back_chunk->adj_prev = (Chunk_Header_Basic*)chunk;
+
+    //INFO2("gc.con.info", "the iteration merges [" << counter << "] chunks, to merge length=" << get_to_merge_length(free_list));
+    chunk->status = CHUNK_FREE | CHUNK_MERGED;
+    free_chunk_list_add_tail(free_list, chunk);
+    chunk = free_list->head;
+  }
+  //INFO2("gc.con.info", "after "<< counter <<" mergings, chunks num [" << get_length(free_list) << "], time=" << (time_now()-merge_start) << " us");
+}
+ 
+
+static inline Free_Chunk_List * gc_collect_global_free_chunk_list(Wspace *wspace, GC *gc)
+{
+  
+  free_chunk_list_init(&global_free_chunk_list);
+  Free_Chunk_List *global_free_list = &global_free_chunk_list;
+  unsigned int i;
+  for(i = NUM_ALIGNED_FREE_CHUNK_BUCKET; i--;)
+    move_free_chunks_between_lists(global_free_list, &wspace->aligned_free_chunk_lists[i]);
+  for(i = NUM_UNALIGNED_FREE_CHUNK_BUCKET; i--;)
+    move_free_chunks_between_lists(global_free_list, &wspace->unaligned_free_chunk_lists[i]);
+
+  move_free_chunks_between_lists(global_free_list, wspace->hyper_free_chunk_list);
+  move_free_chunks_between_lists(global_free_list, &free_chunk_list_from_sweepers);
+  
+  wspace_reset_free_list_chunks(global_free_list, CHUNK_FREE|CHUNK_TO_MERGE);
+  
+  return global_free_list;
+}
+
+//final remerge in a STW manner, this can reduce the lock of merging global free list
+void gc_merge_free_list_global(GC *gc) {
+  Wspace *wspace = gc_get_wspace(gc);
+  int64 start_merge = time_now();
+  
+  Free_Chunk_List *global_free_list = gc_collect_global_free_chunk_list(wspace, gc);
+  wspace_merge_free_list(wspace, global_free_list);
+  wspace_reset_free_list_chunks(global_free_list);
+  
+  //put to global list
+  Free_Chunk *chunk = global_free_list->head;
+  while(chunk) {
+     global_free_list->head = chunk->next;
+     if(global_free_list->head)
+      global_free_list->head->prev = NULL;
+     wspace_put_free_chunk(wspace, chunk);
+     chunk = global_free_list->head;
+  }
+  //INFO2("gc.merge", "[merge global] time=" << (time_now()-start_merge) << " us" );
+  
+}
+
 
 static void allocator_sweep_local_chunks(Allocator *allocator)
 {
@@ -243,9 +299,7 @@ static void allocator_sweep_local_chunks(Allocator *allocator)
 
 static void gc_sweep_mutator_local_chunks(GC *gc)
 {
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
   lock(gc->mutator_list_lock);     // vvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
-
   /* release local chunks of each mutator in unique mark-sweep GC */
   Mutator *mutator = gc->mutator_list;
   while(mutator){
@@ -253,9 +307,7 @@ static void gc_sweep_mutator_local_chunks(GC *gc)
     allocator_sweep_local_chunks((Allocator*)mutator);
     mutator = mutator->next;
   }
-
   unlock(gc->mutator_list_lock);
-#endif
 }
 
 static void gc_wait_mutator_signal(GC *gc, unsigned int handshake_signal)
@@ -279,18 +331,14 @@ static volatile unsigned int num_sweeping_collectors = 0;
    The mark bit and alloc bit is exchanged before entering this function. 
    This function is to clear the mark bit and merge the free chunks concurrently.   
   */
-void wspace_sweep_concurrent(Collector* collector)
+void wspace_sweep_concurrent(Conclctor* sweeper)
 {
-  collector->time_measurement_start = time_now();
-  GC *gc = collector->gc;
+  GC *gc = sweeper->gc;
+  
   Wspace *wspace = gc_get_wspace(gc);
 
-  collector->live_obj_size = 0;
-  collector->live_obj_num = 0;
-
-  unsigned int num_active_collectors = gc->num_active_collectors;
-  
-  atomic_cas32(&num_sweeping_collectors, 0, num_active_collectors+1);
+  sweeper->live_obj_size = 0;
+  sweeper->live_obj_num = 0;
 
   Pool* used_chunk_pool = wspace->used_chunk_pool;
 
@@ -299,7 +347,7 @@ void wspace_sweep_concurrent(Collector* collector)
   /*1. Grab chunks from used list, sweep the chunk and push back to PFC backup list & free list.*/
   chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
   while(chunk_to_sweep != NULL){
-    wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
+    wspace_sweep_chunk_con(wspace, sweeper, chunk_to_sweep);
     chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
   }
 
@@ -312,7 +360,7 @@ void wspace_sweep_concurrent(Collector* collector)
       while(chunk_to_sweep != NULL){
         assert(chunk_to_sweep->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
         chunk_to_sweep->status = CHUNK_NORMAL | CHUNK_USED;
-        wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
+        wspace_sweep_chunk_con(wspace, sweeper, chunk_to_sweep);
         chunk_to_sweep = chunk_pool_get_chunk(pfc_pool);
       }
     }
@@ -320,12 +368,23 @@ void wspace_sweep_concurrent(Collector* collector)
     pfc_pool = wspace_grab_next_pfc_pool(wspace);
   }
 
-  unsigned int old_num = atomic_inc32(&num_sweeping_collectors);
-  if( ++old_num == num_active_collectors ){    
-    
-    /*3. Check the local chunk of mutator*/
-    gc_sweep_mutator_local_chunks(wspace->gc);
+}
 
+
+//final work should be done by the last sweeper
+void wspace_last_sweeper_work( Conclctor *last_sweeper ) {
+
+  GC *gc = last_sweeper->gc;
+  Wspace *wspace = gc_get_wspace(gc);
+  Chunk_Header_Basic* chunk_to_sweep;
+  Pool* used_chunk_pool = wspace->used_chunk_pool;
+
+  /* all but one sweeper finishes its job*/
+  state_transformation( gc, GC_CON_SWEEPING, GC_CON_SWEEP_DONE );
+	
+  /*3. Check the local chunk of mutator*/
+  gc_sweep_mutator_local_chunks(wspace->gc);
+  
     /*4. Sweep gloabl alloc normal chunks again*/
     gc_set_sweep_global_normal_chunk();
     gc_wait_mutator_signal(wspace->gc, HSIG_MUTATOR_SAFE);
@@ -337,27 +396,27 @@ void wspace_sweep_concurrent(Collector* collector)
         while(chunk_to_sweep != NULL){
           assert(chunk_to_sweep->status == (CHUNK_NORMAL | CHUNK_NEED_ZEROING));
           chunk_to_sweep->status = CHUNK_NORMAL | CHUNK_USED;
-          wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
+          wspace_sweep_chunk_con(wspace, last_sweeper, chunk_to_sweep);
           chunk_to_sweep = chunk_pool_get_chunk(pfc_pool);
         }
       }
       /*grab more pfc pools*/
       pfc_pool = wspace_grab_next_pfc_pool(wspace);
     }
-    
-    /*4. Check the used list again.*/
+
+    /*5. Check the used list again.*/
     chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
     while(chunk_to_sweep != NULL){
-      wspace_sweep_chunk_con(wspace, collector, chunk_to_sweep);
+      wspace_sweep_chunk_con(wspace, last_sweeper, chunk_to_sweep);
       chunk_to_sweep = chunk_pool_get_chunk(used_chunk_pool);
     }
 
-    /*5. Switch the PFC backup list to PFC list.*/
+    /*6. Switch the PFC backup list to PFC list.*/
     wspace_exchange_pfc_pool(wspace);
     
     gc_unset_sweep_global_normal_chunk();
 
-    /*6. Put back live abnormal chunk and normal unreusable chunk*/
+    /*7. Put back live abnormal chunk and normal unreusable chunk*/
     Chunk_Header* used_abnormal_chunk = wspace_get_live_abnormal_chunk(wspace);
     while(used_abnormal_chunk){      
       used_abnormal_chunk->status = CHUNK_USED | CHUNK_ABNORMAL;
@@ -373,19 +432,15 @@ void wspace_sweep_concurrent(Collector* collector)
       unreusable_normal_chunk = wspace_get_unreusable_normal_chunk(wspace);
     }
     pool_empty(wspace->unreusable_normal_chunk_pool);
-    
-    
-    /*7. Merge free chunks*/
-    Free_Chunk_List* free_chunk_list = wspace_get_free_chunk_list(wspace);
-    wspace_merge_free_chunks_concurrent(wspace, free_chunk_list);
-    wspace_reset_free_chunks_status(wspace);
-    
-    /* let other collectors go */
-    num_sweeping_collectors++;
-  }
-  while(num_sweeping_collectors != num_active_collectors + 1);  
-  collector->time_measurement_end = time_now();
+
+    /*8. Merge free chunks from sweepers*/
+   Free_Chunk_List *free_list_from_sweeper = wspace_collect_free_chunks_from_sweepers(gc);
+   wspace_merge_free_list(wspace, free_list_from_sweeper);
+     
+  /* last sweeper will transform the state to before_finish */
+  state_transformation( gc, GC_CON_SWEEP_DONE, GC_CON_BEFORE_FINISH );
 }
+
 
 
 

@@ -77,7 +77,7 @@ Boolean verifier_compare_objs_pools(Pool* objs_pool_before_gc, Pool* objs_pool_a
 Boolean verifier_parse_options(Heap_Verifier* heap_verifier, char* options);
 void verifier_log_before_gc(Heap_Verifier* heap_verifier);
 void verifier_log_after_gc(Heap_Verifier* heap_verifier);
-void verifier_log_start(const char* message);
+void verifier_log_start(char* message);
 Boolean verify_rootset_slot(REF* p_ref, Heap_Verifier*  heap_verifier);
 
 
@@ -128,7 +128,7 @@ inline void verify_live_object_slot(REF* p_ref, Heap_Verifier* heap_verifier)
     if(!obj_is_alloc_in_color_table(p_obj))
       printf("\nERROR: obj after GC should be set its alloc color!\n");
   }else{
-    if(gc_mark_is_concurrent())
+	  if( !in_con_idle(heap_verifier->gc) )
       assert(obj_is_mark_black_in_table(p_obj));
   }
 #endif

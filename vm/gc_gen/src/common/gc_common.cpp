@@ -22,7 +22,7 @@
 #include "gc_common.h"
 #include "gc_metadata.h"
 #include "../thread/mutator.h"
-#include "../thread/marker.h"
+#include "../thread/conclctor.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../gen/gen.h"
 #include "../mark_sweep/gc_ms.h"
@@ -74,11 +74,19 @@ void gc_copy_interior_pointer_table_to_rootset();
 static int64 collection_start_time = time_now();
 static int64 collection_end_time = time_now();
 
-int64 get_collection_end_time()
+int64 get_gc_start_time() 
+{ return collection_start_time; }
+
+void set_gc_start_time() 
+{ collection_start_time = time_now(); }
+
+int64 get_gc_end_time()
 { return collection_end_time; }
 
-void set_collection_end_time()
-{ collection_end_time = time_now(); }
+void set_gc_end_time()
+{ 
+  collection_end_time = time_now();
+}
 
 void gc_decide_collection_kind(GC* gc, unsigned int cause)
 {
@@ -93,17 +101,17 @@ void gc_decide_collection_kind(GC* gc, unsigned int cause)
 
 }
 
-void gc_update_space_stat(GC_MS* gc)
+void gc_update_space_stat(GC* gc)
 {
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
-    gc_ms_update_space_stat((GC_MS*)gc);
+      gc_ms_update_space_stat((GC_MS *)gc);
 #endif
 }
 
-void gc_reset_space_stat(GC_MS* gc)
+void gc_reset_space_stat(GC* gc)
 {
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
-    gc_ms_reset_space_stat((GC_MS*)gc);
+      gc_ms_reset_space_stat((GC_MS *)gc);
 #endif
 }
 
@@ -118,7 +126,7 @@ void gc_prepare_rootset(GC* gc)
   gc_set_rootset(gc);
 }
 
-void gc_reset_after_collection(GC* gc, int64 time_mutator, int64 time_collection)
+void gc_reset_after_collection(GC* gc)
 {
   if(gc_is_gen_mode()) gc_prepare_mutator_remset(gc);
 
@@ -139,11 +147,9 @@ void gc_reset_after_collection(GC* gc, int64 time_mutator, int64 time_collection
 #endif
   }
 
-  gc_update_space_stat((GC_MS*)gc);
+  gc_update_space_stat(gc);
   
-  gc_update_collection_scheduler(gc, time_mutator, time_collection);
-
-  gc_reset_space_stat((GC_MS*)gc);
+  gc_reset_space_stat(gc);
 
   gc_reset_collector_state(gc);
 
@@ -154,22 +160,24 @@ void gc_reset_after_collection(GC* gc, int64 time_mutator, int64 time_collection
 
 }
 
+void set_check_delay( int64 mutator_time );
+
 void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
 {  
   INFO2("gc.process", "\nGC: GC start ...\n");
 
-  collection_start_time = time_now();
-  int64 time_mutator = collection_start_time - collection_end_time;
-
-  gc->num_collections++;
   gc->cause = gc_cause;
 
   if(gc_is_specify_con_gc()){
-    gc_finish_con_GC(gc, time_mutator);    
-    collection_end_time = time_now();
+    gc_wait_con_finish(gc);
     INFO2("gc.process", "GC: GC end\n");
     return;
   }
+
+   set_gc_start_time();
+  int64 time_mutator = get_gc_start_time() - get_gc_end_time();
+  
+  gc->num_collections++;
 
   /* FIXME:: before mutators suspended, the ops below should be very careful
      to avoid racing with mutators. */
@@ -207,16 +215,16 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   gc_gen_reclaim_heap((GC_Gen*)gc, collection_start_time);
 #endif
 
-  collection_end_time = time_now(); 
+  set_gc_end_time();
 
-  int64 time_collection = collection_end_time - collection_start_time;
+  int64 time_collection = get_gc_end_time() - get_gc_start_time();
 
 #if !defined(USE_UNIQUE_MARK_SWEEP_GC)&&!defined(USE_UNIQUE_MOVE_COMPACT_GC)
   gc_gen_collection_verbose_info((GC_Gen*)gc, time_collection, time_mutator);
   gc_gen_space_verbose_info((GC_Gen*)gc);
 #endif
 
-  gc_reset_after_collection(gc, time_mutator, time_collection);
+  gc_reset_after_collection(gc);
 
   gc_assign_free_area_to_mutators(gc);
   
@@ -226,9 +234,6 @@ void gc_reclaim_heap(GC* gc, unsigned int gc_cause)
   INFO2("gc.process", "GC: GC end\n");
   return;
 }
-
-
-
 
 
 

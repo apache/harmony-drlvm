@@ -20,6 +20,7 @@
 
 #define STAT_SAMPLE_WINDOW_SIZE 5
 
+struct GC_MS;
 typedef struct Con_Collection_Scheduler {
   /*common field*/
   GC* gc;
@@ -46,10 +47,17 @@ typedef struct Con_Collection_Scheduler {
 void con_collection_scheduler_initialize(GC* gc);
 void con_collection_scheduler_destruct(GC* gc);
 
+void gc_update_scheduler_parameter( GC *gc );
+void gc_force_update_scheduler_parameter( GC *gc );
+Boolean gc_con_perform_collection( GC* gc );
 Boolean gc_sched_con_collection(GC* gc, unsigned int gc_cause);
-void gc_update_con_collection_scheduler(GC* gc, int64 time_mutator, int64 time_collection);
 
 void gc_decide_cc_scheduler_kind(char* cc_scheduler);
 void gc_set_default_cc_scheduler_kind();
+
+extern unsigned int mostly_con_final_marker_num;
+extern unsigned int mostly_con_long_marker_num;
+
 #endif
+
 

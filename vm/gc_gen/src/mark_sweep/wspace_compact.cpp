@@ -33,7 +33,7 @@ void wspace_decide_compaction_need(Wspace *wspace)
   float free_mem_ratio = (float)free_mem_size / wspace->committed_heap_size;
 
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
-  if(!gc_mark_is_concurrent() && (free_mem_ratio > WSPACE_COMPACT_RATIO) && (wspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
+  if( gc_con_is_in_STW(wspace->gc) && (free_mem_ratio > WSPACE_COMPACT_RATIO) && (wspace->gc->cause != GC_CAUSE_RUNTIME_FORCE_GC)){
 #else
   if(collect_is_major()){
 #endif
@@ -274,7 +274,6 @@ void wspace_compact(Collector *collector, Wspace *wspace)
     }
   }
 }
-
 
 
 

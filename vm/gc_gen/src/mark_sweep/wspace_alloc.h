@@ -184,8 +184,9 @@ inline void *alloc_in_chunk(Chunk_Header* &chunk)
   void *p_obj = (void*)((POINTER_SIZE_INT)chunk->base + ((POINTER_SIZE_INT)chunk->slot_size * slot_index));
 
   /*mark black is placed here because of race condition between ops color flip. */
-  if(p_obj && is_obj_alloced_live())
+  if(p_obj && is_obj_alloced_live()) {
     obj_mark_black_in_table((Partial_Reveal_Object*)p_obj, chunk->slot_size);
+  }
     
   alloc_slot_in_table(table, slot_index);
   if(chunk->status & CHUNK_NEED_ZEROING)

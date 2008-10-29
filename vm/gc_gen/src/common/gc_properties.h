@@ -54,7 +54,8 @@ extern unsigned int GC_PROP;
 enum GC_Property{
   ALGO_HAS_NOS          = 0x1,
   ALGO_HAS_LOS          = 0x2,
-  ALGO_IS_GEN           = 0x4,
+  ALGO_IS_UNIQUE      = 0x4,
+  ALGO_IS_GEN           = 0x8,
   
   ALGO_COPY_FORWARD     = 0x10,
   ALGO_COPY_SEMISPACE   = 0x20, 
@@ -105,6 +106,21 @@ FORCE_INLINE void gc_set_gen_flag()
 FORCE_INLINE void gc_clear_gen_flag()
 {
   GC_PROP &= ~ALGO_IS_GEN;  
+}
+
+FORCE_INLINE Boolean gc_is_unique_space()
+{
+  return gc_is_kind(ALGO_IS_UNIQUE);
+}
+
+FORCE_INLINE Boolean gc_is_unique_move_compact()
+{
+  return gc_is_kind(ALGO_IS_UNIQUE) && gc_is_kind(ALGO_COMPACT_MOVE);
+}
+
+FORCE_INLINE Boolean gc_is_unique_mark_sweep()
+{
+  return gc_is_kind(ALGO_IS_UNIQUE) && gc_is_kind(ALGO_MS_NORMAL);
 }
 
 FORCE_INLINE Boolean gc_is_gen_mode()

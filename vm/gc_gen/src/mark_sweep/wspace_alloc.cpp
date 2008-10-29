@@ -120,8 +120,9 @@ void *wspace_thread_local_alloc(unsigned size, Allocator *allocator)
 #ifdef SSPACE_VERIFY
   wspace_verify_alloc(p_obj, size);
 #endif
-
-  if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
+ if(p_obj) {
+   ((Mutator*)allocator)->new_obj_occupied_size+=size;
+ }
   return p_obj;
 }
 
@@ -149,6 +150,7 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
       //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
       if(!chunk){
         mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
+	 //INFO2("gc.wspace", "[Local Alloc Failed] alloc obj with size" << size << " bytes" );
         return NULL;
       }
       chunk->status |= CHUNK_IN_USE;
@@ -184,6 +186,7 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
     //if(!chunk) chunk = wspace_steal_pfc(wspace, seg_index, index);
     if(!chunk) {
       mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
+      //INFO2("gc.wspace", "[Non-Local Alloc Failed] alloc obj with size" << size << " bytes" );
       return NULL;
     }
     p_obj = alloc_in_chunk(chunk);
@@ -201,7 +204,9 @@ static void *wspace_alloc_normal_obj(Wspace *wspace, unsigned size, Allocator *a
     
     mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
   }
-  
+  if(p_obj) {
+  	((Mutator*)allocator)->new_obj_occupied_size+=size;
+  }
   return p_obj;
 }
 
@@ -224,7 +229,7 @@ static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *al
   
   mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_ENTER_ALLOC_MARK);  
   if(is_obj_alloced_live()){
-    chunk->table[0] |= cur_mark_black_color  ;
+    chunk->table[0] |= cur_mark_black_color; // just for debugging, mark new object
   } 
   mutator_post_signal((Mutator*) allocator,HSIG_MUTATOR_SAFE);
   
@@ -234,6 +239,8 @@ static void *wspace_alloc_super_obj(Wspace *wspace, unsigned size, Allocator *al
   chunk->status = CHUNK_ABNORMAL| CHUNK_USED;
   wspace_reg_used_chunk(wspace, chunk);
   assert(get_obj_info_raw((Partial_Reveal_Object*)chunk->base) & SUPER_OBJ_MASK);
+  
+  ((Mutator*)allocator)->new_obj_occupied_size+=chunk_size;
   return chunk->base;
 }
 
@@ -257,14 +264,21 @@ static void *wspace_try_alloc(unsigned size, Allocator *allocator)
 #ifdef WSPACE_CONCURRENT_GC_STATS
   if(p_obj && gc_con_is_in_marking()) ((Partial_Reveal_Object*)p_obj)->obj_info |= NEW_OBJ_MASK;
 #endif
-  
+
+ 
   return p_obj;
 }
+
+Free_Chunk_List *get_hyper_free_chunk_list();
 
 /* FIXME:: the collection should be seperated from the alloation */
 void *wspace_alloc(unsigned size, Allocator *allocator)
 {
   void *p_obj = NULL;
+  /*
+  if( get_hyper_free_chunk_list()->head == NULL )
+  	INFO2("gc.wspace", "[BEFORE ALLOC]hyper free chunk is EMPTY!!");
+  */
   
   if(gc_is_specify_con_gc())
     gc_sched_collection(allocator->gc, GC_CAUSE_CONCURRENT_GC);
@@ -273,6 +287,10 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
   p_obj = wspace_try_alloc(size, allocator);
   if(p_obj){
     ((Mutator*)allocator)->new_obj_size += size;
+    /*
+    if( get_hyper_free_chunk_list()->head == NULL )
+  	INFO2("gc.wspace", "[AFTER FIRST ALLOC]hyper free chunk is EMPTY!!");
+    */
     return p_obj;
   }
   
@@ -284,9 +302,21 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
   if(p_obj){
     vm_gc_unlock_enum();
     ((Mutator*)allocator)->new_obj_size += size;
+    /*
+    if( get_hyper_free_chunk_list()->head == NULL )
+  	INFO2("gc.wspace", "[AFTER SECOND ALLOC]hyper free chunk is EMPTY!!");
+    */
     return p_obj;
   }
-  gc_reclaim_heap(allocator->gc, GC_CAUSE_MOS_IS_FULL);
+  
+  INFO2("gc.con.info", "[Exhausted Cause] Allocation size is :" << size << " bytes");
+  GC *gc = allocator->gc;
+  /*
+  gc->cause = GC_CAUSE_MOS_IS_FULL;
+  if(gc_is_specify_con_gc())
+    gc_relaim_heap_con_mode(gc);
+  else*/ 
+  gc_reclaim_heap(gc, GC_CAUSE_MOS_IS_FULL);
   vm_gc_unlock_enum();
 
 #ifdef SSPACE_CHUNK_INFO
@@ -294,7 +324,10 @@ void *wspace_alloc(unsigned size, Allocator *allocator)
 #endif
 
   p_obj = wspace_try_alloc(size, allocator);
-  
+  /*
+  if( get_hyper_free_chunk_list()->head == NULL )
+  	INFO2("gc.wspace", "[AFTER COLLECTION ALLOC]hyper free chunk is EMPTY!!");
+  */
   if(p_obj) ((Mutator*)allocator)->new_obj_size += size;
   
   return p_obj;

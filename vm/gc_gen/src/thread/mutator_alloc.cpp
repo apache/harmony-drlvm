@@ -31,8 +31,6 @@
 
 //#define GC_OBJ_SIZE_STATISTIC
 
-volatile Boolean obj_alloced_live = FALSE;
-
 #ifdef GC_OBJ_SIZE_STATISTIC
 #define GC_OBJ_SIZE_STA_MAX 256*KB
 unsigned int obj_size_distribution_map[GC_OBJ_SIZE_STA_MAX>>10];

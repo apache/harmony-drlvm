@@ -231,6 +231,7 @@ static void merge_free_chunks_in_list(Wspace *wspace, Free_Chunk_List *list)
 
 void wspace_merge_free_chunks(GC *gc, Wspace *wspace)
 {
+  
   Free_Chunk_List free_chunk_list;
   free_chunk_list.head = NULL;
   free_chunk_list.tail = NULL;

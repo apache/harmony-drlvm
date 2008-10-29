@@ -24,12 +24,14 @@
 #include "../common/gc_common.h"
 #include "../common/gc_concurrent.h"
 
+#define DEFAULT_HEAP_UTILIZATION_RATE 0.92f
 /*
  * The sweep space accomodates objects collected by mark-sweep
  */
 
 struct Size_Segment;
 struct Free_Chunk_List;
+struct Con_Collection_Statistics;
 
 typedef struct Wspace {
   /* <-- first couple of fields are overloadded as Space */
@@ -71,13 +73,10 @@ typedef struct Wspace {
   Free_Chunk_List *aligned_free_chunk_lists;
   Free_Chunk_List *unaligned_free_chunk_lists;
   Free_Chunk_List *hyper_free_chunk_list;
-  POINTER_SIZE_INT surviving_obj_num;
-  POINTER_SIZE_INT surviving_obj_size;
+  
+  Con_Collection_Statistics *con_collection_statistics;
+  
 } Wspace;
-
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-void wspace_set_space_statistic(Wspace *wspace);
-#endif
 
 Wspace *wspace_initialize(GC *gc, void *start, POINTER_SIZE_INT wspace_size, POINTER_SIZE_INT commit_size);
 void wspace_destruct(Wspace *wspace);

@@ -37,7 +37,10 @@ extern Boolean GEN_NONGEN_SWITCH;
 
 extern Boolean FORCE_FULL_COMPACT;
 
-extern unsigned int NUM_MARKERS;
+extern unsigned int NUM_CONCLCTORS;
+extern unsigned int NUM_CON_MARKERS;
+extern unsigned int NUM_CON_SWEEPERS;
+
 extern unsigned int NUM_COLLECTORS;
 extern unsigned int MINOR_COLLECTORS;
 extern unsigned int MAJOR_COLLECTORS;
@@ -59,12 +62,12 @@ unsigned int GC_PROP;
 GC* gc_mc_create();
 GC* gc_ms_create();
 
-static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
+static GC* gc_unique_decide_collection_algo(char* unique_algo, Boolean has_los)
 {
   /* if unique_algo is not set, gc_gen_decide_collection_algo is called. */
   assert(unique_algo);
   
-  GC_PROP = ALGO_POOL_SHARE | ALGO_DEPTH_FIRST;
+  GC_PROP = ALGO_POOL_SHARE | ALGO_DEPTH_FIRST | ALGO_IS_UNIQUE;
   
   assert(!has_los); /* currently unique GCs don't use LOS */
   if(has_los) 
@@ -84,7 +87,7 @@ static GC* gc_decide_collection_algo(char* unique_algo, Boolean has_los)
     GC_PROP |= ALGO_MS_NORMAL;
     gc = gc_ms_create();
   }else{
-    LWARN(48, "GC algorithm setting incorrect. Will use default value.");
+    LWARN(48, "\nGC algorithm setting incorrect. Will use default value.\n");
     GC_PROP |= ALGO_COMPACT_MOVE;
     gc = gc_mc_create();  
   }
@@ -159,7 +162,7 @@ GC* gc_parse_options()
     if(minor_algo || major_algo){
       LWARN(60, "Generational options cannot be set with unique_algo, ignored.");
     }
-    gc = gc_decide_collection_algo(unique_algo, has_los);
+    gc = gc_unique_decide_collection_algo(unique_algo, has_los);
     vm_properties_destroy_value(unique_algo);  
   }else{ /* default */
     gc = gc_gen_decide_collection_algo(minor_algo, major_algo, has_los);
@@ -225,7 +228,7 @@ GC* gc_parse_options()
 
   if (min_heap_size > max_heap_size){
     max_heap_size = min_heap_size;
-    LWARN(61, "Max heap size you set is too small, reset to {0}MB" << max_heap_size/MB);
+    LWARN(61, "Max heap size is too small, reset to {0}MB" << max_heap_size/MB);
   }
 
   min_heap_size_bytes = min_heap_size;
@@ -248,10 +251,24 @@ GC* gc_parse_options()
     NUM_COLLECTORS = (num==0)? NUM_COLLECTORS:num;
   }
 
-  if (vm_property_is_set("gc.num_markers", VM_PROPERTIES) == 1) {
-    unsigned int num = vm_property_get_integer("gc.num_markers");
-    NUM_MARKERS = (num==0)? NUM_MARKERS:num;
+  if (vm_property_is_set("gc.num_conclctors", VM_PROPERTIES) == 1) {
+    unsigned int num = vm_property_get_integer("gc.num_conclctors");
+    NUM_CONCLCTORS = (num==0)? NUM_CONCLCTORS:num;
   }
+
+  // for concurrent GC debug
+  if (vm_property_is_set("gc.num_con_markers", VM_PROPERTIES) == 1) {
+    unsigned int num = vm_property_get_integer("gc.num_con_markers");
+    NUM_CON_MARKERS = (num==0)? NUM_CON_MARKERS:num;
+  }
+
+  if (vm_property_is_set("gc.num_con_sweepers", VM_PROPERTIES) == 1) {
+    unsigned int num = vm_property_get_integer("gc.num_con_sweepers");
+    NUM_CON_SWEEPERS = (num==0)? NUM_CON_SWEEPERS:num;
+  }
+
+
+  
 
   if (vm_property_is_set("gc.tospace_size", VM_PROPERTIES) == 1) {
     TOSPACE_SIZE = vm_property_get_size("gc.tospace_size");
@@ -408,7 +425,6 @@ GC* gc_parse_options()
 
   return gc;
 }
-
 
 
 

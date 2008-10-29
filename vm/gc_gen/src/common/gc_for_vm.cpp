@@ -30,7 +30,7 @@
 #include "../mark_sweep/gc_ms.h"
 #include "../move_compact/gc_mc.h"
 #include "interior_pointer.h"
-#include "../thread/marker.h"
+#include "../thread/conclctor.h"
 #include "../thread/collector.h"
 #include "../verify/verify_live_heap.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
@@ -115,7 +115,10 @@ int gc_init()
   collection_scheduler_initialize(gc);
 
   if(gc_is_specify_con_gc()){
-    marker_initialize(gc);
+     gc->gc_concurrent_status = GC_CON_NIL;
+    conclctor_initialize(gc);
+  } else {
+     gc->gc_concurrent_status = GC_CON_DISABLE;
   }
   
   collector_initialize(gc);
@@ -134,6 +137,9 @@ void gc_wrapup()
 { 
   INFO2("gc.process", "GC: call GC wrapup ....");
   GC* gc =  p_global_gc;
+  // destruct threads first, and then destruct data structures
+  conclctor_destruct(gc);
+  collector_destruct(gc);
 
 #if defined(USE_UNIQUE_MARK_SWEEP_GC)
  gc_ms_destruct((GC_MS*)gc);
@@ -148,8 +154,6 @@ void gc_wrapup()
 #ifndef BUILD_IN_REFERENT
   gc_finref_metadata_destruct(gc);
 #endif
-  collector_destruct(gc);
-  marker_destruct(gc);
 
   if( verify_live_heap ){
     gc_terminate_heap_verification(gc);
@@ -442,7 +446,6 @@ Boolean obj_belongs_to_gc_heap(Partial_Reveal_Object* p_obj)
 {
   return address_belongs_to_gc_heap(p_obj, p_global_gc);  
 }
-
 
 
 

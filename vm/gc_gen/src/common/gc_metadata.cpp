@@ -26,6 +26,7 @@
 #include "compressed_ref.h"
 #include "../utils/sync_stack.h"
 #include "../gen/gen.h"
+#include "../verify/verify_live_heap.h"
 
 #define GC_METADATA_SIZE_BYTES (1*MB)
 #define GC_METADATA_EXTEND_SIZE_BYTES (1*MB)
@@ -74,6 +75,7 @@ void gc_metadata_initialize(GC* gc)
   }
 
   gc_metadata.gc_rootset_pool = sync_pool_create();
+  //gc_metadata.gc_verifier_rootset_pool = sync_pool_create();
   gc_metadata.gc_uncompressed_rootset_pool = sync_pool_create();
   gc_metadata.mutator_remset_pool = sync_pool_create();
   gc_metadata.collector_remset_pool = sync_pool_create();
@@ -552,6 +554,7 @@ void gc_metadata_verify(GC* gc, Boolean is_before_gc)
 Boolean obj_is_mark_black_in_table(Partial_Reveal_Object* p_obj);
 #endif
 
+void analyze_bad_obj(Partial_Reveal_Object *p_obj);
 void gc_reset_dirty_set(GC* gc)
 {
   GC_Metadata* metadata = gc->metadata;
@@ -559,18 +562,14 @@ void gc_reset_dirty_set(GC* gc)
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
     Vector_Block* local_dirty_set = mutator->dirty_set;
-    assert(local_dirty_set);
-    if(!vector_block_is_empty(local_dirty_set)){
-#ifdef _DEBUG
+    if(!vector_block_is_empty(local_dirty_set)) {
       POINTER_SIZE_INT* iter = vector_block_iterator_init(local_dirty_set);
       while(!vector_block_iterator_end(local_dirty_set,iter)){
         Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;
         iter = vector_block_iterator_advance(local_dirty_set, iter);
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-        assert(obj_is_mark_black_in_table(p_obj));
-#endif
+	    analyze_bad_obj(p_obj);
       }
-#endif
+      RAISE_ERROR;
       vector_block_clear(mutator->dirty_set);
     }
     mutator = mutator->next;
@@ -581,25 +580,26 @@ void gc_reset_dirty_set(GC* gc)
 
   if(!pool_is_empty(global_dirty_set_pool)){
     Vector_Block* dirty_set = pool_get_entry(global_dirty_set_pool);
-    while(dirty_set != NULL){
+    while(dirty_set != NULL) {
       if(!vector_block_is_empty(dirty_set)){
-#ifdef _DEBUG
-        POINTER_SIZE_INT* iter = vector_block_iterator_init(dirty_set);
-        while(!vector_block_iterator_end(dirty_set,iter)){
-          Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;          
-          iter = vector_block_iterator_advance(dirty_set, iter);
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-          assert(obj_is_mark_black_in_table(p_obj));
-#endif
-        }
-#endif
+      /*
+      POINTER_SIZE_INT* iter = vector_block_iterator_init(dirty_set);
+      while(!vector_block_iterator_end(dirty_set,iter)){
+        Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) *iter;
+        iter = vector_block_iterator_advance(dirty_set, iter);
+	 analyze_bad_obj(p_obj);
+      }*/
+      RAISE_ERROR;
+        vector_block_clear(dirty_set);
+        pool_put_entry(metadata->free_set_pool,dirty_set);
+      } else {
+         pool_put_entry(metadata->free_set_pool,dirty_set);
       }
-      vector_block_clear(dirty_set);
-      pool_put_entry(metadata->free_set_pool,dirty_set);
-      dirty_set = pool_get_entry(global_dirty_set_pool);
-    }
+    dirty_set = pool_get_entry(global_dirty_set_pool);
   }  
+ }
 }
+
 
 void gc_prepare_dirty_set(GC* gc)
 {
@@ -610,14 +610,59 @@ void gc_prepare_dirty_set(GC* gc)
   
   Mutator *mutator = gc->mutator_list;
   while (mutator) {
+    if( vector_block_is_empty(mutator->dirty_set) ) {
+	  mutator = mutator->next;
+	  continue; 
+    }
     //FIXME: temproray solution for mostly concurrent.
-    lock(mutator->dirty_set_lock);
+    //lock(mutator->dirty_set_lock);
     pool_put_entry(gc_dirty_set_pool, mutator->dirty_set);
     mutator->dirty_set = free_set_pool_get_entry(metadata);    
+    //unlock(mutator->dirty_set_lock);
+    mutator = mutator->next;
+  }
+  unlock(gc->mutator_list_lock);
+}
+void gc_copy_local_dirty_set_to_global(GC *gc)
+{
+
+  GC_Metadata* metadata = gc->metadata;
+  if(!pool_is_empty(metadata->gc_dirty_set_pool)) //only when the global dirty is empty
+  	return;
+  
+  Pool* gc_dirty_set_pool = metadata->gc_dirty_set_pool;
+  Vector_Block* dirty_copy = free_set_pool_get_entry(metadata);
+  unsigned int i = 0;
+  Vector_Block* local_dirty_set = NULL;
+  
+  lock(gc->mutator_list_lock);
+  Mutator *mutator = gc->mutator_list;
+  
+  while (mutator) { 
+    lock(mutator->dirty_set_lock);
+    local_dirty_set = mutator->dirty_set;
+    if( vector_block_is_empty(local_dirty_set) ) {
+	  unlock(mutator->dirty_set_lock);
+	  mutator = mutator->next;
+	  continue; 
+    }
+    unsigned int dirty_set_size = vector_block_entry_count(local_dirty_set);
+    for(i=0; i<dirty_set_size; i++) {
+	POINTER_SIZE_INT p_obj = vector_block_get_entry(local_dirty_set);
+	vector_block_add_entry(dirty_copy, p_obj);
+	if(vector_block_is_full(dirty_copy)) {
+	   pool_put_entry(gc_dirty_set_pool, dirty_copy);
+	   dirty_copy = free_set_pool_get_entry(metadata); 
+	 }
+    }
     unlock(mutator->dirty_set_lock);
     mutator = mutator->next;
   }
   unlock(gc->mutator_list_lock);
+  if( !vector_block_is_empty(dirty_copy) )
+    pool_put_entry(gc_dirty_set_pool, dirty_copy);
+  else
+    free_set_pool_put_entry(dirty_copy, metadata);
 }
 
 void gc_clear_dirty_set(GC* gc)
@@ -636,7 +681,11 @@ void gc_clear_dirty_set(GC* gc)
 }
 
 void free_set_pool_put_entry(Vector_Block* block, GC_Metadata *metadata)
-{ pool_put_entry(metadata->free_set_pool, block); }
+{
+  if(!vector_block_is_empty(block))
+  	RAISE_ERROR;
+  pool_put_entry(metadata->free_set_pool, block); 
+}
 
 
 void gc_reset_collectors_rem_set(GC *gc) 
@@ -653,6 +702,5 @@ void gc_reset_collectors_rem_set(GC *gc)
     collector->rem_set = NULL;
   }
 }
-
 
 

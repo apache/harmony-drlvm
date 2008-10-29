@@ -67,6 +67,7 @@ void gc_fix_rootset(Collector* collector, Boolean double_fix);
 void gc_clear_remset(GC* gc);
 
 void gc_prepare_dirty_set(GC* gc);
+void gc_copy_local_dirty_set_to_global(GC *gc);
 void gc_reset_dirty_set(GC* gc);
 void gc_clear_dirty_set(GC* gc);
 
@@ -118,14 +119,14 @@ inline Vector_Block *free_task_pool_get_entry(GC_Metadata *metadata)
   while(!block)
       block = gc_metadata_extend(metadata->free_task_pool);
    
-  assert(vector_stack_is_empty(block));
+  assert(vector_block_is_empty(block));
   return block;
 }
 
 inline void mutator_remset_add_entry(Mutator* mutator, REF* p_ref)
 {
   assert( p_ref >= gc_heap_base_address() && p_ref < gc_heap_ceiling_address()); 
-
+  
   Vector_Block* root_set = mutator->rem_set;  
   vector_block_add_entry(root_set, (POINTER_SIZE_INT)p_ref);
   
@@ -139,17 +140,22 @@ inline void mutator_remset_add_entry(Mutator* mutator, REF* p_ref)
 inline void mutator_dirtyset_add_entry(Mutator* mutator, Partial_Reveal_Object* p_obj)
 {
   Vector_Block* dirty_set = mutator->dirty_set;    
+  mutator->dirty_obj_slot_num++;
   vector_block_add_entry(dirty_set, (POINTER_SIZE_INT)p_obj);
 
-  if( !vector_block_is_full(dirty_set) ) return;
-
-  vector_block_set_full(dirty_set);
-
-  if(vector_block_set_exclusive(dirty_set)){    
-    pool_put_entry(gc_metadata.gc_dirty_set_pool, dirty_set);
+  if( !vector_block_is_full(dirty_set) ) {
+       return;
   }
- 
+  
+  lock(mutator->dirty_set_lock);
+  if( vector_block_is_empty(dirty_set) ) {
+  	vector_block_clear(dirty_set);
+	unlock(mutator->dirty_set_lock);
+       return;
+  }
+  pool_put_entry(gc_metadata.gc_dirty_set_pool, dirty_set);
   mutator->dirty_set = free_set_pool_get_entry(&gc_metadata);
+  unlock(mutator->dirty_set_lock);
 }
 
 inline void collector_repset_add_entry(Collector* collector, Partial_Reveal_Object** p_ref)

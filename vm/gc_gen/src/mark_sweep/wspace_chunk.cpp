@@ -29,6 +29,9 @@ static Free_Chunk_List  aligned_free_chunk_lists[NUM_ALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  unaligned_free_chunk_lists[NUM_UNALIGNED_FREE_CHUNK_BUCKET];
 static Free_Chunk_List  hyper_free_chunk_list;
 
+Free_Chunk_List *get_hyper_free_chunk_list() {
+	return &hyper_free_chunk_list;
+}
 
 static void init_size_segment(Size_Segment *seg, unsigned int size_min, unsigned int size_max, unsigned int gran_shift_bits, Boolean local_alloc)
 {
@@ -313,15 +316,20 @@ void wspace_put_free_chunk_to_tail(Wspace *wspace, Free_Chunk *chunk)
 {
   POINTER_SIZE_INT chunk_size = CHUNK_SIZE(chunk);
   assert(!(chunk_size % CHUNK_GRANULARITY));
-  
+
+  Free_Chunk_List *free_list = NULL;
   if(chunk_size > HYPER_OBJ_THRESHOLD){
-    lock(wspace->hyper_free_chunk_list->lock);
+    free_list = wspace->hyper_free_chunk_list;
+    lock(free_list->lock);
     list_put_hyper_free_chunk_to_tail(wspace->hyper_free_chunk_list, chunk);
-    unlock(wspace->hyper_free_chunk_list->lock);
-  }else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK))
-    list_put_free_chunk_to_tail(&wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
-  else
-    list_put_free_chunk_to_tail(&wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)], chunk);
+    unlock(free_list->lock);
+  }else if(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK) && !(chunk_size & NORMAL_CHUNK_LOW_MASK)) {
+    free_list = &wspace->aligned_free_chunk_lists[ALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)];
+    list_put_free_chunk_to_tail(free_list, chunk);
+  } else {
+    free_list = &wspace->unaligned_free_chunk_lists[UNALIGNED_CHUNK_SIZE_TO_INDEX(chunk_size)];
+    list_put_free_chunk_to_tail(free_list, chunk);
+  }
 
 }
 
@@ -410,9 +418,11 @@ Free_Chunk *wspace_get_normal_free_chunk(Wspace *wspace)
   assert(!chunk);
   
   /* search in the hyper free chunk list */
+
   chunk = wspace_get_hyper_free_chunk(wspace, NORMAL_CHUNK_SIZE_BYTES, TRUE);
   assert(!((POINTER_SIZE_INT)chunk & NORMAL_CHUNK_LOW_MASK));
-  
+  /*if(chunk == NULL )
+  INFO2("gc.wspace", "return from hyper free chunk list");*/
   return chunk;
 }
 
@@ -476,7 +486,12 @@ Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size,
   
   Free_Chunk *prev_chunk = NULL;
   Free_Chunk *chunk = list->head;
+  /*
+  if( chunk == NULL  )
+  INFO2("gc.wspace", "NO free hyper chunk now!!!" );
+  */
   while(chunk){
+    
     if(CHUNK_SIZE(chunk) >= chunk_size){
       Free_Chunk *next_chunk = chunk->next;
       if(prev_chunk)
@@ -488,6 +503,8 @@ Free_Chunk *wspace_get_hyper_free_chunk(Wspace *wspace, unsigned int chunk_size,
       else
         list->tail = prev_chunk;
       break;
+    } else {
+      //INFO2("gc.wspace", "check chunk with SIZE "<<CHUNK_SIZE(chunk) << " ,not enough" );
     }
     prev_chunk = chunk;
     chunk = chunk->next;
@@ -952,7 +969,6 @@ void fastdiv_init()
 }
 
 #endif
-
 
 
 

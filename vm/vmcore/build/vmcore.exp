@@ -633,6 +633,9 @@ VMCORE_0.1 {
     apr_atomic_dec32;
     apr_atomic_inc32;
     apr_atomic_cas32;
+    apr_atomic_add32;
+    apr_atomic_set32;
+    apr_sleep;
     apr_time_now;
     apr_atomic_casptr;
     port_rw_barrier;

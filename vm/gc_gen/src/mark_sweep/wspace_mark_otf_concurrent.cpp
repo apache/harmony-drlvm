@@ -16,7 +16,11 @@
  */
 #include "wspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
-#include "../thread/marker.h"
+#include "../thread/conclctor.h"
+#include "gc_ms.h"
+struct GC_MS;
+struct Wspace;
+struct Space_Statistics;
 
 Boolean obj_is_marked_in_table(Partial_Reveal_Object *obj);
 
@@ -32,7 +36,7 @@ static FORCE_INLINE void scan_slot(Collector* marker, REF *p_ref)
   }  
 }
 
-static FORCE_INLINE void scan_object(Marker* marker, Partial_Reveal_Object *p_obj)
+static FORCE_INLINE void scan_object(Conclctor* marker, Partial_Reveal_Object *p_obj)
 {
   assert((((POINTER_SIZE_INT)p_obj) % GC_OBJECT_ALIGNMENT) == 0);
 
@@ -71,42 +75,59 @@ static FORCE_INLINE void scan_object(Marker* marker, Partial_Reveal_Object *p_ob
 
 }
 
-static void trace_object(Marker* marker, Partial_Reveal_Object *p_obj)
+static void trace_object(Conclctor* marker, Partial_Reveal_Object *p_obj)
 {
   scan_object(marker, p_obj);
-  obj_mark_black_in_table(p_obj);
+  //obj_mark_black_in_table(p_obj);
+  obj_mark_black_in_table(p_obj, marker);
   
   Vector_Block *trace_stack = marker->trace_stack;
   while(!vector_stack_is_empty(trace_stack)){
     p_obj = (Partial_Reveal_Object*)vector_stack_pop(trace_stack);
     scan_object(marker, p_obj);    
-    obj_mark_black_in_table(p_obj);
+    //obj_mark_black_in_table(p_obj);
+    obj_mark_black_in_table(p_obj, marker);
     trace_stack = marker->trace_stack;
   }
 }
 
-static Boolean concurrent_mark_need_terminating(GC* gc)
+static Boolean dirty_set_is_empty(GC *gc) 
 {
+  lock(gc->mutator_list_lock);
+  Mutator *mutator = gc->mutator_list;
+  while (mutator) {
+    Vector_Block* local_dirty_set = mutator->dirty_set;
+    if(!vector_block_is_empty(local_dirty_set)){
+      unlock(gc->mutator_list_lock); 
+      return FALSE;
+    }
+    mutator = mutator->next;
+  }
   GC_Metadata *metadata = gc->metadata;
-  return gc_local_dirtyset_is_empty(gc) && pool_is_empty(metadata->gc_dirty_set_pool);
+  Boolean is_empty = pool_is_empty(metadata->gc_dirty_set_pool);
+  unlock(gc->mutator_list_lock); //unlock put here to prevent creating new mutators before checking global dirty set
+  return is_empty;
+}
+static Boolean concurrent_mark_need_terminating_otf(GC* gc)
+{
+  return dirty_set_is_empty(gc);
 }
 
 /* for marking phase termination detection */
 static volatile unsigned int num_active_markers = 0;
+//static volatile unsigned int root_set_obj_size = 0;
 
-void wspace_mark_scan_concurrent(Marker* marker)
+void wspace_mark_scan_concurrent(Conclctor* marker)
 {
-  marker->time_measurement_start = time_now();
+  //marker->time_measurement_start = time_now();
   GC *gc = marker->gc;
   GC_Metadata *metadata = gc->metadata;
   
   /* reset the num_finished_collectors to be 0 by one collector. This is necessary for the barrier later. */
-  atomic_inc32(&num_active_markers);
-  
+  unsigned int current_thread_id = atomic_inc32(&num_active_markers);
   marker->trace_stack = free_task_pool_get_entry(metadata);
-  
   Vector_Block *root_set = pool_iterator_next(metadata->gc_rootset_pool);
-  
+
   /* first step: copy all root objects to mark tasks.*/
   while(root_set){
     POINTER_SIZE_INT *iter = vector_block_iterator_init(root_set);
@@ -116,6 +137,7 @@ void wspace_mark_scan_concurrent(Marker* marker)
       
       assert(p_obj!=NULL);
       assert(address_belongs_to_gc_heap(p_obj, gc));
+      //if(obj_mark_gray_in_table(p_obj, &root_set_obj_size))
       if(obj_mark_gray_in_table(p_obj))
         collector_tracestack_push((Collector*)marker, p_obj);
     }
@@ -126,8 +148,10 @@ void wspace_mark_scan_concurrent(Marker* marker)
   
   marker->trace_stack = free_task_pool_get_entry(metadata);
 
+  state_transformation( gc, GC_CON_START_MARKERS, GC_CON_TRACING);
 retry:
   
+  gc_copy_local_dirty_set_to_global(marker->gc);
   /*second step: mark dirty object snapshot pool*/
   Vector_Block* dirty_set = pool_get_entry(metadata->gc_dirty_set_pool);
 
@@ -137,7 +161,10 @@ retry:
       Partial_Reveal_Object *p_obj = (Partial_Reveal_Object *)*iter;
       iter = vector_block_iterator_advance(dirty_set,iter);
 
-      assert(p_obj!=NULL); //FIXME: restrict?
+      if(p_obj==NULL) { //FIXME: restrict?
+        RAISE_ERROR;
+      }
+      marker->num_dirty_slots_traced++;
       if(obj_mark_gray_in_table(p_obj))
         collector_tracestack_push((Collector*)marker, p_obj);
     } 
@@ -175,39 +202,15 @@ retry:
            3.global snapshot pool is empty.
     */
   atomic_dec32(&num_active_markers);
-  while(num_active_markers != 0 || !concurrent_mark_need_terminating(gc)){
-    if(!pool_is_empty(metadata->mark_task_pool) || !pool_is_empty(metadata->gc_dirty_set_pool)){
-      atomic_inc32(&num_active_markers);
-      goto retry; 
-    }else{
-      /*grab a block from mutator and begin tracing*/
-      POINTER_SIZE_INT thread_num = (POINTER_SIZE_INT)marker->thread_handle;
-      Vector_Block* local_dirty_set = gc_get_local_dirty_set(gc, (unsigned int)(thread_num + 1));      
-      /*1.  If local_dirty_set has been set full bit, the block is full and will no longer be put into global snapshot pool; 
-                  so it should be checked again to see if there're remaining entries unscanned in it. In this case, the 
-                  share bit in local_dirty_set should not be cleared, beacause of rescanning exclusively. 
-             2.  If local_dirty_set has not been set full bit, the block is used by mutator and has the chance to be put into
-                  global snapshot pool. In this case, we simply clear the share bit in local_dirty_set. 
-           */
-      if(local_dirty_set != NULL){
-        atomic_inc32(&num_active_markers);
-        do{        
-          while(!vector_block_is_empty(local_dirty_set)){ //|| !vector_block_not_full_set_unshared(local_dirty_set)){
-            Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*) vector_block_get_entry(local_dirty_set);
-            if(!obj_belongs_to_gc_heap(p_obj)) {
-              assert(0);
-            }
-            
-            if(obj_mark_gray_in_table(p_obj)){ 
-              collector_tracestack_push((Collector*)marker, p_obj);
-            }
-          }
-        }while(!vector_block_not_full_set_unshared(local_dirty_set) && !vector_block_is_empty(local_dirty_set));
-        goto retry;
-      }
+  while(num_active_markers != 0 || !concurrent_mark_need_terminating_otf(gc)){
+     if(!pool_is_empty(metadata->mark_task_pool) || !concurrent_mark_need_terminating_otf(gc)){
+       atomic_inc32(&num_active_markers);
+       goto retry; 
     }
+    apr_sleep(15000);
   }
-  
+
+  state_transformation( gc, GC_CON_TRACING, GC_CON_TRACE_DONE );
   /* put back the last mark stack to the free pool */
   mark_task = (Vector_Block*)marker->trace_stack;
   vector_stack_clear(mark_task);
@@ -215,16 +218,31 @@ retry:
   marker->trace_stack = NULL;
   assert(pool_is_empty(metadata->gc_dirty_set_pool));
 
-  marker->time_measurement_end = time_now();
-  marker->time_mark = marker->time_measurement_end - marker->time_measurement_start;
-  
+    //INFO2("gc.con.info", "<stage 5>first marker finishes its job");
+
   return;
 }
+
+void wspace_last_otf_marker_work( Conclctor *last_marker ) {
+  GC *gc = last_marker->gc;
+  
+  gc_reset_dirty_set(gc);
+  gc_set_barrier_function(WB_REM_NIL);
+  
+  //INFO2("gc.con.info", "<stage 6>all markers finish ");
+  gc_con_update_stat_after_marking(gc); //calculate marked size
+
+  gc_clear_rootset(gc);
+
+  gc_prepare_sweeping(gc);
+  state_transformation( gc, GC_CON_TRACE_DONE, GC_CON_BEFORE_SWEEP );
+}
+
 
 void trace_obj_in_ms_concurrent_mark(Collector *collector, void *p_obj)
 {
   obj_mark_gray_in_table((Partial_Reveal_Object*)p_obj);
-  trace_object((Marker*)collector, (Partial_Reveal_Object *)p_obj);
+  trace_object((Conclctor*)collector, (Partial_Reveal_Object *)p_obj);
 }
 
 

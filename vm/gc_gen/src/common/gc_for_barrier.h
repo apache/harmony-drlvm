@@ -32,7 +32,8 @@ enum Write_Barrier_Function{
   WB_REM_SOURCE_REF    = 0x02,
   WB_REM_OLD_VAR       = 0x03,
   WB_REM_NEW_VAR       = 0x04,
-  WB_REM_OBJ_SNAPSHOT  = 0x05
+  WB_REM_OBJ_SNAPSHOT  = 0x05,
+  WB_CON_DEBUG = 0x06
 };
 
 inline void gc_set_barrier_function(unsigned int wb_function)
@@ -41,6 +42,5 @@ inline void gc_set_barrier_function(unsigned int wb_function)
 }
 
 #endif /* _GC_FOR_BARRIER_H_ */
-
 
 

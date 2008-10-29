@@ -21,6 +21,7 @@
 #include "gc_ms.h"
 #include "../gen/gen.h"
 #include "../thread/collector.h"
+#include "../thread/conclctor.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/fix_repointed_refs.h"
 #include "../common/gc_concurrent.h"
@@ -269,13 +270,14 @@ void mark_sweep_wspace(Collector *collector)
      Mark all live objects in heap ****************************/
   atomic_cas32(&num_marking_collectors, 0, num_active_collectors+1);
 
-  if(!gc_mark_is_concurrent()){  
+  //if mark has been done in a concurrent manner, skip this mark
+  if( gc_con_is_in_STW(gc) ) {
     if(collect_is_fallback())
       wspace_fallback_mark_scan(collector, wspace);
     else
       wspace_mark_scan(collector, wspace);
   }
-  
+    
   unsigned int old_num = atomic_inc32(&num_marking_collectors);
   if( ++old_num == num_active_collectors ){
     /* last collector's world here */
@@ -292,8 +294,9 @@ void mark_sweep_wspace(Collector *collector)
 #endif
     gc_identify_dead_weak_roots(gc);
     gc_init_chunk_for_sweep(gc, wspace);
-    /* let other collectors go */
-    num_marking_collectors++;
+  
+  /* let other collectors go */
+  num_marking_collectors++;
   }
   while(num_marking_collectors != num_active_collectors + 1);
   
@@ -302,8 +305,8 @@ void mark_sweep_wspace(Collector *collector)
   atomic_cas32( &num_sweeping_collectors, 0, num_active_collectors+1);
   
   wspace_sweep(collector, wspace);
-  
   old_num = atomic_inc32(&num_sweeping_collectors);
+  //INFO2("gc.con.scheduler", "[SWEEPER NUM] num_sweeping_collectors = " << num_sweeping_collectors);
   if( ++old_num == num_active_collectors ){
 #ifdef SSPACE_TIME
     wspace_sweep_time(FALSE, wspace->need_compact);
@@ -391,10 +394,6 @@ void mark_sweep_wspace(Collector *collector)
   
   if(!collect_is_major())
     wspace_merge_free_chunks(gc, wspace);
-
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-  wspace_set_space_statistic(wspace);
-#endif 
 
 #ifdef SSPACE_VERIFY
   wspace_verify_after_collection(gc);

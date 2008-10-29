@@ -20,12 +20,15 @@
 
 #include "wspace_chunk.h"
 #include "wspace_verify.h"
+#include "../thread/conclctor.h"
 
 #define PFC_REUSABLE_RATIO 0.1
 #define WSPACE_COMPACT_RATIO 0.06
 
 inline Boolean chunk_is_reusable(Chunk_Header *chunk)
 { return (float)(chunk->slot_num-chunk->alloc_num)/chunk->slot_num > PFC_REUSABLE_RATIO; }
+
+struct Conclctor;
 
 #define OBJ_ALLOC_BIT_IN_TABLE  0x01
 #define OBJ_BLACK_BIT_IN_TABLE  0x02
@@ -172,6 +175,52 @@ FORCE_INLINE Boolean obj_is_mark_black_in_table(Partial_Reveal_Object *obj, unsi
   
 }
 
+//just debugging for root set size
+FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj, volatile unsigned int *slot_size)
+{
+  volatile POINTER_SIZE_INT *p_color_word;
+  Chunk_Header *chunk;
+  unsigned int slot_index;
+  
+  if(is_super_obj(obj)){
+    chunk = ABNORMAL_CHUNK_HEADER(obj);
+    slot_index = 0;
+  } else {
+    chunk = NORMAL_CHUNK_HEADER(obj);
+    slot_index = slot_addr_to_index(chunk, obj);
+  }
+  
+  unsigned int word_index = slot_index >> SLOT_NUM_PER_WORD_SHIT;
+  unsigned int index_in_word = COLOR_BITS_PER_OBJ * (slot_index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  p_color_word = &chunk->table[word_index];
+  
+  assert(p_color_word);
+  
+  //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_color = cur_mark_gray_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;  
+  if(old_word & mark_color) return FALSE; /*already marked gray*/
+
+  apr_atomic_add32(slot_size, chunk->slot_size);
+  
+  //POINTER_SIZE_INT new_word = (old_word & color_bits_mask) | mark_color;
+  POINTER_SIZE_INT new_word = old_word | mark_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(old_word & mark_color) return FALSE; /*already marked gray*/
+    
+    //new_word = (old_word & color_bits_mask) | mark_color;
+    new_word = old_word | mark_color;
+  }
+  
+  return FALSE;
+}
+
 
 FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
 {
@@ -184,7 +233,7 @@ FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
   POINTER_SIZE_INT mark_color = cur_mark_gray_color << index_in_word;
   
   POINTER_SIZE_INT old_word = *p_color_word;  
-  if(old_word & mark_color) return FALSE; /*already marked gray or black.*/
+  if(old_word & mark_color) return FALSE; /*already marked gray*/
   
   //POINTER_SIZE_INT new_word = (old_word & color_bits_mask) | mark_color;
   POINTER_SIZE_INT new_word = old_word | mark_color;
@@ -194,7 +243,7 @@ FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
       return TRUE; /*returning true does not mean it's marked by this thread. */
     }
     old_word = *p_color_word;
-    if(old_word & mark_color) return FALSE; /*already marked gray or black.*/
+    if(old_word & mark_color) return FALSE; /*already marked gray*/
     
     //new_word = (old_word & color_bits_mask) | mark_color;
     new_word = old_word | mark_color;
@@ -203,12 +252,12 @@ FORCE_INLINE Boolean obj_mark_gray_in_table(Partial_Reveal_Object *obj)
   return FALSE;
 }
 
-FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
 {
   //assert(obj_is_mark_in_table(obj));
   volatile POINTER_SIZE_INT *p_color_word;
   unsigned int index_in_word;
-  p_color_word = get_color_word_in_table(obj, index_in_word, size);
+  p_color_word = get_color_word_in_table(obj, index_in_word);
   assert(p_color_word);
   
   //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
@@ -233,12 +282,59 @@ FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigne
 
 }
 
-FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
+
+FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, unsigned int size)
+{
+  //assert(obj_is_mark_in_table(obj));
+  volatile POINTER_SIZE_INT *p_color_word;
+  unsigned int index_in_word;
+  p_color_word = get_color_word_in_table(obj, index_in_word, size);
+  assert(p_color_word);
+  
+  //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_black_color = (OBJ_DIRTY_BIT_IN_TABLE|cur_mark_black_color) << index_in_word;   //just debugging, to mark new object
+  
+  POINTER_SIZE_INT old_word = *p_color_word;  
+  if(old_word & mark_black_color) return FALSE; /*already marked black*/
+  
+  POINTER_SIZE_INT new_word = old_word | mark_black_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(old_word & mark_black_color) return FALSE; /*already marked black*/
+    
+    new_word = old_word | mark_black_color;
+  }
+  
+  return FALSE;
+
+}
+
+FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, Conclctor* marker)
 {
  // assert(obj_is_mark_in_table(obj));
   volatile POINTER_SIZE_INT *p_color_word;
-  unsigned int index_in_word;
-  p_color_word = get_color_word_in_table(obj, index_in_word);
+  Chunk_Header *chunk;
+  unsigned int slot_index;
+  unsigned int obj_ocuppied_size = 0;
+  
+  if(is_super_obj(obj)){
+    chunk = ABNORMAL_CHUNK_HEADER(obj);
+    slot_index = 0;
+    obj_ocuppied_size = CHUNK_SIZE(chunk);
+  } else {
+    chunk = NORMAL_CHUNK_HEADER(obj);
+    slot_index = slot_addr_to_index(chunk, obj);
+    obj_ocuppied_size = chunk->slot_size;
+  }
+  
+  unsigned int word_index = slot_index >> SLOT_NUM_PER_WORD_SHIT;
+  unsigned int index_in_word = COLOR_BITS_PER_OBJ * (slot_index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  p_color_word = &chunk->table[word_index];
+  
   assert(p_color_word);
   
   //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
@@ -246,6 +342,58 @@ FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj)
   
   POINTER_SIZE_INT old_word = *p_color_word;
   if(obj_is_mark_black_in_table(obj)) return FALSE; /*already marked black*/
+
+  marker->live_obj_num++;
+  marker->live_obj_size+=obj_ocuppied_size;
+  
+  POINTER_SIZE_INT new_word = old_word | mark_black_color;
+  while(new_word != old_word) {
+    POINTER_SIZE_INT temp = (POINTER_SIZE_INT)atomic_casptr((volatile void**)p_color_word, (void*)new_word, (void*)old_word);
+    if(temp == old_word){
+      return TRUE; /*returning true does not mean it's marked by this thread. */
+    }
+    old_word = *p_color_word;
+    if(obj_is_mark_black_in_table(obj)) return FALSE; /*already marked black*/
+    
+    new_word = old_word | mark_black_color;
+  }
+  
+  return FALSE;
+}
+
+static volatile unsigned int mutator_marked = 0;
+
+FORCE_INLINE Boolean obj_mark_black_in_table(Partial_Reveal_Object *obj, Mutator *mutator)
+{
+ // assert(obj_is_mark_in_table(obj));
+  volatile POINTER_SIZE_INT *p_color_word;
+  Chunk_Header *chunk;
+  unsigned int slot_index;
+  unsigned int obj_size = 0;
+  
+  if(is_super_obj(obj)){
+    chunk = ABNORMAL_CHUNK_HEADER(obj);
+    slot_index = 0;
+    obj_size = CHUNK_SIZE(chunk);
+  } else {
+    chunk = NORMAL_CHUNK_HEADER(obj);
+    slot_index = slot_addr_to_index(chunk, obj);
+    obj_size = chunk->slot_size;
+  }
+
+  unsigned int word_index = slot_index >> SLOT_NUM_PER_WORD_SHIT;
+  unsigned int index_in_word = COLOR_BITS_PER_OBJ * (slot_index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  p_color_word = &chunk->table[word_index];
+  assert(p_color_word);
+  
+  //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
+  POINTER_SIZE_INT mark_black_color = cur_mark_black_color << index_in_word;
+  
+  POINTER_SIZE_INT old_word = *p_color_word;
+  if(obj_is_mark_black_in_table(obj)) return FALSE; /*already marked black*/
+
+  //mutator->new_obj_size += vm_object_size(obj);
+  mutator->write_barrier_marked_size += obj_size;
   
   POINTER_SIZE_INT new_word = old_word | mark_black_color;
   while(new_word != old_word) {
@@ -304,12 +452,29 @@ FORCE_INLINE Boolean obj_is_dirty_in_table(Partial_Reveal_Object *obj)
     return FALSE;
 }
 
-FORCE_INLINE Boolean obj_clear_mark_in_table(Partial_Reveal_Object *obj)
+FORCE_INLINE Boolean obj_clear_mark_in_table(Partial_Reveal_Object *obj, Conclctor *marker)
 {
-  volatile POINTER_SIZE_INT *p_color_word;
-  unsigned int index_in_word;
-  p_color_word = get_color_word_in_table(obj, index_in_word);
+   volatile POINTER_SIZE_INT *p_color_word;
+  Chunk_Header *chunk;
+  unsigned int slot_index;
+  
+  if(is_super_obj(obj)){
+    chunk = ABNORMAL_CHUNK_HEADER(obj);
+    slot_index = 0;
+  } else {
+    chunk = NORMAL_CHUNK_HEADER(obj);
+    slot_index = slot_addr_to_index(chunk, obj);
+  }
+
+  unsigned int word_index = slot_index >> SLOT_NUM_PER_WORD_SHIT;
+  unsigned int index_in_word = COLOR_BITS_PER_OBJ * (slot_index & (((unsigned int)(SLOT_NUM_PER_WORD_IN_TABLE-1))));
+  p_color_word = &chunk->table[word_index];
   assert(p_color_word);
+
+  if(obj_is_mark_black_in_table(obj)) {
+     marker->live_obj_num--;
+     marker->live_obj_size-=chunk->slot_size; 
+  }
   
   //POINTER_SIZE_INT color_bits_mask = ~(OBJ_COLOR_MASK << index_in_word);
   POINTER_SIZE_INT mark_color = (cur_mark_black_color|cur_mark_gray_color) << index_in_word;
@@ -417,7 +582,7 @@ inline unsigned int word_set_bit_num(POINTER_SIZE_INT word)
 inline void ops_color_flip(void)
 {
   POINTER_SIZE_INT temp = cur_alloc_color;
-  cur_alloc_color = cur_mark_black_color;
+  cur_alloc_color = cur_mark_black_color; //can not use mark = alloc, otherwise some obj alloc when swapping may be lost
   cur_mark_black_color = temp;
   cur_alloc_mask = (~cur_alloc_mask) & FLIP_COLOR_MASK_IN_TABLE;
   cur_mark_mask = (~cur_mark_mask) & FLIP_COLOR_MASK_IN_TABLE;

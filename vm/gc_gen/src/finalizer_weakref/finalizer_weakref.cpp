@@ -178,7 +178,7 @@ static inline void resurrect_obj_tree(Collector *collector, REF *p_ref)
   } else {
     assert(major_is_marksweep());
     p_ref_or_obj = p_obj;
-    if(!gc_mark_is_concurrent())
+   if( gc->gc_concurrent_status == GC_CON_NIL ) 
       trace_object = trace_obj_in_ms_marking;
     else
       trace_object = trace_obj_in_ms_concurrent_mark;
@@ -850,7 +850,6 @@ void gc_copy_finaliable_obj_to_rootset(GC *gc)
   finref_copy_pool(finalizable_obj_pool, finalizable_obj_pool_copy, gc);
   finref_copy_pool_to_rootset(gc, finalizable_obj_pool_copy);
 }
-
 
 
 

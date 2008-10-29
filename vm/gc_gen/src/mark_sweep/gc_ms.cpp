@@ -18,10 +18,11 @@
 #include "../common/gc_common.h"
 
 #include "gc_ms.h"
+#include "../common/gc_concurrent.h"
 #include "wspace_mark_sweep.h"
 #include "../finalizer_weakref/finalizer_weakref.h"
 #include "../common/compressed_ref.h"
-#include "../thread/marker.h"
+#include "../thread/conclctor.h"
 #include "../verify/verify_live_heap.h"
 #ifdef USE_32BITS_HASHCODE
 #include "../common/hashcode.h"
@@ -69,7 +70,7 @@ void gc_ms_destruct(GC_MS *gc_ms)
 
 void gc_ms_reclaim_heap(GC_MS *gc)
 {
-  if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
+  //if(verify_live_heap) gc_verify_heap((GC*)gc, TRUE);
   
   Wspace *wspace = gc_ms_get_wspace(gc);
   
@@ -77,32 +78,48 @@ void gc_ms_reclaim_heap(GC_MS *gc)
   
   wspace_reset_after_collection(wspace);
   
-  if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
+  //if(verify_live_heap) gc_verify_heap((GC*)gc, FALSE);
 }
 
-void wspace_mark_scan_concurrent(Marker* marker);
+void wspace_mark_scan_concurrent(Conclctor* marker);
+void wspace_last_mc_marker_work(Conclctor *last_marker);
+void wspace_last_otf_marker_work(Conclctor *last_marker);
+
 void gc_ms_start_con_mark(GC_MS* gc, unsigned int num_markers)
 {
   if(gc->num_active_markers == 0)
     pool_iterator_init(gc->metadata->gc_rootset_pool);
-  
-  marker_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_concurrent,(Space*)gc->wspace, num_markers);
+
+  set_marker_final_func( (TaskType)wspace_last_otf_marker_work );
+  conclctor_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_concurrent,(Space*)gc->wspace, num_markers, CONCLCTOR_ROLE_MARKER);
 }
 
-void wspace_mark_scan_mostly_concurrent(Marker* marker);
+void wspace_mark_scan_mostly_concurrent(Conclctor* marker);
+void wspace_last_mc_marker_work(Conclctor* marker);
+
 void gc_ms_start_mostly_con_mark(GC_MS* gc, unsigned int num_markers)
 {
   if(gc->num_active_markers == 0)
     pool_iterator_init(gc->metadata->gc_rootset_pool);
   
-  marker_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace, num_markers);
+  set_marker_final_func( (TaskType)wspace_last_mc_marker_work );
+  conclctor_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace, num_markers, CONCLCTOR_ROLE_MARKER);
 }
+
+
+void wspace_final_mark_scan_mostly_concurrent( Conclctor *marker );
+void conclctor_execute_task_synchronized(GC* gc, TaskType task_func, Space* space, unsigned int num_markers, unsigned int role);
 
 void gc_ms_start_mostly_con_final_mark(GC_MS* gc, unsigned int num_markers)
 {
   pool_iterator_init(gc->metadata->gc_rootset_pool);
   
-  marker_execute_task((GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace);
+  conclctor_execute_task_synchronized( (GC*)gc,(TaskType)wspace_final_mark_scan_mostly_concurrent,(Space*)gc->wspace, num_markers, CONCLCTOR_ROLE_MARKER ); 
+  
+  /*
+  collector_execute_task( (GC*)gc,(TaskType)wspace_mark_scan_mostly_concurrent,(Space*)gc->wspace );
+  collector_set_weakref_sets( (GC*)gc );
+  */
 }
 
 /*FIXME: move this function out of this file.*/
@@ -119,32 +136,54 @@ void gc_check_mutator_allocation(GC* gc)
   unlock(gc->mutator_list_lock);
 }
 
-void wspace_sweep_concurrent(Collector* collector);
-void gc_ms_start_con_sweep(GC_MS* gc, unsigned int num_collectors)
+
+void wspace_sweep_concurrent(Conclctor* collector);
+void wspace_last_sweeper_work(Conclctor *last_sweeper);
+//void gc_con_print_stat_heap_utilization_rate(GC *gc);
+  void gc_ms_get_current_heap_usage(GC_MS *gc);
+
+void gc_ms_start_con_sweep(GC_MS* gc, unsigned int num_conclctors)
 {
   ops_color_flip();
   mem_fence();
   gc_check_mutator_allocation((GC*)gc);
-  gc_disable_alloc_obj_live();
+  gc_disable_alloc_obj_live((GC*)gc);
+  //just debugging
+  //gc_con_print_stat_heap_utilization_rate((GC*)gc);
+  //INFO2("gc.scheduler", "=== Start Con Sweeping ===");
+  Con_Collection_Statistics *con_collection_stat = gc_ms_get_con_collection_stat(gc);
+  con_collection_stat->sweeping_time = time_now();
+  
+  gc_ms_get_current_heap_usage(gc);
+  gc_clear_conclctor_role((GC*)gc);
   wspace_init_pfc_pool_iterator(gc->wspace);
-  
-  collector_execute_task_concurrent((GC*)gc, (TaskType)wspace_sweep_concurrent, (Space*)gc->wspace, num_collectors);
+  set_sweeper_final_func( (TaskType)wspace_last_sweeper_work );
+  conclctor_execute_task_concurrent((GC*)gc, (TaskType)wspace_sweep_concurrent, (Space*)gc->wspace, num_conclctors, CONCLCTOR_ROLE_SWEEPER);
 
-  collector_release_weakref_sets((GC*)gc, num_collectors);
+  //conclctor_release_weakref_sets((GC*)gc);
 }
 
-void gc_ms_start_con_mark(GC_MS* gc)
+unsigned int gc_ms_get_live_object_size(GC_MS* gc)
 {
-  pool_iterator_init(gc->metadata->gc_rootset_pool);
+  POINTER_SIZE_INT num_live_obj = 0;
+  POINTER_SIZE_INT size_live_obj = 0;
   
-  marker_execute_task_concurrent((GC*)gc,(TaskType)wspace_mark_scan_concurrent,(Space*)gc->wspace);
+  unsigned int num_collectors = gc->num_active_collectors;
+  Collector** collectors = gc->collectors;
+  unsigned int i;
+  for(i = 0; i < num_collectors; i++){
+    Collector* collector = collectors[i];
+    num_live_obj += collector->live_obj_num;
+    size_live_obj += collector->live_obj_size;
+  }
+  return size_live_obj;
 }
+
 
 void gc_ms_update_space_stat(GC_MS* gc)
 {
   POINTER_SIZE_INT num_live_obj = 0;
-  POINTER_SIZE_INT size_live_obj = 0;  
-  POINTER_SIZE_INT new_obj_size = 0;
+  POINTER_SIZE_INT size_live_obj = 0;
   
   Space_Statistics* wspace_stat = gc->wspace->space_statistic;
 
@@ -157,22 +196,20 @@ void gc_ms_update_space_stat(GC_MS* gc)
     size_live_obj += collector->live_obj_size;
   }
 
-  new_obj_size = gc_get_new_object_size((GC*)gc, TRUE);
-
-  wspace_stat->size_new_obj = new_obj_size;
-  
+  wspace_stat->size_new_obj = gc_get_mutator_new_obj_size( (GC*)gc );  
   wspace_stat->num_live_obj = num_live_obj;
   wspace_stat->size_live_obj = size_live_obj;  
   wspace_stat->last_size_free_space = wspace_stat->size_free_space;
   wspace_stat->size_free_space = gc->committed_heap_size - size_live_obj;/*TODO:inaccurate value.*/  
   wspace_stat->space_utilization_ratio = (float)wspace_stat->size_new_obj / wspace_stat->last_size_free_space;
-
+  
   INFO2("gc.space.stat","[GC][Space Stat] num_live_obj        : "<<wspace_stat->num_live_obj<<" ");
   INFO2("gc.space.stat","[GC][Space Stat] size_live_obj       : "<<wspace_stat->size_live_obj<<" ");
   INFO2("gc.space.stat","[GC][Space Stat] size_free_space     : "<<wspace_stat->size_free_space<<" ");
   INFO2("gc.space.stat","[GC][Space Stat] last_size_free_space: "<<wspace_stat->last_size_free_space<<" ");
   INFO2("gc.space.stat","[GC][Space Stat] size_new_obj        : "<<wspace_stat->size_new_obj<<" ");  
   INFO2("gc.space.stat","[GC][Space Stat] utilization_ratio   : "<<wspace_stat->space_utilization_ratio<<" ");
+
 }
 
 void gc_ms_reset_space_stat(GC_MS* gc)
@@ -180,10 +217,12 @@ void gc_ms_reset_space_stat(GC_MS* gc)
   Space_Statistics* wspace_stat = gc->wspace->space_statistic;
   wspace_stat->size_new_obj = 0;
   wspace_stat->num_live_obj = 0;
-  wspace_stat->size_live_obj = 0;
+  wspace_stat->size_live_obj = 0; 
   wspace_stat->space_utilization_ratio = 0;
 }
 
 void gc_ms_iterate_heap(GC_MS *gc)
 {
 }
+
+

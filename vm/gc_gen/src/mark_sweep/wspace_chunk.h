@@ -204,6 +204,35 @@ inline void free_chunk_list_clear(Free_Chunk_List *list)
   assert(list->lock == FREE_LOCK);
 }
 
+inline void free_chunk_list_add_tail(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  chunk->next = NULL;
+  if(list->head) {
+    list->tail->next = chunk;
+    chunk->prev = list->tail;
+    list->tail = chunk;
+  } else {
+    chunk->prev = NULL;
+    list->head = list->tail = chunk;
+  }
+  list->chunk_num++;
+}
+
+inline void free_chunk_list_add_head(Free_Chunk_List *list, Free_Chunk *chunk)
+{
+  chunk->prev = NULL;
+  if(list->head) {
+    list->head->prev = chunk;
+    chunk->next = list->head;
+    list->head = chunk;
+  } else {
+    chunk->next = NULL;
+    list->head = list->tail = chunk;
+  }
+  list->chunk_num++;
+}
+
+
 inline void free_list_detach_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
 {
   if(chunk->prev)
@@ -218,6 +247,18 @@ inline void free_list_detach_chunk(Free_Chunk_List *list, Free_Chunk *chunk)
   --list->chunk_num;
 }
 
+inline Boolean chunk_is_in_list(Free_Chunk_List *from_list, Free_Chunk *chunk)
+{
+  Free_Chunk *pro_chunk = from_list->head;
+  while(pro_chunk) {
+    if(pro_chunk == chunk)
+	  return TRUE;
+    pro_chunk = pro_chunk->next;
+  }
+  return FALSE; 
+}
+
+
 inline void move_free_chunks_between_lists(Free_Chunk_List *to_list, Free_Chunk_List *from_list)
 {
   if(to_list->tail){
@@ -229,8 +270,10 @@ inline void move_free_chunks_between_lists(Free_Chunk_List *to_list, Free_Chunk_
     from_list->tail->next = to_list->head;
     to_list->head = from_list->head;
   }
+  //to_list->chunk_num += from_list->chunk_num;
   from_list->head = NULL;
   from_list->tail = NULL;
+  from_list->chunk_num = 0;
 }
 
 /* Padding the last index word in table to facilitate allocation */
@@ -402,7 +445,7 @@ inline Chunk_Header *wspace_get_pfc(Wspace *wspace, unsigned int seg_index, unsi
   Chunk_Header *chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
 
   /*2. If in concurrent sweeping phase, search PFC backup pool*/
-  if(!chunk && gc_con_is_in_sweeping()){
+  if(!chunk && in_con_sweeping_phase(wspace->gc)){
     pfc_pool = wspace->pfc_pools_backup[seg_index][index];
     chunk = (Chunk_Header*)pool_get_entry(pfc_pool);
   }

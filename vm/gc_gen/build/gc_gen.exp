@@ -34,6 +34,7 @@ GC_GEN_0.1 {
     gc_heap_write_global_slot;
     gc_heap_write_ref;
     gc_heap_wrote_object;
+    gc_heap_copy_object_array;
     gc_init;
     gc_is_object_pinned;
     gc_iterate_heap;

@@ -651,6 +651,7 @@ extern void (*gc_heap_write_global_slot_compressed)(U_32 *p_slot,
                                                     Managed_Object_Handle value);
 extern void (*gc_heap_wrote_object)(Managed_Object_Handle p_base_of_object_just_written);
 
+extern Boolean (*gc_heap_copy_object_array)(Managed_Object_Handle src_array, unsigned int src_start, Managed_Object_Handle dst_array, unsigned int dst_start, unsigned int length);
 /* 
  * The variables below are exported by the VM so other DLLs modules
  * may use them. <code>dll_gc.cpp</code> initializes them to the addresses exported
@@ -693,6 +694,12 @@ GCExport void gc_write_barrier(Managed_Object_Handle p_base_of_obj_with_slot);
  */
 GCExport void gc_heap_wrote_object (Managed_Object_Handle p_base_of_object_just_written);
 
+/**
+ * * By calling this function VM notifies GC that a array copy operation should be performed.
+ * *
+ * * This function is for write barriers on array copy operations
+ * */
+GCExport Boolean gc_heap_copy_object_array(Managed_Object_Handle src_array, unsigned int src_start, Managed_Object_Handle dst_array, unsigned int dst_start, unsigned int length);
 
 /**
  * By calling this function VM notifies GC that a heap reference was written to

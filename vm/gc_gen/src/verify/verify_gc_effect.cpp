@@ -328,7 +328,7 @@ void verifier_update_verify_info(Partial_Reveal_Object* p_obj, Heap_Verifier* he
     if(!obj_is_alloc_in_color_table(p_obj))
       printf("\nERROR: obj after GC should be set its alloc color!\n");
   }else{
-    if(gc_mark_is_concurrent())
+    if( !in_con_idle(heap_verifier->gc) )
       assert(obj_is_mark_black_in_table(p_obj));
   }
 #endif
@@ -558,6 +558,7 @@ void verifier_clear_gc_verification(Heap_Verifier* heap_verifier)
 
 void verifier_reset_hash_distance()
 { hash_obj_distance = 0;}
+
 
 
 

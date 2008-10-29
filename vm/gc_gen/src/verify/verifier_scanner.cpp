@@ -445,4 +445,3 @@ void verifier_init_object_scanner(Heap_Verifier* heap_verifier)
 
 
 
-

@@ -31,24 +31,16 @@ void collection_scheduler_destruct(GC* gc)
   return;
 }
 
-void gc_update_collection_scheduler(GC* gc, int64 time_mutator, int64 time_collection)
-{
-  if(gc_is_specify_con_gc()){
-    gc_update_con_collection_scheduler(gc, time_mutator, time_collection);
-  }
-  return;
-}
 
 Boolean gc_sched_collection(GC* gc, unsigned int gc_cause)
 {
   /*collection scheduler only schedules concurrent collection now.*/
   if(GC_CAUSE_CONCURRENT_GC == gc_cause){
     assert(gc_is_specify_con_gc());
-    return gc_sched_con_collection(gc, gc_cause);
+    return gc_con_perform_collection( gc );
   }else{
     return FALSE;
   }
 }
-
 
 

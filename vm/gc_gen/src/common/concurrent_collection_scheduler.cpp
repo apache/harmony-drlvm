@@ -22,7 +22,7 @@
 #include "collection_scheduler.h"
 #include "concurrent_collection_scheduler.h"
 #include "gc_concurrent.h"
-#include "../thread/marker.h"
+#include "../thread/conclctor.h"
 #include "../verify/verify_live_heap.h"
 
 #define NUM_TRIAL_COLLECTION 2
@@ -53,6 +53,7 @@ Boolean gc_use_time_scheduler()
 Boolean gc_use_space_scheduler()
 { return cc_scheduler_kind & SPACE_BASED_SCHEDULER; }
 
+
 static int64 time_delay_to_start_mark = MAX_DELAY_TIME;
 static POINTER_SIZE_INT space_threshold_to_start_mark = MAX_SPACE_THRESHOLD;
 
@@ -75,6 +76,7 @@ void con_collection_scheduler_destruct(GC* gc)
   STD_FREE(gc->collection_scheduler);
 }
 
+
 void gc_decide_cc_scheduler_kind(char* cc_scheduler)
 {
   string_to_upper(cc_scheduler);
@@ -93,281 +95,248 @@ void gc_set_default_cc_scheduler_kind()
   gc_enable_time_scheduler();
 }
 
-static Boolean time_to_start_mark(GC* gc)
-{
-  if(!gc_use_time_scheduler()) return FALSE;
-  
-  int64 time_current = time_now();
-  return (time_current - get_collection_end_time()) > time_delay_to_start_mark;
-}
+/*====================== new scheduler ===================*/
+extern unsigned int NUM_CON_MARKERS;
+extern unsigned int NUM_CON_SWEEPERS;
+unsigned int gc_get_mutator_number(GC *gc);
 
-static Boolean space_to_start_mark(GC* gc)
-{
-  if(!gc_use_space_scheduler()) return FALSE;
+#define MOSTLY_CON_MARKER_DIVISION 0.5
+unsigned int mostly_con_final_marker_num=1;
+unsigned int mostly_con_long_marker_num=1;
 
-  POINTER_SIZE_INT size_new_obj = gc_get_new_object_size(gc,FALSE);
-  return (size_new_obj > space_threshold_to_start_mark); 
-}
-
-static Boolean gc_need_start_con_mark(GC* gc)
-{
-  if(!gc_is_specify_con_mark() || gc_mark_is_concurrent()) return FALSE;
-  
-  if(time_to_start_mark(gc) || space_to_start_mark(gc)) 
-    return TRUE;
-  else 
-    return FALSE;
-}
-
-static Boolean gc_need_start_con_sweep(GC* gc)
-{
-  if(!gc_is_specify_con_sweep() || gc_sweep_is_concurrent()) return FALSE;
-
-  /*if mark is concurrent and STW GC has not started, we should start concurrent sweep*/
-  if(gc_mark_is_concurrent() && !gc_con_is_in_marking(gc))
-    return TRUE;
-  else
-    return FALSE;
-}
-
-static Boolean gc_need_reset_after_con_collect(GC* gc)
-{
-  if(gc_sweep_is_concurrent() && !gc_con_is_in_sweeping(gc))
-    return TRUE;
-  else
-    return FALSE;
-}
-
-static Boolean gc_need_start_con_enum(GC* gc)
-{
-  /*TODO: support on-the-fly root set enumeration.*/
-  return FALSE;
-}
-
-#define SPACE_UTIL_RATIO_CORRETION 0.2f
-#define TIME_CORRECTION_OTF_MARK 0.65f
-#define TIME_CORRECTION_OTF_MARK_SWEEP 1.0f
-#define TIME_CORRECTION_MOSTLY_MARK 0.5f
-
-static void con_collection_scheduler_update_stat(GC* gc, int64 time_mutator, int64 time_collection)
-{  
-  Space* space = NULL;
-  Con_Collection_Scheduler* cc_scheduler = (Con_Collection_Scheduler*)gc->collection_scheduler;
-
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-  space = (Space*) gc_get_wspace(gc);
-#endif  
-  if(!space) return;
-
-  Space_Statistics* space_stat = space->space_statistic;
-  
-  unsigned int slot_index = cc_scheduler->last_window_index;
-  unsigned int num_slot   = cc_scheduler->num_window_slots;
-  
-  cc_scheduler->trace_load_window[slot_index] = space_stat->num_live_obj;
-  cc_scheduler->alloc_load_window[slot_index] = space_stat->size_new_obj;
-  cc_scheduler->space_utilization_ratio[slot_index] = space_stat->space_utilization_ratio;
-
-  cc_scheduler->last_mutator_time = time_mutator;
-  cc_scheduler->last_collector_time = time_collection;
-  
-  if(NUM_TRIAL_COLLECTION == 0 || gc->num_collections < NUM_TRIAL_COLLECTION)
-    return;
-  
-  cc_scheduler->alloc_rate_window[slot_index] 
-    = time_mutator == 0 ? 0 : (float)cc_scheduler->alloc_load_window[slot_index] / time_mutator; 
-
-  if(gc_mark_is_concurrent()){
-    cc_scheduler->trace_rate_window[slot_index]
-      = time_collection == 0 ? MAX_TRACING_RATE : (float)cc_scheduler->trace_load_window[slot_index] / time_collection;
-  }else{
-    cc_scheduler->trace_rate_window[slot_index] = MIN_TRACING_RATE;
-  }
-
-  cc_scheduler->num_window_slots = num_slot >= STAT_SAMPLE_WINDOW_SIZE ? num_slot : (++num_slot);
-  cc_scheduler->last_window_index = (++slot_index)% STAT_SAMPLE_WINDOW_SIZE;  
-}
-
-static void con_collection_scheduler_update_start_point(GC* gc, int64 time_mutator, int64 time_collection)
-{
-  if(NUM_TRIAL_COLLECTION == 0 || gc->num_collections < NUM_TRIAL_COLLECTION)
-    return;
-
-  Space* space = NULL;
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-  space = (Space*) gc_get_wspace(gc);
-#endif  
-  if(!space) return;
-
-  Space_Statistics* space_stat = space->space_statistic;
-
-  float sum_alloc_rate = 0;
-  float sum_trace_rate = 0;
-  float sum_space_util_ratio = 0;
-
-  Con_Collection_Scheduler* cc_scheduler = (Con_Collection_Scheduler*)gc->collection_scheduler;   
-  
-  int64 time_this_collection_correction = 0;
-#if 0
-  float space_util_ratio = space_stat->space_utilization_ratio;
-  if(space_util_ratio > (1-SPACE_UTIL_RATIO_CORRETION)){
-    time_this_collection_correction = 0;
-  }else{
-    time_this_collection_correction 
-      = (int64)(((1 - space_util_ratio - SPACE_UTIL_RATIO_CORRETION)/(space_util_ratio))* time_mutator);
-  }
-#endif
-
-  unsigned int i;
-  for(i = 0; i < cc_scheduler->num_window_slots; i++){
-    sum_alloc_rate += cc_scheduler->alloc_rate_window[i];
-    sum_trace_rate += cc_scheduler->trace_rate_window[i];
-    sum_space_util_ratio += cc_scheduler->space_utilization_ratio[i];
-  }
-
-  TRACE2("gc.con.cs","Allocation Rate: ");
-  for(i = 0; i < cc_scheduler->num_window_slots; i++){
-    TRACE2("gc.con.cs",i+1<<"--"<<cc_scheduler->alloc_rate_window[i]);
-  }
-
-  TRACE2("gc.con.cs","Tracing Rate: ");
-  for(i = 0; i < cc_scheduler->num_window_slots; i++){
-    TRACE2("gc.con.cs",i+1<<"--"<<cc_scheduler->trace_rate_window[i]);
-  }
-
-  float average_alloc_rate = sum_alloc_rate / cc_scheduler->num_window_slots;
-  float average_trace_rate = sum_trace_rate / cc_scheduler->num_window_slots;
-  float average_space_util_ratio = sum_space_util_ratio / cc_scheduler->num_window_slots;
-
-  TRACE2("gc.con.cs","averAllocRate: "<<average_alloc_rate<<"averTraceRate: "<<average_trace_rate<<"  average_space_util_ratio: "<<average_space_util_ratio<<" ");
-
-  if(average_alloc_rate == 0 ){
-    time_delay_to_start_mark = MIN_DELAY_TIME;
-    space_threshold_to_start_mark = MIN_SPACE_THRESHOLD;
-  }else if(average_trace_rate == 0){
-    time_delay_to_start_mark = MAX_DELAY_TIME;
-    space_threshold_to_start_mark = MAX_SPACE_THRESHOLD;
-  }else{
-    float time_alloc_expected = (space_stat->size_free_space * average_space_util_ratio) / average_alloc_rate;
-    float time_trace_expected = space_stat->num_live_obj / average_trace_rate;
-    TRACE2("gc.con.cs","[GC][Con] expected alloc time "<<time_alloc_expected<<"  expected collect time  "<<time_trace_expected<<" ");
-
-    if(time_alloc_expected > time_trace_expected){
-      if(gc_is_kind(ALGO_CON_OTF_OBJ)||gc_is_kind(ALGO_CON_OTF_REF)){
-        float time_correction = gc_sweep_is_concurrent()? TIME_CORRECTION_OTF_MARK_SWEEP : TIME_CORRECTION_OTF_MARK;
-        cc_scheduler->time_delay_to_start_mark = (int64)((time_alloc_expected - time_trace_expected)*time_correction);
-      }else if(gc_is_kind(ALGO_CON_MOSTLY)){
-        cc_scheduler->time_delay_to_start_mark = (int64)(time_mutator* TIME_CORRECTION_MOSTLY_MARK);
-      }
-    }else{
-      cc_scheduler->time_delay_to_start_mark = MIN_DELAY_TIME;
+unsigned int gc_get_marker_number(GC* gc) {
+  unsigned int mutator_num = gc_get_mutator_number(gc);
+  unsigned int marker_specified = NUM_CON_MARKERS;
+  if(marker_specified == 0) {
+    if( gc_is_kind(ALGO_CON_OTF_OBJ) || gc_is_kind(ALGO_CON_OTF_REF) ) {
+	marker_specified = min(gc->num_conclctors, mutator_num>>1);
+	INFO2("gc.con.scheduler", "[Marker Num] mutator num="<<mutator_num<<", assign marker num="<<marker_specified);
+    } else if(gc_is_kind(ALGO_CON_MOSTLY)) {
+       marker_specified = min(gc->num_conclctors, mutator_num>>1);
+	mostly_con_final_marker_num = max(marker_specified, mostly_con_final_marker_num); // in the STW phase, so all the conclctor can be used
+	mostly_con_long_marker_num = (unsigned int)(marker_specified*MOSTLY_CON_MARKER_DIVISION);
+       //INFO2("gc.con.scheduler", "[Marker Num] common marker="<<marker_specified<<", final marker="<<mostly_con_final_marker_num);
     }
-
-    cc_scheduler->space_threshold_to_start_mark = 
-      (POINTER_SIZE_INT)(space_stat->size_free_space * ((time_alloc_expected - time_trace_expected) / time_alloc_expected));
-
-    time_delay_to_start_mark = cc_scheduler->time_delay_to_start_mark + time_this_collection_correction;
-    space_threshold_to_start_mark = cc_scheduler->space_threshold_to_start_mark;
   }
-  TRACE2("gc.con.cs","[GC][Con] concurrent marking will delay "<<(unsigned int)(time_delay_to_start_mark>>10)<<" ms ");
-  TRACE2("gc.con.cs","[GC][Con] time correction "<<(unsigned int)(time_this_collection_correction>>10)<<" ms ");
 
+  assert(marker_specified);
+  return marker_specified;
 }
 
-void gc_update_con_collection_scheduler(GC* gc, int64 time_mutator, int64 time_collection)
+#define CON_SWEEPER_DIVISION 0.8
+unsigned int gc_get_sweeper_numer(GC *gc) {
+  unsigned int sweeper_specified = NUM_CON_SWEEPERS;
+  if(sweeper_specified == 0) 
+    sweeper_specified = (unsigned int)(gc->num_conclctors*CON_SWEEPER_DIVISION);
+  //INFO2("gc.con.scheduler", "[Sweeper Num] assign sweeper num="<<sweeper_specified);
+  assert(sweeper_specified);
+  return sweeper_specified;
+}
+
+
+
+
+#define DEFAULT_CONSERCATIVE_FACTOR (1.0f)
+#define CONSERCATIVE_FACTOR_FULLY_CONCURRENT (0.95f)
+static float conservative_factor = DEFAULT_CONSERCATIVE_FACTOR;
+
+/* for checking heap effcient*/
+#define SMALL_DELTA 1000 //minimal check frequency is about delta us
+#define SPACE_CHECK_STAGE_TWO_TIME (SMALL_DELTA<<6)
+#define SPACE_CHECK_STAGE_ONE_TIME (SMALL_DELTA<<12)
+
+#define DEFAULT_ALLOC_RATE (1<<19) //500k/ms
+#define DEFAULT_MARKING_TIME (1<<9) //512 ms
+
+static int64 last_check_time_point = time_now();
+static int64 check_delay_time = time_now(); //  initial value is just for modifying
+
+//just debugging
+int64 get_last_check_point()
 {
-  assert(gc_is_specify_con_gc());
-  if(GC_CAUSE_RUNTIME_FORCE_GC == gc->cause) return;
+   return last_check_time_point;
+}
+
+static unsigned int alloc_space_threshold = 0;
+
+static unsigned int space_check_stage_1; //SPACE_CHECK_EXPECTED_START_TIME
+static unsigned int space_check_stage_2; //BIG_DELTA
+
+static unsigned int calculate_start_con_space_threshold(Con_Collection_Statistics *con_collection_stat, unsigned int heap_size)
+{
   
-  con_collection_scheduler_update_stat(gc, time_mutator, time_collection);
-  con_collection_scheduler_update_start_point(gc, time_mutator, time_collection);
-
-  return;
-}
-
-Boolean gc_sched_con_collection(GC* gc, unsigned int gc_cause)
-{
-  if(!try_lock(gc->lock_collect_sched)) return FALSE;
-  vm_gc_lock_enum();    
-
-  gc_try_finish_con_phase(gc);
-
-  if(gc_need_start_con_enum(gc)){
-    /*TODO:Concurrent rootset enumeration.*/
-    assert(0);
-  }
-  
-  if(gc_need_start_con_mark(gc)){
-    INFO2("gc.con.info", "[GC][Con] concurrent mark start ...");
-    gc_start_con_mark(gc);
-    vm_gc_unlock_enum();
-    unlock(gc->lock_collect_sched);
-    return TRUE;
-  }
-
-  if(gc_need_start_con_sweep(gc)){
-    gc->num_collections++;
-    INFO2("gc.con.info", "[GC][Con] collection number:"<< gc->num_collections<<" ");
-    gc_start_con_sweep(gc);
-    vm_gc_unlock_enum();
-    unlock(gc->lock_collect_sched);
-    return TRUE;
-  }
-
-  if(gc_need_reset_after_con_collect(gc)){
-    int64 pause_start = time_now();
-    int disable_count = vm_suspend_all_threads();
-    gc_reset_after_con_collect(gc);
-    gc_start_mutator_time_measure(gc);
-    set_collection_end_time();
-    vm_resume_all_threads(disable_count);
-    vm_gc_unlock_enum();
-    INFO2("gc.con.time","[GC][Con]pause(reset collection):    "<<((unsigned int)((time_now()-pause_start)>>10))<<"  ms ");
-    unlock(gc->lock_collect_sched);
-    return TRUE;
-  }
-  vm_gc_unlock_enum();
-  unlock(gc->lock_collect_sched);
-  return FALSE;
-}
-
-extern unsigned int NUM_MARKERS;
-
-unsigned int gc_decide_marker_number(GC* gc)
-{
-  unsigned int num_active_marker;
-  Con_Collection_Scheduler* cc_scheduler = (Con_Collection_Scheduler*)gc->collection_scheduler;   
-
-  /*If the number of markers is specfied, just return the specified value.*/
-  if(NUM_MARKERS != 0) return NUM_MARKERS;
-
-  /*If the number of markers isn't specified, we decide the value dynamically.*/
-  if(NUM_TRIAL_COLLECTION == 0 || gc->num_collections < NUM_TRIAL_COLLECTION){
-    /*Start trial cycle, collection set to 1 in trial cycle and */
-    num_active_marker = 1;
-  }else{
-    num_active_marker = cc_scheduler->last_marker_num;
-    int64 c_time = cc_scheduler->last_collector_time;
-    int64 m_time = cc_scheduler->last_mutator_time;
-    int64 d_time = cc_scheduler->time_delay_to_start_mark;
-
-    if(num_active_marker == 0) num_active_marker = 1;
-
-    if((c_time + d_time) > m_time || (float)d_time < (m_time * 0.25)){      
-      TRACE2("gc.con.cs","[GC][Con] increase marker number.");
-      num_active_marker ++;
-      if(num_active_marker > gc->num_markers) num_active_marker = gc->num_markers;
-    }else if((float)d_time > (m_time * 0.6)){
-      TRACE2("gc.con.cs","[GC][Con] decrease marker number.");
-      num_active_marker --;
-      if(num_active_marker == 0)  num_active_marker = 1;
+  float util_rate = con_collection_stat->heap_utilization_rate;
+  unsigned int space_threshold = 0;
+  if( gc_is_kind(ALGO_CON_OTF_OBJ) || gc_is_kind(ALGO_CON_OTF_REF) ) {
+    if( con_collection_stat->trace_rate == 0 )  //for initial iteration
+         con_collection_stat->trace_rate = con_collection_stat->alloc_rate*20;
+    unsigned int alloc_rate = con_collection_stat->alloc_rate;
+    if(alloc_rate<con_collection_stat->trace_rate) {       //  THRESHOLD = Heap*utilization_rate*(1-alloc_rate/marking_rate), accurate formaler
+      float alloc_marking_rate_ratio = (float)(alloc_rate)/con_collection_stat->trace_rate;
+     
+      space_threshold = (unsigned int)(heap_size*util_rate*(1-alloc_marking_rate_ratio)*conservative_factor);
+    } else {  //use default
+       unsigned int alloc_while_marking = DEFAULT_MARKING_TIME*con_collection_stat->alloc_rate;
+       space_threshold = (unsigned int)(heap_size*util_rate) -alloc_while_marking;
     }
+  } else if(gc_is_kind(ALGO_CON_MOSTLY)) {
+    unsigned int alloc_while_marking = DEFAULT_MARKING_TIME*con_collection_stat->alloc_rate;
+    space_threshold = (unsigned int)(heap_size*util_rate) -alloc_while_marking;
+  }
+
+  if( space_threshold > con_collection_stat->surviving_size_at_gc_end )
+    alloc_space_threshold = space_threshold - con_collection_stat->surviving_size_at_gc_end;
+  else
+    alloc_space_threshold = MIN_SPACE_THRESHOLD;
     
-    TRACE2("gc.con.cs","[GC][Con] ctime  "<<(unsigned)(c_time>>10)<<"  mtime  "<<(unsigned)(m_time>>10)<<"  dtime  "<<(unsigned)(d_time>>10));
-    TRACE2("gc.con.cs","[GC][Con] marker num : "<<num_active_marker<<" ");
-  }
-
-  cc_scheduler->last_marker_num = num_active_marker;
-  return num_active_marker;
+  //INFO2("gc.con.info", "[Threshold] alloc_space_threshold=" << alloc_space_threshold);
+  return space_threshold;
 }
+
+/* this parameters are updated at end of GC */
+void gc_update_scheduler_parameter( GC *gc )
+{
+   Con_Collection_Statistics *con_collection_stat = gc_ms_get_con_collection_stat((GC_MS*)gc);
+   last_check_time_point = time_now();
+   
+   unsigned int alloc_rate = con_collection_stat->alloc_rate;
+   space_check_stage_1 = alloc_rate * trans_time_unit(SPACE_CHECK_STAGE_ONE_TIME);
+   space_check_stage_2 = alloc_rate * trans_time_unit(SPACE_CHECK_STAGE_TWO_TIME);
+   //INFO2( "gc.con.scheduler", "space_check_stage_1=["<<space_check_stage_1<<"], space_check_stage_2=["<<space_check_stage_2<<"]" );
+
+   check_delay_time = (con_collection_stat->gc_start_time - con_collection_stat->gc_end_time)>>2;
+   //INFO2("gc.con.scheduler", "next check time = [" << trans_time_unit(check_delay_time) << "] ms" );
+   if(gc_is_specify_con_sweep()) {
+	  conservative_factor = CONSERCATIVE_FACTOR_FULLY_CONCURRENT;
+   }
+   calculate_start_con_space_threshold(con_collection_stat, gc->committed_heap_size);
+}
+
+void gc_force_update_scheduler_parameter( GC *gc ) 
+{
+    last_check_time_point = time_now();
+    //check_delay_time = SPACE_CHECK_STAGE_ONE_TIME;
+    check_delay_time = time_now();
+    //INFO2("gc.con.scheduler", "next check time = [" << trans_time_unit(check_delay_time) << "] ms" );
+    Con_Collection_Statistics *con_collection_stat = gc_ms_get_con_collection_stat((GC_MS*)gc);
+    con_collection_stat->alloc_rate = DEFAULT_ALLOC_RATE;
+}
+
+
+
+static inline Boolean check_start_mark( GC *gc ) 
+{
+   unsigned int new_object_occupied_size = gc_get_mutator_new_obj_size(gc);
+   Con_Collection_Statistics *con_collection_stat = gc_ms_get_con_collection_stat((GC_MS*)gc);
+   /*just debugging*/
+   float used_rate = (float)(con_collection_stat->surviving_size_at_gc_end + new_object_occupied_size)/gc->committed_heap_size;
+   if( alloc_space_threshold < new_object_occupied_size ) {
+	INFO2( "gc.con.info", "[Start Con] check has been delayed " << check_delay_time << " us, until ratio at start point="<<used_rate );
+	return TRUE;
+   }
+   
+   unsigned int free_space = alloc_space_threshold - new_object_occupied_size;
+     //INFO2("gc.con.info", "[GC Scheduler debug] alloc_space_threshold="<<alloc_space_threshold<<", new_object_occupied_size"<<new_object_occupied_size);
+   int64 last_check_delay = check_delay_time;
+     
+   if( free_space < space_check_stage_2 ) {
+	check_delay_time = SMALL_DELTA;
+   } else if( free_space < space_check_stage_1 ) {
+       if(check_delay_time>SPACE_CHECK_STAGE_TWO_TIME ) { //if time interval is too small, the alloc rate will not be updated
+           unsigned int interval_time = trans_time_unit(time_now() - con_collection_stat->gc_end_time);
+	    unsigned int interval_space = new_object_occupied_size;
+	    con_collection_stat->alloc_rate = interval_space/interval_time;
+	}
+	check_delay_time = ((alloc_space_threshold - new_object_occupied_size)/con_collection_stat->alloc_rate)<<9;
+   }
+   last_check_time_point = time_now();
+
+   //INFO2("gc.con.info", "[GC Scheduler] check has been delayed=" << last_check_delay << " us, used_rate=" << used_rate << ", free_space=" << free_space << " bytes, next delay=" << check_delay_time << " us" );
+   return FALSE;
+}
+
+static SpinLock check_lock;
+static inline Boolean space_should_start_mark( GC *gc) 
+{
+  if( ( time_now() -last_check_time_point ) > check_delay_time && try_lock(check_lock) ) { //first condition is checked frequently, second condition is for synchronization
+      Boolean should_start = check_start_mark(gc);
+      unlock(check_lock); 
+      return should_start;
+  }
+  return FALSE;
+}
+
+inline static Boolean gc_con_start_condition( GC* gc ) {
+   return space_should_start_mark(gc);
+}
+
+
+void gc_reset_after_con_collection(GC *gc);
+void gc_merge_free_list_global(GC *gc);
+void gc_con_stat_information_out(GC *gc);
+
+unsigned int sub_time = 0;
+int64 pause_time = 0;
+/* 
+   concurrent collection entry function, it may start proper phase according to the current state.
+*/
+Boolean gc_con_perform_collection( GC* gc ) {
+  int disable_count;
+  int64 pause_start;
+  Con_Collection_Statistics *con_collection_stat = gc_ms_get_con_collection_stat((GC_MS*)gc);
+  switch( gc->gc_concurrent_status ) {
+    case GC_CON_NIL :
+      if( !gc_con_start_condition(gc) )
+        return FALSE;
+      if( !state_transformation( gc, GC_CON_NIL, GC_CON_STW_ENUM ) )
+        return FALSE;
+      
+      gc->num_collections++;
+      gc->cause = GC_CAUSE_CONCURRENT_GC;
+
+      con_collection_stat->gc_start_time = time_now();
+      disable_count = hythread_reset_suspend_disable();
+	  
+      gc_start_con_enumeration(gc); //now, it is a stw enumeration
+      con_collection_stat->marking_start_time = time_now();
+      state_transformation( gc, GC_CON_STW_ENUM, GC_CON_START_MARKERS );
+      gc_start_con_marking(gc);
+
+      INFO2("gc.con.time","[ER] start con pause, ERSM="<<((unsigned int)(time_now()-con_collection_stat->gc_start_time))<<"  us "); // ERSM means enumerate rootset and start concurrent marking
+      vm_resume_threads_after();
+      hythread_set_suspend_disable(disable_count);
+      break;
+	  
+    case GC_CON_BEFORE_SWEEP :
+      if(!gc_is_specify_con_sweep())
+	  return FALSE;
+      if( !state_transformation( gc, GC_CON_BEFORE_SWEEP, GC_CON_SWEEPING ) )
+	  return FALSE;
+      gc_ms_start_con_sweep((GC_MS*)gc, gc_get_sweeper_numer(gc));
+      break;
+     
+	
+    case GC_CON_BEFORE_FINISH :
+	 if( !state_transformation( gc, GC_CON_BEFORE_FINISH, GC_CON_RESET ) )
+		  return FALSE;
+        /* thread should be suspended before the state transformation,
+            it is for the case that the heap is exhausted in the reset state, although it is almost impossible */
+        disable_count = vm_suspend_all_threads();
+	 pause_start = time_now();
+	 
+        gc_merge_free_list_global(gc);
+        gc_reset_after_con_collection(gc);
+        state_transformation( gc, GC_CON_RESET, GC_CON_NIL );
+	 pause_time = time_now()-pause_start;
+	 
+        vm_resume_all_threads(disable_count);
+	 gc_con_stat_information_out(gc);
+	 INFO2("gc.con.time","[GC][Con]pause(reset collection):  CRST="<<pause_time<<"  us\n\n"); // CRST means concurrent reset
+        break;
+    default :
+      return FALSE;
+  }
+  return TRUE;
+}
+
 

@@ -15,14 +15,28 @@
  *  limitations under the License.
  */
 
-#ifndef _MARKER_H_
-#define _MARKER_H_
+
+#ifndef _CONCLCTOR_H_
+#define _CONCLCTOR_H_
 
 #include "../common/gc_space.h"
 #include "../mark_sweep/wspace_chunk.h"
 
-typedef struct Marker{
-  /* <-- first couple of fields are overloaded as Allocator */
+extern SpinLock print_lock; //just for debug, print information
+
+enum CONCLCTOR_STATUS {
+  CONCLCTOR_NIL = 0x00,
+  CONCLCTOR_ACTIVE = 0x01,
+  CONCLCTOR_DEAD = 0x02,
+};
+
+enum CONCLCTOR_ROLE {
+   CONCLCTOR_ROLE_NIL = 0x0,
+   CONCLCTOR_ROLE_MARKER = 0x1,
+   CONCLCTOR_ROLE_SWEEPER = 0x2,
+};
+
+typedef struct Conclctor {
   void *free;
   void *ceiling;
   void *end;
@@ -38,7 +52,7 @@ typedef struct Marker{
   /* End of Allocator --> */
 
   /* FIXME:: for testing */
-  Space* mark_space;
+  Space* con_space;
   
   /* backup allocator in case there are two target copy spaces, such as semispace GC */
   Allocator* backup_allocator;
@@ -71,36 +85,51 @@ typedef struct Marker{
   POINTER_SIZE_INT non_los_live_obj_size;
   POINTER_SIZE_INT los_live_obj_size;
   POINTER_SIZE_INT segment_live_size[NORMAL_SIZE_SEGMENT_NUM];
+
   unsigned int result;
 
-  Boolean marker_is_active;
+  /* idle, active or dead */
+  unsigned int status;
+  /* null, marker or sweeper */
+  unsigned int role;
+  //VmEventHandle markroot_finished_event;
+  int64 time_conclctor;
 
-  VmEventHandle markroot_finished_event;
-
-  int64 time_mark;
-  Marker* next;
   unsigned int num_dirty_slots_traced;
-} Marker;
 
-typedef Marker* Marker_List;
+  Conclctor* next;
 
+} Conclctor;
+
+//#define MAX_NUM_CONCLCTORS 0xff
+//#define MIN_NUM_CONCLCTORS 0x01
 #define MAX_NUM_MARKERS 0xff
 #define MIN_NUM_MARKERS 0x01
 
-void marker_initialize(GC* gc);
-void marker_destruct(GC* gc);
+typedef Conclctor* Conclctor_List;
 
-void marker_execute_task(GC* gc, TaskType task_func, Space* space);
-void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_markers);
-void marker_execute_task_concurrent(GC* gc, TaskType task_func, Space* space);
+void conclctor_destruct(GC* gc);
+void conclctor_initialize(GC* gc);
+void conclctor_execute_task_concurrent(GC* gc, TaskType task_func, Space* space, unsigned int num_conclctors, unsigned int role);
+int64 gc_get_conclctor_time(GC* gc, unsigned int req_role);
+void gc_clear_conclctor_role(GC *gc);
+void conclctor_set_weakref_sets(GC* gc);
+void conclctor_release_weakref_sets(GC* gc);
+void conclctor_reset_weakref_sets(Conclctor *conclctor);
 
-void wait_mark_finish(GC* gc);
-Boolean is_mark_finished(GC* gc);
-int64 gc_get_marker_time(GC* gc);
+//void conclctor_release_weakref_sets(GC* gc, unsigned int num_conclctor);
+//void conclctor_restore_obj_info(Collector* collector);
 
-#endif //_MARKER_H_
+extern TaskType marker_final_func;
+extern TaskType sweeper_final_func;
 
+inline void set_marker_final_func( TaskType func ) {
+  marker_final_func = func;
+}
 
+inline void set_sweeper_final_func( TaskType func ) {
+  sweeper_final_func = func;
+}
 
-
+#endif //#ifndef _CONCLCTOR_H_
 

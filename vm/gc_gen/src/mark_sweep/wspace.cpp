@@ -63,6 +63,10 @@ Wspace *wspace_initialize(GC *gc, void *start, POINTER_SIZE_INT wspace_size, POI
   memset(wspace->space_statistic, 0, sizeof(Space_Statistics));
   wspace->space_statistic->size_free_space = commit_size;
 
+  wspace->con_collection_statistics = (Con_Collection_Statistics*)STD_MALLOC(sizeof(Con_Collection_Statistics));
+  memset(wspace->con_collection_statistics, 0, sizeof(Con_Collection_Statistics));
+  wspace->con_collection_statistics->heap_utilization_rate = DEFAULT_HEAP_UTILIZATION_RATE;
+
 #ifdef USE_UNIQUE_MARK_SWEEP_GC
   gc_ms_set_wspace((GC_MS*)gc, wspace);
 #else
@@ -207,17 +211,6 @@ void gc_clear_collector_local_chunks(GC *gc)
   }
 }
 
-#ifdef USE_UNIQUE_MARK_SWEEP_GC
-void wspace_set_space_statistic(Wspace *wspace)
-{
-  GC_MS *gc = (GC_MS*)wspace->gc;
-
-  for(unsigned int i = 0; i < gc->num_collectors; ++i){
-    wspace->surviving_obj_num += gc->collectors[i]->live_obj_num;
-    wspace->surviving_obj_size += gc->collectors[i]->live_obj_size;
-  }
-}
-#endif
 
 extern void wspace_decide_compaction_need(Wspace *wspace);
 extern void mark_sweep_wspace(Collector *collector);
