@@ -125,13 +125,14 @@ static void parse_proc_meminfo(size_t required_size){
     LWARN(52, "GC large_page: Large pages are not supported by kernel.\nGC large_page: CONFIG_HUGETLB_PAGE and CONFIG_HUGETLBFS needs to be enabled.");
   } else if (proc_huge_pages_total == 0){
     LWARN(53, "GC large_page: No large pages reserved,  Use the following command: echo num> /proc/sys/vm/nr_hugepages.\nGC large_page: Do it just after kernel boot before huge pages become fragmented.");
-  } else if (proc_huge_pages_free * proc_huge_page_size < required_size) {
-    if (proc_huge_pages_total * proc_huge_page_size >= required_size) {
-      LWARN(54, "GC large_page: Not enough free large pages, some of reserved space is already busy.");
-    } else {
-      LWARN(54, "GC large_page: Not enough free large pages, some of reserved space is already busy.");
+  } else {
+    //compute required huge page number
+    size_t required = (required_size+proc_huge_page_size-1)/proc_huge_page_size;
+    if (proc_huge_pages_total < required) {
+      LWARN(54, "GC large_page: required size exceeds total large page size.");
+    } else if (proc_huge_pages_free < required) {
+      LWARN(55, "GC large_page: required size exceeds free large page size.");
     }
-    LWARN(55, "GC large_page: Large pages can be only allocated.");
   }
 }
 
