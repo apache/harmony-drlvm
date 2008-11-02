@@ -913,7 +913,7 @@ EscAnalyzer::instrExam2() {
 
             case Op_LdVar:             // ldvar
                 type = inst->getDst()->getType();
-                if (type->isReference()) {
+                if (type->isReference()&&(!type->isUnmanagedPtr())) {
                     cgnode = findCnGNode_op(inst->getDst()->getId());
                     assert(cgnode!=NULL);
                     cgn_src=findCnGNode_op(inst->getSrc(0)->getId());
