@@ -63,7 +63,7 @@ protected:
     void emitCode();
     void registerExceptionHandlers();
     void registerExceptionRegion(void * regionStart, void * regionEnd, Node * regionDispatchNode);
-    void packCode();
+    int  packCode();
     void postPass();
     void registerDirectCall(MethodDesc * md, void * instStartAddr);
     
@@ -297,7 +297,7 @@ void CodeEmitter::runImpl()
     constantAreaLayout.doLayout(irManager);
     irManager->resolveRuntimeInfo();
     emitCode();
-    packCode();
+    //packCode(); //.this phase of function is moved into code emit phase
     postPass();
     constantAreaLayout.finalizeSwitchTables();
     traversalInfo.resize(irManager->getFlowGraph()->getMaxNodeId() + 1, 0);
@@ -543,6 +543,11 @@ void CodeEmitter::emitCode( void ) {
     unsigned codeSize = (unsigned)(ip-codeStreamStart);
     assert( codeSize < maxMethodSize );
 
+/*....Perform code pack to resolve target addresses of branck instructions before copy the native code to code buffer....*/
+    irManager->setCodeStartAddr(codeStreamStart);
+    int my_displacement = packCode();
+    codeSize = codeSize - my_displacement;
+
     U_8 * codeBlock = (U_8*)irManager->getCompilationInterface().allocateCodeBlock(
             codeSize , JMP_TARGET_ALIGMENT, getCodeSectionHeat(0), 0, false );
     memcpy(codeBlock, codeStreamStart, codeSize); 
@@ -556,7 +561,8 @@ void CodeEmitter::emitCode( void ) {
 }
 
 //________________________________________________________________________________________
-void CodeEmitter::packCode() {
+int CodeEmitter::packCode() {
+    int bbDisplacement = 0;
     bool newOpndsCreated = false;
     for( BasicBlock * bb = (BasicBlock*)irManager->getFlowGraph()->getEntryNode(), * succ; bb != NULL; bb = succ) {
         succ = (BasicBlock*)bb->getLayoutSucc();
@@ -588,7 +594,7 @@ void CodeEmitter::packCode() {
                 int succCodeOffset = succ->getCodeOffset();
                 int bbCodeSize = bb->getCodeSize();
                 int succCodeSize = succ->getCodeSize();
-                int bbDisplacement = succCodeOffset - bbCodeOffset - bbCodeSize;
+                bbDisplacement = succCodeOffset - bbCodeOffset - bbCodeSize;
                 if (bbDisplacement != 0){
                     U_8 * ps = (U_8*)irManager->getCodeStartAddr() + succCodeOffset;
                     U_8 * pd = ps - bbDisplacement;
@@ -602,6 +608,8 @@ void CodeEmitter::packCode() {
     }
     if (newOpndsCreated)
         irManager->fixLivenessInfo();
+
+    return bbDisplacement;
 }
 
 //________________________________________________________________________________________
