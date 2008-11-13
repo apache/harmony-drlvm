@@ -27,6 +27,8 @@
 #include "open/rt_helpers.h"
 #include "jni_types.h"
 
+#define _DEBUG_CHECK_NULL_
+
 #ifdef __cplusplus
 extern "C" {
 #endif

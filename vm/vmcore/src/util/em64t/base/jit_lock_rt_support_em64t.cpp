@@ -374,7 +374,7 @@ NativeCodePtr rth_get_lil_monitor_exit() {
 #ifdef _DEBUG_CHECK_NULL_//_DEBUG    
     // check if object is null
     cs = lil_parse_onto_end(cs,
-        "jc i0 = %0i:ref, throw_null_pointer;"
+        "jc i0 = %0i:ref, throw_null_pointer;",
         (ManagedObject *) VM_Global_State::loader_env->managed_null
     );
     assert(cs);
