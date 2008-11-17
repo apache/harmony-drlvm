@@ -334,7 +334,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
      * Note: We don't check member access permission for each super class.
      * Java 1.5 API specification doesn't require this check.
      */
-    public Class<?>[] getClasses() {
+    public Class[] getClasses() {
         checkMemberAccess(Member.PUBLIC);
         Class<?> clss = this;
         ArrayList<Class<?>> classes = null;
@@ -379,7 +379,7 @@ public final class Class<T> implements Serializable, AnnotatedElement, GenericDe
         return VMClassRegistry.getComponentType(this);
     }
 
-    public Constructor<T> getConstructor(Class<?>... argumentTypes)
+    public Constructor<T> getConstructor(Class... argumentTypes)
         throws NoSuchMethodException {
         checkMemberAccess(Member.PUBLIC);
         Constructor<T> ctors[] = getReflectionData().getPublicConstructors(); 
