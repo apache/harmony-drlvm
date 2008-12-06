@@ -189,7 +189,7 @@ void verifier_log_before_gc(Heap_Verifier* heap_verifier)
     printf(" .......................................................................... \n");
     printf(" Allocation  Verify: %s , ", alloc_verifier->is_verification_passed?"passed":"failed");
     printf("new nos: %d : %d , ", alloc_verifier->num_nos_newobjs, alloc_verifier->num_nos_objs);
-    printf("new los: %d : %d \n", alloc_verifier->num_los_newobjs, 
+    printf("new los: %d : %lld \n", alloc_verifier->num_los_newobjs, 
           alloc_verifier->num_los_objs-alloc_verifier->last_num_los_objs);
   }
 
@@ -209,7 +209,7 @@ void verifier_log_before_gc(Heap_Verifier* heap_verifier)
   }
 }
 
-void verifier_log_start(char* message)
+void verifier_log_start(const char* message)
 {
   printf("------------------------------%-16s------------------------------\n", message);
 }
@@ -217,7 +217,7 @@ void verifier_log_start(char* message)
 void verifier_collect_kind_log(Heap_Verifier* heap_verifier)
 {
   GC* gc = heap_verifier->gc;
-  char* gc_kind;
+  const char* gc_kind;
   if(collect_is_minor()){ 
     gc_kind = " minor collection.";
   }else if(collect_is_fallback()){ 
