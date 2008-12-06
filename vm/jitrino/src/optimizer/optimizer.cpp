@@ -177,22 +177,22 @@ void OptInitAction::readFlags()
     optimizerFlags.dump_abcd_stats = getBoolArg("dump_abcd_stats", false);
 
     optimizerFlags.abcdFlags = new (mm) AbcdFlags;
-    memset(optimizerFlags.abcdFlags, sizeof(AbcdFlags), 0);
+    memset(optimizerFlags.abcdFlags, 0, sizeof(AbcdFlags));
 
     optimizerFlags.gcmFlags = new (mm) GcmFlags;
-    memset(optimizerFlags.gcmFlags, sizeof(GcmFlags), 0);
+    memset(optimizerFlags.gcmFlags, 0, sizeof(GcmFlags));
     
     optimizerFlags.memOptFlags = new (mm) MemoptFlags;
-    memset(optimizerFlags.memOptFlags, sizeof(MemoptFlags), 0);
+    memset(optimizerFlags.memOptFlags, 0, sizeof(MemoptFlags));
 
     optimizerFlags.syncOptFlags = new (mm) SyncOptFlags;
-    memset(optimizerFlags.syncOptFlags, sizeof(SyncOptFlags), 0);
+    memset(optimizerFlags.syncOptFlags, 0, sizeof(SyncOptFlags));
 
     optimizerFlags.loopBuilderFlags = new (mm) LoopBuilderFlags;
-    memset(optimizerFlags.loopBuilderFlags, sizeof(LoopBuilderFlags), 0);
+    memset(optimizerFlags.loopBuilderFlags, 0, sizeof(LoopBuilderFlags));
 
     optimizerFlags.dabceFlags = new (mm) DynamicABCEFlags;
-    memset(optimizerFlags.dabceFlags, sizeof(DynamicABCEFlags), 0);
+    memset(optimizerFlags.dabceFlags, 0, sizeof(DynamicABCEFlags));
 
     Abcd::readFlags(this, optimizerFlags.abcdFlags);
     GlobalCodeMotion::readFlags(this, optimizerFlags.gcmFlags);
