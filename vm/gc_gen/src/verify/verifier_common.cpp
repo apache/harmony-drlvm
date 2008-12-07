@@ -188,24 +188,24 @@ void verifier_log_before_gc(Heap_Verifier* heap_verifier)
   if(heap_verifier->need_verify_allocation){
     printf(" .......................................................................... \n");
     printf(" Allocation  Verify: %s , ", alloc_verifier->is_verification_passed?"passed":"failed");
-    printf("new nos: %d : %d , ", alloc_verifier->num_nos_newobjs, alloc_verifier->num_nos_objs);
-    printf("new los: %d : %lld \n", alloc_verifier->num_los_newobjs, 
+    printf("new nos: %" FMT64 "u : %" FMT64 "u , ", alloc_verifier->num_nos_newobjs, alloc_verifier->num_nos_objs);
+    printf("new los: %" FMT64 "u : %lld \n", alloc_verifier->num_los_newobjs, 
           alloc_verifier->num_los_objs-alloc_verifier->last_num_los_objs);
   }
 
   if(heap_verifier->need_verify_rootset){
     printf(" .......................................................................... \n");
     printf(" RootSet      Verify: %s, ", rootset_verifier->is_verification_passed?"passed":"failed");
-    printf("num: %d, ", rootset_verifier->num_slots_in_rootset);
-    printf("error num: %d \n", rootset_verifier->num_error_slots);
+    printf("num: %" FMT64 "u, ", rootset_verifier->num_slots_in_rootset);
+    printf("error num: %" FMT64 "u \n", rootset_verifier->num_error_slots);
 
   }
 
   if(heap_verifier->need_verify_writebarrier){
     printf(" .......................................................................... \n");
     printf(" WriteBarrier Verify: %s, ", wb_verifier->is_verification_passed?"passed":"failed");
-    printf("cached: %d, ", wb_verifier->num_ref_wb_in_remset);
-    printf("real : %d \n", wb_verifier->num_ref_wb_after_scanning);
+    printf("cached: %" FMT64 "u, ", wb_verifier->num_ref_wb_in_remset);
+    printf("real : %" FMT64 "u \n", wb_verifier->num_ref_wb_after_scanning);
   }
 }
 
@@ -241,17 +241,17 @@ void verifier_log_after_gc(Heap_Verifier* heap_verifier)
     verifier_collect_kind_log(heap_verifier);
     printf(" GC Verify Result: %s  \n", gc_verifier->is_verification_passed?"Passed":"Failed*");
     printf(" .......................................................................... \n");
-    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "live obj", "NUM" ,gc_verifier->num_live_objects_before_gc, gc_verifier->num_live_objects_after_gc);
-    printf(" %-14s:    %-7s |   Before %7d MB   |   After %7d MB   |\n","live obj", "SIZE", gc_verifier->size_live_objects_before_gc>>20, gc_verifier->size_live_objects_after_gc>>20);
-    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "resurrect obj", "NUM",gc_verifier->num_resurrect_objects_before_gc, gc_verifier->num_resurrect_objects_after_gc);
+    printf(" %-14s:    %-7s |   Before %10" FMT64 "u   |   After %10" FMT64 "u   |\n", "live obj", "NUM" ,gc_verifier->num_live_objects_before_gc, gc_verifier->num_live_objects_after_gc);
+    printf(" %-14s:    %-7s |   Before %7" FMT64 "u MB   |   After %7" FMT64 "u MB   |\n","live obj", "SIZE", gc_verifier->size_live_objects_before_gc>>20, gc_verifier->size_live_objects_after_gc>>20);
+    printf(" %-14s:    %-7s |   Before %10" FMT64 "u   |   After %10" FMT64 "u   |\n", "resurrect obj", "NUM",gc_verifier->num_resurrect_objects_before_gc, gc_verifier->num_resurrect_objects_after_gc);
     if(gc_verifier->size_resurrect_objects_before_gc>>20 == 0 &&  gc_verifier->size_resurrect_objects_before_gc != 0){
       if(gc_verifier->size_resurrect_objects_before_gc>>10 == 0 ){
-        printf(" %-14s:    %-7s |   Before %7d  B   |   After %7d  B   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc, gc_verifier->size_resurrect_objects_after_gc);
+        printf(" %-14s:    %-7s |   Before %7" FMT64 "u  B   |   After %7" FMT64 "u  B   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc, gc_verifier->size_resurrect_objects_after_gc);
       }else{  
-        printf(" %-14s:    %-7s |   Before %7d KB   |   After %7d KB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>10, gc_verifier->size_resurrect_objects_after_gc>>10);
+        printf(" %-14s:    %-7s |   Before %7" FMT64 "u KB   |   After %7" FMT64 "u KB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>10, gc_verifier->size_resurrect_objects_after_gc>>10);
       }
     }else{
-      printf(" %-14s:    %-7s |   Before %7d MB   |   After %7d MB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>20, gc_verifier->size_resurrect_objects_after_gc>>20);
+      printf(" %-14s:    %-7s |   Before %7" FMT64 "u MB   |   After %7" FMT64 "u MB   |\n", "resurrect obj", "SIZE", gc_verifier->size_resurrect_objects_before_gc>>20, gc_verifier->size_resurrect_objects_after_gc>>20);
     }
     verifier_hashcode_log(gc_verifier);
   }
@@ -264,7 +264,7 @@ void verifier_log_after_gc(Heap_Verifier* heap_verifier)
 
 void verifier_hashcode_log(GC_Verifier* gc_verifier)
 {
-    printf(" %-14s:    %-7s |   Before %10d   |   After %10d   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
+    printf(" %-14s:    %-7s |   Before %10" FMT64 "u   |   After %10" FMT64 "u   |\n", "hashcode", "NUM", gc_verifier->num_hash_before_gc, gc_verifier->num_hash_after_gc);
 }
 
 
