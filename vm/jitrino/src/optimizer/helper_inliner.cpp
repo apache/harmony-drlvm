@@ -72,6 +72,7 @@ void HelperInlinerAction::init() {
     registerHelper(Op_TauLdIntfcVTableAddr, VM_RT_GET_INTERFACE_VTABLE_VER0);
     registerHelper(Op_TauCheckCast, VM_RT_CHECKCAST);
     registerHelper(Op_TauInstanceOf, VM_RT_INSTANCEOF);
+    registerHelper(Op_IdentHC, VM_RT_GET_IDENTITY_HASHCODE);
 }
 
 void HelperInlinerAction::registerHelper(Opcode opcode, VM_RT_SUPPORT helperId) {

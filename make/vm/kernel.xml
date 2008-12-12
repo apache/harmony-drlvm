@@ -59,6 +59,7 @@
             <classpath>
                 <fileset dir="${drlvm.deploy.dir}/jdk/jre/lib/boot" includes="*.jar" />
                 <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="vmmagic*.jar" />
+<!--                <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="gc_gen.jar" /> -->
                 <fileset dir="${drlvm.deploy.dir}/jdk/jre/bin/default" includes="antlr*.jar" />
             </classpath>
     

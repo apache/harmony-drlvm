@@ -80,6 +80,8 @@ public class VMHelper {
 
     public static void writeBarrier(Address objBase, Address objSlot, Address source) {fail();}
 
+    public static int getHashcode(Address p_obj){fail(); return 0;}
+
     public static Address getInterfaceVTable(Object obj, Address intfTypePtr) {fail(); return null;}
  
     public static void checkCast(Object obj, Address castTypePtr) {fail();}

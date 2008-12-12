@@ -84,15 +84,12 @@ long generic_hashcode(ManagedObject * p_obj)
 
 jint object_get_generic_hashcode(JNIEnv*, jobject jobj)
 {
-    tmn_suspend_disable();
-    ManagedObject* p_obj;
+    jint hash;
     if (jobj != NULL) {
-        p_obj = ((ObjectHandle)jobj)->object;
+        hash = generic_hashcode(((ObjectHandle)jobj)->object);
     } else {
-        p_obj = NULL;
+        hash = 0;
     }
-    jint hash = generic_hashcode(p_obj);
-    tmn_suspend_enable(); 
     return hash;
 }
 

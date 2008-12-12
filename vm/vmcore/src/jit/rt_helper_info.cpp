@@ -72,6 +72,11 @@ static JIT_RT_Function_Entry _jit_rt_function_entries_base[] = {
             INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              1,
             NULL,   NULL,   NULL,   NULL},
 
+    {VM_RT_GET_IDENTITY_HASHCODE,              "VM_RT_GET_IDENTITY_HASHCODE",
+            INTERRUPTIBLE_ALWAYS,              CALLING_CONVENTION_STDCALL,              1,
+            NULL,   NULL,   "(Ljava/lang/Object;)I",   NULL},
+
+
     {VM_RT_MONITOR_ENTER,                      "VM_RT_MONITOR_ENTER",
             INTERRUPTIBLE_SOMETIMES,           CALLING_CONVENTION_STDCALL,              1,
             "org/apache/harmony/drlvm/thread/ThreadHelper",   "monitorEnterUseReservation",

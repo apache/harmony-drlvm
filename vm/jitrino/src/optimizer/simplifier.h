@@ -935,6 +935,10 @@ public:
             return opnd->getInst();
         return inst;
     }
+    
+    Inst* caseIdentHC(Inst* inst) {
+        return caseDefault(inst);
+    }
 
     // default
     Inst* caseDefault(Inst* inst)  {

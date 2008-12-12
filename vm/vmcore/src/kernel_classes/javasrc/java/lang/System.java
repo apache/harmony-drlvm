@@ -34,6 +34,8 @@ import java.nio.channels.Channel;
 import org.apache.harmony.lang.RuntimePermissionCollection;
 import org.apache.harmony.vm.VMStack;
 import org.apache.harmony.luni.platform.Environment;
+//import org.apache.harmony.drlvm.VMHelper;
+//import org.apache.harmony.drlvm.gc_gen.GCHelper;
 
 /**
  * @com.intel.drl.spec_ref 
@@ -188,6 +190,11 @@ public final class System {
      * @com.intel.drl.spec_ref
      */
     public static int identityHashCode(Object object) {
+//	if (VMHelper.isVMMagicPackageSupported()) {
+//                return GCHelper.get_hashcode(object);
+//        } else {
+//                return VMMemoryManager.getIdentityHashCode(object);
+//        } 
         return VMMemoryManager.getIdentityHashCode(object);
     }
 

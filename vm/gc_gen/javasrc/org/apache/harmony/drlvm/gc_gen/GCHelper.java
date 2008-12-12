@@ -259,6 +259,72 @@ public class GCHelper {
         VMHelper.writeBarrier(p_objBase, p_objSlot, p_target);
     }
 
+    private static final long VT_BASE = getVTBase();
+    private static final int  OBJ_INFO_OFFSET = 4;
+    private static final int  HASHCODE_UNSET = 0x0;
+    private static final int  HASHCODE_SET_ATTACHED = 0x0c;
+    private static final int  HASHCODE_SET_UNALLOCATED = 0x04;
+    private static final int  HASHCODE_MASK = 0x1c;
+    private static final int  GC_CLASS_FLAG_ARRAY = 0x02;
+    private static final long GC_CLASS_FLAGS_MASK = ~((long)0x07);
+    private static final int  GC_OBJ_ALIGN_MASK   = GC_OBJECT_ALIGNMENT - 1;
+    private static final int  ARRAY_ELEM_SIZE_OFFSET_IN_GCVT  = getArrayElemSizeOffsetInGCVT();
+    private static final int  ARRAY_FIRST_ELEM_OFFSET_IN_GCVT = getArrayFirstElemOffsetInGCVT();
+    private static final int  GC_ALLOCATED_SIZE_OFFSET_IN_GCVT= getGCAllocatedSizeOffsetInGCVT();
+
+    @Inline
+    public static int get_hashcode(Object object){
+        if(object == null) return 0;
+	Address p_obj = ObjectReference.fromObject(object).toAddress();
+        int obj_info = p_obj.loadInt(Offset.fromIntZeroExtend(OBJ_INFO_OFFSET));
+
+	int hashcodeFlag = obj_info & HASHCODE_MASK;
+
+	if (hashcodeFlag == HASHCODE_SET_UNALLOCATED) {
+		return (p_obj.toInt())>>2;
+	} else if(hashcodeFlag == HASHCODE_SET_ATTACHED) {
+                int obj_size;
+//                Address vt_address = Address.fromLong((p_obj.loadLong()>>32) + VT_BASE); //TODO: support uncompressed 64-bit 
+                Address vt_address = Address.fromLong(p_obj.loadInt() + VT_BASE); //TODO: support uncompressed 64-bit 
+                Address gcvt_raw_address = vt_address.loadAddress();				
+                Address gcvt_address = Address.fromLong(gcvt_raw_address.toLong() & GC_CLASS_FLAGS_MASK);
+
+                long gcvt = gcvt_raw_address.toLong();		
+
+                if((gcvt & GC_CLASS_FLAG_ARRAY) != 0){
+                    int array_first_elem_offset 
+                        = gcvt_address.loadInt(Offset.fromIntZeroExtend(ARRAY_FIRST_ELEM_OFFSET_IN_GCVT));
+                    int array_elem_size
+                        = gcvt_address.loadInt(Offset.fromIntZeroExtend(ARRAY_ELEM_SIZE_OFFSET_IN_GCVT));
+
+                    int array_len
+                        = p_obj.loadInt(Offset.fromIntZeroExtend(ARRAY_LEN_OFFSET));
+
+                    obj_size 
+                      = (array_first_elem_offset + array_elem_size * array_len + GC_OBJ_ALIGN_MASK)& (~GC_OBJ_ALIGN_MASK);
+
+                } else {
+                     obj_size =  gcvt_address.loadInt(Offset.fromIntZeroExtend(GC_ALLOCATED_SIZE_OFFSET_IN_GCVT));   
+                }
+
+                return p_obj.loadInt(Offset.fromIntZeroExtend(obj_size));
+
+	} else if(hashcodeFlag == HASHCODE_UNSET) {
+                obj_info = p_obj.prepareInt(Offset.fromIntZeroExtend(OBJ_INFO_OFFSET));
+                int new_obj_info = obj_info | HASHCODE_SET_UNALLOCATED;
+                while(! p_obj.attempt(obj_info, new_obj_info, Offset.fromIntZeroExtend(OBJ_INFO_OFFSET))){
+                    obj_info = p_obj.prepareInt(Offset.fromIntZeroExtend(OBJ_INFO_OFFSET));
+                    if((obj_info & HASHCODE_SET_UNALLOCATED) != 0 ) break;
+                    new_obj_info = obj_info | HASHCODE_SET_UNALLOCATED;
+                }
+                return (p_obj.toInt())>>2;
+
+	} else {
+                return VMHelper.getHashcode(p_obj);	
+	}
+    }
+
+
     private static native boolean isPrefetchEnabled();
     private static native int getLargeObjectSize();
     private static native int getTlaFreeOffset(); 
@@ -272,6 +338,13 @@ public class GCHelper {
     private static native boolean getGenMode(); 
     private static native long getNosBoundary();    
     private static native int TLSGCOffset();
+
+ 
+    private static native long getVTBase();    
+    private static native int getArrayElemSizeOffsetInGCVT();
+    private static native int getArrayFirstElemOffsetInGCVT();
+    private static native int getGCAllocatedSizeOffsetInGCVT();
+
 }
 
 

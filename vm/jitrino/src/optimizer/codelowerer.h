@@ -322,6 +322,8 @@ private:
 
     Inst* caseTauIsNonNull(Inst* inst) {return caseDefault(inst);}
 
+    Inst* caseIdentHC(Inst* inst) { return caseDefault(inst);  }
+    
     IRManager& _irm;
     bool _preserveSsa;
 };

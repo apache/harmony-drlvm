@@ -128,6 +128,7 @@ DECLARE_HLO_MAGIC_INLINER(System_arraycopy_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_compareTo_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_regionMatches_HLO_Handler);
 DECLARE_HLO_MAGIC_INLINER(String_indexOf_HLO_Handler);
+DECLARE_HLO_MAGIC_INLINER(System_identityHashCode_Handler);
 
 DEFINE_SESSION_ACTION(HLOAPIMagicSession, hlo_api_magic, "APIMagics HLO Pass")
 
@@ -158,6 +159,11 @@ HLOAPIMagicSession::_run(IRManager& irm)
                     if (!strcmp(methodName, "arraycopy") && !strcmp(signature, "(Ljava/lang/Object;ILjava/lang/Object;II)V")) {
                         if(getBoolArg("System_arraycopy_as_magic", true) && arraycopyOptimizable(callInst, irm.getCompilationInterface().needWriteBarriers()))
                             handlers.push_back(new (mm) System_arraycopy_HLO_Handler(callInst));
+                    }
+                    if (!strcmp(methodName, "identityHashCode")) {
+                        if (getBoolArg("getIdentityHashCode", false)) {
+                            handlers.push_back(new (mm) System_identityHashCode_Handler(callInst));
+                        }
                     }
                 }
                 if (!strcmp(className, "java/lang/String")) {

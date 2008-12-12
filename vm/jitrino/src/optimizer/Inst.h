@@ -1097,6 +1097,7 @@ public:
     Inst*    makeVMHelperCall(Opnd* dst, VM_RT_SUPPORT id, U_32 numArgs,
                                Opnd** args);
     
+    Inst*    makeIdentHC(Opnd* dst, Opnd* src);
 
     Inst*    makeReturn(Opnd* src);
     Inst*    makeReturn();    // void return type
@@ -1907,6 +1908,9 @@ public:
     virtual Inst*
     caseTauIsNonNull(Inst* inst)=0;//         {return caseDefault(inst);}
 
+    virtual Inst*
+    caseIdentHC(Inst* inst)=0;//         {return caseDefault(inst);}
+    
     virtual Inst*
     caseDefault(Inst* inst)=0;//            {return NULL;}
 

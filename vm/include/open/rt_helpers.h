@@ -512,7 +512,7 @@ enum VM_RT_SUPPORT {
  // Non-VM specific helpers for the JIT
  ///// 
 
-
+    VM_RT_GET_IDENTITY_HASHCODE,
 /**
  * @param The parameters are the following:
  *        arg\ Object reference for the source array. Must be non-null and refer to an array 

@@ -586,6 +586,24 @@ String_indexOf_HLO_Handler::run()
     cfg.orderNodes(true);
 }
 
+void 
+System_identityHashCode_Handler::run() {
+    InstFactory& instFactory = builder->getInstFactory();
+
+    // the fist two are tau operands
+    Opnd* dst = callInst->getDst();
+    Opnd* obj = callInst->getSrc(2);    
+    // Opnd * opnds[] = { obj }; 
+
+    Node* firstNode = callInst->getNode();   
+    builder->setCurrentBCOffset(callInst->getBCOffset());
+    builder->setCurrentNode(firstNode);    
+    
+    // builder->appendInst(instFactory.makeVMHelperCall(dst, VM_RT_GET_IDENTITY_HASHCODE, 1, opnds));    
+    builder->appendInst(instFactory.makeIdentHC(dst, obj));        
+    callInst->unlink();       
+}
+
 Node*
 HLOAPIMagicIRBuilder::genNodeAfter(Node* srcNode, LabelInst* label, Node* dispatch) {
     currentNode = cfg.createBlockNode(label);

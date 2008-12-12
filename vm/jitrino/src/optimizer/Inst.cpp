@@ -1918,6 +1918,10 @@ Inst* InstFactory::makePrefetch(Opnd* addr) {
     return makeInst(Op_Prefetch, Modifier(), Type::Void, OpndManager::getNullOpnd(), addr);
 }
 
+Inst* InstFactory::makeIdentHC(Opnd* dst, Opnd* src) {
+    return makeInst(Op_IdentHC, Modifier(), dst->getType()->tag, dst, src);
+}
+
 Inst*
 InstFactory::makeDirectCall(Opnd* dst,
                             Opnd* tauNullChecked,
@@ -2722,6 +2726,7 @@ InstOptimizer::dispatch(Inst* inst) {
     case Op_TauHasType:         return caseTauHasType(inst->asTypeInst());
     case Op_TauHasExactType:    return caseTauHasExactType(inst->asTypeInst());
     case Op_TauIsNonNull:       return caseTauIsNonNull(inst);
+    case Op_IdentHC:            return caseIdentHC(inst);
 
     default:
         ::std::cerr << "Unknown opcode! " << inst->getOpcode() << " : "

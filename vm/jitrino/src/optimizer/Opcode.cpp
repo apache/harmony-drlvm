@@ -215,6 +215,7 @@ static OpcodeInfo opcodeTable[] = {
     { Op_TauHasType,            false, MB::Movable,       MK::None,                             "tauhastype ",        "tauhastype      %0,%d -) %l",        }, // temporary declaration that source is of given type
     { Op_TauHasExactType,       false, MB::CSEable,       MK::None,                             "tauexacttype ",        "tauexacttype      %0,%d -) %l",        }, // temporary declaration that source is exactly of given type
     { Op_TauIsNonNull,          true, MB::CSEable,       MK::None,                             "tauisnonnull ",        "tauisnonnull      %0 -) %l",        }, // temporary declaration that source null
+    { Op_IdentHC,              true,  MB::Call,   MK::None,                                  "identityHC",      "identityHC %s -) %l ",            }, 
 };                                                             
 
 unsigned short Modifier::encode(Opcode opcode, U_32 numbits) const

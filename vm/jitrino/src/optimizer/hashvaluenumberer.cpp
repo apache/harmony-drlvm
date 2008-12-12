@@ -949,7 +949,11 @@ public:
             return found;
         return hashInst(inst);
     }
-
+    
+    Inst* caseIdentHC(Inst* inst) {
+        return inst;
+    }
+    
     // default
     Inst* caseDefault(Inst* inst)                   { return inst; }
 private:

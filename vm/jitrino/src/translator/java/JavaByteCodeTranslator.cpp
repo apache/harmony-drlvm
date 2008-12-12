@@ -3134,6 +3134,13 @@ bool JavaByteCodeTranslator::genVMHelper(const char* mname, U_32 numArgs, Opnd *
         return true;
     }
 
+    if (!strcmp(mname,"getHashcode")) {
+        assert(numArgs == 1);
+        Opnd* res = irBuilder.genVMHelperCall(VM_RT_GET_IDENTITY_HASHCODE, resType, numArgs, srcOpnds);
+        pushOpnd(res);
+        return true;
+    }
+    
     return false;
 }
 

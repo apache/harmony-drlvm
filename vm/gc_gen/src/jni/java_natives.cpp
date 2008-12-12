@@ -119,6 +119,25 @@ JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeOb
    return (jint) GC_LOS_OBJ_SIZE_THRESHOLD;
 }
 
+#define OFFSET(structure, member)  ((int)(POINTER_SIZE_INT) &((structure *)0)->member)
+
+JNIEXPORT jlong JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getVTBase(JNIEnv *e, jclass c) 
+{
+  return (jlong)vtable_base;
+}
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getArrayElemSizeOffsetInGCVT(JNIEnv *e, jclass c) 
+{
+  return (jint)OFFSET(GC_VTable_Info,array_elem_size);
+}
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getArrayFirstElemOffsetInGCVT(JNIEnv *e, jclass c) 
+{
+  return (jint)OFFSET(GC_VTable_Info,array_first_elem_offset);
+}
+JNIEXPORT jint JNICALL Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCAllocatedSizeOffsetInGCVT(JNIEnv *e, jclass c) 
+{
+  return (jint)OFFSET(GC_VTable_Info,gc_allocated_size);
+}
+
 #ifdef __cplusplus
 }
 #endif

@@ -13,6 +13,10 @@ GC_GEN_0.1 {
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCObjectAlignment;
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getLargeObjectSize;
     Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_isPrefetchEnabled;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getVTBase;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getArrayElemSizeOffsetInGCVT;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getArrayFirstElemOffsetInGCVT;
+    Java_org_apache_harmony_drlvm_gc_1gen_GCHelper_getGCAllocatedSizeOffsetInGCVT;
     gc_add_compressed_root_set_entry;
     gc_add_root_set_entry;
     gc_add_root_set_entry_interior_pointer;

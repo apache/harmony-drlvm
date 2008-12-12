@@ -378,6 +378,32 @@ static void *generate_object_allocation_stub_with_thread_pointer(char *fast_obj_
 } //generate_object_allocation_stub_with_thread_pointer
 
 
+static void *getaddress__vm_gethashcode_java_object_resolved_using_gethashcode_naked()
+{
+    const int stub_size = 16;
+    char *stub = (char *)malloc_fixed_code_for_jit(stub_size, DEFAULT_CODE_ALIGNMENT, CODE_BLOCK_HEAT_MAX/2, CAA_Allocate);
+#ifdef _DEBUG
+    memset(stub, 0xcc /*int 3*/, stub_size);
+#endif
+    char *ss = stub;
+
+    ss = push(ss,  M_Base_Opnd(esp_reg, 4));
+    ss = call(ss, (char *)gc_get_hashcode0);
+    ss = alu(ss, add_opc,  esp_opnd,  Imm_Opnd(4));
+    ss = ret(ss,  Imm_Opnd(4));
+    assert((ss - stub) <= stub_size);
+
+    compile_add_dynamic_generated_code_chunk("gethashcode_java_object_resolved_using_gethashcode_naked", false, stub, stub_size);
+
+    if (jvmti_should_report_event(JVMTI_EVENT_DYNAMIC_CODE_GENERATED)) {
+        jvmti_send_dynamic_code_generated_event("gethashcode_java_object_resolved_using_gethashcode_naked", stub, stub_size);
+    }
+
+    DUMP_STUB(stub, "getaddress__vm_gethashcode_java_object_resolved_using_gethashcode_naked", ss - stub);
+
+    return (void *)stub;
+} //generate_object_allocation_stub_with_thread_pointer
+
 static void *getaddress__vm_alloc_java_object_resolved_using_vtable_and_size_naked()
 {
     static void *addr = 0;
@@ -1057,6 +1083,10 @@ void *vm_helper_get_addr(VM_RT_SUPPORT f)
 
     case VM_RT_GC_HEAP_WRITE_REF:
         return (void*)gc_heap_slot_write_ref;
+            
+    case VM_RT_GET_IDENTITY_HASHCODE:
+        return getaddress__vm_gethashcode_java_object_resolved_using_gethashcode_naked();
+        
     default:
         LDIE(50, "Unexpected helper id {0}" << f);
         return 0;

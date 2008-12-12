@@ -2939,6 +2939,8 @@ CG_OpndHandle* InstCodeSelector::callvmhelper(U_32              numArgs,
     case VM_RT_GET_INVOKE_SPECIAL_ADDR_WITHRESOLVE:
     case VM_RT_INITIALIZE_CLASS_WITHRESOLVE:
     case VM_RT_MULTIANEWARRAY_RESOLVED:
+        
+    case VM_RT_GET_IDENTITY_HASHCODE:
 {
         dstOpnd = retType==NULL ? NULL: irManager.newOpnd(retType);
         CallInst * callInst=irManager.newRuntimeHelperCallInst(callId, numArgs, (Opnd**)args, dstOpnd);

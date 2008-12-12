@@ -453,7 +453,9 @@ enum Opcode {
     Op_TauIsNonNull,
 
     // prefixes: unaligned, volatile, tail,
-    NumOpcodes,
+    Op_IdentHC,
+    
+    NumOpcodes,       
 };
 
 class Modifier {

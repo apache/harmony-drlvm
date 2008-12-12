@@ -62,6 +62,7 @@ static void init_gc_helpers()
     vm_helper_register_magic_helper(VM_RT_NEW_RESOLVED_USING_VTABLE_AND_SIZE, "org/apache/harmony/drlvm/gc_gen/GCHelper", "alloc");
     vm_helper_register_magic_helper(VM_RT_NEW_VECTOR_USING_VTABLE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "allocArray");
     vm_helper_register_magic_helper(VM_RT_GC_HEAP_WRITE_REF,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "write_barrier_slot_rem");
+    vm_helper_register_magic_helper(VM_RT_GET_IDENTITY_HASHCODE,  "org/apache/harmony/drlvm/gc_gen/GCHelper", "get_hashcode");
 }
 
 int gc_init() 
@@ -368,24 +369,15 @@ I_32 gc_get_hashcode(Managed_Object_Handle p_object)
 #endif
 
   Partial_Reveal_Object* p_obj = (Partial_Reveal_Object*)p_object;
-  if(!p_obj) return 0;
   assert(address_belongs_to_gc_heap(p_obj, p_global_gc));
   Obj_Info_Type info = get_obj_info_raw(p_obj);
-  Obj_Info_Type new_info = 0;
   int hash;
-  
-  switch(info & HASHCODE_MASK){
-    case HASHCODE_SET_UNALLOCATED:
-      hash = hashcode_gen((void*)p_obj);
-      break;
-    case HASHCODE_SET_ATTACHED:
-      hash = hashcode_lookup(p_obj,info);
-      break;
-    case HASHCODE_SET_BUFFERED:
-      hash = hashcode_lookup(p_obj,info);
-      break;
-    case HASHCODE_UNSET:
-      new_info = info | HASHCODE_SET_BIT;
+  unsigned int infoMask = (unsigned int)(info & HASHCODE_MASK);
+  if (infoMask == HASHCODE_SET_BUFFERED)          hash = obj_lookup_hashcode_in_buf(p_obj);
+  else if (infoMask == HASHCODE_SET_UNALLOCATED)  hash = hashcode_gen((void*)p_obj);
+  else if (infoMask == HASHCODE_SET_ATTACHED)     hash = *(int*) ((unsigned char *)p_obj + vm_object_size(p_obj));
+  else if  (infoMask == HASHCODE_UNSET) {
+      Obj_Info_Type new_info = info | HASHCODE_SET_BIT;
       while (true) {
         Obj_Info_Type temp =
           atomic_casptrsz((volatile POINTER_SIZE_INT*)(&p_obj->obj_info), new_info, info);
@@ -394,10 +386,8 @@ I_32 gc_get_hashcode(Managed_Object_Handle p_object)
         new_info = info | HASHCODE_SET_BIT;
       }
       hash = hashcode_gen((void*)p_obj);
-      break;
-    default:
-      assert(0);
-  }
+  }    else                                       assert(0);
+
   return hash;
 }
 #endif //USE_32BITS_HASHCODE
