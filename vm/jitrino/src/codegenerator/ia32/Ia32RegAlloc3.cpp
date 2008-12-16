@@ -168,6 +168,7 @@ struct RegAlloc3 : public SessionAction
     int  duplicates (Indexes* list, BoolMatrix& matrix, int x0, int x1);
     void pruneGraph ();
     bool shouldPrune (const Opndx&) const;
+    RegAlloc3::RegMask occupiedReg (OpndSize, OpndSize, RegAlloc3::RegMask);
     bool assignRegs ();
     bool assignReg  (Opndx&);
     void spillRegs  ();
@@ -1232,6 +1233,23 @@ bool RegAlloc3::assignRegs ()
     return spilled == 0;
 }
 
+RegAlloc3::RegMask RegAlloc3::occupiedReg (OpndSize tgtSize, OpndSize adjSize, RegAlloc3::RegMask adjMask) {
+#if !defined(_EM64T_)    
+    if (!((tgtSize != adjSize) && ((tgtSize == OpndSize_8) || (adjSize == OpndSize_8))))
+#endif
+        return adjMask;
+
+    RegMask val = adjMask;
+    if (tgtSize == OpndSize_8) {
+        if (adjMask <= 8) //for AH, CH, DH, BH
+            val |= adjMask<<4;
+    } else if (adjSize == OpndSize_8) {
+        if (adjMask >= 16) //for AH, CH, DH, BH
+            val >>= 4;
+    }
+    return val;
+}
+
 
 bool RegAlloc3::assignReg (Opndx& opndx)
 {
@@ -1242,7 +1260,10 @@ bool RegAlloc3::assignReg (Opndx& opndx)
     {
         Opndx& opndz = graph.at(*i);
         if (opndz.ridx == opndx.ridx)
-            alloc |= opndz.alloc;
+            if (opndz.opnd != NULL) //for operand nodes
+                alloc |= occupiedReg(opndx.opnd->getSize(), opndz.opnd->getSize(), opndz.alloc);
+            else //for color nodes
+                alloc |= occupiedReg(opndx.opnd->getSize(), OpndSize_32, opndz.alloc);
     }
 
     if ((alloc = opndx.avail & ~alloc) == 0)

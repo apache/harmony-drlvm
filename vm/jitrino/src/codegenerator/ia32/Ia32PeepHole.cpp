@@ -484,7 +484,8 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
         if (step1 && next->getMnemonic() == Mnemonic_MOV)
         {
             Opnd *movopnd1, *movopnd2, *nextmovopnd1, *nextmovopnd2;
-            if (inst->getKind() == Inst::Kind_CopyPseudoInst)
+            bool isInstCopyPseudo = (inst->getKind() == Inst::Kind_CopyPseudoInst);
+            if (isInstCopyPseudo)
             {
                 movopnd1 = inst->getOpnd(0);
                 movopnd2 = inst->getOpnd(1);
@@ -496,7 +497,8 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
                 movopnd1 = inst->getOpnd(movdefs.begin());
                 movopnd2 = inst->getOpnd(movuses.begin());
             }
-            if (next->getKind() == Inst::Kind_CopyPseudoInst)
+            bool isNextCopyPseudo = (next->getKind() == Inst::Kind_CopyPseudoInst);
+            if (isNextCopyPseudo)
             {
                 nextmovopnd1 = next->getOpnd(0);
                 nextmovopnd2 = next->getOpnd(1);
@@ -522,7 +524,10 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
                 bool dstNotUsed = !ls.getBit(movopnd1->getId());
                 if (dstNotUsed)
                 {
-                    irManager->newInst(Mnemonic_MOV, nextmovopnd1, movopnd2)->insertAfter(inst);
+                    if (isInstCopyPseudo && isNextCopyPseudo)
+                        irManager->newCopyPseudoInst(Mnemonic_MOV, nextmovopnd1, movopnd2)->insertAfter(inst);
+                    else
+                        irManager->newInst(Mnemonic_MOV, nextmovopnd1, movopnd2)->insertAfter(inst);
                     inst->unlink();
                     next->unlink();
                     return Changed_Node;
@@ -602,7 +607,6 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MOV(Inst* inst)
     }
     return Changed_Nothing;
 }
-
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_CMP(Inst* inst) {
     assert(inst->getMnemonic()==Mnemonic_CMP);

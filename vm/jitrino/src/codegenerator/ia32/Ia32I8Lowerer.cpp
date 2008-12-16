@@ -289,6 +289,7 @@ void I8Lowerer::runImpl()
         for (Inst* inst = (Inst*)node->getFirstInst(),*nextInst=NULL; inst!=NULL; inst = nextInst) {
             nextInst = inst->getNextInst();
             U_32  defCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Def);
+            U_32  useCount = inst->getOpndCount(Inst::OpndRole_InstLevel|Inst::OpndRole_Use);
             if(inst->getMnemonic() == Mnemonic_CDQ) {
                 if (inst->getNextInst()!=NULL && inst->getNextInst()->getMnemonic() == Mnemonic_IDIV) {
                     continue;
@@ -310,8 +311,17 @@ void I8Lowerer::runImpl()
                 tmpInst->insertAfter(inst);
                 inst->unlink();
                 inst = tmpInst;
-            }
-        }
+            } else {
+                if (cdq) {
+                    Opnd* defCDQ = cdq->getOpnd(0);
+                    for (U_32 i=defCount;i<defCount+useCount;i++) {
+                        if (defCDQ == inst->getOpnd(i)) {
+                            cdq = NULL;
+                            break;
+                        }
+                    }
+                }
+            }        }
     }
     
     checkIR(irManager);

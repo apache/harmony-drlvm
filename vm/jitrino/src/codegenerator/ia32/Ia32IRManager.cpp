@@ -1324,8 +1324,15 @@ void IRManager::calculateTotalRegUsage(OpndKind regKind) {
     U_32 opndCount=getOpndCount();
     for (U_32 i=0; i<opndCount; i++){
         Opnd * opnd=getOpnd(i);
-        if (opnd->isPlacedIn(regKind))
-            gpTotalRegUsage |= getRegMask(opnd->getRegName());
+        if (opnd->isPlacedIn(regKind)) {
+            RegName reg = opnd->getRegName();
+            unsigned mask = getRegMask(reg);
+#if !defined(_EM64T_)
+            if ((reg == RegName_AH) || (reg == RegName_CH) || (reg == RegName_DH) || (reg == RegName_BH))
+                mask >>= 4;
+#endif
+            gpTotalRegUsage |= mask;
+        }
     }
 }
 //_________________________________________________________________________________________________
