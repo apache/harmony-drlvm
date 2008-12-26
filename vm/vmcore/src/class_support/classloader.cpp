@@ -2131,7 +2131,7 @@ Class* BootstrapClassLoader::LoadFromJarFile( JarFile* jar_file,
 
     STD_FREE(buffer);
 
-    INFO2("class", "[Loaded " << (NULL != class_name ? class_name->bytes : "NULL") << " from " << jar_file->GetName()  << "]");
+    INFO2("class", "[Loaded " << (NULL != class_name ? class_name->bytes : "NULL") << " from " << JarFile::GetJar(entry->GetJarIndex())->GetName()  << "]");
     return clss;
 } // BootstrapClassLoader::LoadFromJarFile
 
