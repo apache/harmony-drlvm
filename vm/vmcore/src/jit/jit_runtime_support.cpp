@@ -1289,7 +1289,7 @@ static void *rth_newarray_withresolve(Class_Handle klass, unsigned cp_idx, unsig
     
     //resolve and init object class
     Class* objClass = resolveClass(klass, cp_idx, false);
-    initializeClass(objClass);
+    //initializeClass(objClass);
     assert(!objClass->is_primitive());
 
     void* res = NULL;
