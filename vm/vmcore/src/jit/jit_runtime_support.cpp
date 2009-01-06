@@ -1287,11 +1287,11 @@ static NativeCodePtr rth_get_lil_newobj_withresolve(int * dyn_count) {
 static void *rth_newarray_withresolve(Class_Handle klass, unsigned cp_idx, unsigned arraySize) {
     ASSERT_THROW_AREA;
     
-    //resolve and init object class
+    //resolve object class (newarray does not require initializing the element class)
     Class* objClass = resolveClass(klass, cp_idx, false);
+    // following initialize() is commented, see details in HARMONY-6020. Basically, VM spec $2.17.4 
+    // does not say the creation of an array of type T needs iniatializing T.
     //initializeClass(objClass);
-    //Spec does not require objClass be inited here, 
-    //Removing the initializeClass can pass the circular class init test cases in HARMONY-6020
     assert(!objClass->is_primitive());
 
     void* res = NULL;
