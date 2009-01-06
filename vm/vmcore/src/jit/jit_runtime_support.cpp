@@ -1290,6 +1290,8 @@ static void *rth_newarray_withresolve(Class_Handle klass, unsigned cp_idx, unsig
     //resolve and init object class
     Class* objClass = resolveClass(klass, cp_idx, false);
     //initializeClass(objClass);
+    //Spec does not require objClass be inited here, 
+    //Removing the initializeClass can pass the circular class init test cases in HARMONY-6020
     assert(!objClass->is_primitive());
 
     void* res = NULL;
