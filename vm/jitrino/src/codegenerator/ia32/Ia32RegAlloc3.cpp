@@ -1260,10 +1260,12 @@ bool RegAlloc3::assignReg (Opndx& opndx)
     {
         Opndx& opndz = graph.at(*i);
         if (opndz.ridx == opndx.ridx)
+        {
             if (opndz.opnd != NULL) //for operand nodes
                 alloc |= occupiedReg(opndx.opnd->getSize(), opndz.opnd->getSize(), opndz.alloc);
             else //for color nodes
                 alloc |= occupiedReg(opndx.opnd->getSize(), OpndSize_32, opndz.alloc);
+        }
     }
 
     if ((alloc = opndx.avail & ~alloc) == 0)
