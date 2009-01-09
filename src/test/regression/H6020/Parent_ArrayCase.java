@@ -17,24 +17,11 @@
 
 package org.apache.harmony.drlvm.tests.regression.h6020;
 
-import junit.framework.TestCase;
-
-public class CircularClassInitTest extends TestCase{
-    public static void main(String[] args) {
-        CircularClassInitTest.testObjectCase();
-        CircularClassInitTest.testArrayCase();
-        System.out.println("PASSED");
-    }
-
-    public static void testObjectCase() {
-        Child_ObjectCase c = Parent_ObjectCase.createChild();
-        if(c.ROOT != null) {
-            fail();
-        }        
-    }
-
-    public static void testArrayCase() {
-        Child_ArrayCase c  = Parent_ArrayCase.createChild();
+public class Parent_ArrayCase {
+    private static final Child_ArrayCase[] childCache = new Child_ArrayCase[5];
+    
+    public static Child_ArrayCase createChild(){
+        return childCache[0];
     }
 }
 
