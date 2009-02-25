@@ -172,7 +172,7 @@ public:
             assert(sp < stackDepth);
             switch (op) {
             case MulOp::pushc: assert(ip<len); thestack[sp] = data[ip++]; when[sp] = 0; sp += 1; break;
-            case MulOp::pushy: thestack[sp] = y; when[sp] = 0; sp += 1; break;
+            case MulOp::pushy: thestack[sp] = y; when[sp] = COST_LOADY; sp += 1; break;
             case MulOp::swap: assert(sp >= 2); ::std::swap(thestack[sp-1], thestack[sp-2]); ::std::swap(when[sp-1], when[sp-2]); break;
             case MulOp::dup: assert(sp >= 1); thestack[sp] = thestack[sp-1]; when[sp] = when[sp-1]; sp += 1; break;
             case MulOp::dup2: assert(sp >= 2); thestack[sp] = thestack[sp-2]; when[sp] = when[sp-2]; sp += 1; break;
@@ -255,6 +255,8 @@ public:
         int ip = 0;
         int sp = 0;
         int subnum = 0;
+        if (len == 0)
+            return; // no reduction
         while (ip < len) {
             enum MulOp::Op op = (enum MulOp::Op) data[ip];
             ip += 1;
@@ -351,6 +353,8 @@ public:
         thestack[0] = 0;
         int ip = 0;
         int sp = 0;
+        if (len == 0)
+            return NULL; // no reduction
         while (ip < len) {
             enum MulOp::Op op = (enum MulOp::Op) data[ip];
             ip += 1;
@@ -442,6 +446,14 @@ void planMul(MulMethod &m, inttype d, int depth) {
         int k = width - 1;
         m.append(MulOp::pushy); m.append(MulOp::shiftl, k);
     } else {
+    /* ONLY DO REDUCTION FOR THE TWO CASES */
+        if ((d < 32) && (d > 0)) {
+            planMulLookup<inttype, width>(m, d, depth+1);
+        } else if (isPowerOf2(d)) {
+            int k = whichPowerOf2<inttype, width>(d);
+            m.append(MulOp::pushy); m.append(MulOp::shiftl, k);
+        }
+    /* 
         if (d < 0) {
             planMulNeg<inttype, width>(m, d, depth);
         } else if (d < 32) {
@@ -452,6 +464,7 @@ void planMul(MulMethod &m, inttype d, int depth) {
         } else {
             planMulLarge<inttype, width>(m, d, depth+1);
         }
+    */
     }
 #ifdef TEST_OUTPUT
     DEBUGPRINT2("planMul(" << d << ")", res);
@@ -875,50 +888,36 @@ void planMulLookup(MulMethod &m, inttype d, int depth) {
     case 0: m.append(MulOp::pushc, 0); break;
     case 1: m.append(MulOp::pushy); break;
     case 2: m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
-    case 3: m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
+    case 3: m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1); break;
     case 4: m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 2); break;
-    case 5: m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 2); break;
+    case 5: m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2); break;
     case 6: 
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 7:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
     case 8: m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 3); break;
-    case 9: m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 3); break;
+    case 9: m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 3); break;
     case 10:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2);
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 11:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
     case 12:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 2); break;
     case 13:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 2); break;
     case 14:
-        m.append(MulOp::pushy); 
-        if (m.SMALL_SHIFT_MAXBITS == 4) {
-            m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 4);
-        } else if (m.SMALL_SHIFT_MAXBITS == 3) {
-            m.append(MulOp::shiftl, 4);
-        } else {
-            assert(0);
-        }
-        m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1);
-        m.append(MulOp::sub); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 15:
-        m.append(MulOp::pushy); 
-        if (m.SMALL_SHIFT_MAXBITS == 4) {
-            m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 4);
-        } else if (m.SMALL_SHIFT_MAXBITS == 3) {
-            m.append(MulOp::shiftl, 4);
-        } else {
-            assert(0);
-        }
-        m.append(MulOp::pushy); m.append(MulOp::sub); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::dup); m.append(MulOp::shladd, 2); break;
     case 16:
         m.append(MulOp::pushy); 
         if (m.SMALL_SHIFT_MAXBITS == 4) {
@@ -930,70 +929,58 @@ void planMulLookup(MulMethod &m, inttype d, int depth) {
         }
         break;
     case 17:
-        if (m.SMALL_SHIFT_MAXBITS == 4) {
-            m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 4);
-        } else if (m.SMALL_SHIFT_MAXBITS == 3) {
-            m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shiftl, 4); m.append(MulOp::add);
-        } else {
-            assert(0);
-        }
+        m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 3);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
         break;
     case 18:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 3); 
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 3); 
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 19:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 3); 
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 3); 
         m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
     case 20:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 2); 
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2); 
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 2); break;
     case 21:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 2); 
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2); 
         m.append(MulOp::pushy); m.append(MulOp::shladd, 2); break;
     case 22:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
-        m.append(MulOp::pushy); 
-        if (m.SMALL_SHIFT_MAXBITS == 4) {
-            m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 4);
-        } else if (m.SMALL_SHIFT_MAXBITS == 3) {
-            m.append(MulOp::shiftl, 4);
-        } else {
-            assert(0);
-        }
-        m.append(MulOp::shladd, 1); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 23:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
-        m.append(MulOp::pushy); m.append(MulOp::neg);
-        m.append(MulOp::shladd, 3); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
     case 24:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 3); break;
     case 25:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 3); break;
     case 26:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
-        m.append(MulOp::pushy); m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1);
-        m.append(MulOp::shladd, 3); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 27:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::dup); m.append(MulOp::shladd, 3); break;
     case 28:
-        m.append(MulOp::pushy); m.append(MulOp::neg);
-        m.append(MulOp::pushy); m.append(MulOp::shiftl, 5);
-        m.append(MulOp::shladd, 2); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 2); break;
     case 29:
-        m.append(MulOp::pushy); m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 1);
         m.append(MulOp::pushy); m.append(MulOp::shladd, 2); break;
     case 30:
-        m.append(MulOp::pushy); m.append(MulOp::neg);
-        m.append(MulOp::pushy); m.append(MulOp::shiftl, 5);
-        m.append(MulOp::shladd, 1); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::dup); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushc, 0); m.append(MulOp::shladd, 1); break;
     case 31:
-        m.append(MulOp::pushy); m.append(MulOp::neg);
-        m.append(MulOp::pushy); m.append(MulOp::shiftl, 5);
-        m.append(MulOp::add); break;
+        m.append(MulOp::pushy); m.append(MulOp::dup); m.append(MulOp::shladd, 1);
+        m.append(MulOp::dup); m.append(MulOp::shladd, 2);
+        m.append(MulOp::pushy); m.append(MulOp::shladd, 1); break;
     default:
         assert(0);
     }

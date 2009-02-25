@@ -343,7 +343,7 @@ public:
      */
     bool isSubjectForLivenessAnalysis()const
     {
-        return (memOpndKind&(MemOpndKind_StackManualLayout|MemOpndKind_ConstantArea|MemOpndKind_Heap))==0 && !isPlacedIn(OpndKind_Imm);
+        return (memOpndKind&(MemOpndKind_StackManualLayout|MemOpndKind_ConstantArea|MemOpndKind_Heap|MemOpndKind_LEA))==0 && !isPlacedIn(OpndKind_Imm);
     }
 
     /** Returns the segment register used with the operand (memory). */

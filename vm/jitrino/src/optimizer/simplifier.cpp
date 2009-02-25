@@ -1185,10 +1185,9 @@ Simplifier::simplifyMul(Type* type,
         return NULL;
     }
 
-    // convert multiply-by-constant to shifts if this is a late simplify pass
-    if (isLate) {
-        if (src1isConstant || src2isConstant) {
-            switch (type->tag) {
+    // reduce multiply-by-constant
+    if (src1isConstant || src2isConstant) {
+        switch (type->tag) {
             case Type::Int32:
             case Type::UInt32:
                 if (src1isConstant) {
@@ -1227,9 +1226,9 @@ Simplifier::simplifyMul(Type* type,
                    
             default:
                 break;
-            }
         }
     }
+
 
     //
     // Inversion
@@ -1321,11 +1320,10 @@ Simplifier::simplifyMulHi(Type* type,
     if (src2isConstant && ConstantFolder::isConstantZero(src2))
         return src2;
 
-    // convert multiply-by-constant to shifts if this is a late simplify pass
-    if (isLate) {
-        if (src1isConstant || src2isConstant) {
-            bool isSigned = false;
-            switch (type->tag) {
+    // reduce multiply-by-constant
+    if (src1isConstant || src2isConstant) {
+        bool isSigned = false;
+        switch (type->tag) {
             case Type::Int32: isSigned = true;
             case Type::UInt32:
                 if (src1isConstant) {
@@ -1373,10 +1371,9 @@ Simplifier::simplifyMulHi(Type* type,
 
             default:
                 break;
-            }
         }
     }
-
+    
     return NULL;
 }
 
@@ -1445,7 +1442,7 @@ Simplifier::simplifyTauDiv(Type* dstType,
                     src2->getInst()->asConstInst(),
                     mod.isSigned());
     
-#ifdef _IPF_
+
     const OptimizerFlags& optimizerFlags = irManager.getOptimizerFlags();
     //
     // further ops only for integers
@@ -1485,92 +1482,123 @@ Simplifier::simplifyTauDiv(Type* dstType,
             return opnd;
         
         // convert other cases to MulHi and shift if lower_divconst set
-        if (optimizerFlags.lower_divconst &&
-            (dstType->tag == Type::Int32) &&
-            mod.isSigned()) {
-
-            I_32 denom = value2.i4;
-            // note that 0 and 1 were handled above
-            if (denom == -1) {
-                // convert to neg
-                Opnd *res = genNeg(dstType, src1)->getDst();
-                return res;
-            } else if (isPowerOf2<I_32>(denom)) {
-                // convert to shift and such
-                I_32 absdenom = (denom < 0) ? -denom : denom;
-                int k = whichPowerOf2<I_32,32>(absdenom);
-                Opnd *kminus1 = genLdConstant((I_32)(k - 1))->getDst();
-                // make k-1 copies of the sign bit
-                Opnd *shiftTheSign = genShr(dstType, 
-                                            Modifier(SignedOp)|Modifier(ShiftMask_None),
-                                            src1, kminus1)->getDst();
-                // we 32-k zeros in on left to put copies of sign on right
-                Opnd *t32minusk = genLdConstant((I_32)(32-k))->getDst();
-                // if (n<0), this is 2^k-1, else 0
-                Opnd *kminus1ones = genShr(dstType, 
-                                           Modifier(UnsignedOp)|Modifier(ShiftMask_None),
-                                           shiftTheSign, t32minusk)->getDst();
-                Opnd *added = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
-                                     src1, kminus1ones)->getDst();
-                Opnd *kOpnd = genLdConstant((I_32)k)->getDst();
-                Opnd *res = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
-                                   added, kOpnd)->getDst();
-                if (denom != absdenom) { // ((denom < 0) && (k < 31))
-                    res = genNeg(dstType, res)->getDst();
-                }
-                return res;
-            } else {
-                // convert to MulHi and such
-                I_32 magicNum, shiftBy;
-                getMagic<I_32, U_32, 32>(denom, &magicNum, &shiftBy);
-                
-                Opnd *mulRes;
-                if (optimizerFlags.use_mulhi) {
-                    Opnd *magicOpnd = genLdConstant(magicNum)->getDst();
-                    mulRes = genMulHi(dstType, SignedOp, magicOpnd,
-                                      src1)->getDst();
+        if (optimizerFlags.lower_divconst && mod.isSigned()) {
+            if (dstType->tag == Type::Int32) {
+                I_32 denom = value2.i4;
+                // note that 0 and 1 were handled above
+                if (denom == -1) {
+                    // convert to neg
+                    Opnd *res = genNeg(dstType, src1)->getDst();
+                    return res;
+                } else if (isPowerOf2<I_32>(denom)) {
+                    // convert to shift and such
+                    I_32 absdenom = (denom < 0) ? -denom : denom;
+                    int k = whichPowerOf2<I_32,32>(absdenom);
+                    Opnd *kminus1 = genLdConstant((I_32)(k - 1))->getDst();
+                    // make k-1 copies of the sign bit
+                    Opnd *shiftTheSign = genShr(dstType, 
+                                                Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                                src1, kminus1)->getDst();
+                    // we 32-k zeros in on left to put copies of sign on right
+                    Opnd *t32minusk = genLdConstant((I_32)(32-k))->getDst();
+                    // if (n<0), this is 2^k-1, else 0
+                    Opnd *kminus1ones = genShr(dstType, 
+                                               Modifier(UnsignedOp)|Modifier(ShiftMask_None),
+                                               shiftTheSign, t32minusk)->getDst();
+                    Opnd *added = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
+                                         src1, kminus1ones)->getDst();
+                    Opnd *kOpnd = genLdConstant((I_32)k)->getDst();
+                    Opnd *res = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                       added, kOpnd)->getDst();
+                    if (denom != absdenom) { // ((denom < 0) && (k < 31))
+                        res = genNeg(dstType, res)->getDst();
+                    }
+                    return res;
                 } else {
-                    Opnd *magicOpnd = genLdConstant((int64)magicNum)->getDst();
-                    TypeManager &tm = irManager.getTypeManager();
-                    Type *dstType64 = tm.getInt64Type();
-                    Opnd *src64 = genConv(dstType64, Type::Int64, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
+                    // convert to MulHi and such
+                    I_32 magicNum, shiftBy;
+                    getMagic<I_32, U_32, 32>(denom, &magicNum, &shiftBy);
+                
+                    Opnd *mulRes;
+                    if (optimizerFlags.use_mulhi) {
+                        Opnd *magicOpnd = genLdConstant(magicNum)->getDst();
+                        mulRes = genMulHi(dstType, SignedOp, magicOpnd,
                                           src1)->getDst();
-                    Opnd *mulRes64 = genMul(dstType64, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), magicOpnd,
-                                            src64)->getDst();
-                    Opnd *constant32 = genLdConstant((I_32)32)->getDst();
-                    Opnd *mulRes64h = genShr(dstType64, 
-                                             Modifier(SignedOp)|Modifier(ShiftMask_None),
-                                             mulRes64,
-                                             constant32)->getDst();
-                    mulRes = genConv(dstType, Type::Int32, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
-                                     mulRes64h)->getDst();
+                    } else {
+                        Opnd *magicOpnd = genLdConstant((int64)magicNum)->getDst();
+                        TypeManager &tm = irManager.getTypeManager();
+                        Type *dstType64 = tm.getInt64Type();
+                        Opnd *src64 = genConv(dstType64, Type::Int64, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
+                                              src1)->getDst();
+                        Opnd *mulRes64 = genMul(dstType64, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), magicOpnd,
+                                                src64)->getDst();
+                        Opnd *constant32 = genLdConstant((I_32)32)->getDst();
+                        Opnd *mulRes64h = genShr(dstType64, 
+                                                 Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                                 mulRes64,
+                                                 constant32)->getDst();
+                        mulRes = genConv(dstType, Type::Int32, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
+                                         mulRes64h)->getDst();
+                    }
+                    // need to adjust for overflow in magicNum
+                    // this is indicated by sign which differs from
+                    // the denom.
+                    if ((denom > 0) && (magicNum < 0)) {
+                        mulRes = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), 
+                                        mulRes, src1)->getDst();
+                    } else if ((denom < 0) && (magicNum > 0)) {
+                        mulRes = genSub(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), 
+                                        mulRes, src1)->getDst();
+                    }
+                    Opnd *shiftByOpnd = genLdConstant(shiftBy)->getDst();
+                    mulRes = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                    mulRes, shiftByOpnd)->getDst();
+                    Opnd *thirtyOne = genLdConstant((I_32)31)->getDst();
+                    Opnd *oneIfNegative = genShr(dstType,
+                                                 Modifier(UnsignedOp)|Modifier(ShiftMask_None),
+                                                 ((denom < 0) 
+                                                  ? mulRes
+                                                  : src1),
+                                                 thirtyOne)->getDst();
+                    Opnd *res = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), mulRes, oneIfNegative)->getDst();
+                    return res;
                 }
-                // need to adjust for overflow in magicNum
-                // this is indicated by sign which differs from
-                // the denom.
-                if ((denom > 0) && (magicNum < 0)) {
-                    mulRes = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), 
-                                    mulRes, src1)->getDst();
-                } else if ((denom < 0) && (magicNum > 0)) {
-                    mulRes = genSub(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), 
-                                    mulRes, src1)->getDst();
+            } else if (dstType->tag == Type::Int64) {
+                int64 denom = value2.i8;
+                // note that 0 and 1 were handled above
+                if (denom == -1) {
+                    // convert to neg
+                    Opnd *res = genNeg(dstType, src1)->getDst();
+                    return res;
+                } else if (isPowerOf2<int64>(denom)) {
+                    // convert to shift and such
+                    int64 absdenom = (denom < 0) ? -denom : denom;
+                    int k = whichPowerOf2<int64,64>(absdenom);
+                    Opnd *kminus1 = genLdConstant((int64)(k - 1))->getDst();
+                    // make k-1 copies of the sign bit
+                    Opnd *shiftTheSign = genShr(dstType, 
+                                                Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                                src1, kminus1)->getDst();
+                    // we 64-k zeros in on left to put copies of sign on right
+                    Opnd *t64minusk = genLdConstant((int64)(64-k))->getDst();
+                    // if (n<0), this is 2^k-1, else 0
+                    Opnd *kminus1ones = genShr(dstType, 
+                                               Modifier(UnsignedOp)|Modifier(ShiftMask_None),
+                                               shiftTheSign, t64minusk)->getDst();
+                    Opnd *added = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No),
+                                         src1, kminus1ones)->getDst();
+                    Opnd *kOpnd = genLdConstant((int64)k)->getDst();
+                    Opnd *res = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
+                                       added, kOpnd)->getDst();
+                    if (denom != absdenom) { // ((denom < 0) && (k < 63))
+                        res = genNeg(dstType, res)->getDst();
+                    }
+                    return res;
                 }
-                Opnd *shiftByOpnd = genLdConstant(shiftBy)->getDst();
-                mulRes = genShr(dstType, Modifier(SignedOp)|Modifier(ShiftMask_None),
-                                mulRes, shiftByOpnd)->getDst();
-                Opnd *thirtyOne = genLdConstant((I_32)31)->getDst();
-                Opnd *oneIfNegative = genShr(dstType,
-                                             Modifier(UnsignedOp)|Modifier(ShiftMask_None),
-                                             ((denom < 0) 
-                                              ? mulRes
-                                              : src1),
-                                             thirtyOne)->getDst();
-                Opnd *res = genAdd(dstType, Modifier(Overflow_None)|Modifier(Exception_Never)|Modifier(Strict_No), mulRes, oneIfNegative)->getDst();
-                return res;
             }
         }
     }
-#endif
+
     return NULL;
 }
 
@@ -1593,7 +1621,7 @@ Simplifier::simplifyTauRem(Type* dstType,
                     src1->getInst()->asConstInst(),
                     src2->getInst()->asConstInst(),
                     mod.isSigned());
-#ifdef _IPF_
+
     //
     // don't simplify floating point further
     //
@@ -1634,21 +1662,6 @@ Simplifier::simplifyTauRem(Type* dstType,
                 //
                 return genLdConstant((I_32)0)->getDst();
             }
-            if (isPowerOf2<I_32>(denom)) {
-                int k = whichPowerOf2<I_32,32>(denom);
-                I_32 maskInt = (((I_32)0x1)<<k)-1;
-                Opnd *maskOpnd = genLdConstant(maskInt)->getDst();
-                Opnd *maskedOpnd = genAnd(src1->getType(),
-                                          src1, maskOpnd)->getDst();
-                Opnd *res = maskedOpnd;
-                if (denom < 0) {
-                    I_32 signInt = ((I_32)-1) ^ maskInt;
-                    Opnd *extendedSign 
-                        = genLdConstant(signInt)->getDst();
-                    res = genOr(src1->getType(), res, extendedSign)->getDst();
-                }
-                return res;
-            }
         } else if (ConstantFolder::isConstant(src2inst, cv.i8)) {
             int64 denom = cv.i8;
             if ((denom == -1) || (denom == 1)) {
@@ -1656,21 +1669,6 @@ Simplifier::simplifyTauRem(Type* dstType,
                 // s1 % +-1 -> 0 
                 //
                 return genLdConstant((int64)0)->getDst();
-            }
-            if (isPowerOf2<int64>(denom)) {
-                int k = whichPowerOf2<int64,64>(denom);
-                int64 maskInt = (((int64)0x1)<<k)-1;
-                Opnd *maskOpnd = genLdConstant(maskInt)->getDst();
-                Opnd *maskedOpnd = genAnd(src1->getType(),
-                                          src1, maskOpnd)->getDst();
-                Opnd *res = maskedOpnd;
-                if (denom < 0) {
-                    int64 signInt = ((int64)-1) ^ maskInt;
-                    Opnd *extendedSign 
-                        = genLdConstant(signInt)->getDst();
-                    res = genOr(src1->getType(), res, extendedSign)->getDst();
-                }
-                return res;
             }
         }
 
@@ -1686,7 +1684,7 @@ Simplifier::simplifyTauRem(Type* dstType,
             return remOpnd;
         }
     }
-#endif
+
     return NULL;
 }
 //-----------------------------------------------------------------------------

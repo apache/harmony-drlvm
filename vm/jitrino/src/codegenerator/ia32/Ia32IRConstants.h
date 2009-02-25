@@ -64,6 +64,7 @@ enum MemOpndKind
     MemOpndKind_Stack=0x1f,
     MemOpndKind_Heap=0x20,
     MemOpndKind_ConstantArea=0x40,
+    MemOpndKind_LEA=0x80,
     MemOpndKind_Any=0xff,
 };
 

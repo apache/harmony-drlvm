@@ -1201,12 +1201,32 @@ Opnd * InstCodeSelector::shiftOp(IntegerOp::Types opType, Mnemonic mn, Opnd * va
 
 //_______________________________________________________________________________________________________________
 //  Shift left and add
-
+#define LEA_EXP_LIMIT 3
 CG_OpndHandle*    InstCodeSelector::shladd(IntegerOp::Types opType, 
                                               CG_OpndHandle*   value, 
                                               U_32           imm, 
                                               CG_OpndHandle*   addto)  
 { 
+    if ((opType == IntegerOp::I4) && (imm <= LEA_EXP_LIMIT)) {
+        Type * dstType = irManager.getTypeFromTag(Type::Int32);
+        bool addtoIsImm = false;
+        if (((Opnd*)addto)->isPlacedIn(OpndKind_Imm))
+            addtoIsImm = true;
+        Opnd *res;
+        if (addtoIsImm) {
+            res = irManager.newMemOpnd(dstType, NULL, (Opnd*)value, 
+                irManager.newImmOpnd(typeManager.getInt32Type(), 1<<imm), (Opnd*)addto);
+        } else {
+            res = irManager.newMemOpnd(dstType, (Opnd*)addto, (Opnd*)value, 
+                irManager.newImmOpnd(typeManager.getInt32Type(), 1<<imm), NULL);
+        }
+        res->setMemOpndKind(MemOpndKind_LEA);
+        Opnd *dst = irManager.newOpnd(dstType);
+        Inst *newInst = irManager.newInstEx(Mnemonic_LEA, 1, dst, res);
+        appendInsts(newInst);
+        return dst;
+    }
+
     Opnd * shiftDest = (Opnd *)shl(opType, value, irManager.newImmOpnd(typeManager.getUInt8Type(), imm));
     ArithmeticOp::Types atype;
     switch (opType) {

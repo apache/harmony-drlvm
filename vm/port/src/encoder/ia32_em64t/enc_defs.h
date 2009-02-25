@@ -604,12 +604,12 @@ Mnemonic_SETcc,                         // Set Byte on Condition
     CCM(SET,NLE), CCM(SET,G),
 
 Mnemonic_SAL, Mnemonic_SHL=Mnemonic_SAL,// Shift left
-Mnemonic_SAR,                           // Unsigned shift right
+Mnemonic_SAR,                           // Shift right
 Mnemonic_ROR,                           // Rotate right
 Mnemonic_RCR,                           // Rotate right through CARRY flag
 Mnemonic_ROL,                           // Rotate left
 Mnemonic_RCL,                           // Rotate left through CARRY flag
-Mnemonic_SHR,                           // Signed shift right
+Mnemonic_SHR,                           // Unsigned shift right
 Mnemonic_SHRD,                          // Double Precision Shift Right
 Mnemonic_SHLD,                          // Double Precision Shift Left
 
