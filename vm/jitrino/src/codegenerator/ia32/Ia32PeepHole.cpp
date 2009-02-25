@@ -99,10 +99,17 @@ private:
     //
     //
     bool m_bHadAnyChange;
+
+    // For local propagation from new generated MOV
+    StlHashMap<Opnd*, Opnd*> *copyMap;
+    StlSet<Opnd*> *tempSet;
 }; // ~PeepHoleOpt
 
 void PeepHoleOpt::runImpl(void)
 {
+    MemoryManager mm("handleBasicBlock");
+    copyMap = new(mm) StlHashMap<Opnd*, Opnd*>(mm);
+    tempSet = new(mm) StlSet<Opnd*>(mm);
     setIRManager(irManager);
     irManager->calculateOpndStatistics();
     m_bHadAnyChange = false;
@@ -144,6 +151,8 @@ void PeepHoleOpt::runImpl(void)
 
 PeepHoleOpt::Changed PeepHoleOpt::handleBasicBlock(Node* node)
 {
+    copyMap->clear();
+    tempSet->clear();
     Inst* inst = (Inst*)node->getFirstInst();
     Changed changedInBB = Changed_Nothing;
     while (inst != NULL) {
@@ -177,11 +186,100 @@ PeepHoleOpt::Changed PeepHoleOpt::handleBasicBlock(Node* node)
     return changedInBB;
 }
 
+static bool isTypeConversionAllowed(Opnd* fromOpnd, Opnd* toOpnd) {
+    Type * fromType = fromOpnd->getType();
+    Type * toType = toOpnd->getType();
+    bool fromIsGCType = fromType->isObject() || fromType->isManagedPtr();
+    bool toIsGCType = toType->isObject() || toType->isManagedPtr();
+    return fromIsGCType == toIsGCType;
+}
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst(Inst* inst)
 {
     PeepHoleOpt::Changed temp;
 
+    // Local propagation
+    Inst::Opnds opnds(inst, Inst::OpndRole_All);
+    
+    for (Inst::Opnds::iterator it=opnds.begin();it != opnds.end();it = opnds.next(it)) {
+        Opnd * opnd=inst->getOpnd(it);
+        U_32 roles=inst->getOpndRoles(it);
+                
+        if (roles & Inst::OpndRole_Use) {
+            if ((roles & Inst::OpndRole_All & Inst::OpndRole_FromEncoder) 
+                && (roles & Inst::OpndRole_All & Inst::OpndRole_ForIterator)
+                && (roles & Inst::OpndRole_Changeable) && ((roles & Inst::OpndRole_Def) == 0)
+                && copyMap->has(opnd)) {
+                if (opnd->getType()->isUnmanagedPtr() && (*copyMap)[opnd]->getType()->isInteger())
+                    (*copyMap)[opnd]->setType(opnd->getType());
+                inst->setOpnd(it, (*copyMap)[opnd]);
+            }
+        }
+    }
+
+    for (Inst::Opnds::iterator it = opnds.begin();it != opnds.end();it = opnds.next(it)) {
+        Opnd * opnd=inst->getOpnd(it);
+        U_32 roles=inst->getOpndRoles(it);
+
+        if (roles & Inst::OpndRole_Def) {
+            if (copyMap->has(opnd)) {
+            	if (Log::isEnabled()) Log::out()<<"copy relation DELETED: " << opnd->getFirstId() << "<=" << (*copyMap)[opnd]->getFirstId() <<std::endl;
+                copyMap->erase(opnd);
+            }
+
+            tempSet->clear();
+            for(StlHashMap<Opnd*, Opnd*>::iterator iter=copyMap->begin();
+                iter!=copyMap->end();++iter)
+                if (iter->second == opnd) {
+                    if (Log::isEnabled()) Log::out()<<"copy relation DELETED: " << iter->first->getFirstId() << "<=" << iter->second->getFirstId() <<std::endl;
+                    tempSet->insert(iter->first);
+                }
+            for(StlSet<Opnd*>::iterator iter=tempSet->begin();
+                iter!=tempSet->end();++iter)
+                copyMap->erase(*iter);
+        }
+    }
+
+    if (inst->getMnemonic() == Mnemonic_MOV) {
+        Inst::Opnds opnds(inst, Inst::OpndRole_All);
+        Opnd * dst = NULL;
+        Opnd * src = NULL;
+        U_32 counterDef = 0;
+        U_32 counterUse = 0;
+
+        for (Inst::Opnds::iterator it=opnds.begin();it!=opnds.end();it=opnds.next(it)) {
+            Opnd * opnd = inst->getOpnd(it);
+            U_32 roles = inst->getOpndRoles(it);
+                    
+            if (roles & Inst::OpndRole_Def) {
+                counterDef++;
+                dst = opnd;
+            } else if (roles & Inst::OpndRole_Use) {
+                counterUse++;
+                src = opnd;
+            }
+        }
+
+        if ((counterDef == 1) && (counterUse == 1) && (!dst->hasAssignedPhysicalLocation())) {
+            bool kindsAreOk = true;
+            if(src->canBePlacedIn(OpndKind_FPReg) || dst->canBePlacedIn(OpndKind_FPReg)) {
+                Constraint srcConstr = src->getConstraint(Opnd::ConstraintKind_Calculated);
+                Constraint dstConstr = dst->getConstraint(Opnd::ConstraintKind_Calculated);
+                kindsAreOk = ! (srcConstr&dstConstr).isNull();
+            }
+            bool typeConvOk = src->getSize() == dst->getSize() && isTypeConversionAllowed(src, dst);
+            if (typeConvOk && kindsAreOk && ! src->isPlacedIn(OpndKind_Reg)) {
+                if (copyMap->has(src)) {
+                    (*copyMap)[dst] = (*copyMap)[src];
+                    if (Log::isEnabled()) Log::out()<<"copy relation INSERTED: " << dst->getFirstId() << "<=" << (*copyMap)[src]->getFirstId() <<std::endl;
+                } else {
+                    (*copyMap)[dst] = src;
+                    if (Log::isEnabled()) Log::out()<<"copy relation INSERTED: " << dst->getFirstId() << "<=" << src->getFirstId() <<std::endl;
+                }
+            }
+        }
+    }
+            
     if (inst->hasKind(Inst::Kind_PseudoInst) && inst->getKind() != Inst::Kind_CopyPseudoInst) {
         return Changed_Nothing;
     }
@@ -632,19 +730,32 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_CMP(Inst* inst) {
 
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_MUL(Inst* inst) {
-    assert(inst->getMnemonic()==Mnemonic_IMUL || inst->getMnemonic()==Mnemonic_MUL);
+    assert((inst->getMnemonic() == Mnemonic_IMUL) || (inst->getMnemonic() == Mnemonic_MUL));
+    
     if (inst->getForm() == Inst::Form_Native) {
         return Changed_Nothing;
     }
+    
     Inst::Opnds defs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
-    Opnd* dst = inst->getOpnd(defs.begin());
-    if (defs.next(defs.begin())!=defs.end()) {
+    Opnd* dst1 = inst->getOpnd(defs.begin());
+    Opnd* dst2 = NULL;
+    if ((inst->getMnemonic() == Mnemonic_IMUL) && (defs.next(defs.begin()) != defs.end())){
         return Changed_Nothing;
     }
+    else { //inst->getMnemonic() == Mnemonic_MUL
+        dst2 = inst->getOpnd(defs.next(defs.begin()));
+        if (defs.next(defs.next(defs.begin()))!=defs.end())
+            return Changed_Nothing;
+    }
+
     Inst::Opnds uses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
     Opnd* src1= inst->getOpnd(uses.begin());
     Opnd* src2= inst->getOpnd(uses.next(uses.begin()));
-    assert(src1!=NULL && src2!=NULL && dst!=NULL);
+    if (inst->getMnemonic() == Mnemonic_IMUL)
+        assert(src1!=NULL && src2!=NULL && dst1!=NULL);
+    else //inst->getMnemonic() == Mnemonic_MUL
+        assert(src1!=NULL && src2!=NULL && dst1!=NULL && dst2!=NULL);
+
     if (isImm(src1)) {
         Opnd* tmp = src1; src1 = src2; src2 = tmp;
     }
@@ -652,33 +763,49 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_MUL(Inst* inst) {
         int immVal = (int)src2->getImmValue();
         if (immVal == 0) {
             if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 0"<<std::endl;
-            irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src2)->insertAfter(inst);
+            if (inst->getMnemonic() == Mnemonic_IMUL) {
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst1, src2)->insertAfter(inst);
+            } else { //inst->getMnemonic() == Mnemonic_MUL
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst1, src2)->insertAfter(inst);
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst2, src2)->insertAfter(inst);
+            }
             inst->unlink();
             return Changed_Inst;
         } else if (immVal == 1) {
             if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 1"<<std::endl;
-            irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src1)->insertAfter(inst);
+            if (inst->getMnemonic() == Mnemonic_IMUL) {
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst1, src1)->insertAfter(inst);
+            } else { //inst->getMnemonic() == Mnemonic_MUL
+                Opnd* zero = irManager->newImmOpnd(dst1->getType(), 0);
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst1, zero)->insertAfter(inst);
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst2, src1)->insertAfter(inst);
+            }
             inst->unlink();
             return Changed_Inst;
         } else if (immVal == 2) {
-            if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2"<<std::endl;
-            irManager->newInstEx(Mnemonic_ADD, 1, dst, src1, src1)->insertAfter(inst);
-            inst->unlink();
-            return Changed_Inst;
-        } else {
-            int minBit=getMinBit(immVal);   
-            int maxBit=getMaxBit(immVal);
-            if (minBit == maxBit) {
-                assert(minBit>=2);
-                if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2^"<<minBit<<std::endl;
-                Type* int32Type = irManager->getTypeManager().getUInt32Type();
-                irManager->newInstEx(Mnemonic_SHL, 1, dst, src1, irManager->newImmOpnd(int32Type, minBit))->insertAfter(inst);
+            if (inst->getMnemonic() == Mnemonic_IMUL) {
+                if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2"<<std::endl;
+                irManager->newInstEx(Mnemonic_ADD, 1, dst1, src1, src1)->insertAfter(inst);
                 inst->unlink();
                 return Changed_Inst;
             }
-        }
-    }
-    return Changed_Nothing;
+        } else {
+            if (inst->getMnemonic() == Mnemonic_IMUL) {
+                int minBit=getMinBit(immVal);   
+                int maxBit=getMaxBit(immVal);
+                if (minBit == maxBit) {
+                     assert(minBit>=2);
+                     if (Log::isEnabled()) Log::out()<<"I"<<inst->getId()<<" -> MUL with 2^"<<minBit<<std::endl;
+                     Type* immType = irManager->getTypeManager().getUInt8Type();
+                     irManager->newCopyPseudoInst(Mnemonic_MOV, dst1, src1)->insertBefore(inst);
+                     irManager->newInst(Mnemonic_SHL, dst1, irManager->newImmOpnd(immType, minBit))->insertBefore(inst);
+                     inst->unlink();
+                     return Changed_Inst;
+                 }
+             }
+          }
+      }
+      return Changed_Nothing;
 }
 
 PeepHoleOpt::Changed PeepHoleOpt::handleInst_ALU(Inst* inst)
@@ -730,6 +857,44 @@ PeepHoleOpt::Changed PeepHoleOpt::handleInst_ALU(Inst* inst)
                     irManager->newInstEx(Mnemonic_TEST, 0, src1, newopnd2)->insertAfter(inst);
                 else
                     irManager->newInst(Mnemonic_TEST, src1, newopnd2)->insertAfter(inst);
+                inst->unlink();
+                return Changed_Inst;
+            }
+        }
+    } else if (mnemonic == Mnemonic_ADD) {
+        /* Change "dst=src+0" to "MOV dst, src" if there is another ADD inst followed in the same BB. */
+        Inst::Opnds defs(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Def);
+        Opnd* dst = inst->getOpnd(defs.begin());
+        Inst::Opnds uses(inst, Inst::OpndRole_Explicit|Inst::OpndRole_Use);
+        Opnd* src1= inst->getOpnd(uses.begin());
+        Opnd* src2= inst->getOpnd(uses.next(uses.begin()));
+
+        bool src1IsZero = false;
+        bool src2IsZero = false;
+        if (src1->isPlacedIn(OpndKind_Imm) && (src1->getImmValue() == 0))
+            src1IsZero = true;
+        if (src2->isPlacedIn(OpndKind_Imm) && (src2->getImmValue() == 0))
+            src2IsZero = true;
+
+        bool anotherADD = false;
+        Inst *iter = inst->getNextInst();
+        while (iter != NULL) {
+            if (iter->getMnemonic() == Mnemonic_ADC)
+                break;
+            if (iter->getMnemonic() == Mnemonic_ADD) {
+                anotherADD = true;
+                break;
+            }
+            iter = iter->getNextInst();;
+        }
+
+        if (anotherADD) {
+            if (src1IsZero) {
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src2)->insertAfter(inst);
+                inst->unlink();
+                return Changed_Inst;
+            } else if (src2IsZero) {
+                irManager->newCopyPseudoInst(Mnemonic_MOV, dst, src1)->insertAfter(inst);
                 inst->unlink();
                 return Changed_Inst;
             }

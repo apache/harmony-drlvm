@@ -975,16 +975,14 @@ void I8Lowerer::inlineMul64(Inst* inst)
     (1)         (2)             (3)
     */
     //
-    newSubGFG();
-    Node* entryNode = getSubCfgEntryNode();
+    if (inline_mul64_checks) {
+        newSubGFG();
+        Node* entryNode = getSubCfgEntryNode();
     
-    Node* longMulNode = newBB();
-    Node* storeResultNode = newBB();
-    setCurrentNode(NULL); 
-    if (!inline_mul64_checks) {
-        connectNodes(entryNode, longMulNode);
-    }
-    else {
+        Node* longMulNode = newBB();
+        Node* storeResultNode = newBB();
+        setCurrentNode(NULL); 
+    
         Node* test_A_Node = newBB();
         Node* test_B_Node = newBB();
         Node* simpleMulNode = newBB();
@@ -1018,38 +1016,63 @@ void I8Lowerer::inlineMul64(Inst* inst)
         connectNodeTo(storeResultNode);
         setCurrentNode(NULL);
         simpleMulNode = (Node*)0xDEADBEEF;
+
+        entryNode = (Node*)0xDEADBEEF;
+    
+        setCurrentNode(longMulNode);
+        /* mov eax, a_lo*/  newInst(Mnemonic_MOV, eax, a_lo);
+        /* mul     b_hi */  newInst(Mnemonic_MUL, 2, edx, eax, eax, b_hi);
+        //
+        // Now, EAX=a_lo*b_hi, EDX content is dropped
+        //
+                            // save a_lo*b_hi(EAX) 
+        /* mov ecx, eax */  newInst(Mnemonic_MOV, ecx, eax);
+        /* mov eax, a_hi*/  newInst(Mnemonic_MOV, eax, a_hi);
+        /* mul b_lo     */  newInst(Mnemonic_MUL, 2, edx, eax, eax, b_lo);
+        /* add ecx, eax */  newInst(Mnemonic_ADD, 1, ecx, ecx, eax);
+
+        /* mov eax, a_lo */ newInst(Mnemonic_MOV, eax, a_lo);
+        /* mul b_lo      */ newInst(Mnemonic_MUL, 2, edx, eax, eax, b_lo);
+        /* add edx, ecx */  newInst(Mnemonic_ADD, 1, edx, edx, ecx);
+        connectNodes(longMulNode, storeResultNode);
+        setCurrentNode(NULL);
+        longMulNode = (Node*)0xDEADBEEF;
+
+        //
+        // storeResultNode:
+        //
+        setCurrentNode(storeResultNode);
+        /* mov res_lo, eax*/    newInst(Mnemonic_MOV, res_lo, eax);
+        /* mov res_hi, edx*/    newInst(Mnemonic_MOV, res_hi, edx);
+        setCurrentNode(NULL);
+        connectNodes(storeResultNode, getSubCfgReturnNode());
+
+        propagateSubCFG(inst);
+    } else {
+        /* mov eax, a_lo */ irManager->newCopyPseudoInst(Mnemonic_MOV, eax, a_lo)->insertBefore(inst);
+        /* mul     b_hi */  irManager->newInstEx(Mnemonic_MUL, 2, edx, eax, eax, b_hi, NULL)->insertBefore(inst);
+        // Now, EAX=low32bit(a_lo*b_hi), EDX content is dropped
+
+        /* mov ecx, eax */  irManager->newCopyPseudoInst(Mnemonic_MOV, ecx, eax)->insertBefore(inst); 
+        // Now, a_lo*b_hi is saved to ECX
+        
+        /* mov eax, a_hi*/  irManager->newCopyPseudoInst(Mnemonic_MOV, eax, a_hi)->insertBefore(inst);
+        /* mul b_lo     */  irManager->newInstEx(Mnemonic_MUL, 2, edx, eax, eax, b_lo, NULL)->insertBefore(inst);
+        // Now, EAX=low32bit(a_hi*b_lo), EDX content is dropped
+        
+        /* add ecx, eax */  irManager->newInstEx(Mnemonic_ADD, 1, ecx, ecx, eax)->insertBefore(inst);
+        // Now, ECX=low32bit(a_lo*b_hi+a_hi*b_lo)
+
+        /* mov eax, a_lo */ irManager->newCopyPseudoInst(Mnemonic_MOV, eax, a_lo)->insertBefore(inst);
+        /* mul b_lo      */ irManager->newInstEx(Mnemonic_MUL, 2, edx, eax, eax, b_lo, NULL)->insertBefore(inst);
+        // Now, EAX=low32bit(a_lo*b_lo) and EDX=high32bit(a_lo*b_lo)
+        
+        /* add edx, ecx */  irManager->newInstEx(Mnemonic_ADD, 1, edx, edx, ecx)->insertBefore(inst);
+        // Now, EDX=low32bit(a_lo*b_hi+a_hi*b_lo)+high32bit(a_lo*b_lo)
+
+        /* mov res_lo, eax*/    irManager->newCopyPseudoInst(Mnemonic_MOV, res_lo, eax)->insertBefore(inst);
+        /* mov res_hi, edx*/    irManager->newCopyPseudoInst(Mnemonic_MOV, res_hi, edx)->insertBefore(inst);
     }
-    entryNode = (Node*)0xDEADBEEF;
-    
-    setCurrentNode(longMulNode);
-    /* mov eax, a_lo*/  newInst(Mnemonic_MOV, eax, a_lo);
-    /* mul     b_hi */  newInst(Mnemonic_MUL, 2, edx, eax, eax, b_hi);
-    //
-    // Now, EAX=a_lo*b_hi, EDX content is dropped
-    //
-                        // save a_lo*b_hi(EAX) 
-    /* mov ecx, eax */  newInst(Mnemonic_MOV, ecx, eax);
-    /* mov eax, a_hi*/  newInst(Mnemonic_MOV, eax, a_hi);
-    /* mul b_lo     */  newInst(Mnemonic_MUL, 2, edx, eax, eax, b_lo);
-    /* add ecx, eax */  newInst(Mnemonic_ADD, 1, ecx, ecx, eax);
-
-    /* mov eax, a_lo */ newInst(Mnemonic_MOV, eax, a_lo);
-    /* mul b_lo      */ newInst(Mnemonic_MUL, 2, edx, eax, eax, b_lo);
-    /* add edx, ecx */  newInst(Mnemonic_ADD, 1, edx, edx, ecx);
-    connectNodes(longMulNode, storeResultNode);
-    setCurrentNode(NULL);
-    longMulNode = (Node*)0xDEADBEEF;
-    
-    //
-    // storeResultNode:
-    //
-    setCurrentNode(storeResultNode);
-    /* mov res_lo, eax*/    newInst(Mnemonic_MOV, res_lo, eax);
-    /* mov res_hi, edx*/    newInst(Mnemonic_MOV, res_hi, edx);
-    setCurrentNode(NULL);
-    connectNodes(storeResultNode, getSubCfgReturnNode());
-
-    propagateSubCFG(inst);
 }
 
 void I8Lowerer::lowerDiv64(Inst* inst)
