@@ -1652,14 +1652,6 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
         }
     }
 
-    /*
-     *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
-     *  that needs it
-     */
-    m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
-    m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
-    m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, vmboot);
-
     // create temp pool for apr functions
     apr_pool_t *tmp_pool;
     apr_pool_create(&tmp_pool, NULL);
@@ -1669,6 +1661,46 @@ bool BootstrapClassLoader::Initialize(ManagedObject* UNREF loader)
     SetClasspathFromString(vmboot, tmp_pool);
     STD_FREE(vmboot);
 
+    // get a classpath from archive files manifests and
+    // set into boot class path collection
+    for( BCPElement* element = m_BCPElements.m_first;
+         element;
+         element = element->m_next )
+    {
+        TRACE2("classloader.bootclasspath", "BCP: " << element->m_path->bytes );
+        if( element->m_isJarFile ) {
+            SetClasspathFromJarFile( element->m_jar, tmp_pool );
+        }
+    }
+
+    // Here we have constructed boot class path without appended application class path
+    size_t vmboot_len = 0;
+    // Count new path length
+    for(BCPElement* element = m_BCPElements.m_first;
+        element;
+        element = element->m_next)
+    {
+        vmboot_len += element->m_path->len + 1; // 1 is for either PATH_SEPARATOR or \0
+    }
+    vmboot = (char*)STD_MALLOC(vmboot_len);
+    vmboot[0] = '\0';
+    for(BCPElement* element = m_BCPElements.m_first;
+        element;
+        element = element->m_next)
+    {
+        if(element != m_BCPElements.m_first) {
+            strcat(vmboot, PORT_PATH_SEPARATOR_STR);
+        }
+        strcat(vmboot, element->m_path->bytes);
+    }
+    /*
+     *  set VM_BOOT_CLASS_PATH and SUN_BOOT_CLASS_PATH for any code 
+     *  that needs it
+     */
+    m_env->VmProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
+    m_env->JavaProperties()->set(VM_BOOT_CLASS_PATH, vmboot);
+    m_env->JavaProperties()->set(SUN_BOOT_CLASS_PATH, vmboot);
+    
     // check if vm.bootclasspath.appendclasspath property is set to true
     if( TRUE == vm_property_get_boolean("vm.bootclasspath.appendclasspath", FALSE, VM_PROPERTIES) ) {
         // append classpath to bootclasspath
