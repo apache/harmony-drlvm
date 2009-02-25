@@ -780,7 +780,7 @@ void DynamicABCE::fillTemplate(ArrayAccessTemplate* arrayAccess, Inst* checkInst
             arrayAccess->index == inst->getSrc(1) && arrayAccess->array == NULL) {
             assert(ldBaseInst == NULL);
             ldBaseInst = inst->getSrc(0)->asSsaOpnd()->getInst();
-            assert(ldBaseInst->getOpcode() == Op_LdArrayBaseAddr);
+            assert((ldBaseInst->getOpcode() == Op_LdArrayBaseAddr)||(ldBaseInst->getOpcode() == Op_LdVar));
             arrayAccess->array = ldBaseInst->getSrc(0)->asSsaOpnd();
             break;
         }
