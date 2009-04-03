@@ -219,7 +219,7 @@ PORT_INLINE uint64 port_atomic_cas64(volatile uint64 * data , uint64 value, uint
         "pop %%ebx"
         : /* no outputs (why not comp?)*/
         :"m"(comp), "m"(value), "m"(data) /* inputs */
-        :"%eax", "%ecx", "%edx", "%esi" /* clobbers */
+        :"%eax", "%ecx", "%edx", "%esi", "memory" /* clobbers */
     );
     return comp;
 #elif defined(_EM64T_) // defined(_IA32_)
