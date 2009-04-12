@@ -120,15 +120,15 @@ void InsertPi::insertPiToNode(Node* block)
     //  (2) this block dominates all other predecessors
     //  (3) idom has multiple out-edges
     //  (4) idom has only 1 edge to this node
-    
+
     // (1a) if a predecessor dominates it must be idom
     Node *idom = _domTree.getIdom(block);
-    
+
     // (3) must exist and have multiple out-edges
     if ((idom == NULL) || (idom->hasOnlyOneSuccEdge())) {
         return;
     }
-    
+
     if (Log::isEnabled()) {
         Log::out() << "Checking block " << (int)block->getId() << " with idom "
                    << (int) idom->getId() << std::endl;
@@ -184,7 +184,7 @@ void InsertPi::insertPiToNode(Node* block)
                     }
                 }
                 break;
-                
+
             case Edge::Kind_Dispatch: 
                 return;
 
@@ -198,11 +198,10 @@ void InsertPi::insertPiToNode(Node* block)
                     insertPiForUnexceptionalPEI(block, lasti);
                 }
                 // We could look for a bounds check in predecessor.
-                
+
                 // But: since now all useful PEIs have explicit results,
                 // they imply a Pi-like action.
                 break;
-                
             case Edge::Kind_Catch:
                 break;
             default:
@@ -403,7 +402,7 @@ void InsertPi::insertPiForBranch(Node* block,
                                        true,
                                        // negate for false edge
                                        (kind == Edge::Kind_False));
-        }                                       
+        }
     }
 }
 //------------------------------------------------------------------------------
@@ -424,8 +423,19 @@ void InsertPi::insertPiForComparison(Node* block,
         op->print(Log::out());
         Log::out() << ", ";
         Log::out() << (swap_operands ? "true" : "false");
+        Log::out() << ", ";
         Log::out() << (negate_comparison ? "true" : "false");
-        Log::out() << std::endl;
+        Log::out() << ")" << std::endl;
+
+        // Print last inst from all prev blocks.
+        Edges::const_iterator it = block->getInEdges().begin(),
+            end = block->getInEdges().end();
+        for(; it != end; ++it) {
+            Edge* edge = (*it);
+            Log::out() << "pred inst---> ";
+            ((Inst*)edge->getSourceNode()->getLastInst())->print(Log::out());
+            Log::out() << std::endl;
+        }
     }
 
     PiCondition bounds0 = bounds;
@@ -757,7 +767,7 @@ bool InsertPi::getAliases(Opnd *opnd, AbcdAliases *aliases, int64 addend)
                 }
                 // now constOpnd0 should be constant
                 // op1 is the non-constant operand
-                
+
                 Inst *inst0 = constOpnd0->getInst();
                 assert(inst0);
                 ConstInst *cinst0 = inst0->asConstInst();
@@ -830,7 +840,7 @@ void InsertPi::insertPiForOpndAndAliases(Node *block,
             Log::out() << " under condition ";
             cond.print(Log::out());
             Log::out() << std::endl;
-        }            
+        }
         AbcdAliases aliases(_mm);
         // check for aliases
         insertPiForOpnd(block, org, cond, tauOpnd);
@@ -921,141 +931,168 @@ void InsertPi::renamePiVariablesInNode(Node *block)
     // the piTable.  Since we are visiting in preorder over dominator
     // tree dominator order, any found version will dominate this node.
 
-    // we defer adding any new mappings for the Pi instructions here until
-    // we are past the Pi instructions
-    
-    // first process any pi nodes, just the RHSs
+    // Phase 0: remap just Pi inst source operands.
     Inst* headInst = (Inst*)block->getFirstInst();
-    for (int phase=0; phase < 2; ++phase) {
-        // phase 0: remap just Pi node source operands
-        // phase 1: add Pi remappings, remap source operands of other instructions
-    
-        for (Inst* inst = headInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
-            
-            if (inst->getOpcode() == Op_TauPi) {
-                if (phase == 1) {
-                    // add any Pi node destination to the map.
-                    
-                    Opnd *dstOpnd = inst->getDst();
-                    assert(dstOpnd->isPiOpnd());
-                    Opnd *orgOpnd = dstOpnd->asPiOpnd()->getOrg();
-                    if (_useAliases) {
-                        if (orgOpnd->isSsaVarOpnd()) {
-                            orgOpnd = orgOpnd->asSsaVarOpnd()->getVar();
-                        }
-                    }
-                    _piMap->insert(orgOpnd, dstOpnd);
-                    if (Log::isEnabled()) {
-                        Log::out() << "adding remap for Pi of ";
-                        orgOpnd->print(Log::out());
-                        Log::out() << " to ";
-                        inst->getDst()->print(Log::out());
-                        Log::out() << std::endl;
-                    }
-                    
-                    continue; // don't remap Pi sources;
-                }
-            } else {
-                if (phase == 0) {
-                    // no more Pi instructions, we're done with phase 0.
-                    break; 
+    for (Inst* inst = headInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
+        if (inst->getOpcode() == Op_TauPi) {
+            // Replace Pi source operands with renames from the map.
+            Opnd *dstOpnd = inst->getDst();
+            assert(dstOpnd->isPiOpnd());
+            Opnd *srcOpnd = inst->getSrc(0);
+            if (_useAliases) {
+                if (srcOpnd->isSsaVarOpnd()) {
+                    srcOpnd = srcOpnd->asSsaVarOpnd()->getVar();
                 }
             }
-            
-            // now process source operands
-            U_32 numOpnds = inst->getNumSrcOperands();
-            for (U_32 i=0; i<numOpnds; i++) {
-                Opnd *opnd = inst->getSrc(i);
-                if (opnd->isPiOpnd())
-                    opnd = opnd->asPiOpnd()->getOrg();
-                Opnd *foundOpnd = _piMap->lookup(opnd);
-                if (foundOpnd) {
-                    inst->setSrc(i,foundOpnd);
+            // Find the end of the operand replace chain.
+            // The most constrained operand is being used, the more
+            // opportunities we have for optimization.
+            Opnd *replaceOpnd = _piMap->lookupTillEnd(srcOpnd);
+            if (replaceOpnd) {
+                // Disallow remapping source operand of Pi Nodes to their
+                // destination operands.
+                if (Log::isEnabled()) {
+                    Log::out() << "remapping src in Pi: ";
+                    inst->print(Log::out());
+                    Log::out() << ", replaceOpnd: ";
+                    replaceOpnd->print(Log::out());
+                }
+                if (dstOpnd->getId() != replaceOpnd->getId()) {
+                    inst->setSrc(0, replaceOpnd);
+                    srcOpnd = replaceOpnd;
+                    if (Log::isEnabled()) {
+                        Log::out() << "... done" << std::endl;
+                    }
+                } else {
+                    if (Log::isEnabled()) {
+                        Log::out() << "... defines this opnd, cannot remap" << std::endl;
+                    }
                 }
             }
 
-            if (inst->getOpcode() == Op_TauPi) {
-                // for a Pi, remap variables appearing in the condition as well
+            // We now replaced the source. Add any Pi node destination to the map.
+            _piMap->insert(srcOpnd, dstOpnd);
+            if (Log::isEnabled()) {
+                Log::out() << "adding remap for Pi of ";
+                srcOpnd->print(Log::out());
+                Log::out() << " to ";
+                inst->getDst()->print(Log::out());
+                Log::out() << std::endl;
+            }
+        }
+    }
+
+    // Phase 1: add Pi remappings, remap source operands of other instructions
+    // and pi conditions.
+    for (Inst* inst = headInst->getNextInst(); inst != NULL; inst = inst->getNextInst()) {
+
+        // Remap source operands if they match a Pi definition.
+        U_32 numOpnds = inst->getNumSrcOperands();
+        for (U_32 i=0; i<numOpnds; i++) {
+            Opnd *opnd = inst->getSrc(i);
+            while (opnd->isPiOpnd()) {
+                opnd = opnd->asPiOpnd()->getOrg();
+            }
+            // Transitively look up for deepest Pi renamings of this operand.
+            // The most constrained operand is being used, the more
+            // opportunities we have for optimization.
+            Opnd *foundOpnd = _piMap->lookupTillEnd(opnd);
+            if (foundOpnd) {
+                // Remap the source operand except for Pi instruction and for
+                // array argument for chkbounds instruction. The latter is
+                // because (a) we do not need any facts provided by pi renaming
+                // for this operand, (b) we should limit array operand renaming
+                // to be able to search the proof path by exact array operand
+                // id.
+                if (inst->getOpcode() != Op_TauPi &&
+                    (inst->getOpcode() != Op_TauCheckBounds || i != 0)) {
+                    inst->setSrc(i, foundOpnd);
+                }
+            }
+        }
+
+        // Remap variables appearing in the condition of the Pi node.
+        if (inst->getOpcode() == Op_TauPi) {
+            TauPiInst *thePiInst = inst->asTauPiInst();
+            assert(thePiInst);
+
+            if (Log::isEnabled()) {
+                Log::out() << "remapping condition in ";
+                inst->print(Log::out());
+                Log::out() << std::endl;
+            }
+            PiCondition *cond = thePiInst->cond;
+            if (Log::isEnabled()) {
+                Log::out() << "  original condition is ";
+                cond->print(Log::out());
+                Log::out() << std::endl;
+            }
+            Opnd *lbRemap = cond->getLb().getVar().the_var;
+            if (lbRemap) {
                 if (Log::isEnabled()) {
-                    Log::out() << "remapping condition in ";
-                    inst->print(Log::out());
+                    Log::out() << "  has lbRemap=";
+                    lbRemap->print(Log::out());
                     Log::out() << std::endl;
                 }
-                TauPiInst *thePiInst = inst->asTauPiInst();
-                assert(thePiInst);
-                PiCondition *cond = thePiInst->cond;
-                if (Log::isEnabled()) {
-                    Log::out() << "  original condition is ";
-                    cond->print(Log::out());
-                    Log::out() << std::endl;
-                }
-                Opnd *lbRemap = cond->getLb().getVar().the_var;
-                if (lbRemap) {
+                if (lbRemap->isPiOpnd())
+                    lbRemap = lbRemap->asPiOpnd()->getOrg();
+                Opnd *lbRemapTo = _piMap->lookupTillEnd(lbRemap);
+                if (lbRemapTo) {
                     if (Log::isEnabled()) {
-                        Log::out() << "  has lbRemap=";
+                        Log::out() << "adding remap of lbRemap=";
                         lbRemap->print(Log::out());
-                        Log::out() << std::endl;
+                        Log::out() << " to lbRemapTo=";
+                        lbRemapTo->print(Log::out());
+                        Log::out() << " to condition ";
+                        cond->print(Log::out());
                     }
-                    if (lbRemap->isPiOpnd())
-                        lbRemap = lbRemap->asPiOpnd()->getOrg();
-                    Opnd *lbRemapTo = _piMap->lookup(lbRemap);
-                    if (lbRemapTo) {
-                        if (Log::isEnabled()) {
-                            Log::out() << "adding remap of lbRemap=";
-                            lbRemap->print(Log::out());
-                            Log::out() << " to lbRemapTo=";
-                            lbRemapTo->print(Log::out());
-                            Log::out() << " to condition ";
-                            cond->print(Log::out());
-                        }
-                        PiCondition remapped(*cond, lbRemap, lbRemapTo);
-                        if (Log::isEnabled()) {
-                            Log::out() << " YIELDS1 ";
-                            remapped.print(Log::out());
-                        }
-                        *cond = remapped;
-                        if (Log::isEnabled()) {
-                            Log::out() << " YIELDS ";
-                            cond->print(Log::out());
-                            Log::out() << std::endl;
-                        }
+                    PiCondition remapped(*cond, lbRemap, lbRemapTo);
+                    if (Log::isEnabled()) {
+                        Log::out() << " YIELDS1 ";
+                        remapped.print(Log::out());
+                    }
+                    *cond = remapped;
+                    if (Log::isEnabled()) {
+                        Log::out() << " YIELDS ";
+                        cond->print(Log::out());
+                        Log::out() << std::endl;
                     }
                 }
-                Opnd *ubRemap = cond->getUb().getVar().the_var;
-                if (ubRemap && (lbRemap != ubRemap)) {
+            }
+            Opnd *ubRemap = cond->getUb().getVar().the_var;
+            if (ubRemap && (lbRemap != ubRemap)) {
+                if (Log::isEnabled()) {
+                    Log::out() << "  has ubRemap=";
+                    ubRemap->print(Log::out());
+                    Log::out() << std::endl;
+                }
+                if (ubRemap->isPiOpnd())
+                    ubRemap = ubRemap->asPiOpnd()->getOrg();
+                Opnd *ubRemapTo = _piMap->lookupTillEnd(ubRemap);
+                if (ubRemapTo) {
                     if (Log::isEnabled()) {
-                        Log::out() << "  has ubRemap=";
+                        Log::out() << "adding remap of ubRemap=";
                         ubRemap->print(Log::out());
-                        Log::out() << std::endl;
+                        Log::out() << " to ubRemapTo=";
+                        ubRemapTo->print(Log::out());
+                        Log::out() << " to condition ";
+                        cond->print(Log::out());
                     }
-                    if (ubRemap->isPiOpnd())
-                        ubRemap = ubRemap->asPiOpnd()->getOrg();
-                    Opnd *ubRemapTo = _piMap->lookup(ubRemap);
-                    if (ubRemapTo) {
-                        if (Log::isEnabled()) {
-                            Log::out() << "adding remap of ubRemap=";
-                            ubRemap->print(Log::out());
-                            Log::out() << " to ubRemapTo=";
-                            ubRemapTo->print(Log::out());
-                            Log::out() << " to condition ";
-                            cond->print(Log::out());
-                        }
-                        PiCondition remapped(*cond, ubRemap, ubRemapTo);
-                        if (Log::isEnabled()) {
-                            Log::out() << " YIELDS1 ";
-                            remapped.print(Log::out());
-                        }
-                        *cond = remapped;
-                        if (Log::isEnabled()) {
-                            Log::out() << " YIELDS ";
-                            cond->print(Log::out());
-                            Log::out() << std::endl;
-                        }
+                    PiCondition remapped(*cond, ubRemap, ubRemapTo);
+                    if (Log::isEnabled()) {
+                        Log::out() << " YIELDS1 ";
+                        remapped.print(Log::out());
+                    }
+                    *cond = remapped;
+                    if (Log::isEnabled()) {
+                        Log::out() << " YIELDS ";
+                        cond->print(Log::out());
+                        Log::out() << std::endl;
                     }
                 }
             }
         }
-    }        
+    }
 }
 //------------------------------------------------------------------------------
 

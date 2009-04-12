@@ -242,7 +242,7 @@ void InequalityGraph::printEdge(std::ostream& os, IneqEdge* e, PrnEdgeType t) co
     os << "];" << std::endl;
 }
 
-void InequalityGraph::printListWithSetExcluded (std::ostream& os, 
+void InequalityGraph::printListWithSetExcluded (std::ostream& os,
     EdgeSet* edge_set, EdgeList* elist, PrnEdgeType ptype) const
 {
     EdgeList::iterator it = elist->begin(),
@@ -257,12 +257,12 @@ void InequalityGraph::printListWithSetExcluded (std::ostream& os,
 
 void InequalityGraph::printDotBody(std::ostream& os) const
 {
-    IdToOpndMap::const_iterator it = _id_to_opnd_map.begin(), 
+    IdToOpndMap::const_iterator it = _id_to_opnd_map.begin(),
         last = _id_to_opnd_map.end();
     for (; it != last; it++ ) {
         IOpnd* opnd = it->second;
         os << "\""; opnd->printName(os); os << "\"";
-        os << " [label=\"{"; 
+        os << " [label=\"{";
         opnd->printFullName(os);
         os << "}\"];" << std::endl;
     }
@@ -317,13 +317,13 @@ Bound* BoundAllocator::newBound(I_32 val, const BoundState& bs)
 
 Bound* BoundAllocator::create_inc1(Bound* bound)
 {
-    return newBound(bound->isUpper() ? bound->_bound + 1 : bound->_bound - 1, 
+    return newBound(bound->isUpper() ? bound->_bound + 1 : bound->_bound - 1,
                     bound->getBoundState());
 }
 
 Bound* BoundAllocator::create_dec1(Bound* bound)
 {
-    return newBound(bound->isUpper() ? bound->_bound - 1 :  bound->_bound + 1, 
+    return newBound(bound->isUpper() ? bound->_bound - 1 :  bound->_bound + 1,
                     bound->getBoundState());
 }
 
@@ -334,19 +334,19 @@ Bound* BoundAllocator::create_dec_const(Bound* bound, I_32 cnst)
 
 //------------------------------------------------------------------------------
 
-void Bound::printFullName(std::ostream& os) 
-{ 
+void Bound::printFullName(std::ostream& os)
+{
     os << "Bound(";
     if ( isUpper() ) {
         os << "upper";
     }else{
         os << "lower";
     }
-    os << ", " << _bound << ")"; 
+    os << ", " << _bound << ")";
 }
 
-bool Bound::leq(Bound* bound1, Bound* bound2) 
-{ 
+bool Bound::leq(Bound* bound1, Bound* bound2)
+{
     assert(bound1 && bound2);
     assert(bound1->isUpper() == bound2->isUpper());
     return Bound::int32_leq(bound1->_bound, bound2);
@@ -355,22 +355,22 @@ bool Bound::leq(Bound* bound1, Bound* bound2)
 bool Bound::eq(Bound* bound1, Bound* bound2)
 {
     assert(!bound1 || !bound2 || bound1->isUpper() == bound2->isUpper());
-    return bound1 && bound2 && 
+    return bound1 && bound2 &&
         Bound::leq(bound1, bound2) && Bound::leq(bound2, bound1);
 }
 
-bool Bound::leq_int32(Bound* bound1, I_32 value) 
-{ 
+bool Bound::leq_int32(Bound* bound1, I_32 value)
+{
     assert(bound1);
-    return bound1->isUpper() ? 
-        bound1->_bound <= value : 
+    return bound1->isUpper() ?
+        bound1->_bound <= value :
         bound1->_bound >= value;
 }
 
-bool Bound::int32_leq(I_32 value, Bound* bound1) 
-{ 
+bool Bound::int32_leq(I_32 value, Bound* bound1)
+{
     assert(bound1);
-    return bound1->isUpper() ? 
+    return bound1->isUpper() ?
         value <= bound1->_bound :
         value >= bound1->_bound;
 }
@@ -466,7 +466,7 @@ void TrueReducedFalseChart::addTrue(Bound* t_bound)
 
     clearRedundantReduced();
     assert(!_min_reduced || Bound::leq(_min_reduced, _min_true));
-    assert(!_max_false || !_min_reduced || 
+    assert(!_max_false || !_min_reduced ||
            Bound::leq(_max_false, _min_reduced));
 }
 
@@ -611,9 +611,9 @@ void MemoizedDistances::print(std::ostream& os) const
 //------------------------------------------------------------------------------
 
 Bound* ActiveOpnds::getBound(IOpnd* opnd) const
-{ 
-    assert(hasOpnd(opnd)); 
-    
+{
+    assert(hasOpnd(opnd));
+
     return _map.find(opnd)->second;
 }
 
@@ -645,7 +645,7 @@ bool ClassicAbcdSolver::demandProve
     if (Log::isEnabled() ) {
         Log::out() << "demandProve(";
         _source_opnd->printFullName(Log::out());
-        Log::out() << ", "; 
+        Log::out() << ", ";
         dest->printFullName(Log::out());
         Log::out() << ", ";
         bound.printFullName(Log::out());
@@ -664,9 +664,9 @@ bool ClassicAbcdSolver::demandProve
     return true;
 }
 
-void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest, 
-                                                           Bound* bound, 
-                                                           U_32 prn_level, 
+void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
+                                                           Bound* bound,
+                                                           U_32 prn_level,
                                                       meet_func_t meet_f)
 {
     InequalityGraph::edge_iterator in_it = _igraph.inEdgesBegin(dest);
@@ -676,8 +676,8 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
     assert(in_edge->getDst() == dest);
     ProveResult res;
     assert(!_mem_distance.hasLeqBoundResult(dest, bound));
-    res = prove(in_edge->getSrc(), 
-                _bound_alloc.create_dec_const(bound, 
+    res = prove(in_edge->getSrc(),
+                _bound_alloc.create_dec_const(bound,
                                               in_edge->getLength()),
                 prn_level + 1);
     in_it.next();
@@ -685,7 +685,7 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
         if(((res >= Reduced)  && (meet_f == meetBest)) ||
            ((res == False) && (meet_f == meetWorst))) {
             // For any x, meetBest(True, x)    == True
-            //            meetBest(Reduced, x) >= Reduced  
+            //            meetBest(Reduced, x) >= Reduced
             //        and meetWorst(False, x)  == False
             if (Log::isEnabled() ) {
                 Printer prn(prn_level, Log::out());
@@ -698,9 +698,9 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
         in_edge = in_it.get();
         assert(in_edge->getDst() == dest);
         IOpnd* pred = in_edge->getSrc();
-        res = meet_f(res, 
-                     prove(pred, 
-                           _bound_alloc.create_dec_const(bound, 
+        res = meet_f(res,
+                     prove(pred,
+                           _bound_alloc.create_dec_const(bound,
                                                          in_edge->getLength()),
                            prn_level + 1));
     }
@@ -710,40 +710,40 @@ void ClassicAbcdSolver::updateMemDistanceWithPredecessors (IOpnd* dest,
 //
 // prove that distance between '_source_opnd' and 'dest' is <= bound
 //
-ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound, 
+ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound,
         U_32 prn_level)
 {
     Printer prn(prn_level, Log::out());
     if ( Log::isEnabled() ) {
-        prn.prnStr("prove("); 
+        prn.prnStr("prove(");
         dest->printFullName(Log::out());
-        Log::out() << ", "; 
+        Log::out() << ", ";
         bound->printFullName(Log::out()); Log::out() << ")" << std::endl;
     }
 
-    // if ( C[dest - _source_opnd <= e] == True    for some e<=bound ) 
+    // if ( C[dest - _source_opnd <= e] == True    for some e<=bound )
     //     return True
     if ( _mem_distance.minTrueDistanceLeqBound(dest, bound) ) {
         prn.prnStrLn("case 3: => True");
         return True;
     }
 
-    // if ( C[dest - _source_opnd <= e] == False   for some e>=bound ) 
+    // if ( C[dest - _source_opnd <= e] == False   for some e>=bound )
     //     return False
     if ( _mem_distance.maxFalseDistanceGeqBound(dest, bound) ) {
         prn.prnStrLn("case 4: => False");
         return False;
     }
 
-    // if ( C[dest - _source_opnd <= e] == Reduced for some e<=bound ) 
+    // if ( C[dest - _source_opnd <= e] == Reduced for some e<=bound )
     //     return Reduced
     if ( _mem_distance.minReducedDistanceLeqBound(dest, bound) ) {
         prn.prnStrLn("case 5: => Reduced");
         return Reduced;
     }
-    
+
     // traversal reached the _source_opnd vertex
-    if ( (dest->getID() == _source_opnd->getID()) && 
+    if ( dest->getID() == _source_opnd->getID() &&
           Bound::int32_leq(0, bound) ) {
         prn.prnStrLn("reached source vertex => True");
         return True;
@@ -751,8 +751,8 @@ ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound,
 
     // all constant operands are implicitly connected
     if ( dest->isConstant() && _source_opnd->isConstant() ) {
-        if ( Bound::const_distance_leq(_source_opnd->getConstant(), 
-                                       dest->getConstant(), 
+        if ( Bound::const_distance_leq(_source_opnd->getConstant(),
+                                       dest->getConstant(),
                                        bound) ) {
             prn.prnStrLn("reached source vertex (const) => True");
             return True;
@@ -761,7 +761,7 @@ ProveResult ClassicAbcdSolver::prove(IOpnd* dest, Bound* bound,
             return False;
         }
     }
-    
+
     // if dest has no predecessor then fail
     InequalityGraph::edge_iterator in_it = _igraph.inEdgesBegin(dest);
     InequalityGraph::edge_iterator in_end = _igraph.inEdgesEnd(dest);
@@ -843,7 +843,7 @@ void ClassicAbcdSolver::Printer::prnStrLn(const char* str)
  *     i2 = i3 + 1;
  *     goto for
  * }
- * 
+ *
  * 0 -(0)-> i0 -(0)-> i1(phi)
  * i1(phi) -(0)-> i3 -(1)-> i2 -(0)-> i1(phi)
  * A.length -(-1)-> i3
@@ -922,7 +922,7 @@ void testSimpleIGraph()
  *     goto for1
  * }
  * 0 -(0)-> i0 -(0)-> i1(phi) -(0)-> i2 -(1)-> i3 -(0)-> i1 (phi)
- * A.length -(-1)-> i2 
+ * A.length -(-1)-> i2
  * 0 -(0)-> j0 -(0)-> j1(phi) -(0)-> j2 -(1)-> j3 -(0)-> j1 (phi)
  * i2 -(-1)-> j2
  *
@@ -935,7 +935,7 @@ void testDoubleCycleGraph()
     InequalityGraph g(mm);
     ClassicAbcdSolver solver(g, mm);
 
-    IOpnd i0(0), i1(1, true /*phi*/), i2(2), i3(3), 
+    IOpnd i0(0), i1(1, true /*phi*/), i2(2), i3(3),
           j0(10), j1(11, true /*phi*/), j2(12), j3(13), length(20);
     assert(g.isEmpty());
     g.addOpnd(&i0);
@@ -1034,14 +1034,14 @@ void testPaperIGraph()
     IOpnd length(55); // A.length
 
     IOpnd limit0(00), st0(10), limit1(01, true /*phi*/), st1(11, true /*phi*/),
-          st2(12), limit2(02), st3(13), limit3(03), j0(20), 
+          st2(12), limit2(02), st3(13), limit3(03), j0(20),
           j1(21, true /*phi*/), j2(22), limit4(04), j3(23), t0(30), t1(31),
           j4(24);
- 
-    g.addOpnd(&limit0); g.addOpnd(&limit1); g.addOpnd(&limit2); 
+
+    g.addOpnd(&limit0); g.addOpnd(&limit1); g.addOpnd(&limit2);
         g.addOpnd(&limit3); g.addOpnd(&limit4);
     g.addOpnd(&st0); g.addOpnd(&st1); g.addOpnd(&st2); g.addOpnd(&st3);
-    g.addOpnd(&j0); g.addOpnd(&j1); g.addOpnd(&j2); g.addOpnd(&j3); 
+    g.addOpnd(&j0); g.addOpnd(&j1); g.addOpnd(&j2); g.addOpnd(&j3);
         g.addOpnd(&j4);
     g.addOpnd(&t0); g.addOpnd(&t1);
 
@@ -1129,7 +1129,7 @@ void testMemoizedDistances()
  *     i3 = i2 + 1;
  *     goto for
  * }
- * 
+ *
  * INT_MAX -(0)-> i0 -(0)-> i1(phi)
  * i1(phi) -(0)-> i2 -(1)-> i3 -(0)-> i1(phi)
  * A.length -(-1)-> i2
@@ -1148,11 +1148,11 @@ void testOverflow()
     ClassicAbcdSolver solver(g, mm);
 
     assert(g.isEmpty());
-    IOpnd i0(00), i1(01, true /*phi */), i2(02), i3(03), 
-          intmax(20, false /* phi */, true /* constant */), 
-          zero(22, false /* phi */, true /* constant */), 
+    IOpnd i0(00), i1(01, true /*phi */), i2(02), i3(03),
+          intmax(20, false /* phi */, true /* constant */),
+          zero(22, false /* phi */, true /* constant */),
           length(21);
-    
+
     intmax.setConstant(INT_MAX);
     zero.setConstant(0);
     g.addOpnd(&zero);
@@ -1278,9 +1278,9 @@ void testBasicIGraphOperations()
     InequalityGraph g(mm);
 
     assert(g.isEmpty());
-    IOpnd i0(00), i1(01, true /*phi */), i2(02), i3(03), 
-          intmax(20, false /* phi */, true /* constant */), 
-          zero(22, false /* phi */, true /* constant */), 
+    IOpnd i0(00), i1(01, true /*phi */), i2(02), i3(03),
+          intmax(20, false /* phi */, true /* constant */),
+          zero(22, false /* phi */, true /* constant */),
           length(21);
 
     intmax.setConstant(INT_MAX);
@@ -1356,5 +1356,5 @@ int classic_abcd_test_main()
     return 0;
 }
 
-} //namespace Jitrino 
+} //namespace Jitrino
 

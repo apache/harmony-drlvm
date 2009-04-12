@@ -30,7 +30,7 @@ namespace Jitrino {
 class IOpnd {
 public:
     IOpnd(U_32 id, bool is_phi = false, bool is_constant = false) :
-        _id(id), _phi(is_phi), _const(is_constant), 
+        _id(id), _phi(is_phi), _const(is_constant),
         _unconstrained(false), _value(0)
     {}
 
@@ -455,19 +455,19 @@ private:
 
 class MemoizedDistances {
 public:
-    MemoizedDistances(BoundAllocator& alloc) : 
+    MemoizedDistances(BoundAllocator& alloc) :
         _bound_alloc(alloc),
-        _map(_bound_alloc.getMemoryManager()) 
+        _map(_bound_alloc.getMemoryManager())
     {}
 
     void makeEmpty();
 
-    // set [dest - source <= bound] 
+    // set [dest - source <= bound]
     void updateLeqBound(IOpnd* dest, Bound* bound, ProveResult res);
 
     bool hasLeqBoundResult(IOpnd* dest, Bound* bound) const;
 
-    // returns [dest - source <= bound] 
+    // returns [dest - source <= bound]
     //      that is True, Reduced or False
     ProveResult getLeqBoundResult(IOpnd* dest, Bound* bound) const;
 
@@ -510,9 +510,9 @@ private:
 
 class ClassicAbcdSolver {
 public:
-    ClassicAbcdSolver(InequalityGraph& i, MemoryManager& solver_mem_mgr) : 
-        _igraph(i), 
-        _source_opnd(NULL), 
+    ClassicAbcdSolver(InequalityGraph& i, MemoryManager& solver_mem_mgr) :
+        _igraph(i),
+        _source_opnd(NULL),
         _bound_alloc(solver_mem_mgr),
         _mem_distance(_bound_alloc),
         _active(solver_mem_mgr)
@@ -539,7 +539,7 @@ private:
 
     private:
         U_32 _level;
-        std::ostream& _os; 
+        std::ostream& _os;
     };
 
     InequalityGraph& _igraph;
@@ -551,6 +551,6 @@ private:
 
 int classic_abcd_test_main();
 
-} //namespace Jitrino 
+} //namespace Jitrino
 
 #endif /* _CLASSIC_ABCD_SOLVER_H */

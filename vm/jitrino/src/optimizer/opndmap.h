@@ -109,6 +109,17 @@ public:
                   U_32 init_factor, U_32 resize_factor, U_32 resize_to) :
         SparseScopedMap<Opnd *, Opnd *>(n, mm, init_factor, resize_factor,
                                         resize_to) {};
+    Opnd *lookupTillEnd(Opnd *o) {
+        Opnd *found = lookup(o);
+        if (NULL == found) {
+            return NULL;
+        }
+        Opnd *foundMore;
+        while (NULL != (foundMore = lookup(found))) {
+            found = foundMore;
+        }
+        return found;
+    }
 };
 
 

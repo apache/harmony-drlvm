@@ -64,7 +64,7 @@ public:
         }
     }
 
-    Opnd* getOrg() const { assert(_opnd); return _opnd; }
+    Opnd* getOrg() const { return _opnd; }
 
     static U_32 getProxyIdByOpnd(Opnd* opnd);
 private:
@@ -150,7 +150,7 @@ U_32 IOpndProxy::getProxyIdByOpnd(Opnd* opnd)
 
 class BuildInequalityGraphWalker {
 public:
-    BuildInequalityGraphWalker(InequalityGraph* igraph, bool isLower) :
+    BuildInequalityGraphWalker(InequalityGraph* igraph) :
         _igraph(igraph), _const_id_counter(1 /*reserve 0 for solver*/),
         _map_opnd_to_pi_inst(igraph->getMemoryManager())
     {}
@@ -325,14 +325,14 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
             Opnd* src1 = inst->getSrc(1);
             addEdgeIfConstOpnd(proxy_dst, src0, src1, false /* negate */) 
             || addEdgeIfConstOpnd(proxy_dst, src1, src0, false /* negate */);
-        } 
+        }
             break;
         case Op_Sub:
         {
             proxy_dst = addOldOrCreateOpnd(inst->getDst());
             addEdgeIfConstOpnd(proxy_dst, inst->getSrc(1), inst->getSrc(0),
                                true /* negate */ );
-        } 
+        }
             break;
         case Op_TauPi:
         {
@@ -350,10 +350,17 @@ void BuildInequalityGraphWalker::applyToInst(Inst* inst)
         }
             break;
         case Op_TauArrayLen:
-        case Op_LdConstant:
+        case Op_LdConstant: case Op_LdStatic: case Op_TauLdInd:
+        case Op_TauLdField: case Op_TauLdElem:
+        case Op_DirectCall: case Op_TauVirtualCall: case Op_IndirectCall:
+        case Op_IndirectMemoryCall: case Op_JitHelperCall: case Op_VMHelperCall:
+        case Op_DefArg:
+            // All these load instructions may potentially produce an operand
+            // that would be a parameter to a newarray, hence we need it to be
+            // reachable with inequality edges. Need to keep it constrained.
             addOldOrCreateOpnd(inst->getDst());
             break;
-        case Op_TauStInd: case Op_TauStElem: case Op_TauStField: 
+        case Op_TauStInd: case Op_TauStElem: case Op_TauStField:
         case Op_TauStRef: case Op_TauStStatic:
             break;
         default:
@@ -412,6 +419,12 @@ bool BuildInequalityGraphWalker::addDistance
         }
         _igraph->addEdge(src->getID(), dst->getID(), (I_32)constant);
         return true;
+    } else {
+        if ( Log::isEnabled() ) {
+            Log::out() << "addDistance(): skipping edge, operand is unconstrained: ";
+            src->printName(Log::out());
+            Log::out() << std::endl;
+        }
     }
     return false;
 }
@@ -610,7 +623,7 @@ void ClassicAbcd::runPass()
     insertPi.insertPi();
     InequalityGraph igraph(ineq_mm);
     igraph.addOpnd(_zeroIOp);
-    BuildInequalityGraphWalker igraph_walker(&igraph, false /*lower*/);
+    BuildInequalityGraphWalker igraph_walker(&igraph);
     typedef ScopedDomNodeInst2DomWalker<true, BuildInequalityGraphWalker>
         IneqBuildDomWalker;
     IneqBuildDomWalker dom_walker(igraph_walker);
@@ -644,7 +657,7 @@ void ClassicAbcd::runPass()
             Opnd *tauOp = opndManager.createSsaTmpOpnd(typeManager.getTauType());
             Inst* tau_point = instFactory.makeTauPoint(tauOp);
             tau_point->insertBefore(redundant_inst);
-      
+
             if (Log::isEnabled()) {
                 Log::out() << "Inserted taupoint inst ";
                 tau_point->print(Log::out());
@@ -659,7 +672,7 @@ void ClassicAbcd::runPass()
             copy->insertBefore(redundant_inst);
             FlowGraph::eliminateCheck(cfg, redundant_inst->getNode(), redundant_inst, false);
             checks_eliminated++;
-            
+
             if (Log::isEnabled()) {
                 Log::out() << "Replaced bound check with inst ";
                 copy->print(Log::out());
