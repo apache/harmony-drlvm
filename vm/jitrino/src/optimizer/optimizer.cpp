@@ -43,7 +43,6 @@
 #include "inliner.h"
 #include "devirtualizer.h"
 
-#include "abcd/abcd.h"
 #include "dabce.h"
 
 #include "Jitrino.h"
@@ -176,9 +175,6 @@ void OptInitAction::readFlags()
     //classic_abcd
     optimizerFlags.dump_abcd_stats = getBoolArg("dump_abcd_stats", false);
 
-    optimizerFlags.abcdFlags = new (mm) AbcdFlags;
-    memset(optimizerFlags.abcdFlags, 0, sizeof(AbcdFlags));
-
     optimizerFlags.gcmFlags = new (mm) GcmFlags;
     memset(optimizerFlags.gcmFlags, 0, sizeof(GcmFlags));
     
@@ -194,7 +190,6 @@ void OptInitAction::readFlags()
     optimizerFlags.dabceFlags = new (mm) DynamicABCEFlags;
     memset(optimizerFlags.dabceFlags, 0, sizeof(DynamicABCEFlags));
 
-    Abcd::readFlags(this, optimizerFlags.abcdFlags);
     GlobalCodeMotion::readFlags(this, optimizerFlags.gcmFlags);
     MemoryOpt::readFlags(this, optimizerFlags.memOptFlags);
     SyncOpt::readFlags(this, optimizerFlags.syncOptFlags);
@@ -224,7 +219,6 @@ void showFlags(std::ostream& os) {
     os << "    dump_abcd_stats[={on|OFF}]  - dump (to bounds_checks.log) how many bounds checks "
                                          << "were eliminated per method" << std::endl;
 
-    Abcd::showFlags(os);
     GlobalCodeMotion::showFlags(os);
     MemoryOpt::showFlags(os);
     SyncOpt::showFlags(os);

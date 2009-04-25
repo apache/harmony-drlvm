@@ -29,7 +29,6 @@
 namespace Jitrino {
 
 struct MemoptFlags;
-struct AbcdFlags;
 struct GcmFlags;
 struct SyncOptFlags;
 struct LoopBuilderFlags;
@@ -113,7 +112,6 @@ struct OptimizerFlags {
     bool rept_aggressive;
 
 
-    AbcdFlags*              abcdFlags;
     GcmFlags*               gcmFlags;
     MemoptFlags*            memOptFlags;
     SyncOptFlags*           syncOptFlags;
