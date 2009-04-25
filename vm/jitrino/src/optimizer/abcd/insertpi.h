@@ -19,11 +19,11 @@
 #define _INSERTPI_H
 
 #include <iostream>
-#include "open/types.h"
-#include "Opcode.h"
-#include "FlowGraph.h"
-#include "abcd/AbcdFlags.h"
+
 #include "abcdbounds.h"
+#include "FlowGraph.h"
+#include "Opcode.h"
+#include "open/types.h"
 #include "opndmap.h"
 
 namespace Jitrino {

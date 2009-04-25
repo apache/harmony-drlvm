@@ -15,34 +15,24 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, Pavel A. Ozhdikhin
- * @version $Revision: 1.12.24.4 $
- *
- */
-
 #include <ostream>
-#include "abcd.h"
+
 #include "abcdbounds.h"
+#include "constantfolder.h"
 #include "opndmap.h"
 #include "simplifier.h"
-#include "constantfolder.h"
 
 namespace Jitrino {
 
-static int numbitsInType(Type::Tag typetag) {
-    if ((typetag == Type::Int64) || (typetag == Type::UInt64) ||
-        ((typetag == Type::IntPtr) && (sizeof(POINTER_SIZE_INT) == 8))) {
-        return 64;
-    } else {
-        return 32;
-    }
-};
+namespace {
+bool hasTypeBounds(Type::Tag srcTag, int64 &lb, int64 &ub);
+int numbitsInType(Type::Tag typetag);
+}  // namespace
 
 void AbcdReasons::print(::std::ostream &os) const
 {
     assert(facts.size() < 100);
-    StlSet<SsaTmpOpnd *>::const_iterator 
+    StlSet<SsaTmpOpnd *>::const_iterator
         iter = facts.begin(),
         end = facts.end();
     if (iter != end) {
@@ -96,12 +86,12 @@ PiBound PiBound::add(const PiBound &other, bool is_signed) const {
                 v1.i8 = var_multiple;
                 v2.i8 = other.var_multiple;
                 if (ConstantFolder::foldConstant(typetag, Op_Add, v1, v2, res, is_signed)){
-                    int64 mult = ((numbitsInType(typetag)==64) 
-                                  ? res.i8 
+                    int64 mult = ((numbitsInType(typetag)==64)
+                                  ? res.i8
                                   : ((int64)res.i4));
                     return PiBound(typetag, mult, var_part, c);
                 }
-            }            
+            }
         }
     }
     return getUnknown();
@@ -116,8 +106,8 @@ PiBound PiBound::neg () const {
         int64 c = (numbitsInType(typetag)==64) ? res.i8 : ((int64)res.i4);
         v1.i8 = var_multiple;
         if (ConstantFolder::foldConstant(typetag, Op_Neg, v1, res)) {
-            int64 mult = ((numbitsInType(typetag)==64) 
-                          ? res.i8 
+            int64 mult = ((numbitsInType(typetag)==64)
+                          ? res.i8
                           : ((int64)res.i4));
             return PiBound(typetag, mult, var_part, c);
         }
@@ -166,24 +156,24 @@ PiBound PiBound::mul(const PiBound &other, bool is_signed) const {
                 v1.i8 = var_part.isEmpty() ? other.var_multiple : var_multiple;
                 v2.i8 = var_part.isEmpty() ? const_part : other.const_part;
                 if (ConstantFolder::foldConstant(typetag, Op_Mul, v1, v2, res, is_signed)){
-                    int64 mult = ((numbitsInType(typetag)==64) 
-                                  ? res.i8 
+                    int64 mult = ((numbitsInType(typetag)==64)
+                                  ? res.i8
                                   : ((int64)res.i4));
                     return PiBound(typetag, mult, var_part, c);
                 }
-            }            
+            }
         }
     }
     return getUnknown();
 }
 
-PiBound 
+PiBound
 PiBound::cast(Type::Tag newtype, bool isLb) const {
     if (isUnknown()) return PiBound(newtype, true);
     else if (isUndefined()) return PiBound(newtype, false);
     else if (var_multiple == 0) {
         int64 lb, ub;
-        if (Abcd::hasTypeBounds(newtype, lb, ub)) {
+        if (hasTypeBounds(newtype, lb, ub)) {
             if (isLb) {
                 return PiBound(newtype, var_multiple, var_part,
                                ::std::max(const_part, lb));
@@ -339,7 +329,7 @@ PiCondition::print(::std::ostream &os) const
 PiCondition PiCondition::typeBounds(Type::Tag dstTag, Type::Tag srcTag)
 {
     int64 lb, ub;
-    if (Abcd::hasTypeBounds(srcTag, lb, ub)) {
+    if (hasTypeBounds(srcTag, lb, ub)) {
         return PiCondition(PiBound(dstTag, lb), PiBound(dstTag, ub));
     } else {
         return PiCondition(PiBound(dstTag, true), PiBound(dstTag, true));
@@ -364,7 +354,7 @@ void printPiCondition(const PiCondition *cond, ::std::ostream &os)
 {
     cond->print(os);
 }
- 
+
 PiBoundIter
 VarBound::getPredecessors(bool boundingBelow, bool useReasons,
                           MemoryManager &mm) const
@@ -393,17 +383,51 @@ VarBound::isMinMax(bool isMin) const {
 
 bool
 VarBound::isConvVar() const {
-    return Abcd::isConvOpnd(the_var);
+    Inst *defInst = the_var ? the_var->getInst() : 0;
+    return (defInst && (defInst->getOpcode() == Op_Conv));
 }
 
 VarBound
 VarBound::getConvSource() const {
-    return Abcd::getConvSource(the_var);
+    assert(isConvVar());
+    Inst *defInst = the_var->getInst();
+    return defInst->getSrc(0);
+}
+
+// true if type1 includes all values from type2
+bool
+VarBound::typeIncludes(Type::Tag type1, Type::Tag type2)
+{
+    if (type1 == type2) return true;
+    int64 lb1, lb2, ub1, ub2;
+    bool hasBounds1, hasBounds2;
+    hasBounds1 = hasTypeBounds(type1, lb1, ub1);
+    hasBounds2 = hasTypeBounds(type2, lb2, ub2);
+    if ((!hasBounds1) || (!hasBounds2)) {
+        return false;
+    } else {
+        if ((lb1 <= lb2) && (ub2 <= ub1)) {
+            return true;
+        } else {
+            return false;
+        }
+    }
 }
 
 bool
 VarBound::convPassesSource() const {
-    return Abcd::convPassesSource(the_var);
+    assert(isConvVar());
+    Inst *instr = the_var->getInst();
+    Opnd *srci = instr->getSrc(0); // the source operand
+    Type::Tag srcType = srci->getType()->tag;
+    Type::Tag dstType = the_var->getType()->tag;
+    Type::Tag instrType = instr->getType();
+    if (typeIncludes(dstType, instrType) &&
+        typeIncludes(instrType, srcType)) {
+        return true;
+    } else {
+        return false;
+    }
 }
 
 bool
@@ -420,7 +444,7 @@ VarBound::isConvexFunction() const {
     return false;
 }
 
-ConstBound 
+ConstBound
 VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
                               VarBound &inputVar) const
 {
@@ -442,12 +466,12 @@ VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
                 } else {
                     return ConstBound();
                 }
-                
+
                 if (outputBound.isKnown()) {
                     Type::Tag typetag = the_inst->getType();
                     // must be signed
                     switch (typetag) {
-                    case Type::Int32: 
+                    case Type::Int32:
                         {
                             I_32 bound = outputBound.getInt32();
                             if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
@@ -467,9 +491,9 @@ VarBound::getConvexInputBound(bool isLB, ConstBound outputBound,
                             }
                             inputVar = VarBound(inputOpnd);
                             return ConstBound(input);
-                        } 
+                        }
 
-                    case Type::Int64: 
+                    case Type::Int64:
                         {
                             int64 bound = outputBound.getInt64();
                             if (the_inst->getShiftMaskModifier() == ShiftMask_Masked)
@@ -573,19 +597,19 @@ Opnd *PiBoundIter::getConstantOpnd(Opnd *opnd)
     }
 }
 
-PiBound PiBoundIter::getBound(AbcdReasons *why0) { 
+PiBound PiBoundIter::getBound(AbcdReasons *why0) {
     if (why0) {
         assert(why);
         why0->addReasons(*why);
     }
-    return current; 
+    return current;
 }
 
 void PiBoundIter::init(bool useReasons)
 {
     assert(!why);
     why = useReasons ? new AbcdReasons(mm) : 0;
-}    
+}
 
 void PiBoundIter::setCurrent()
 {
@@ -646,7 +670,7 @@ void PiBoundIter::setCurrent()
                 int64 c;
                 // I assume we've done folding first
                 assert(!(constOpnd0 && constOpnd1));
-                
+
                 if (constOpnd1) {
                     // swap the operands;
                     constOpnd0 = constOpnd1;
@@ -654,14 +678,14 @@ void PiBoundIter::setCurrent()
                 }
                 // now constOpnd0 is the constant opnd
                 // op1 is the non-constant opnd
-                
+
                 Inst *inst0 = constOpnd0->getInst();
                 assert(inst0);
                 ConstInst *cinst0 = inst0->asConstInst();
                 assert(cinst0);
                 ConstInst::ConstValue cv = cinst0->getValue();
                 c = cv.i4;
-                
+
                 VarBound vb(op1);
                 current = PiBound(instr->getType(), 1, vb, c);
             } else
@@ -839,7 +863,7 @@ void PiBoundIter::setCurrent()
                 current = bounds3.getLb();
             } else {
                 current = bounds3.getUb();
-            }                
+            }
         } else {
             instr = 0;
         }
@@ -882,4 +906,32 @@ void PiBoundIter::setCurrent()
     }
 }
 
-} //namespace Jitrino 
+namespace {
+bool hasTypeBounds(Type::Tag srcTag, int64 &lb, int64 &ub)
+{
+    switch (srcTag) {
+    case Type::Int8:   lb = -int64(0x80); ub = 0x7f; return true;
+    case Type::Int16:  lb = -int64(0x8000); ub = 0x7fff; return true;
+    case Type::Int32:  lb = -int64(0x80000000); ub = 0x7fffffff; return true;
+    case Type::Int64:
+        lb = __INT64_C(0x8000000000000000);
+        ub = __INT64_C(0x7fffffffffffffff); return true;
+    case Type::UInt8:  lb = 0; ub = 0x100; return true;
+    case Type::UInt16: lb = 0; ub = 0x10000; return true;
+    case Type::UInt32: lb = 0; ub = __INT64_C(0x100000000); return true;
+    default:
+        return false;
+    }
+}
+
+int numbitsInType(Type::Tag typetag) {
+    if ((typetag == Type::Int64) || (typetag == Type::UInt64) ||
+        ((typetag == Type::IntPtr) && (sizeof(POINTER_SIZE_INT) == 8))) {
+        return 64;
+    } else {
+        return 32;
+    }
+}
+}  // namespace
+
+}  // namespace Jitrino

@@ -15,12 +15,6 @@
  *  limitations under the License.
  */
 
-/**
- * @author Intel, Pavel A. Ozhdikhin
- * @version $Revision: 1.16.24.4 $
- *
- */
-
 #ifndef _ABCD_BOUNDS_H
 #define _ABCD_BOUNDS_H
 
@@ -30,6 +24,8 @@
 #include "Type.h"
 
 #include "Stl.h"
+
+#include "Opnd.h"
 
 namespace Jitrino {
 
@@ -78,9 +74,9 @@ public:
     void print(::std::ostream &os) const;
 };
 
-// rather than having to create new variable objects to represent 
-// the upper and lower bounds on a variable, we just add a qualifier 
-// var_is_lb which indicates which of the 2 bounds of that variable this 
+// rather than having to create new variable objects to represent
+// the upper and lower bounds on a variable, we just add a qualifier
+// var_is_lb which indicates which of the 2 bounds of that variable this
 // bound is based on.
 struct VarBound {
     Opnd *the_var;
@@ -121,6 +117,9 @@ struct VarBound {
     bool isConvexFunction() const; // constant inputs => constant outputs
     ConstBound getConvexInputBound(bool isLB, ConstBound outputBound,
                                    VarBound &inputVar) const;
+
+    // true if type1 includes all values from type2
+    static bool typeIncludes(Type::Tag type1, Type::Tag type2);
 };
 
 class ConstBound {
