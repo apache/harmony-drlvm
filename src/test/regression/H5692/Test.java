@@ -111,12 +111,12 @@ public class Test extends TestCase {
         return false;
     }
 
-    public void testTraceAll() throws Exception {
-        if (!isDebugBuild(getProcessOutput("-version"))) {
-            return;
-        }
-        validateVerboseClass(getProcessOutput("-verbose:class -Xtrace:"));
-    }
+    //public void testTraceAll() throws Exception {
+    //    if (!isDebugBuild(getProcessOutput("-version"))) {
+    //        return;
+    //    }
+    //    validateVerboseClass(getProcessOutput("-verbose:class -Xtrace:"));
+    //}
 }
 
 class Application {
