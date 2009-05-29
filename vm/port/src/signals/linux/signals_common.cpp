@@ -265,6 +265,21 @@ static sig_reg signals_used[] =
 
 static struct sigaction old_actions[sizeof(signals_used)/sizeof(signals_used[0])];
 
+// For signals that must change their default behavior
+struct sig_redef
+{
+    int             signal;
+    sighandler_t    handler;
+    bool            set_up;
+};
+
+static sig_redef signals_other[] =
+{
+    { SIGPIPE, SIG_IGN, false }
+};
+
+static sighandler_t old_handlers[sizeof(signals_other)/sizeof(signals_other[0])];
+
 
 static void restore_signals()
 {
@@ -275,6 +290,14 @@ static void restore_signals()
 
         signals_used[i].set_up = false;
         sigaction(signals_used[i].signal, &old_actions[i], NULL);
+    }
+    for (size_t j = 0; j < sizeof(signals_other)/sizeof(signals_other[0]); j++)
+    {
+        if (!signals_other[j].set_up)
+            continue;
+
+        signals_other[j].set_up = false;
+        signal(signals_other[j].signal, old_handlers[j]);
     }
 }
 
@@ -299,6 +322,17 @@ int initialize_signals()
         }
 
         signals_used[i].set_up = true;
+    }
+
+    for (size_t j = 0; j < sizeof(signals_other)/sizeof(signals_other[0]); j++)
+    {
+        old_handlers[j] = signal(signals_other[j].signal, signals_other[j].handler);
+        if (old_handlers[j] == SIG_ERR)
+        {
+            restore_signals();
+            return -1;
+        }
+        signals_other[j].set_up = true;
     }
 
     // Prepare gdb crash handler
