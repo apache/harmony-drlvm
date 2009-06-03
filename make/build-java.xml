@@ -19,6 +19,12 @@
 
     <dirname property="bj.imported.basedir" file="${ant.file.build-java}"/>
     <import file="${bj.imported.basedir}/properties.xml"/>
+
+    <!-- During packaging, these files must be copied into the meta-inf dir -->
+    <fileset id="hy.required.metainf-files" dir="${hy.hdk}">
+        <include name="NOTICE" />
+        <include name="LICENSE" />
+    </fileset>
     
     <macrodef name="compile-java">
         <attribute name="src"/>
@@ -46,9 +52,11 @@
             <mkdir dir="${drlvm.bin.dir}"/>
             <jar jarfile="${drlvm.bin.dir}/@{component}.jar" manifest="@{manifest}">
                 <fileset dir="${drlvm.semi.dir}/@{component}/classes"/>
+                <metainf refid="hy.required.metainf-files"/>
             </jar>
             <jar jarfile="${drlvm.bin.dir}/@{component}-src.jar" manifest="@{manifest}">
                 <fileset dir="@{src}" includes="**/*.java"/>
+                <metainf refid="hy.required.metainf-files"/>
             </jar>
         </sequential>
     </macrodef>

@@ -223,12 +223,12 @@ Usage:
             todir="${drlvm.bin.dir}"/>
 
         <copy file="${drlvm.base.dir}/make/resources/readme.txt" 
-            todir="${drlvm.deploy.dir}/jdk/jre"/>
-        <replace file="${drlvm.base.dir}/make/resources/readme.txt">
+              tofile="${drlvm.deploy.dir}/jdk/jre/README"/>
+        <replace file="${drlvm.deploy.dir}/jdk/jre/README" >
             <replacefilter token="@{hy.os}" value="${hy.os}"/>
             <replacefilter token="@{hy.arch}" value="${hy.arch}"/>
         </replace>
-        <fixcrlf srcDir="${drlvm.deploy.dir}/jdk/jre/" includes="readme.txt" />
+        <fixcrlf srcDir="${drlvm.deploy.dir}/jdk/jre" includes="README" />
         
         <chmod file="${drlvm.deploy.dir}/jdk/jre/bin/java*" perm="ugo+x" />
     </target>
