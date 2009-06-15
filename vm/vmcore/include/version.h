@@ -57,7 +57,7 @@
 
 #define VM_VERSION "Apache Harmony HEAD"
 
-#define VERSION "java version \"1.5.0\" \n" "pre-alpha : not complete or compatible\n" \
+#define VERSION "pre-alpha : not complete or compatible\n" \
     "svn = r" VERSION_SVN_TAG ", (" __DATE__ "), " \
     VERSION_OS "/" VERSION_ARCH "/" VERSION_COMPILER ", " VERSION_DEBUG_STRING " build\n" \
     "http://harmony.apache.org"

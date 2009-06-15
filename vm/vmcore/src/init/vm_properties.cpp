@@ -28,6 +28,7 @@
 #include "vm_properties.h"
 #include "init.h"
 #include "port_modules.h"
+#include "version.h"
 #if defined(FREEBSD)
 #include <dlfcn.h>
 #endif
@@ -149,6 +150,7 @@ static void init_java_properties(Properties & properties)
     properties.set_new("java.version", "1.5.0");
     properties.set_new("java.vendor", "Apache Software Foundation");
     properties.set_new("java.vendor.url", "http://harmony.apache.org");
+    properties.set_new("java.fullversion", VERSION);
 
     // java.home initialization, try to find absolute location of the executable and set
     // java.home to the parent directory.
