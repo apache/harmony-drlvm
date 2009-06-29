@@ -539,7 +539,7 @@ struct MethInfo
     {
         if (m_fname_sig.empty()) {
             m_fname_sig = meth_fname();
-            m_fname += meth_sig();
+            m_fname_sig += meth_sig();
         }
         return m_fname_sig.c_str();
     }
