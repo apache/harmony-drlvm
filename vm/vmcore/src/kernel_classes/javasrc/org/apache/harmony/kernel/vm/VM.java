@@ -79,6 +79,10 @@ public final class VM {
         return clazz != null ? getClassLoader(clazz) : null;
     }
 
+    public static Class<?> getStackClass(int depth) {
+        return VMStack.getCallerClass(depth);
+    }
+
     /* PRIVATE */
 
     /**
