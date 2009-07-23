@@ -116,6 +116,7 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
 {
     pthread_t thread;
     pthread_attr_t attr;
+    pthread_attr_t attr_nosched;
     struct sched_param param;
     thread_start_struct_t* startstr;
     int res;
@@ -140,7 +141,9 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
         return ENOMEM;
 
     pthread_attr_init(&attr);
+    pthread_attr_init(&attr_nosched);
     pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+    pthread_attr_setdetachstate(&attr_nosched, PTHREAD_CREATE_DETACHED);
 
     if (stacksize != 0)
     {
@@ -160,9 +163,12 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
         }
 
         res = pthread_attr_setstacksize(&attr, stacksize);
+        if (res == 0)
+            res = pthread_attr_setstacksize(&attr_nosched, stacksize);
         if (res)
         {
             pthread_attr_destroy(&attr);
+            pthread_attr_destroy(&attr_nosched);
             STD_FREE(startstr);
             return res;
         }
@@ -180,6 +186,7 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
         if (res != 0)
         {
             pthread_attr_destroy(&attr);
+            pthread_attr_destroy(&attr_nosched);
             STD_FREE(startstr);
             return res;
         }*/
@@ -191,7 +198,11 @@ int port_thread_create(/* out */osthread_t* phandle, size_t stacksize, int prior
 
     res = pthread_create(&thread, &attr, (pthread_func_t)thread_start_func, startstr);
 
+    if (res == EPERM) // EPERM relates to scheduling only
+        res = pthread_create(&thread, &attr_nosched, (pthread_func_t)thread_start_func, startstr);
+
     pthread_attr_destroy(&attr);
+    pthread_attr_destroy(&attr_nosched);
 
     if (res == 0)
     {
@@ -323,7 +334,11 @@ static int setup_stack(port_tls_data_t* tlsdata)
         return EINVAL;
 
     // maps unmapped part of the stack
-    ptr = (char*)mmap(tlsdata->stack_addr - tlsdata->stack_size, mapping_size,
+    mapping_addr = (size_t)tlsdata->stack_addr - tlsdata->stack_size;
+    mapping_size =
+        (tlsdata->guard_stack_size + tlsdata->mem_protect_size + 2*PSD->guard_page_size - 1) &
+            ~(PSD->guard_page_size - 1);
+    ptr = (char*)mmap((void*)mapping_addr, mapping_size,
             STACK_MAPPING_ACCESS, STACK_MMAP_ATTRS, -1, 0);
 
     if (ptr == MAP_FAILED)
@@ -375,11 +390,14 @@ static int init_stack(port_tls_data_t* tlsdata, size_t stack_size, Boolean temp)
         return -1;
 
     err = find_stack_addr_size(&tlsdata->stack_addr, &tlsdata->stack_size);
-    if (err != 0) return err;
+    if (err != 0) {fprintf(stderr, "init_stack:CP#1\n");return err;}
 
-    if (tlsdata->foreign || temp || stack_size == 0)
+    // Workaround for incorrect stack_size returned by pthread_attr_getstack
+    // for main thread, while stack_addr + stack_size gives correct stack top
+    if (tlsdata->foreign)
         tlsdata->stack_size = PSD->foreign_stack_size;
-    else
+
+    if (stack_size != 0 && !tlsdata->foreign)
         tlsdata->stack_size = stack_size;
 
     tlsdata->guard_page_size = PSD->guard_page_size;
