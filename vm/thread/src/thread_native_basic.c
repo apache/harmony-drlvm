@@ -888,7 +888,7 @@ IDATA VMCALL hythread_set_state(hythread_t thread, IDATA state) {
 } // hythread_set_state
 
 IDATA VMCALL hythread_get_thread_id_offset() {
-    return (U_32)&((HyThread *)0)->thread_id;
+    return (U_32)(size_t)&((HyThread *)0)->thread_id;
 } // hythread_get_thread_id_offset
 
 IDATA VMCALL hythread_set_thread_stop_callback(hythread_t thread,

@@ -268,9 +268,9 @@ static struct sigaction old_actions[sizeof(signals_used)/sizeof(signals_used[0])
 // For signals that must change their default behavior
 struct sig_redef
 {
-    int             signal;
-    sighandler_t    handler;
-    bool            set_up;
+    int     signal;
+    sig_t   handler;
+    bool    set_up;
 };
 
 static sig_redef signals_other[] =
@@ -278,7 +278,7 @@ static sig_redef signals_other[] =
     { SIGPIPE, SIG_IGN, false }
 };
 
-static sighandler_t old_handlers[sizeof(signals_other)/sizeof(signals_other[0])];
+static sig_t old_handlers[sizeof(signals_other)/sizeof(signals_other[0])];
 
 
 static void restore_signals()

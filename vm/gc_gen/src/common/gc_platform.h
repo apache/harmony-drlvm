@@ -66,7 +66,7 @@ extern char* large_page_hint;
 #define prefetchnta(pref_addr)	_mm_prefetch((char*)(pref_addr), _MM_HINT_NTA )
 #endif /*ALLOC_PREFETCH*/
 
-#elif defined (__linux__)
+#elif defined (__linux__) || defined (FREEBSD)
 #define FORCE_INLINE inline  __attribute__((always_inline))
 
 #ifdef PREFETCH_SUPPORTED
