@@ -154,6 +154,22 @@ public class Unsafe {
     }
 
     /**
+     * Writes an int value to an Object's field using ordered
+     * setting. Ordered setting of a field is equivalent to the
+     * volatile setting of that field except that it does not ensure
+     * that the change is immediately available to other threads.
+     * 
+     * @param object The instance containing the field to write to.
+     * @param fieldOffset The offset of the int field in the object.
+     * @param newValue The value to write.
+     */
+    public void putOrderedInt(Object object, long fieldOffset,
+                              int newValue) {
+        // should probably implement less strict implementation
+        putIntVolatile(object, fieldOffset, newValue);
+    }
+
+    /**
      * <p>
      * Writes an int value to an Object's field as though it were declared
      * <code>volatile</code>.
@@ -182,6 +198,22 @@ public class Unsafe {
     }
 
     /**
+     * Writes a long value to an Object's field using ordered
+     * setting. Ordered setting of a field is equivalent to the
+     * volatile setting of that field except that it does not ensure
+     * that the change is immediately available to other threads.
+     * 
+     * @param object The instance containing the field to write to.
+     * @param fieldOffset The offset of the field to write to.
+     * @param newValue The value to write.
+     */
+    public void putOrderedLong(Object object, long fieldOffset,
+                               long newValue) {
+        // should probably implement less strict implementation
+        putLongVolatile(object, fieldOffset, newValue);
+    }
+
+    /**
      * <p>
      * Writes a long value to an Object's field as though it were declared
      * <code>volatile</code>.
@@ -207,6 +239,38 @@ public class Unsafe {
      */
     public long getLongVolatile(Object object, long fieldOffset) {
         return Atomics.getLongVolatile(object, fieldOffset);
+    }
+
+    /**
+     * <p>
+     * Writes an Object reference value to an Object's field.
+     * </p>
+     * 
+     * @param object The instance containing the field to write to.
+     * @param fieldOffset The offset of the field to write to.
+     * @param newValue The value to write.
+     */
+    public void putObject(Object object, long fieldOffset,
+                          Object newValue) {
+        // should probably implement less strict implementation
+        putOrderedObject(object, fieldOffset, newValue);
+    }
+
+    /**
+     * Writes an Object reference value to an Object's field using
+     * ordered setting. Ordered setting of a field is equivalent to
+     * the volatile setting of that field except that it does not
+     * ensure that the change is immediately available to other
+     * threads.
+     * 
+     * @param object The instance containing the field to write to.
+     * @param fieldOffset The offset of the field to write to.
+     * @param newValue The value to write.
+     */
+    public void putOrderedObject(Object object, long fieldOffset,
+                                 Object newValue) {
+        // should probably implement less strict implementation
+        putObjectVolatile(object, fieldOffset, newValue);
     }
 
     /**
