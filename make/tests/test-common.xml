@@ -36,10 +36,12 @@
         <check-one-file dest="${ant-contrib.jar}" src="${ant-contrib.url}"/>
         <check-one-file dest="${jasmin.jar}" src="${jasmin.url}"/>
         <check-one-file dest="${junit.jar}" src="${junit.jar.url}"/>
+        <check-one-file dest="${hamcrest-library.jar}" src="${hamcrest-library.jar.url}"/>
     </target>
         
     <target name="fetch-depends">
         <fetch dep="junit.jar"/>
+        <fetch dep="hamcrest-library.jar"/>
         <fetch dep="jasmin"/>
         <fetch dep="ant-contrib"/>
     </target>
