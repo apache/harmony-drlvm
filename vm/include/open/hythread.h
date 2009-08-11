@@ -125,6 +125,67 @@ typedef struct HyThreadMonitorTracing {
     UDATA yield_count;
 } HyThreadMonitorTracing;
 
+#ifdef HY_NO_THR
+
+/* Thread library version defines */
+#define HYTHREAD_MAJOR_VERSION_NUMBER  1
+#define HYTHREAD_MINOR_VERSION_NUMBER  0
+#define HYTHREAD_CAPABILITY_BASE  0
+#define HYTHREAD_CAPABILITY_STANDARD  1
+#define HYTHREAD_CAPABILITY_MASK ((U_64)(HYTHREAD_CAPABILITY_STANDARD))
+#define HYTHREAD_SET_VERSION(threadLibraryVersion, capabilityMask) \
+  (threadLibraryVersion)->majorVersionNumber = HYTHREAD_MAJOR_VERSION_NUMBER; \
+  (threadLibraryVersion)->minorVersionNumber = HYTHREAD_MINOR_VERSION_NUMBER; \
+  (threadLibraryVersion)->capabilities = (capabilityMask)
+#define HYTHREAD_SET_VERSION_DEFAULT(threadLibraryVersion) \
+  (threadLibraryVersion)->majorVersionNumber = HYTHREAD_MAJOR_VERSION_NUMBER; \
+  (threadLibraryVersion)->minorVersionNumber = HYTHREAD_MINOR_VERSION_NUMBER; \
+  (threadLibraryVersion)->capabilities = HYTHREAD_CAPABILITY_MASK
+
+typedef struct HyThreadLibraryVersion
+{
+  U_16 majorVersionNumber;
+  U_16 minorVersionNumber;
+  U_32 padding;
+  U_64 capabilities;
+} HyThreadLibraryVersion;
+
+/* Thread library function table */
+typedef struct HyThreadLibrary {
+  struct HyThreadLibraryVersion threadVersion;
+
+  IDATA (PVMCALL sem_destroy) (struct HyThreadLibrary *threadLibraryFuncs, hysem_t s);
+  IDATA (PVMCALL sem_init) (struct HyThreadLibrary *threadLibraryFuncs, hysem_t * sp, I_32 initValue);
+  IDATA (PVMCALL sem_post) (struct HyThreadLibrary *threadLibraryFuncs, hysem_t s);
+  IDATA (PVMCALL sem_wait) (struct HyThreadLibrary *threadLibraryFuncs, hysem_t s);
+
+  IDATA (PVMCALL thread_attach) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t * handle);
+  IDATA (PVMCALL thread_create) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t * handle, UDATA stacksize, UDATA priority,
+                UDATA suspend, hythread_entrypoint_t entrypoint,
+                void *entryarg);
+  void  (PVMCALL thread_detach) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t thread);
+  void  (PVMCALL NORETURN thread_exit) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  UDATA *(PVMCALL thread_global) (struct HyThreadLibrary *threadLibraryFuncs, char *name);
+  IDATA (PVMCALL thread_monitor_destroy) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  IDATA (PVMCALL thread_monitor_enter) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  IDATA (PVMCALL thread_monitor_exit) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  IDATA (PVMCALL thread_monitor_init_with_name) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t * handle, UDATA flags, char *name);
+  IDATA (PVMCALL thread_monitor_notify) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  IDATA (PVMCALL thread_monitor_notify_all) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  IDATA (PVMCALL thread_monitor_wait) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
+  hythread_t (PVMCALL thread_self) (struct HyThreadLibrary *threadLibraryFuncs);
+  IDATA (PVMCALL thread_sleep) (struct HyThreadLibrary *threadLibraryFuncs, I_64 millis);
+  IDATA (PVMCALL thread_tls_alloc) (struct HyThreadLibrary *threadLibraryFuncs, hythread_tls_key_t * handle);
+  IDATA (PVMCALL thread_tls_free) (struct HyThreadLibrary *threadLibraryFuncs, hythread_tls_key_t key);
+  void *(PVMCALL thread_tls_get) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t thread, hythread_tls_key_t key);
+  IDATA (PVMCALL thread_tls_set) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t thread, hythread_tls_key_t key, void *value);
+
+  void *self_handle;
+} HyThreadLibrary;
+
+#endif /* HY_NO_THR */
+
+
 #define HYSIZEOF_HyThreadMonitorTracing 24
 
 

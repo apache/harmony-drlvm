@@ -75,12 +75,12 @@ extern int16 tm_tls_capacity;
 extern int16 tm_tls_size;
 
 
-typedef struct HyThreadLibrary {
+typedef struct HyThreadLibraryInternal {
     IDATA a;
     osmutex_t TM_LOCK;
     IDATA     nondaemon_thread_count;
     hycond_t  nondaemon_thread_cond;
-} HyThreadLibrary;
+} HyThreadLibraryInternal;
 
 /** 
   * hythread_group_t pointer to the first element in the thread group

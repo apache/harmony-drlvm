@@ -175,7 +175,7 @@ extern "C" {
 typedef struct HyLatch *hylatch_t;
 
 typedef struct HyThread *hythread_iterator_t;
-typedef struct HyThreadLibrary *hythread_library_t;
+typedef struct HyThreadLibraryInternal *hythread_library_t;
 typedef U_32  hythread_thin_monitor_t;
 typedef void (*hythread_event_callback_proc)(void);
 typedef int (HYTHREAD_PROC *hythread_wrapper_t)(void*);

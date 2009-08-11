@@ -32,6 +32,8 @@
             
             <defineset define="${refs.comp.mode}" if="refs.comp.mode"/>
 
+            <defineset define="HY_NO_THR" if="no.thr.mode" />
+
             <defineset define="NDEBUG" unless="is.cfg.debug"/>
             <defineset define="_DEBUG" if="is.cfg.debug" />
             <defineset define="VM_STATS" if="is.cfg.debug"/>

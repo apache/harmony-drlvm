@@ -28,6 +28,10 @@
     </macrodef>
     
     <target name="setup-native-build" depends="-plugin-cpptasks">
+
+        <condition property="no.thr.mode">
+            <equals arg1="${hy.no.thr}" arg2="true"/>
+        </condition>
         
         <condition property="is.gcc">
             <equals arg1="${hy.cpp.compiler}" arg2="gcc"/>

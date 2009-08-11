@@ -30,6 +30,7 @@
               <pathelement location="${drlvm.include.dir}" />
               <path refid="vm.include"/>
               <pathelement location="${vm.home}/thread/src" />
+              <pathelement location="${hy.hdk}/include" />
             </includepath>
 
             <fileset dir="${vm.home}/thread/src">

@@ -27,6 +27,10 @@
 #include "port_mutex.h"
 #include "thread_private.h"
 
+#ifdef HY_NO_THR
+#include "thread_classlib_defs.h"
+#endif /* HY_NO_THR */
+
 //global constants:
 
 // Global pointer to the threading library
@@ -67,6 +71,92 @@ void hythread_library_init(void) {
 }
 #endif
 
+
+#ifdef HY_NO_THR
+
+/**
+ * Determine the size of the thread library.
+ * 
+ * Given a thread library version, return the size of the structure in bytes
+ * required to be allocated.
+ * 
+ * @param[in] version The HyThreadLibraryVersion structure.
+ * @return size of thread library on success, zero on failure
+ */
+UDATA VMCALL
+hythread_getSize (struct HyThreadLibraryVersion * version)
+{
+    /* Can't initialize a structure that is not understood by this version of the thread library */
+    if (HYTHREAD_MAJOR_VERSION_NUMBER != version->majorVersionNumber)
+    {
+        return 0;
+    }
+
+    return sizeof (HyThreadLibrary);
+}
+
+/*
+ * Stub startup function
+ */
+HY_CFUNC THREXPORT I_32 VMCALL
+hythread_startup_library (struct HyThreadLibraryInternal *threadLibrary)
+{
+    /* Do nothing here - thread library initialised by hythread_allocate_library() */
+    return 0;
+}
+
+/*
+ * Shutdown the thread library - forwards call to hythread_shutdown()
+ */
+HY_CFUNC THREXPORT I_32 VMCALL
+hythread_shutdown_library (struct HyThreadLibraryInternal *threadLibrary)
+{
+    hythread_shutdown();
+	return 0;
+}
+
+/*
+ * Allocate the thread library function table and return it's pointer
+ */
+HY_CFUNC THREXPORT I_32 VMCALL
+hythread_allocate_library (struct HyThreadLibraryVersion *expectedVersion,
+                           struct HyThreadLibrary **threadLibraryFuncs)
+{
+    UDATA size = hythread_getSize (expectedVersion);
+    HyThreadLibrary *threadLib;
+
+    if (0 == size) 
+    {
+        return -1;
+    }
+
+    hythread_lib_create(&TM_LIBRARY);
+
+    /* Allocate memory for the function table */
+    *threadLibraryFuncs = NULL;
+    threadLib = (HyThreadLibrary*) apr_palloc(TM_POOL, sizeof(HyThreadLibrary));
+    if (NULL == threadLib)
+    {
+        return -1;
+    }
+
+    /* Null and initialize the table passed in */
+	memset(threadLib, 0, size);
+	memcpy(threadLib, &MasterThreadLibraryTable, size);
+
+    /* Set version numbers */
+	threadLib->threadVersion.majorVersionNumber = expectedVersion->majorVersionNumber;
+	threadLib->threadVersion.minorVersionNumber = expectedVersion->minorVersionNumber;
+	threadLib->threadVersion.capabilities = HYTHREAD_CAPABILITY_MASK;
+
+    threadLib->self_handle = threadLib;
+    *threadLibraryFuncs = threadLib;
+
+    return 0;
+}
+
+#endif /* HY_NO_THR */
+
 /**
  * Creates and initializes a threading library.
  *
@@ -89,7 +179,7 @@ IDATA VMCALL hythread_lib_create(hythread_library_t * lib) {
     apr_status = apr_pool_create(&TM_POOL, NULL);
     if (apr_status != APR_SUCCESS) return CONVERT_ERROR(apr_status);
 
-    *lib = (hythread_library_t) apr_palloc(TM_POOL, sizeof(HyThreadLibrary));
+    *lib = (hythread_library_t) apr_palloc(TM_POOL, sizeof(HyThreadLibraryInternal));
     if (*lib == NULL) return TM_ERROR_OUT_OF_MEMORY;
 
     hythread_init(*lib);
