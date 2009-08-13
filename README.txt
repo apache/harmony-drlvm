@@ -112,7 +112,7 @@ You can separately obtain those modules, refer to Getting Started page on
 Apache Harmony site [http://harmony.apache.org/quickhelp_contributors.html].
  
 Also, there are external resources required for building DRLVM: 
-zlib, apr-1.2.6, log4cxx, cpptasks-1.b04, etc. 
+zlib, apr-1.2.12, log4cxx, cpptasks-1.b04, etc. 
 This list can change as DRLVM is being developed, so the best way to resolve 
 external dependencies is to let the build download them:
 $ ant fetch-depends
