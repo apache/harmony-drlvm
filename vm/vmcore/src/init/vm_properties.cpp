@@ -167,8 +167,9 @@ static void init_java_properties(Properties & properties)
     properties.set_new("java.vm.vendor", "Apache Software Foundation");
     properties.set_new("java.vm.name", "DRLVM");
     properties.set_new("java.runtime.name", "Apache Harmony");
-    properties.set_new("java.runtime.version", "1.5.0");
-    properties.set_new("java.specification.version", "1.5");
+    properties.set_new("java.runtime.version", JAVA_RUNTIME_VERSION);
+    properties.set_new("java.specification.version",
+                       JAVA_SPECIFICATION_VERSION);
     properties.set_new("java.specification.vendor", "Sun Microsystems Inc.");
     properties.set_new("java.specification.name", "Java Platform API Specification");
     properties.set_new("java.class.version", EXPAND(CLASSFILE_MAJOR_MAX) "."

@@ -19,5 +19,7 @@
 #define _VERSION_SVN_TAG_
 
 #define VERSION_SVN_TAG  "@svn.revision@"
+#define JAVA_RUNTIME_VERSION  "@harmony.java.runtime.version@"
+#define JAVA_SPECIFICATION_VERSION  "@harmony.java.specification.version@"
 
 #endif // _VERSION_SVN_TAG_

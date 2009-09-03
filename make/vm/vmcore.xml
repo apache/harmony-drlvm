@@ -245,10 +245,22 @@
 
     <target name="stamp-version" depends="-check-version,-copy-version"
         if="svn.revision" unless="skip.svn.stamp">
+        <condition property="harmony.java.runtime.version"
+                   value="1.6.0" else="1.5.0">
+            <equals arg1="${harmony.java.version}" arg2="6.0" />
+        </condition>
+        <condition property="harmony.java.specification.version"
+                   value="1.6" else="1.5">
+            <equals arg1="${harmony.java.version}" arg2="6.0" />
+        </condition>
         <copy file="${vm.home}/vmcore/include/version_svn_tag_orig.h"
               tofile="${vm.home}/vmcore/include/version_svn_tag.h" overwrite="true">
             <filterset>
                 <filter token="svn.revision" value="${svn.revision}"/>
+                <filter token="harmony.java.runtime.version"
+                        value="${harmony.java.runtime.version}" />
+                <filter token="harmony.java.specification.version"
+                        value="${harmony.java.specification.version}" />
             </filterset>
         </copy>
     </target>
