@@ -18,7 +18,6 @@
 #include "../java5/context_5.h"
 #include "../java6/context_6.h"
 #ifndef _NDEBUG
-#include "../x_verifier/recompute.h"
 #include "class_interface.h"
 #endif
 
@@ -108,17 +107,6 @@ vf_verify6_class(Class_Handle klass, unsigned verifyAll, char **error )
                 return result;
             }
         }
-
-#ifndef _NDEBUG
-        vf_recompute_stackmaptable(method, &context6.substitution, error, classwide.class_constraints);
-
-        result = context6.verify_method(method);
-        if (result != VF_OK) {
-            vf_create_error_message(method, context6, error);
-        }
-        tc_free(context6.substitution);
-        context6.substitution = NULL;
-#endif  
     }
 
     /**

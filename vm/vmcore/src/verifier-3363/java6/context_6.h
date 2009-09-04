@@ -30,9 +30,6 @@ class vf_Context_6 : public vf_Context_x<vf_Context_6, WorkmapElement_6, _Workma
 public:
     vf_Context_6(SharedClasswideData &classwide) :
       vf_Context_x<vf_Context_6, WorkmapElement_6, _WorkmapElement_6, StackmapElement_6>(classwide)
-#ifndef _NDEBUG
-      , substitution(NULL)
-#endif
       {}
 
       vf_Result verify_method(Method_Handle method);
@@ -137,11 +134,6 @@ public:
     void new_bogus_propagation_constraint(WorkmapElement_6 &wm_el, SmConstant init_val) {
         wm_el = _WorkmapElement_6 (init_val);
     }
-
-    //recomputed stack map used for testing
-#ifndef _NDEBUG
-    U_8* substitution;
-#endif
 };
 
 #endif

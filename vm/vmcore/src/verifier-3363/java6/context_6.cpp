@@ -195,10 +195,6 @@ vf_Result vf_Context_6::load_stackmaptable() {
 
     U_8* stackmaptable = method_get_stackmaptable(m_method);
 
-#ifndef _NDEBUG
-    if (substitution) stackmaptable = substitution;
-#endif
-
     if(!stackmaptable) return VF_OK;
 
     U_8* read_ptr = stackmaptable;
