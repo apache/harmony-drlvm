@@ -64,9 +64,21 @@
             <compilerarg value="/Zi" if="is.windows"/>
             <compilerarg value="/W3" if="is.windows"/>
             <compilerarg value="/WX" if="is.windows" unless="is.x86_64"/>
-            <!-- C4996: 'function': was declared deprecated -->
-            <compilerarg value="/wd4996" if="is.windows"/>
 
+            <!-- 'identifier' : macro redefinition -->
+            <compilerarg value="/wd4005" if="is.msvc"/>
+
+            <!-- 'function': was declared deprecated -->
+            <compilerarg value="/wd4996" if="is.msvc"/>
+
+            <!-- 'operator' : 'identifier1' differs in levels of indirection from 'identifier2' -->
+            <compilerarg value="/wd4047" if="is.msvc"/>
+
+            <!-- 'function' : different types for formal and actual parameter 'number' -->
+            <compilerarg value="/wd4024" if="is.msvc"/>
+
+            <!-- The file contains a character that cannot be represented in the current code page -->
+            <compilerarg value="/wd4819" if="is.msvc"/>
 
             <defineset define="MACOSX" if="is.macosx"/>
             <defineset define="FREEBSD" if="is.freebsd"/>

@@ -44,7 +44,9 @@
     // ..     sdkupdate/2600.2180.7/contents.htm
         #include <winsock2.h>
         #include <windows.h>
-        #define vsnprintf _vsnprintf
+        #if _MSC_VER < 1500
+            #define vsnprintf _vsnprintf
+        #endif
     #pragma pack(pop)
     // ... well, just to be absolutely sure...
     #undef min
