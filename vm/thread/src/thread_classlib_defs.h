@@ -73,7 +73,7 @@ void VMCALL hythread_exit_cl(HyThreadLibrary *threadLibraryFuncs, hythread_monit
 }
 
 
-UDATA * VMCALL hythread_global_cl(HyThreadLibrary *threadLibraryFuncs, char *name) 
+UDATA * VMCALL hythread_global_cl(HyThreadLibrary *threadLibraryFuncs, const char *name) 
 {
     return hythread_global(name);
 }
@@ -93,7 +93,7 @@ IDATA VMCALL hythread_monitor_exit_cl(HyThreadLibrary *threadLibraryFuncs, hythr
     return hythread_monitor_exit(monitor);
 }
 
-IDATA VMCALL hythread_monitor_init_with_name_cl(HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t * handle, UDATA flags, char *name) 
+IDATA VMCALL hythread_monitor_init_with_name_cl(HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t * handle, UDATA flags, const char *name) 
 {
     return hythread_monitor_init_with_name(handle, flags, name);
 }

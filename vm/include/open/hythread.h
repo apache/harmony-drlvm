@@ -117,7 +117,7 @@ struct HyPortLibrary;
 #define HYTHREAD_LIB_FLAG_JLMTS_ENABLED  0x8000
 
 typedef struct HyThreadMonitorTracing {
-    char* monitor_name;
+    const char* monitor_name;
     UDATA enter_count;
     UDATA slow_count;
     UDATA recursive_count;
@@ -165,11 +165,11 @@ typedef struct HyThreadLibrary {
                 void *entryarg);
   void  (PVMCALL thread_detach) (struct HyThreadLibrary *threadLibraryFuncs, hythread_t thread);
   void  (PVMCALL NORETURN thread_exit) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
-  UDATA *(PVMCALL thread_global) (struct HyThreadLibrary *threadLibraryFuncs, char *name);
+  UDATA *(PVMCALL thread_global) (struct HyThreadLibrary *threadLibraryFuncs, const char *name);
   IDATA (PVMCALL thread_monitor_destroy) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
   IDATA (PVMCALL thread_monitor_enter) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
   IDATA (PVMCALL thread_monitor_exit) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
-  IDATA (PVMCALL thread_monitor_init_with_name) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t * handle, UDATA flags, char *name);
+  IDATA (PVMCALL thread_monitor_init_with_name) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t * handle, UDATA flags, const char *name);
   IDATA (PVMCALL thread_monitor_notify) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
   IDATA (PVMCALL thread_monitor_notify_all) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
   IDATA (PVMCALL thread_monitor_wait) (struct HyThreadLibrary *threadLibraryFuncs, hythread_monitor_t monitor);
@@ -288,7 +288,7 @@ hythread_monitor_init PROTOTYPE((hythread_monitor_t* handle, UDATA flags));
 extern HY_CFUNC IDATA VMCALL 
 hythread_sleep PROTOTYPE((I_64 millis));
 extern HY_CFUNC UDATA* VMCALL 
-hythread_global PROTOTYPE((char* name));
+hythread_global PROTOTYPE((const char* name));
 extern HY_CFUNC IDATA VMCALL 
 hythread_tls_alloc_with_finalizer PROTOTYPE((hythread_tls_key_t* handle, hythread_tls_finalizer_t finalizer));
 extern HY_CFUNC void VMCALL 
@@ -333,7 +333,7 @@ extern HY_CFUNC HyThreadMonitorTracing* VMCALL
 hythread_monitor_get_tracing PROTOTYPE((hythread_monitor_t monitor));
 extern HY_CFUNC UDATA VMCALL 
 hythread_get_priority PROTOTYPE((hythread_t thread));
-extern HY_CFUNC char* VMCALL 
+extern HY_CFUNC const char* VMCALL 
 hythread_monitor_get_name PROTOTYPE((hythread_monitor_t monitor));
 extern HY_CFUNC hythread_monitor_t VMCALL 
 hythread_monitor_walk PROTOTYPE((hythread_monitor_t monitor));

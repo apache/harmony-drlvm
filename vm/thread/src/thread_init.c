@@ -474,14 +474,14 @@ IDATA release_start_lock() {
 // need to be hashtable in the future
 */
 #define TABLE_SIZE 256
-char *names[TABLE_SIZE];
+const char *names[TABLE_SIZE];
 UDATA data[TABLE_SIZE];
 int size = 0;
 
 /*
  * return index in array if found, -1 otherwise
  */
-int find_entry (char* name) {
+int find_entry (const char* name) {
     // quick pass
     int i;
     for (i = 0; i < size; i++) {
@@ -499,7 +499,7 @@ int find_entry (char* name) {
 }
 //add entry to the end of the array
 // return new entry index,  -1 if failed.
-int add_entry(char* name) {
+int add_entry(const char* name) {
     int index = size++;
     if (index >= TABLE_SIZE-1) {
         return -1;
@@ -520,7 +520,7 @@ int add_entry(char* name) {
  * 0 on failure.
  * 
  */
-UDATA* VMCALL hythread_global (char* name) {
+UDATA* VMCALL hythread_global (const char* name) {
     //hythread_monitor_enter(*p_global_monitor);
     int index = find_entry(name);
     if (index == -1) {
