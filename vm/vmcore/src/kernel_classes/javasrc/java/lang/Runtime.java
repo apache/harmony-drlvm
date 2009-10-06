@@ -51,7 +51,7 @@ import java.util.ArrayList;
 import org.apache.harmony.vm.VMStack;
 import org.apache.harmony.kernel.vm.VM;
 import org.apache.harmony.luni.util.DeleteOnExit;
-import org.apache.harmony.luni.internal.net.www.protocol.jar.JarURLConnection;
+import org.apache.harmony.luni.internal.net.www.protocol.jar.JarURLConnectionImpl;
 import org.apache.harmony.lang.RuntimePermissionCollection;
 
 /**
@@ -432,7 +432,7 @@ public class Runtime
                 
                 // Close connections.
                 if (VM.closeJars) {
-                    JarURLConnection.closeCachedFiles();
+                    JarURLConnectionImpl.closeCachedFiles();
                 }
 
                 // Delete files.
