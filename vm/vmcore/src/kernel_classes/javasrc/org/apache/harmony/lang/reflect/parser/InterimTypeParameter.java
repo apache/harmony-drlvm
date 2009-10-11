@@ -21,7 +21,6 @@ import java.util.Arrays;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 public class InterimTypeParameter {
     public InterimType classBound;

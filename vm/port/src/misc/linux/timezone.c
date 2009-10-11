@@ -16,7 +16,6 @@
  */
 /** 
 * @author Alexey V. Varlamov, Artem A. Aliev
-* @version $Revision: 1.1.2.1.4.3 $
 */  
 
 #include <unistd.h>

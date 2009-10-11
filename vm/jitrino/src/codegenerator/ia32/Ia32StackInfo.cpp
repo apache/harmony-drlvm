@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Nikolay A. Sidelnikov
- * @version $Revision: 1.14.14.3.4.4 $
  */
 
 #include "Ia32IRManager.h"

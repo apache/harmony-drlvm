@@ -16,7 +16,6 @@
  */
 /**
  * @author Pavel Afremov
- * @version $Revision: 1.3.8.2.4.3 $
  */
 package gc;
 

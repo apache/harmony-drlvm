@@ -2,7 +2,6 @@ package ncai.funcs;
 
 /**
  * @author Petr Ivanov
- * @version $Revision: 1.1.1.1 $
  *
  */
 public class GetAllThreads01 extends Thread{

@@ -16,7 +16,6 @@
  */
 /**
  * @author Ilya Berezhniuk
- * @version $Revision: 1.1.2.1 $
  */
 
 #ifndef _NATIVE_STACK_H_

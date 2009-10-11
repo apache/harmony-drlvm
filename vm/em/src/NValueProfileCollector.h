@@ -16,7 +16,6 @@
 */
 /**
 * @author Yuri Kashnikov
-* @version $Revision$
 */
 /*
         The idea of advanced Top-N-Value (with steady and clear parts, and clear interval)

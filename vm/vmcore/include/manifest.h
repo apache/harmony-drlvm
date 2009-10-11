@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _MANIFEST_H_
 #define _MANIFEST_H_

@@ -26,7 +26,6 @@ import org.apache.harmony.lang.AnnotatedElementTestFrame;
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 public class Package5Test extends AnnotatedElementTestFrame {
     

@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.3.4.3 $
  */  
 #ifndef _JAR_FILE_H_
 #define _JAR_FILE_H_

@@ -16,7 +16,6 @@
  */
 /** 
  * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _VM_KERNEL_CLASSES_H_
 #define _VM_KERNEL_CLASSES_H_

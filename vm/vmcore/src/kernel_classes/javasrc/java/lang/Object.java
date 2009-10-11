@@ -16,7 +16,6 @@
  */
 /**
  * @author Roman S. Bushmanov
- * @version $Revision: 1.1.2.1.4.3 $
  */
 
  package java.lang;

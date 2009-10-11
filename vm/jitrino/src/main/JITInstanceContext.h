@@ -16,7 +16,6 @@
 */
 /**
 * @author Mikhail Y. Fursov
-* @version $Revision$
 */
 
 #ifndef _JIT_INSTANCE_CONTEXT_H_

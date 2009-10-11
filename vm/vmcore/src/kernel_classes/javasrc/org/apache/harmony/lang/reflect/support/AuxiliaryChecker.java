@@ -26,7 +26,6 @@ import org.apache.harmony.vm.VMGenericsAndAnnotations;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

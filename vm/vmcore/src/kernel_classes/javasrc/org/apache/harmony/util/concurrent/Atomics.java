@@ -16,7 +16,6 @@
  */
 /**
  * @author Artem A. Aliev, Andrey Y. Chernyshev, Sergey V. Dmitriev
- * @version $Revision: 1.1.6.3 $
  */
 package org.apache.harmony.util.concurrent;
 

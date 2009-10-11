@@ -16,7 +16,6 @@
  */
 /** 
  * @author Andrey Chernyshev
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 
 #define LOG_DOMAIN "kernel"

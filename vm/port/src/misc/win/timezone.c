@@ -16,7 +16,6 @@
  */
 /**
 * @author Alexey V. Varlamov, Marina V. Goldburt
-* @version $Revision: 1.1.2.1.4.4 $
 */
 
 #include "port_sysinfo.h"

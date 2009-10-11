@@ -20,7 +20,6 @@ import org.apache.harmony.lang.annotation.AllTypesAntn;
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 @AnotherAntn
 public abstract class AnnotatedMembers {

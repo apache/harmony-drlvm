@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.10.12.2.4.4 $
  */
 
 #include "Ia32GCMap.h"

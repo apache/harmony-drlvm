@@ -21,7 +21,6 @@ import java.lang.reflect.GenericDeclaration;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

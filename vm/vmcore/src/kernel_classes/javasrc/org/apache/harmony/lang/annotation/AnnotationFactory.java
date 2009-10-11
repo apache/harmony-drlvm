@@ -48,7 +48,6 @@ import static org.apache.harmony.lang.annotation.AnnotationMember.ERROR;
  * @see java.lang.annotation.Annotation
  * 
  * @author Alexey V. Varlamov, Serguei S. Zapreyev
- * @version $Revision$
  */
 @SuppressWarnings({"serial"})
 public final class AnnotationFactory implements InvocationHandler, Serializable {

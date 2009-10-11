@@ -16,7 +16,6 @@
  */
 /**
  * @author Pavel Afremov
- * @version $Revision: 1.0 $
  */
 package exception;
 

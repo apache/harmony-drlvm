@@ -17,7 +17,6 @@
 
 /** 
  * @author Andrey Chernyshev
- * @version $Revision: 1.1.6.5 $
  */  
 
 /*

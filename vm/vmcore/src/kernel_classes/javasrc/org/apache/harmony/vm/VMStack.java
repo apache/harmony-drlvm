@@ -28,7 +28,6 @@ package org.apache.harmony.vm;
  * interfaces - see the porting interface overview for more details.
  * 
  * @author Evgueni Brevnov, Roman S. Bushmanov
- * @version $Revision: 1.1.6.4 $
  * 
  * @api2vm
  */

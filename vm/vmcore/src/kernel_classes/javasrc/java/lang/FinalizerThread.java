@@ -16,7 +16,6 @@
  */
 /*
  * @author Salikh Zakirov, Pavel Afremov
- * @version $Revision: 1.1.2.2.4.3 $
  */
 package java.lang;
 

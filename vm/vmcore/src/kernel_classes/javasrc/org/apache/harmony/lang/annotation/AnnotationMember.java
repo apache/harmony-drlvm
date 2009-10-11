@@ -48,7 +48,6 @@ import java.util.Arrays;
  * @see org.apache.harmony.lang.annotation.AnnotationFactory
  * 
  * @author Alexey V. Varlamov, Serguei S. Zapreyev
- * @version $Revision$
  */
 @SuppressWarnings({"serial"})
 public class AnnotationMember implements Serializable {

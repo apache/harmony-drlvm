@@ -46,7 +46,6 @@ import org.apache.harmony.vm.VMStack;
  * Base class for all class loaders
  * 
  * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.2.4.4 $
  */
 public abstract class ClassLoader {
 

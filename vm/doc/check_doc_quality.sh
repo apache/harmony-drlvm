@@ -16,7 +16,6 @@
 #    limitations under the License.
 
 # @author: Alexei Fedotov
-# @version: $Revision $
 
 convert_html_to_list() {
   find "$directory" \

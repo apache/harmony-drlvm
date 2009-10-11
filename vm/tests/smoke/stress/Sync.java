@@ -16,7 +16,6 @@
  */
 /** 
 * @author Salikh Zakirov
-* @version $Revision: 1.4.16.3 $
 */  
 
 package stress;

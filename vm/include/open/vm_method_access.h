@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Pavel Pervov
- * @version $Revision: 1.7 $
  */
 #ifndef _VM_METHOD_ACCESS_H
 #define _VM_METHOD_ACCESS_H

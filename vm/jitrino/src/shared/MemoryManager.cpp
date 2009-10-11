@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.14.20.4 $
  *
  */
 

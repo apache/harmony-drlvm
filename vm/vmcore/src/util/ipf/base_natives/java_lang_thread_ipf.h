@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 
 #define OS_HW_REGS_TO_VM_THREAD_REGS()                 \

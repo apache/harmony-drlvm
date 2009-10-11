@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Natalya V. Golovleva
- * @version $Revision$
  *
  */
 

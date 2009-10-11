@@ -23,7 +23,6 @@ import java.security.Permission;
  * re-setting of the system security manager.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 public class ReversibleSecurityManager extends SecurityManager {
     public static final RuntimePermission RESET_PERMISSION = 

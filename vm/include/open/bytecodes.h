@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov, Pavel Rebriy
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 
 #ifndef _BYTECODES_H_

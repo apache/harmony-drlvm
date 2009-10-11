@@ -16,7 +16,6 @@
  */
 /** 
 * @author Alexey V. Varlamov
-* @version $Revision: 1.1.2.1.4.3 $
 */  
 
 #ifndef _PORT_SYSINFO_H_

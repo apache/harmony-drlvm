@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 #ifndef STL_VECTOR_MT_H
 #define STL_VECTOR_MT_H

@@ -17,7 +17,6 @@
 
 /** 
  * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision$
  */  
 
 #include <assert.h>

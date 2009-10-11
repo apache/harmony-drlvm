@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Rebriy
- * @version $Revision: 1.1.2.1.4.3 $
  */
 #ifndef _VERIFIER_H_
 #define _VERIFIER_H_

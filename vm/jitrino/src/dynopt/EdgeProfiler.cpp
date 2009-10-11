@@ -18,7 +18,6 @@
 
 /**
 * @author Jack Liu, Mikhail Y. Fursov, Chen-Dong Yuan
-* @version $Revision$
 */
 
 #include "EMInterface.h"

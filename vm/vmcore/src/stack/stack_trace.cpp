@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Pavel Afremov
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 
 #define LOG_DOMAIN "vm.stack"

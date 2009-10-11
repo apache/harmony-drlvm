@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexei Fedotov
- * @version $Revision: 1.4.8.1.4.3 $
  */
 
 package io;

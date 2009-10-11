@@ -16,7 +16,6 @@
  */
 /**
  * @author Andrey Yakushev
- * @version $Revision$
  */
 
 /**

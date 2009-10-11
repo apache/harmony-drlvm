@@ -16,7 +16,6 @@
  */
 /** 
  * @author Roman S. Bushmanov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 
 #if !defined(__SIMPLE_HASH_TABLE_H_)

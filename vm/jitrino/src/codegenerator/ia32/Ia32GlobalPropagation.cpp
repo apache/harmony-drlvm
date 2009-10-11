@@ -16,7 +16,6 @@
  */
 /**
  * @author Xiaoming GU
- * @version $Revision$
  */
 
 #include <fstream>

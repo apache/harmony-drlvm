@@ -16,7 +16,6 @@
  */
 /** 
  * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.5 $
  */  
 
 #ifndef _PLATFORM_CORE_NATIVES_H_

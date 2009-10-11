@@ -25,7 +25,6 @@ import java.net.URLClassLoader;
  * Various test utilities are provided as static methods of this class.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 public class TestResources {
 

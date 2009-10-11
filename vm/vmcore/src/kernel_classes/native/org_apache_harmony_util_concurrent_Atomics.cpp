@@ -16,7 +16,6 @@
  */
 /** 
  * @author Andrey Chernyshev
- * @version $Revision: 1.1.6.4 $
  */  
 
 #include "jni.h"

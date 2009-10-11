@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Pavel Afremov
- * @version $Revision: 1.7.24.3 $
  */  
 package reflect;
 

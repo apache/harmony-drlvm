@@ -39,7 +39,6 @@ import org.apache.harmony.lang.reflect.support.AuxiliaryUtil;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 public class Parser {
 

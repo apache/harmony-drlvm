@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexey V. Varlamov
- * @version $Revision: 1.1.2.1.4.5 $
  */  
 
 // This interface provides a set of common reflection mechanisms for Java class libraries.

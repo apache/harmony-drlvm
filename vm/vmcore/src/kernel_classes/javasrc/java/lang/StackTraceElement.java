@@ -16,7 +16,6 @@
  */
 /**
  * @author Dmitry B. Yershov
- * @version $Revision: 1.1.2.1.4.3 $
  */
 
 package java.lang;

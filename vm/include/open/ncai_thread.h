@@ -15,7 +15,6 @@
  */
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 #ifndef OPEN_NCAI_THREAD_H

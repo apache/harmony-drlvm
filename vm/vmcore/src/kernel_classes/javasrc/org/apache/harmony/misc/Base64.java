@@ -16,7 +16,6 @@
  */
 /**
 * @author Alexander Y. Kleymenov
-* @version $Revision: 1.1.6.3 $
 */
 
 package org.apache.harmony.misc;

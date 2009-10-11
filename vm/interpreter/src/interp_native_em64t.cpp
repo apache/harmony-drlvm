@@ -16,7 +16,6 @@
  */
 /** 
  * @author Ivan Volosyuk
- * @version $Revision: 1.22.4.6.4.3 $
  */  
 
 #include "interpreter.h"

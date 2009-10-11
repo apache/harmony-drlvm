@@ -16,7 +16,6 @@
  */
 /**
  * @author Gregory Shimansky
- * @version $Revision: 1.1.2.2.4.4 $
  */
 
 #ifndef _JVMTI_DIRECT_H_

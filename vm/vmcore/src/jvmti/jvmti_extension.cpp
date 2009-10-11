@@ -16,7 +16,6 @@
  */
 /** 
  * @author Gregory Shimansky
- * @version $Revision$
  */  
 /*
  * JVMTI extensions API

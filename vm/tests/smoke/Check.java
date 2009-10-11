@@ -16,7 +16,6 @@
  */
 /** 
  * @author Salikh Zakirov
- * @version $Revision: 1.4.24.4 $
  */  
 
 import java.io.*;

@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1 $
  */
 
 #define LOG_DOMAIN "vm.core.shutdown"

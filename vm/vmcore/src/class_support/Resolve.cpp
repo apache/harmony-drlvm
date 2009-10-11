@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.6.4.5 $
  */  
 
 //

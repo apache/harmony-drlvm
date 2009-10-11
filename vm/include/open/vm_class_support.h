@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Pavel Pervov
- * @version $Revision: 1.6 $
  */  
 
 #ifndef _VM_CLASS_SUPPORT_H

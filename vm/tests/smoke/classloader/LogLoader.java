@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.10.14.4 $
  */  
 package classloader;
 import java.io.InputStream;

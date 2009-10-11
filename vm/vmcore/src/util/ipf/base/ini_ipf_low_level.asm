@@ -16,7 +16,6 @@
 
 /**
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
  */
 // Assembly code needed to access low-level IPF features.
 //

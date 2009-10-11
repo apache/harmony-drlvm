@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision: 1.4.12.3.4.4 $
  */
 #include "compiler.h"
 #include "trace.h"

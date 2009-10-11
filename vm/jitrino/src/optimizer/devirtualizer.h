@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Pavel A. Ozhdikhin
- * @version $Revision: 1.8.16.1.4.4 $
  *
  */
 

@@ -16,7 +16,6 @@
  */
 /**
  * @author Andrey Yakushev
- * @version $Revision: 1.1.2.1.4.5 $
  */
 
 #ifdef WIN32

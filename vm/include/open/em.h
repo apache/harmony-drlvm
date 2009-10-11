@@ -16,7 +16,6 @@
  */
 /** 
  * @author Mikhail Y. Fursov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _EM_H_
 #define _EM_H_

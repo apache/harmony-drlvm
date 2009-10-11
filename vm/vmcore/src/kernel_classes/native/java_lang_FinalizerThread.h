@@ -17,7 +17,6 @@
 
 /**
  * @author Pavel Afremov 
- * @version $Revision: 1.1.2.2.4.5 $
  */
 
 /*

@@ -17,7 +17,6 @@
 
 /**
  * @author Roman S. Bushmanov
- * @version $Revision$
  */
 package java.lang;
 

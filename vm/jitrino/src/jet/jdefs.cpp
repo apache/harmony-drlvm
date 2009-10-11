@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander Astapchuk
- * @version $Revision$
  */
 #include "jdefs.h"
 #include <assert.h>

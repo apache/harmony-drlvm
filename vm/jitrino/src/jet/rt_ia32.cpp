@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander Astapchuk
- * @version $Revision$
  */
 #include "enc_ia32.h"
 #include "open/rt_types.h"

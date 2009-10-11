@@ -17,7 +17,6 @@
 
 /** 
  * @author Artem Aliev
- * @version $Revision: 1.1.2.8 $
  */  
 
 /**

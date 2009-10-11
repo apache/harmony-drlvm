@@ -16,7 +16,6 @@
  */
 /**
  * @author Gregory Shimansky, Pavel Afremov
- * @version $Revision: 1.1.2.2.4.5 $
  */
 /*
  * JVMTI stack frame API

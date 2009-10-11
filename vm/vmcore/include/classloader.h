@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov, Pavel Rebriy
- * @version $Revision: 1.1.2.8.4.3 $
  */  
 #ifndef _CLASSLOADER_H_
 #define _CLASSLOADER_H_

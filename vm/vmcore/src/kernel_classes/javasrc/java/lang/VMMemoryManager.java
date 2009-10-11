@@ -25,7 +25,6 @@ package java.lang;
  * interfaces - see the porting interface overview for more detailes.
  *
  * @author Evgueni Brevnov, Roman S. Bushmanov
- * @version $Revision: 1.1.2.1.4.4 $
  *
  * @api2vm
  */

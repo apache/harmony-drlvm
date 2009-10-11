@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.3 $
  */  
 //
 //  Routines used by the VM to emit stub code for the IPF. These routines use the IPF code compactor.

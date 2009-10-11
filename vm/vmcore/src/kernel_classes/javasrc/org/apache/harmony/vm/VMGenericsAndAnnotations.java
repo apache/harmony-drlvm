@@ -29,7 +29,6 @@ import java.lang.annotation.Annotation;
  * interfaces - see the porting interface overview for more detailes.
  * 
  * @author Serguei S. Zapreyev, Alexey V. Varlamov
- * @version $Revision$
  * 
  * @api2vm
  */

@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Vyacheslav P. Shakin
- * @version $Revision: 1.15.12.1.4.4 $
  */
 
 #ifndef _IA32_INST_SELECTOR_H

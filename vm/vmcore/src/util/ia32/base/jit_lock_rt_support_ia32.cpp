@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.2.4.3 $
  */  
 
 #include <open/hythread_ext.h>

@@ -20,7 +20,6 @@ package org.apache.harmony.vm;
  * 
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 public class ClassFormat {
     

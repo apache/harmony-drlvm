@@ -16,7 +16,6 @@
  */
 /**
  * @author Salikh Zakirov
- * @version $Revision: 1.1.28.3 $
  *
  * $Id: List.java,v 1.1.28.3 2006/03/28 14:46:27 aycherny Exp $
  */

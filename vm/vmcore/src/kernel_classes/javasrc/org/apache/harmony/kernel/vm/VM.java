@@ -16,7 +16,6 @@
  */
 /**
  * @author Evgueni V. Brevnov
- * @version $Revision: 1.1.2.3.4.3 $
  */ 
 
 package org.apache.harmony.kernel.vm;

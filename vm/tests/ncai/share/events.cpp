@@ -1,6 +1,5 @@
 /**
  * @author Valentin Al. Sitnick, Petr Ivanov
- * @version $Revision: 1.1.1.1 $
  *
  */
 

@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Pavel Pervov
- * @version $Revision: 1.4 $
  */
 #ifndef _VM_FIELD_ACCESS_H
 #define _VM_FIELD_ACCESS_H

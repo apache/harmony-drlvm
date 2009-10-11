@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander Astapchuk
- * @version $Revision$
  */
 
 #if !defined(__IA32_CGUTILS_INCLUDED__)

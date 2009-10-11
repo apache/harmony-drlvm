@@ -16,7 +16,6 @@
  */
 /** 
  * @author Ivan Volosyuk
- * @version $Revision: 1.2.32.1.4.3 $
  */  
 package exception;
 

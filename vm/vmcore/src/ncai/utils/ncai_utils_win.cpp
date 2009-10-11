@@ -1,6 +1,5 @@
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 #include "open/ncai_thread.h"

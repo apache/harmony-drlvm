@@ -20,7 +20,6 @@ import java.lang.reflect.ReflectPermission;
 
 /**
  * @author Evgueni Brevnov, Roman S. Bushmanov
- * @version $Revision: 1.1.6.4 $
  */
 public interface ReflectPermissionCollection {
 

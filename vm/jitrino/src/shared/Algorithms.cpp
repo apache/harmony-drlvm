@@ -16,7 +16,6 @@
  */
 /**
  * @author Igor V Chebykin
- * @version $Revision: 1.3.12.4.4.4 $
  */
 /**
  * @file

@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.12.14.1.4.3 $
  */
 
 #include "Ia32IRManager.h"

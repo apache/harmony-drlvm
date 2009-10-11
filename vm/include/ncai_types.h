@@ -1,6 +1,5 @@
 /**
  * @author Intel, Petr Ivanov
- * @version $Revision: 1.1.2.10 $
  */
 #ifndef _NCAI_TYPES_H_
 #define _NCAI_TYPES_H_

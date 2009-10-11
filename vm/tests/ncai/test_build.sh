@@ -1,7 +1,6 @@
 #! /bin/bash
 #
 # @author: Valentin Al. Sitnick, Petr Ivanov
-# @version: $Revision$
 #
 
 # STEP 5: set all environment variables needed for test building

@@ -16,7 +16,6 @@
  */
 /**
  * @author Evgueni Brevnov
- * @version $Revision: 1.1 $
  */
 
 #include "m2n.h"

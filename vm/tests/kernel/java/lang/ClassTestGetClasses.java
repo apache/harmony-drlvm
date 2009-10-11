@@ -20,7 +20,6 @@
  * tested method: GetClasses
  * 
  * @author Evgueni V. Brevnov
- * @version $Revision$ 
  */
 
 package java.lang;

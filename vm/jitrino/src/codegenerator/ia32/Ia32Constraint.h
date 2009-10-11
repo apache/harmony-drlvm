@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.9.14.1.4.3 $
  */
 
 #ifndef _IA32_CONSTRAINT_H_

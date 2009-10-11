@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.7.18.4 $
  */  
 package classloader;
 /**

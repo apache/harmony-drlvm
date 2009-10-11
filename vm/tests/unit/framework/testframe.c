@@ -18,7 +18,6 @@
 
 /**
  * @author Salikh Zakirov
- * @version $Revision$
  */
 #include "testframe.h"
 #include <stdio.h>

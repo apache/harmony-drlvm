@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Pavel Afremov
- * @version $Revision: 1.1 $
  */
 #ifndef _EXCEPTIONS_IMPL_H_
 #define _EXCEPTIONS_IMPL_H_

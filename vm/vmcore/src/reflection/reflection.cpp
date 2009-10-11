@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexey V. Varlamov
- * @version $Revision: 1.1.2.2.4.5 $
  */  
  
 #define LOG_DOMAIN "vm.core.reflection"

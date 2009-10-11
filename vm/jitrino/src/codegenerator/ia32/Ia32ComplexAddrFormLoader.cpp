@@ -16,7 +16,6 @@
  */
 /**
  * @author Nikolay A. Sidelnikov
- * @version $Revision: 1.10.12.2.4.3 $
  */
 
 

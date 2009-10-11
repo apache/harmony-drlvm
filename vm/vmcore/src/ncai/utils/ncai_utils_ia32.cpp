@@ -1,6 +1,5 @@
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 #include <open/types.h>

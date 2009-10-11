@@ -16,7 +16,6 @@
  */
 /**
  * @author Evgueni Brevnov, Serguei S. Zapreyev, Alexey V. Varlamov
- * @version $Revision: 1.1.2.2.4.4 $
  */
 
 package java.lang.reflect;

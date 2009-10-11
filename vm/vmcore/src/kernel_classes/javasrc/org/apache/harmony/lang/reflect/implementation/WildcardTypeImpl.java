@@ -28,7 +28,6 @@ import org.apache.harmony.lang.reflect.support.AuxiliaryCreator;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2 $
  */
 public final class WildcardTypeImpl implements WildcardType {
     private final Object startPoint;

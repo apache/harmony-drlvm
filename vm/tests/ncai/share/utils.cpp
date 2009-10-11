@@ -1,6 +1,5 @@
 /**
  * @author Valentin Al. Sitnick
- * @version $Revision: 1.1.1.1 $
  *
  */
 

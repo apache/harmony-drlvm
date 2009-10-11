@@ -17,7 +17,6 @@
 
 /**
  * @author Serguei S.Zapreyev
- * @version $Revision$
  **/
 
 package org.apache.harmony.lang.generics;

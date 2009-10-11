@@ -16,7 +16,6 @@
  */
 /**
  * @author Sergey L. Ivashin
- * @version $Revision: 1.7.22.3 $
  */
 
 #if !defined(__IA32REGALLOCCHECK_H_INCLUDED__)

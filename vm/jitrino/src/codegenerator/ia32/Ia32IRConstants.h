@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.13.12.1.4.3 $
  */
 
 #ifndef _IA32_IR_CONSTANTS_H_

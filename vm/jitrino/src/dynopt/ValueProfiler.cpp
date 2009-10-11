@@ -18,7 +18,6 @@
 
 /**
 * @author Pavel Ozhdikhin
-* @version $Revision$
 */
 
 

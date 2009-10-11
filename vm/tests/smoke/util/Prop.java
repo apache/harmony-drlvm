@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Salikh Zakirov
- * @version $Revision: 1.6.24.3 $
  */  
 package util;
 

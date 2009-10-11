@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision: 1.3.12.3.4.4 $
  */
  
 /**

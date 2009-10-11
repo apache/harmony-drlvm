@@ -16,10 +16,6 @@
  */
 
 /**
- * @version $Revision: 1.1.2.1.4.3 $
- */
-
-/**
  * @file
  * Import interfaces used by the interpreter.
  *

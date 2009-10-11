@@ -17,7 +17,6 @@
 
 /**
  * @author Intel
- * @version $Revision: 1.1 $
  *
  */
 

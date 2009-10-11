@@ -16,7 +16,6 @@
  */
 /** 
  * @author Salikh Zakirov
- * @version $Revision: 1.11.6.3.4.4 $
  */  
 package gc;
 

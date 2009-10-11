@@ -16,7 +16,6 @@
  */
 /**
  * @author Serguei S.Zapreyev
- * @version $Revision: 1.1.2.1.2.1.2.4 $
  */ 
 // java.lang.Runtime class' native support.
 

@@ -29,7 +29,6 @@ import org.apache.harmony.lang.AnnotatedElementTestFrame.ValAntn;
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 public class Method5Test extends AnnotatedElementTestFrame {
 

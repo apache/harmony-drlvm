@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Afremov, Vera Volynets
- * @version $Revision: 1.3.12.1.4.3 $
  */  
  
 package perf;

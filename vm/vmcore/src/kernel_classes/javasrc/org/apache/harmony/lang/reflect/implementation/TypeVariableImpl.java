@@ -29,7 +29,6 @@ import org.apache.harmony.lang.reflect.repository.*;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2 $
  */
 public final class TypeVariableImpl<D extends GenericDeclaration> implements TypeVariable<D> {
     private Type[] bounds;

@@ -16,7 +16,6 @@
  */
 /** 
  * @author Aleksey Ignatenko
- * @version $Revision: 1.1.2.2.4.4 $
  */  
 
 #ifndef __HASHTABLE_H__

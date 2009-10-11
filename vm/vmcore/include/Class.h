@@ -17,7 +17,6 @@
 
 /**
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.7.2.1.2.5 $
  */
 #ifndef _CLASS_H_
 #define _CLASS_H_

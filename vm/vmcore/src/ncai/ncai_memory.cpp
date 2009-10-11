@@ -1,6 +1,5 @@
 /**
  * @author Petr Ivanov
- * @version $Revision$
  */
 #define LOG_DOMAIN "ncai.memory"
 #include "cxxlog.h"

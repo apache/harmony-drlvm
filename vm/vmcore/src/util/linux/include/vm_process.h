@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _VM_PROCESS_H_
 #define _VM_PROCESS_H_

@@ -24,7 +24,6 @@ import java.lang.reflect.InvocationTargetException;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

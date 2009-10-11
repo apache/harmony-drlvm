@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.20.8.2.4.3 $
  */
 
 #ifndef _IA32_IRMANAGER_H_

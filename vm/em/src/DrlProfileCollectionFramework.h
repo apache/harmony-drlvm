@@ -16,7 +16,6 @@
  */
 /**
 * @author Mikhail Y. Fursov
-* @version $Revision: 1.1.2.1.4.3 $
 */
 
 #ifndef _DRL_PROFILE_COLLECTION_FRAMEWORK_H_

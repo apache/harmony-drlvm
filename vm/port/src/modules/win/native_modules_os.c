@@ -16,7 +16,6 @@
  */
 /**
  * @author Petr Ivanov, Ilya Berezhniuk
- * @version $Revision: 1.1.2.1 $
  */
 
 #include "port_malloc.h"

@@ -21,7 +21,6 @@ import java.util.Arrays;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 public final class InterimParameterizedType implements InterimGenericType, InterimType {
     public String currentClauseName; // XXX: It seems to be superfluous but it's been used in AuxiliaryFinder 

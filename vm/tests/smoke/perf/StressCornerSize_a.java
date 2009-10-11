@@ -16,7 +16,6 @@
  */
 /** 
  * @author Vera Volynets
- * @version $Revision: 1.6.22.3 $
  */  
  
 package perf;

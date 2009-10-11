@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov
- * @version $Revision: 1.4.24.3 $
  */  
 package util;
 

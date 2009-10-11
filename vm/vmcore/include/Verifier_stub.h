@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Rebriy
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 
 #ifndef _VERIFIER_STUB_H_

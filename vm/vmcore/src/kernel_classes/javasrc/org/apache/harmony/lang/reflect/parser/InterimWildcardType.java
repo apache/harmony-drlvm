@@ -19,7 +19,6 @@ package org.apache.harmony.lang.reflect.parser;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 public class InterimWildcardType implements InterimType {
     public InterimType bounds[];

@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.6.22.3 $
  */
 
 #include "Ia32CallingConvention.h"

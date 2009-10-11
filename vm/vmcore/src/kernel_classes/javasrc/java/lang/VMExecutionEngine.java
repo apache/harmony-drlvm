@@ -16,7 +16,6 @@
  */
 /**
  * @author Evgueni Brevnov, Roman S. Bushmanov
- * @version $Revision: 1.1.2.1.4.4 $
  */
 package java.lang;
 

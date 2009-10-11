@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.13.16.3 $
  */
 
 #ifndef _IA32_CODE_GENERATOR_

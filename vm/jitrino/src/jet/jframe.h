@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander Astapchuk
- * @version $Revision$
  */
 #if !defined(__JFRAME_H_INCLUDED__)
 #define __JFRAME_H_INCLUDED__

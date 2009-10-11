@@ -1,6 +1,5 @@
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 #define LOG_DOMAIN "ncai.thread"

@@ -16,7 +16,6 @@
  */
 /**
  * @author Sergey L. Ivashin
- * @version $Revision$
  */
 
 #ifndef _PMFACTION_H_

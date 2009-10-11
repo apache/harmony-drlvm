@@ -22,7 +22,6 @@ import java.lang.reflect.Method;
 
 /**
  * @author Evgueni Brevnov, Roman S. Bushmanov
- * @version $Revision: 1.1.6.4 $
  */
 public interface ReflectAccessor {
 

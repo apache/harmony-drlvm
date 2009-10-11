@@ -16,7 +16,6 @@
  */
 /** 
 * @author Intel, Leviev Ilia
-* @version $Revision: $
 */  
 
 /**

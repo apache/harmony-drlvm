@@ -17,7 +17,6 @@
 
 /** 
  * @author Intel, Pavel Afremov
- * @version $Revision$
  */  
 
 #define LOG_DOMAIN "port.old"

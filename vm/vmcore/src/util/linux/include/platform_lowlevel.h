@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _PLATFORM_LOWLEVEL_H_
 #define _PLATFORM_LOWLEVEL_H_

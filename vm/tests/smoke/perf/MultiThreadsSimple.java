@@ -16,7 +16,6 @@
  */
 /** 
  * @author Salikh Zakirov, Vera Volynets
- * @version $Revision: 1.2.20.3 $
  */ 
 
 package perf;

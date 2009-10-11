@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, George A. Timoshenko
- * @version $Revision: 1.12.8.1.4.4 $
  *
  */
 

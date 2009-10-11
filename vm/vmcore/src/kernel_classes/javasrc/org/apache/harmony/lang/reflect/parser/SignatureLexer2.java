@@ -23,7 +23,6 @@ import antlr.Token;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  *
  * NOTE. Initially this Signature Parser was created and debugged using lex and yacc on Linux:
  * 

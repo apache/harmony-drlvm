@@ -16,7 +16,6 @@
  */
 /** 
  * @author Gregory Shimansky
- * @version $Revision: 1.4.28.4 $
  */  
 package jni;
 

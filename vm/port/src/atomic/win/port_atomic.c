@@ -16,7 +16,6 @@
  */
 /** 
  * @author Evgueni Brevnov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 
 /* All code from this file was inlinied in port_atomic.h */

@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, George A. Timoshenko
- * @version $Revision: 1.34.8.4.4.4 $
  */
 
 #include "Stl.h"

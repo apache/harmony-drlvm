@@ -17,7 +17,6 @@
 
 /**
  * @author Nikolay A. Sidelnikov
- * @version $Revision: 1.8.12.1.4.3 $
  */
 
 #ifndef _PLATFORMDEPENDANT_H_

@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Sergey L. Ivashin
- * @version $Revision$
  *
  */
 

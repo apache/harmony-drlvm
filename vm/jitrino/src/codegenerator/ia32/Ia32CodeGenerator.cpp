@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.19.8.4.4.3 $
  */
 
 #define IRTRANSFORMER_REGISTRATION_ON 1

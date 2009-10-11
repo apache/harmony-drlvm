@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Pavel Pervov
- * @version $Revision: 1.10 $
  */
 #ifndef _VM_CLASS_MANIPULATION_H
 #define _VM_CLASS_MANIPULATION_H

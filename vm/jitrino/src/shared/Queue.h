@@ -17,7 +17,6 @@
 
 /**
  * @author Pavel A. Ozhdikhin
- * @version $Revision: 1.2.26.4 $
  */
 
 #ifndef _QUEUE_H_

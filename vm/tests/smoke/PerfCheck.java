@@ -16,7 +16,6 @@
  */
 /** 
  * @author Vera Volynets
- * @version $Revision: 1.1.28.4 $
  */  
 
 import java.lang.reflect.*;

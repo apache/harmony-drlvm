@@ -16,7 +16,6 @@
  */
 /** 
  * @author Ivan Volosyuk, Salikh Zakirov
- * @version $Revision: 1.7.8.1.4.3 $
  */  
 
 package stress;

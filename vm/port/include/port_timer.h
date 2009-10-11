@@ -16,7 +16,6 @@
 */
 /** 
 * @author Alexey V. Varlamov
-* @version $Revision$
 */  
 #ifndef _PORT_TIMER_H_
 #define _PORT_TIMER_H_

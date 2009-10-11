@@ -16,7 +16,6 @@
  */
 /** 
  * @author Mikhail Y. Fursov
- * @version $Revision: 1.1.2.2.4.4 $
  */  
 #ifndef _EM_VM_H_
 #define _EM_VM_H_

@@ -1,6 +1,5 @@
 /**
  * @author Petr Ivanov
- * @version $Revision$
  */
 
 #include <memory.h>

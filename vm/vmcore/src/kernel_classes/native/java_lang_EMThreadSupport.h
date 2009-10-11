@@ -17,7 +17,6 @@
 
 /** 
  * @author Mikhail Fursov
- * @version $Revision: 1.1.2.1.4.5 $
  */  
 
 /*

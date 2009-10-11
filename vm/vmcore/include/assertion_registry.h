@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */  
 
 #ifndef _ASSERTIONS_H_

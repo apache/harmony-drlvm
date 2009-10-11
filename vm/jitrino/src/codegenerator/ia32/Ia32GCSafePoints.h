@@ -16,7 +16,6 @@
  */
 /**
  * @author Mikhail Y. Fursov
- * @version $Revision$
  */
 
 

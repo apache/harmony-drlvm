@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision$
  */  
 #define LOG_DOMAIN "vm.helpers"
 #include "cxxlog.h"

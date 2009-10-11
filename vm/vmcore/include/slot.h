@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Salikh Zakirov
- * @version $Revision$
  */  
 #ifndef _SLOT_H_
 #define _SLOT_H_

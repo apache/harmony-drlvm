@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Salikh Zakirov
- * @version $Revision: 1.6.12.1.4.3 $
  */  
 package util;
 import java.util.Currency;

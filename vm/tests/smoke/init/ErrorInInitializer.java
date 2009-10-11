@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Salikh Zakirov
- * @version $Revision: 1.8.40.3 $
  */  
 package init;
 

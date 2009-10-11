@@ -42,7 +42,6 @@ import junit.framework.TestCase;
  * @see #getElement6()
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 public abstract class AnnotatedElementTestFrame extends TestCase {
 

@@ -34,7 +34,6 @@ import junit.framework.TestCase;
  * The test of annotation implementation, covering all possible types of elements.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 @AllTypesAntn
 public class AllTypesTest extends TestCase {

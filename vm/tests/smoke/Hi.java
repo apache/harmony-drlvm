@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Salikh Zakirov
- * @version $Revision: 1.3.40.3 $
  */  
 public class Hi {
     public static void main (String[] args) {

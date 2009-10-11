@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision$
  */
 #include <stdio.h>
 #include <assert.h>

@@ -17,7 +17,6 @@
 
 /**
  * @author Serguei S.Zapreyev
- * @version $Revision$
  */
 
 package java.lang;

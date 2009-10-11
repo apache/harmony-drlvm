@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Afremov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 #ifndef _NATIVE_FRAME_H_
 #define _NATIVE_FRAME_H_

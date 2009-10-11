@@ -17,7 +17,6 @@
 
 /**
  * @author Elena Semukhina
- * @version $Revision$
  */
 
 package java.lang;

@@ -16,7 +16,6 @@
  */
 /**
  * @author Sergey L. Ivashin
- * @version $Revision$
  */
 
 #ifndef _LOGSTREAM_H_

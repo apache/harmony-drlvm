@@ -1,6 +1,5 @@
 /**
  * @author Intel, Petr Ivanov
- * @version $Revision$
  */
 
 /**

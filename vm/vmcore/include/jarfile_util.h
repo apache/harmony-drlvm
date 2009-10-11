@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Rebriy
- * @version $Revision: 1.1.2.2.4.3 $
  */  
 
 #ifndef __JARFILE_UTIL_H__

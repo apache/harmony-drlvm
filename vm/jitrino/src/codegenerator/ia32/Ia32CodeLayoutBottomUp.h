@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.10.22.4 $
  */
 
 #ifndef _IA32_CODE_LAYOUT_BOTTOM_UP

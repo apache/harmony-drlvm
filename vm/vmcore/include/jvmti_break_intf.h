@@ -16,7 +16,6 @@
  */
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 /**
  * @file jvmti_break_intf.h

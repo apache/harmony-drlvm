@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.11.14.2.4.3 $
  */
 
 #include "Ia32ConstraintsResolver.h"

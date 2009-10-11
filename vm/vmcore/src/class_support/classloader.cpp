@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.11.2.1.2.6 $
  */  
 
 #define LOG_DOMAIN LOG_CLASS_INFO

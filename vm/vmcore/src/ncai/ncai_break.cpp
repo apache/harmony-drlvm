@@ -1,6 +1,5 @@
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 //#include <memory.h>

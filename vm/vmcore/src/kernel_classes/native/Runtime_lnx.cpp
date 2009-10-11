@@ -16,7 +16,6 @@
  */
 /**
  * @author Serguei S.Zapreyev
- * @version $Revision: 1.1.2.1.4.4 $
  * 
  * This java_lang_Runtime.cpp source ("Software") is furnished under license and may
  * only be used or copied in accordance with the terms of that license.

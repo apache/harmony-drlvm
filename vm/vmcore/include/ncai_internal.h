@@ -1,6 +1,5 @@
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 #ifndef _NCAI_INTERNAL_H_
 #define _NCAI_INTERNAL_H_

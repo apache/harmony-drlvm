@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision: 1.1.2.2.4.4 $
  */
 #ifndef __ENC_PRVT_H_INCLUDED__
 #define __ENC_PRVT_H_INCLUDED__

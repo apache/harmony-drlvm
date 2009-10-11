@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Evgueni Brevnov
- * @version $Revision: 1.1 $
  *
  */
 

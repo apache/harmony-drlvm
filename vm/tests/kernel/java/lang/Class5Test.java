@@ -35,7 +35,6 @@ import org.apache.harmony.lang.AnnotatedElementTestFrame.ValAntn;
  * functionality in {@link java.lang.Class java.lang.Class} class.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 public class Class5Test extends AnnotatedElementTestFrame {
 

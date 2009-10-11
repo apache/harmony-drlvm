@@ -18,7 +18,6 @@ package java.lang;
 
 /** 
  * @author Mikhail Y. Fursov
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 class EMThreadSupport {
 

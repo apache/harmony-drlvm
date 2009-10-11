@@ -22,7 +22,6 @@ import java.lang.reflect.Type;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2 $
  */
 public final class GenericArrayTypeImpl implements GenericArrayType {
     private final Type nextLayer;

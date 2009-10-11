@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Nikolay A. Sidelnikov
- * @version $Revision: 1.13.14.3.4.4 $
  */
 
 #ifndef _IA32_STACK_INFO_H_

@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.10.14.2.4.4 $
  */
 
 #ifndef _IA32_GC_MAP_H_

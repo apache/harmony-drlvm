@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov
- * @version $Revision$
  */  
 
 void setup_floating_point_state(int * p_old_floating_point_state) {

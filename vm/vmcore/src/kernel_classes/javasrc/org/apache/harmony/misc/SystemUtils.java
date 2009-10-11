@@ -20,7 +20,6 @@ package org.apache.harmony.misc;
  * Some system utils
  *
  * @author Alexey A. Petrenko
- * @version $Revision: 1.1.6.3 $
  */
 public class SystemUtils {
 	// Public constants

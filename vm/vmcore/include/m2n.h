@@ -16,7 +16,6 @@
  */
 /** 
  * @author Intel, Evgueni Brevnov, Ivan Volosyuk
- * @version $Revision: 1.1.2.1.4.4 $
  */  
 
 #ifndef _M2N_H_

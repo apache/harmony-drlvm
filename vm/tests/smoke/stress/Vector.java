@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov
- * @version $Revision: 1.4.32.3 $
  */  
 package stress;
 

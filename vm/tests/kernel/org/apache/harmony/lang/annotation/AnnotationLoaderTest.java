@@ -30,7 +30,6 @@ import junit.framework.TestCase;
  * annotations.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 public class AnnotationLoaderTest extends TestCase {
 

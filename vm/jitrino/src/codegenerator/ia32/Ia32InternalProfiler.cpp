@@ -16,7 +16,6 @@
  */
 /**
  * @author Nikolay A. Sidelnikov
- * @version $Revision: 1.2.12.3.4.3 $
  */
 #include <cstring>
 #include "Ia32IRManager.h"

@@ -17,7 +17,6 @@
 
 /**
 * @author Intel, Vitaly N. Chaiko
-* @version $Revision: 1.6.14.1.4.5 $
 */
 
 #ifndef _IA32_BC_MAP_H_

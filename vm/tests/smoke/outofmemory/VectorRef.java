@@ -16,7 +16,6 @@
  */
 /** 
  * @author Salikh Zakirov
- * @version $Revision: 1.8.20.1.4.4 $
  */  
 package outofmemory;
 

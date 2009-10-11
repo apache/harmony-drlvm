@@ -16,7 +16,6 @@
  */
 /**
  * @author Pavel Afremov
- * @version $Revision: 1.1.2.1.2.2 $
  */
 
 // This describes the core VM interface to exception manipulation, throwing, and catching

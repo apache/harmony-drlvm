@@ -17,7 +17,6 @@
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 
 @org.apache.harmony.lang.AnnotatedElementTestFrame.MissingTypeAntn

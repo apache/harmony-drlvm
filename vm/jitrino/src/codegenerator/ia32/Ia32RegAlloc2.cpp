@@ -16,7 +16,6 @@
  */
 /**
  * @author Sergey L. Ivashin
- * @version $Revision: 1.13.20.3 $
  */
 
 #include "Ia32IRManager.h"

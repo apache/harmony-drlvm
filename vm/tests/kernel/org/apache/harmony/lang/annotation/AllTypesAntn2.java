@@ -23,7 +23,6 @@ import java.lang.annotation.RetentionPolicy;
  * The annotation containing all possible types of elements.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 @Retention(RetentionPolicy.RUNTIME)
 @AllTypesAntn2(intValue=1,intArrayValue=2, 

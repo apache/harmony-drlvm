@@ -34,7 +34,6 @@ import org.apache.harmony.lang.reflect.implementation.*;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

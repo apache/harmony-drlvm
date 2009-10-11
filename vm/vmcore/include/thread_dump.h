@@ -17,7 +17,6 @@
 
 /**
  * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.1.4.5 $
  */
 
 #ifndef _THREADDUMP_H_

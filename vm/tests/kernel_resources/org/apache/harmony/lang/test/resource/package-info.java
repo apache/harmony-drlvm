@@ -17,7 +17,6 @@
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 @AnotherAntn
 package org.apache.harmony.lang.test.resource;

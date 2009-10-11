@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin, Mikhail Y. Fursov
- * @version $Revision$
  */
 
 #include "Log.h"

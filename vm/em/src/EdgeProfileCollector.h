@@ -16,7 +16,6 @@
 */
 /**
 * @author Jack Liu, Mikhail Y. Fursov, Chen-Dong Yuan
-* @version $Revision$
 */
 
 #ifndef _EDGE_PROFILE_COLLECTOR_H_

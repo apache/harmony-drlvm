@@ -17,7 +17,6 @@
 
 /**
  * @author Salikh Zakirov
- * @version $Revision$
  */
 #ifndef _TESTFRAME_H_
 #define _TESTFRAME_H_

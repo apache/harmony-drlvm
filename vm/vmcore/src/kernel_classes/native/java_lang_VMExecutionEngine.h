@@ -17,7 +17,6 @@
 
 /** 
  * @author Euguene Ostrovsky
- * @version $Revision: 1.1.2.1.4.7 $
  */  
 
 /*

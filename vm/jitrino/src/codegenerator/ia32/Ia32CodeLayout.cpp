@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.8.20.4 $
  */
 
 #include "Ia32CodeLayout.h"

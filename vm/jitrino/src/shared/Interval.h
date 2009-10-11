@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Nikolay A. Sidelnikov
- * @version $Revision$
  *
  */
 

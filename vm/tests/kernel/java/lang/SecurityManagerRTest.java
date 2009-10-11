@@ -17,7 +17,6 @@
 
 /**
  * @author Vladimir Ivanov
- * @version $Revision$
  */
 
 package java.lang;

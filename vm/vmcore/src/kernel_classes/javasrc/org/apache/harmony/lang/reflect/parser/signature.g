@@ -26,7 +26,6 @@ import org.apache.harmony.lang.reflect.parser.*;
  */
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.2 $
  *
  * NOTE 1. This signature.g was created and debugged using 
  * -bash-3.00$ uname -a

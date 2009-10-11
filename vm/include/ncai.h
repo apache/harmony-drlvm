@@ -1,6 +1,5 @@
 /**
  * @author Intel, Petr Ivanov
- * @version $Revision$
  */
 #ifndef _NCAI_H_
 #define _NCAI_H_

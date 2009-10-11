@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Vyacheslav P. Shakin, Mikhail Y. Fursov
- * @version $Revision: 1.18.20.4 $
  */
 
 #ifndef _IA32_CFG_H_

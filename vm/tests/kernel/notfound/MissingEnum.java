@@ -18,7 +18,6 @@ package notfound;
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 public enum MissingEnum {
     A, B, C

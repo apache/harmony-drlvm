@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Vyacheslav P. Shakin
- * @version $Revision: 1.10.12.1.4.4 $
  */
 
 

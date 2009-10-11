@@ -16,7 +16,6 @@
  */
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 
 #include <string.h>

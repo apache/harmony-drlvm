@@ -17,7 +17,6 @@
 
 /**
  * @author Sergey L. Ivashin
- * @version $Revision$
  *
  */
 

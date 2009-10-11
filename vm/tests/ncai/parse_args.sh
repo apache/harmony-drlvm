@@ -1,7 +1,6 @@
 #! /bin/bash
 #
 # @author: Valentin Al. Sitnick, Petr Ivanov
-# @version: $Revision$
 #
 
 # STEP 1: set the deafult values before argument parsing

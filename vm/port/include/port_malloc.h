@@ -16,7 +16,6 @@
  */
 /**
  * @author Evgueni Brevnov, Andrey Yakushev
- * @version $Revision: 1.1.2.1.4.4 $
  */
 #ifndef _PORT_MALLOC_H_
 #define _PORT_MALLOC_H_

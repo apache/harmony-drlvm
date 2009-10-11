@@ -17,7 +17,6 @@
 
 /** 
  * @author Evgueni Brevnov
- * @version $Revision$
  */  
 
 #ifndef _M2N_EM64T_INTERNAL_H_

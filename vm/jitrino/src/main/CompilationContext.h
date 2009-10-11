@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.3.10.2.4.4 $
  */
 
 #ifndef _COMPILATION_CONTEXT_H_

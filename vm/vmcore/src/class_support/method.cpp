@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Pervov
- * @version $Revision: 1.1.2.3.2.1.2.4 $
  */  
 
 #define LOG_DOMAIN "vm.core"

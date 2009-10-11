@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.11.12.1.4.4 $
  */
 
 #include "Ia32CodeLayoutTopDown.h"

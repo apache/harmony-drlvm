@@ -16,7 +16,6 @@
  */
 /**
  * @author Alexander V. Astapchuk
- * @version $Revision: 1.1.2.2.4.4 $
  */
 #ifndef _ENCODER_DEFS_H_
 #define _ENCODER_DEFS_H_

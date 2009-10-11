@@ -17,7 +17,6 @@
 
 /**
  * @author Serguei S.Zapreyev
- * @version $Revision: 1.1.2.1.4.6 $
  * 
  * This java_lang_Runtime_SubProcess_SubInputStream.h source ("Software") is furnished under license and may
  * only be used or copied in accordance with the terms of that license.

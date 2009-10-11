@@ -23,7 +23,6 @@ import org.apache.harmony.lang.reflect.support.AuxiliaryFinder;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

@@ -21,7 +21,6 @@ import java.lang.annotation.RetentionPolicy;
 
 /**
  * @author Alexey V. Varlamov
- * @version $Revision$
  */ 
 @Retention(RetentionPolicy.RUNTIME)
 public @interface MissingAntn {

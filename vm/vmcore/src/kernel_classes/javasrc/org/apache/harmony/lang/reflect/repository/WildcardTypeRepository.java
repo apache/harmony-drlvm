@@ -22,7 +22,6 @@ import org.apache.harmony.lang.reflect.parser.*;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.1 $
  */
 
 /**

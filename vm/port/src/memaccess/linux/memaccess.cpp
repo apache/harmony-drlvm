@@ -16,7 +16,6 @@
  */
 /**
  * @author Ilya Berezhniuk
- * @version $Revision$
  */
 #include <sys/mman.h>
 #include <limits.h>

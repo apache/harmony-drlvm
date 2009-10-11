@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Nikolay A. Sidelnikov
- * @version $Revision: 1.7.22.4 $
  */
 
 #ifndef _IA32RUNTIMEINTERFACE_H_

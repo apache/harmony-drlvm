@@ -16,7 +16,6 @@
  */
 /**
  * @author Intel, Pavel Afremov
- * @version $Revision: 1.1 $
  */
 
 #define LOG_DOMAIN "exn"

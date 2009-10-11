@@ -16,7 +16,6 @@
  */
 /** 
  * @author Gregory Shimansky
- * @version $Revision: 1.1.2.1.4.5 $
  */  
 /*
  * JVMTI thread API

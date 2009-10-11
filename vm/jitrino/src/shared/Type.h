@@ -17,7 +17,6 @@
 
 /**
  * @author Intel, Mikhail Y. Fursov
- * @version $Revision: 1.18.24.4 $
  *
  */
 #ifndef _TYPE_H_

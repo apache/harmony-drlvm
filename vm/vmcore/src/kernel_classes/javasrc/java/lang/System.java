@@ -41,7 +41,6 @@ import org.apache.harmony.luni.platform.Environment;
  * @com.intel.drl.spec_ref 
  * 
  * @author Roman S. Bushmanov
- * @version $Revision: 1.1.2.2.4.3 $
  */
 public final class System {
 

@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov, Salikh Zakirov
- * @version $Revision: 1.12.20.3 $
  */  
 package thread;
 

@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.5.22.3 $
  */
 
 #ifndef _IA32_INTERNAL_TRACE_H_

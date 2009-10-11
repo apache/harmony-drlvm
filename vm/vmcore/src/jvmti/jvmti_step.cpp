@@ -16,7 +16,6 @@
  */
 /** 
  * @author Pavel Rebriy
- * @version $Revision: $
  */
 #define LOG_DOMAIN "jvmti.step"
 #include "cxxlog.h"

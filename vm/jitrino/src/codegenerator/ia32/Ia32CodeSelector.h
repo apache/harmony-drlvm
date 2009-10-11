@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision$
  */
 
 #ifndef _IA32_CODE_SELECTOR_H_

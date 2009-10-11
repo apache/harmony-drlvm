@@ -33,7 +33,6 @@ import antlr.collections.impl.BitSet;
 
 /**
  * @author Serguei S. Zapreyev
- * @version $Revision: 1.1.2.3 $
  *
  * NOTE 1. This signature.g was created and debugged using 
  * -bash-3.00$ uname -a

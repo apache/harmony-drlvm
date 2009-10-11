@@ -16,7 +16,6 @@
  */
 /** 
 * @author Alexey V. Varlamov
-* @version $Revision$
 */  
 
 #include "port_timer.h"

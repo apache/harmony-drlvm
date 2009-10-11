@@ -23,7 +23,6 @@ import java.lang.annotation.RetentionPolicy;
  * The annotation containing all possible types of elements with default values.
  * 
  * @author Alexey V. Varlamov
- * @version $Revision$
  */
 @Retention(RetentionPolicy.RUNTIME)
 @AnotherAntn

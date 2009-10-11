@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.11.12.1.4.3 $
  */
 
 #ifndef _IA32_ENCODER_H_

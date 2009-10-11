@@ -61,7 +61,6 @@ import org.apache.harmony.vm.VMStack;
  * Runtime representation of a class
  *
  * @author Evgueni Brevnov, Serguei S. Zapreyev, Alexey V. Varlamov
- * @version $Revision: 1.1.2.2.4.5 $
  */
 public final class Class<T> implements Serializable, AnnotatedElement, GenericDeclaration, Type {
 

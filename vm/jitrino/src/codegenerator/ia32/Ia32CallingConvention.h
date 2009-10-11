@@ -16,7 +16,6 @@
  */
 /**
  * @author Vyacheslav P. Shakin
- * @version $Revision: 1.8.22.3 $
  */
 
 #ifndef _IA32_CALLING_CONVENTION_H_

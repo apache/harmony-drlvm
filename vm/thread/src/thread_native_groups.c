@@ -17,7 +17,6 @@
 
 /** 
  * @author Nikolay Kuznetsov
- * @version $Revision: 1.1.2.5 $
  */  
 
 /**

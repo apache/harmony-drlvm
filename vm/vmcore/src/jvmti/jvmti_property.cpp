@@ -16,7 +16,6 @@
  */
 /** 
  * @author Gregory Shimansky
- * @version $Revision: 1.1.2.3.4.4 $
  */  
 /*
  * JVMTI property API

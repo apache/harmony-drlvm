@@ -16,7 +16,6 @@
  */
 /** 
  * @author Alexei Fedotov
- * @version $Revision: 1.5.20.3 $
  */  
 package thread;
 
