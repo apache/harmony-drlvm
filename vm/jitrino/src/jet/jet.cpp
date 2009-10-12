@@ -141,6 +141,7 @@
 #include "trace.h"
 #include "mkernel.h"
 #include "PlatformDependant.h"
+#include "version.h"
 
 #include <set>
 #include <string>
@@ -357,8 +358,7 @@ static const char *get_id_string(void)
     if (buf[0] != 0) return buf;
     unsigned len = sizeof(buf)-1;
     
-    const char revision[] = "$Revision$";
-    const char branch[] = "$Name$";
+    const char revision[] = VERSION_SVN_TAG;
 
 #ifdef PROJECT_JET
     #define ALONE_STR   ", alone"
@@ -378,20 +378,16 @@ static const char *get_id_string(void)
     #define COMP_STR    ""
 #endif
 
-    char revision_buf[80] = {0}, branch_buf[80] = {0};
-    if (revision[0] != '$') {
+    char revision_buf[80] = {0};
+    if (revision[0] != 'u') { /* ignore 'u'nknown */
         snprintf(revision_buf, sizeof(revision_buf)-1, " Rev.: %s.",
                  revision);
-    }
-    if (branch[0] != '$') {
-        snprintf(branch_buf, sizeof(branch_buf)-1, " Br.: %s.",
-                 branch);
     }
 
     snprintf(buf, len, 
         "Jitrino.JET" DBG_STR COMP_STR ALONE_STR ": "
         "Built: " __DATE__ " " __TIME__ 
-        ".%s%s", branch_buf, revision_buf);
+        ".%s", revision_buf);
         
     return buf;
 }
