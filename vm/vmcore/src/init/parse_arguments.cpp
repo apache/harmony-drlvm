@@ -348,6 +348,13 @@ void parse_vm_arguments2(Global_Env *p_env)
         else if (begins_with(option, "-agentpath:")) {
             p_env->TI->addAgent(option);
         }
+        else if (begins_with(option, "-javaagent:")) {
+            char* dest = (char*) STD_MALLOC(strlen("-agentlib:hyinstrument=") + strlen(option + 11) + 1);
+            strcpy(dest, "-agentlib:hyinstrument=");
+            strcat(dest, option + 11);
+            p_env->TI->addAgent(dest);
+            STD_FREE((void*) dest);
+        }
         else if (begins_with(option, "-Xrun")) {
             // Compatibility with JNDI
             p_env->TI->addAgent(option);
