@@ -147,7 +147,7 @@ static void init_java_properties(Properties & properties)
     if (APR_SUCCESS != apr_temp_dir_get(&tmp, prop_pool)) {
         tmp = ".";
     }
-    properties.set_new("java.version", "1.5.0");
+    properties.set_new("java.version", JAVA_RUNTIME_VERSION);
     properties.set_new("java.vendor", "Apache Software Foundation");
     properties.set_new("java.vendor.url", "http://harmony.apache.org");
     properties.set_new("java.fullversion", VERSION);
