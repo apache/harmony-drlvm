@@ -50,14 +50,14 @@
                 <javac-elements/>
             </compile-java>
             <mkdir dir="${drlvm.bin.dir}"/>
-            <jar jarfile="${drlvm.bin.dir}/@{component}.jar" manifest="@{manifest}">
+            <hy.jar.bin jarfile="${drlvm.bin.dir}/@{component}.jar"
+                        manifest="@{manifest}">
                 <fileset dir="${drlvm.semi.dir}/@{component}/classes"/>
-                <metainf refid="hy.required.metainf-files"/>
-            </jar>
-            <jar jarfile="${drlvm.bin.dir}/@{component}-src.jar" manifest="@{manifest}">
+            </hy.jar.bin>
+            <hy.jar.src jarfile="${drlvm.bin.dir}/@{component}-src.jar"
+                        manifest="@{manifest}">
                 <fileset dir="@{src}" includes="**/*.java"/>
-                <metainf refid="hy.required.metainf-files"/>
-            </jar>
+            </hy.jar.src>
         </sequential>
     </macrodef>
 </project>
