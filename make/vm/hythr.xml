@@ -21,6 +21,11 @@
     <property name="component" value="hythr"/>
     <import file="common-vm.xml"/>
     
+    <condition property="hy.thr.ver" value="_0.1">
+        <equals arg1="${hy.no.thr}" arg2="false" />
+    </condition>
+    <property name="hy.thr.ver" value="" />
+
     <target name="build" depends="-common-vm">        
         <init-native/>
 
@@ -52,7 +57,7 @@
             <syslibset type="shared" libs="stdc++,pthread" if="is.freebsd"/>
             <linkerarg value="-Wl,-init" if="is.unix"/>
             <linkerarg value="-Wl,hythread_library_init" if="is.unix"/>
-            <linkerarg value="-Wl,--version-script,${vm.home}/thread/src/hythr.exp" if="is.unix"/>
+            <linkerarg value="-Wl,--version-script,${vm.home}/thread/src/hythr${hy.thr.ver}.exp" if="is.unix"/>
         </linker>
         </make-native>
     </target>
