@@ -21,7 +21,7 @@
 				Name="VCCLCompilerTool"
 				AdditionalOptions="/GZ"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\crash_handler\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\signals\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\crash_handler\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\signals\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\classlib\deploy\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_LIB;APR_DECLARE_EXPORT;BUILDING_VM;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -69,7 +69,7 @@
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\crash_handler\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\signals\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\windows_x86_msvc_debug\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\crash_handler\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\encoder\ia32_em64t&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\src\signals\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\classlib\deploy\include&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;PORT_EXPORTS;APR_DECLARE_EXPORT;BUILDING_VM;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;_WIN32_WINNT=0x0501"
 				RuntimeLibrary="2"
 				UsePrecompiledHeader="0"

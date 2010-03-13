@@ -20,7 +20,7 @@
 			<Tool
 				Name="VCCLCompilerTool"
 				Optimization="0"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\build\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\build\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\classlib\deploy\include&quot;"
 				PreprocessorDefinitions="WIN32;_DEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;_WIN32_WINNT=0x0501"
 				MinimalRebuild="TRUE"
 				BasicRuntimeChecks="3"
@@ -38,7 +38,7 @@
 				OutputFile="$(OutDir)/vmi.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib"
+				AdditionalLibraryDirectories="$(ProjectDir)\..\..\..\..\..\classlib\deploy\lib"
 				IgnoreAllDefaultLibraries="FALSE"
 				IgnoreDefaultLibraryNames="libcmtd.lib;msvcrt.lib"
 				GenerateDebugInformation="TRUE"
@@ -80,7 +80,7 @@ copy $(OutDir)\vmi.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationNa
 			CharacterSet="2">
 			<Tool
 				Name="VCCLCompilerTool"
-				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\build\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\include&quot;"
+				AdditionalIncludeDirectories="&quot;$(ProjectDir)\..\..\..\..\build\windows_x86_msvc_$(ConfigurationName)\deploy\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\port\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\include&quot;;&quot;$(ProjectDir)\..\..\..\..\vm\vmcore\src\util\win\include&quot;;&quot;$(ProjectDir)\..\..\..\..\..\classlib\deploy\include&quot;"
 				PreprocessorDefinitions="WIN32;NDEBUG;_WINDOWS;_USRDLL;REFS_USE_UNCOMPRESSED;VM_STATS;_IA32_;PLATFORM_NT;_WIN32_WINNT=0x0501"
 				RuntimeLibrary="0"
 				UsePrecompiledHeader="0"
@@ -96,7 +96,7 @@ copy $(OutDir)\vmi.lib $(ProjectDir)\..\..\..\windows_x86_msvc_$(ConfigurationNa
 				OutputFile="$(OutDir)/vmi.dll"
 				LinkIncremental="1"
 				SuppressStartupBanner="TRUE"
-				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\..\..\working_classlib\deploy\lib&quot;"
+				AdditionalLibraryDirectories="&quot;$(ProjectDir)\..\..\..\..\..\classlib\deploy\lib&quot;"
 				IgnoreDefaultLibraryNames="libcmtd.lib;msvcrt.lib"
 				GenerateDebugInformation="TRUE"
 				SubSystem="2"

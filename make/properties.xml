@@ -73,7 +73,7 @@
     <!-- Harmony Development Kit (HDK) supports modular development mode
          by providing all the header files and binaries required for building -->
     <!-- By default, external classlib build partially substitutes the HDK -->
-    <property name="external.dep.CLASSLIB.loc" value="${drlvm.base.dir}/../working_classlib" />
+    <property name="external.dep.CLASSLIB.loc" value="${drlvm.base.dir}/../classlib" />
     <property name="external.dep.CLASSLIB" location="${external.dep.CLASSLIB.loc}" />
     <condition property="import.hdk">
         <isset property="hy.hdk"/>
