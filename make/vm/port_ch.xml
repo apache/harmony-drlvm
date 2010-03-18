@@ -33,6 +33,7 @@
                 <include name="port/src/thread/include" />
                 <include name="port/src/crash_handler/include" />
                 <include name="port/src/encoder/ia32_em64t" unless="is.ia64"/>
+                <include name="port/src/modules/unix/include" if="is.unix"/>
             </dirset>
             <pathelement location="${drlvm.include.dir}"/>
             <pathelement location="${hy.hdk}/include" />
@@ -40,7 +41,9 @@
 
         <patternset id="ch.src.c">
             <include name="modules/*.c"/>
-            <include name="modules/linux/*.c" if="is.unix"/>
+            <include name="modules/unix/*.c" if="is.unix"/>
+            <include name="modules/unix/linux/*.c" if="is.unix" unless="is.freebsd"/>
+            <include name="modules/unix/freebsd/*.c" if="is.freebsd"/>
             <include name="modules/win/*.c" if="is.windows"/>
 
             <include name="thread/linux/thread_os.c" if="is.unix"/>

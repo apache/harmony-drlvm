@@ -14,9 +14,6 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
-/**
- * @author Petr Ivanov, Ilya Berezhniuk
- */
 
 #include <limits.h>
 #include <stdio.h>
@@ -26,6 +23,7 @@
 #include "open/types.h"
 #include "port_malloc.h"
 #include "port_modules.h"
+#include "port_modules_unix.h"
 
 
 typedef struct _raw_module raw_module;
@@ -124,8 +122,6 @@ native_module_t* native_fill_module(raw_module* rawModule, size_t count)
 
 Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
 {
-    char buf[PATH_MAX];
-    pid_t pid;
     FILE* file;
 
     POINTER_SIZE_INT start, end;
@@ -140,10 +136,7 @@ Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
     if (list_ptr == NULL || count_ptr == NULL)
         return FALSE;
 
-    pid = getpid();
-    sprintf(buf, "/proc/%d/maps", pid);
-
-    file = fopen(buf, "rt");
+    file = port_modules_procmap_open(getpid());
     if (!file)
         return FALSE;
 
@@ -154,10 +147,12 @@ Boolean port_get_all_modules(native_module_t** list_ptr, int* count_ptr)
     module.next = NULL;
     *list_ptr = NULL;
 
-    while (!feof(file) && (fgets(buf, sizeof(buf), file)))
+    while (!feof(file))
     {
-        int res = sscanf(buf, "%" PI_FMT "x-%" PI_FMT "x %c%*c%c%*c %*" PI_FMT "x %*02x:%*02x %*u %s",
-            &start, &end, &acc_r, &acc_x, filename);
+        int res = port_modules_procmap_readline(file, &start, &end, &acc_r, &acc_x, filename);
+
+        if (res < 0)
+            break;
 
         if (res < 4)
             continue;
