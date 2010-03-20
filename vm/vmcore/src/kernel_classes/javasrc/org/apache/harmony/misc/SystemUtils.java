@@ -14,41 +14,51 @@
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
  */
+
 package org.apache.harmony.misc;
 
 /**
  * Some system utils
- *
- * @author Alexey A. Petrenko
  */
 public class SystemUtils {
-	// Public constants
-	// OSes
-	public static final int OS_WINDOWS = 1;
-	public static final int OS_LINUX = 2;
-	public static final int OS_UNKNOWN = -1;
-	
-	// Architectures
-	public static final int ARC_IA32 = 1;
-	public static final int ARC_IA64 = 2;
-	public static final int ARC_UNKNOWN = -1;
-	
-	// Private fields
-	private static int os = 0;
-	
-	// Public interface
-	public static int getOS() {
-		if (os == 0) {			
-			String osname = System.getProperty("os.name").substring(0,3);
-			if (osname.compareToIgnoreCase("win") == 0) {
-				os = OS_WINDOWS;
-			} else {
-				if (osname.compareToIgnoreCase("lin") == 0) {
-					os = OS_LINUX;
-				} else
-					os = OS_UNKNOWN;
-			}
-		}
-		return os;
-	}
+    // Public constants
+    // OSes
+    public static final int OS_WINDOWS = 1;
+    public static final int OS_LINUX = 2;
+    public static final int OS_FREEBSD = 3;
+    public static final int OS_UNKNOWN = -1;
+
+    // Architectures
+    public static final int ARC_IA32 = 1;
+    public static final int ARC_IA64 = 2;
+    public static final int ARC_UNKNOWN = -1;
+
+    // Private fields
+    private static int os = 0;
+    private static int arc = 0;
+
+    /**
+     * getOS method returns on of the operating system codes:
+     * OS_WINDOWS, OS_LINUX, OS_FREEBSD or OS_UNKNOWN
+     * @return Operating system code
+     */
+    public static int getOS() {
+        if (os == 0) {
+            String osname = System.getProperty("os.name").substring(0,3); //$NON-NLS-1$
+            if (osname.compareToIgnoreCase("win") == 0) { //$NON-NLS-1$
+                os = OS_WINDOWS;
+            } else {
+                if (osname.compareToIgnoreCase("lin") == 0) { //$NON-NLS-1$
+                    os = OS_LINUX;
+                } else {
+                    if (osname.compareToIgnoreCase("fre") == 0) { //$NON-NLS-1$
+                        os = OS_FREEBSD;
+                    } else {
+                        os = OS_UNKNOWN;
+                    }
+                }
+            }
+        }
+        return os;
+    }
 }
